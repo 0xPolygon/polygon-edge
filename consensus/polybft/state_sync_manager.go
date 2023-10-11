@@ -10,20 +10,22 @@ import (
 	"sync"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	polybftProto "github.com/0xPolygon/polygon-edge/consensus/polybft/proto"
-	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
-	"github.com/0xPolygon/polygon-edge/contracts"
-	"github.com/0xPolygon/polygon-edge/tracker"
-	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/umbracle/ethgo"
 	bolt "go.etcd.io/bbolt"
 	"google.golang.org/protobuf/proto"
+
+	bls "github.com/0xPolygon/polygon-edge/bls"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	polybftProto "github.com/0xPolygon/polygon-edge/consensus/polybft/proto"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
+	"github.com/0xPolygon/polygon-edge/contracts"
+	"github.com/0xPolygon/polygon-edge/tracker"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 type Runtime interface {
@@ -228,20 +230,20 @@ func (s *stateSyncManager) saveVote(msg *TransportMessage) error {
 }
 
 // Verifies signature of the message against the public key of the signer and checks if the signer is a validator
-func (s *stateSyncManager) verifyVoteSignature(valSet validator.ValidatorSet, signer types.Address, signature []byte,
-	hash []byte) error {
-	validator := valSet.Accounts().GetValidatorMetadata(signer)
+func (s *stateSyncManager) verifyVoteSignature(valSet validator.ValidatorSet, signerAddr types.Address,
+	signature []byte, hash []byte) error {
+	validator := valSet.Accounts().GetValidatorMetadata(signerAddr)
 	if validator == nil {
-		return fmt.Errorf("unable to resolve validator %s", signer)
+		return fmt.Errorf("unable to resolve validator %s", signerAddr)
 	}
 
 	unmarshaledSignature, err := bls.UnmarshalSignature(signature)
 	if err != nil {
-		return fmt.Errorf("failed to unmarshal signature from signer %s, %w", signer.String(), err)
+		return fmt.Errorf("failed to unmarshal signature from signer %s, %w", signerAddr.String(), err)
 	}
 
-	if !unmarshaledSignature.Verify(validator.BlsKey, hash, bls.DomainStateReceiver) {
-		return fmt.Errorf("incorrect signature from %s", signer)
+	if !unmarshaledSignature.Verify(validator.BlsKey, hash, signer.DomainStateReceiver) {
+		return fmt.Errorf("incorrect signature from %s", signerAddr)
 	}
 
 	return nil
@@ -565,7 +567,7 @@ func (s *stateSyncManager) buildCommitment(dbTx *bolt.Tx) error {
 
 	hashBytes := hash.Bytes()
 
-	signature, err := s.config.key.SignWithDomain(hashBytes, bls.DomainStateReceiver)
+	signature, err := s.config.key.SignWithDomain(hashBytes, signer.DomainStateReceiver)
 	if err != nil {
 		return fmt.Errorf("failed to sign commitment message. Error: %w", err)
 	}

@@ -11,6 +11,7 @@ import (
 	"github.com/umbracle/ethgo/jsonrpc"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/merkle-tree"
@@ -19,8 +20,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
 
+	bls "github.com/0xPolygon/polygon-edge/bls"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
-	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
@@ -66,7 +67,7 @@ func TestCheckpointManager_SubmitCheckpoint(t *testing.T) {
 
 		validators.IterAcct(aliases, func(t *validator.TestValidator) {
 			bitmap.Set(idx)
-			signatures = append(signatures, t.MustSign(dummyMsg, bls.DomainCheckpointManager))
+			signatures = append(signatures, t.MustSign(dummyMsg, signer.DomainCheckpointManager))
 			idx++
 		})
 
@@ -170,7 +171,7 @@ func TestCheckpointManager_abiEncodeCheckpointBlock(t *testing.T) {
 	var signatures bls.Signatures
 
 	currentValidators.IterAcct(nil, func(v *validator.TestValidator) {
-		signatures = append(signatures, v.MustSign(proposalHash, bls.DomainCheckpointManager))
+		signatures = append(signatures, v.MustSign(proposalHash, signer.DomainCheckpointManager))
 		bmp.Set(i)
 		i++
 	})

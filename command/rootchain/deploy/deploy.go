@@ -18,7 +18,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
-	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
@@ -125,7 +125,7 @@ var (
 				NewMatic:             types.StringToAddress(params.stakeTokenAddr),
 				NewChildValidatorSet: contracts.ValidatorSetContract,
 				NewExitHelper:        config.ExitHelperAddress,
-				NewDomain:            bls.DomainValidatorSetString,
+				NewDomain:            signer.DomainValidatorSetString,
 			}
 
 			return initContract(fmt, relayer, initParams,
