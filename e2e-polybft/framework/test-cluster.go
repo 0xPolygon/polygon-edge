@@ -131,8 +131,7 @@ type TestClusterConfig struct {
 	IsPropertyTest  bool
 	TestRewardToken string
 
-	RootTrackerPollInterval    time.Duration
-	RelayerTrackerPollInterval time.Duration
+	RootTrackerPollInterval time.Duration
 
 	ProxyContractsAdmin string
 
@@ -393,12 +392,6 @@ func WithRootTrackerPollInterval(pollInterval time.Duration) ClusterOption {
 	}
 }
 
-func WithRelayerTrackerPollInterval(pollInterval time.Duration) ClusterOption {
-	return func(h *TestClusterConfig) {
-		h.RelayerTrackerPollInterval = pollInterval
-	}
-}
-
 func WithProxyContractsAdmin(address string) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.ProxyContractsAdmin = address
@@ -504,11 +497,6 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		if cluster.Config.BlockTime != 0 {
 			args = append(args, "--block-time",
 				cluster.Config.BlockTime.String())
-		}
-
-		if cluster.Config.RelayerTrackerPollInterval != 0 {
-			args = append(args, "--block-tracker-poll-interval",
-				cluster.Config.RelayerTrackerPollInterval.String())
 		}
 
 		if cluster.Config.TestRewardToken != "" {
@@ -695,7 +683,6 @@ func (c *TestCluster) InitTestServer(t *testing.T,
 		config.Relayer = nodeType.IsSet(Relayer)
 		config.NumBlockConfirmations = c.Config.NumBlockConfirmations
 		config.BridgeJSONRPC = bridgeJSONRPC
-		config.RelayerTrackerPollInterval = c.Config.RelayerTrackerPollInterval
 	})
 
 	// watch the server for stop signals. It is important to fix the specific
