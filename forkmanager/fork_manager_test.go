@@ -54,6 +54,17 @@ func TestForkManager(t *testing.T) {
 	assert.Equal(t, 2, handlersACnt)
 	assert.Equal(t, 3, handlersBCnt)
 
+	// double deactivate should be same as single deactivate
+	assert.NoError(t, forkManager.DeactivateFork(ForkA))
+	assert.NoError(t, forkManager.DeactivateFork(ForkA))
+	assert.Equal(t, 1, len(forkManager.handlersMap[HandlerA]))
+	assert.Equal(t, 2, len(forkManager.handlersMap[HandlerB]))
+
+	// activate fork again
+	assert.NoError(t, forkManager.ActivateFork(ForkA, 0))
+	assert.Equal(t, handlersACnt, len(forkManager.handlersMap[HandlerA]))
+	assert.Equal(t, handlersBCnt, len(forkManager.handlersMap[HandlerB]))
+
 	t.Run("activate not registered fork", func(t *testing.T) {
 		t.Parallel()
 
@@ -68,6 +79,12 @@ func TestForkManager(t *testing.T) {
 		// count not changed
 		assert.Equal(t, handlersACnt, len(forkManager.handlersMap[HandlerA]))
 		assert.Equal(t, handlersBCnt, len(forkManager.handlersMap[HandlerB]))
+	})
+
+	t.Run("deactivate not registered fork", func(t *testing.T) {
+		t.Parallel()
+
+		assert.Error(t, forkManager.DeactivateFork(ForkE))
 	})
 
 	t.Run("is fork enabled", func(t *testing.T) {
@@ -273,4 +290,65 @@ func TestForkManager_HandlerReplacement(t *testing.T) {
 		assert.Equal(t, "AEH", execute(HandlerA, i))
 		assert.Equal(t, "ADH", execute(HandlerA, i+10))
 	}
+}
+
+func TestForkManager_HandlerPrecedence(t *testing.T) {
+	t.Parallel()
+
+	forkManager := &forkManager{
+		forkMap:     map[string]*Fork{},
+		handlersMap: map[HandlerDesc][]forkHandler{},
+	}
+
+	execute := func(name HandlerDesc, block uint64) string {
+		//nolint:forcetypeassert
+		return forkManager.GetHandler(name, block).(func() string)()
+	}
+
+	forkManager.RegisterFork(ForkA, nil)
+	forkManager.RegisterFork(ForkB, nil)
+	forkManager.RegisterFork(ForkC, nil)
+	forkManager.RegisterFork(ForkD, nil)
+	forkManager.RegisterFork(ForkE, nil)
+
+	assert.NoError(t, forkManager.RegisterHandler(ForkA, HandlerA, func() string { return "A" }))
+	assert.NoError(t, forkManager.RegisterHandler(ForkB, HandlerA, func() string { return "B" }))
+	assert.NoError(t, forkManager.RegisterHandler(ForkC, HandlerA, func() string { return "C" }))
+	assert.NoError(t, forkManager.RegisterHandler(ForkD, HandlerA, func() string { return "D" }))
+	assert.NoError(t, forkManager.RegisterHandler(ForkE, HandlerA, func() string { return "E" }))
+
+	assert.NoError(t, forkManager.ActivateFork(ForkE, 10))
+	assert.NoError(t, forkManager.ActivateFork(ForkC, 2))
+	assert.NoError(t, forkManager.ActivateFork(ForkA, 2))
+	assert.NoError(t, forkManager.ActivateFork(ForkB, 2))
+	assert.NoError(t, forkManager.ActivateFork(ForkD, 2))
+
+	assert.Equal(t, "D", execute(HandlerA, 2))
+	assert.NoError(t, forkManager.DeactivateFork(ForkD))
+	assert.Equal(t, "C", execute(HandlerA, 2))
+	assert.NoError(t, forkManager.DeactivateFork(ForkC))
+	assert.Equal(t, "B", execute(HandlerA, 2))
+	assert.NoError(t, forkManager.DeactivateFork(ForkB))
+	assert.Equal(t, "A", execute(HandlerA, 3))
+	assert.NoError(t, forkManager.DeactivateFork(ForkA))
+	assert.Nil(t, forkManager.GetHandler(HandlerA, 0))
+	assert.Equal(t, "E", execute(HandlerA, 11))
+
+	assert.NoError(t, forkManager.ActivateFork(ForkA, 0))
+	assert.NoError(t, forkManager.ActivateFork(ForkB, 0))
+	assert.NoError(t, forkManager.ActivateFork(ForkC, 0))
+
+	assert.Equal(t, "C", execute(HandlerA, 2))
+	assert.NoError(t, forkManager.DeactivateFork(ForkC))
+	assert.Equal(t, "B", execute(HandlerA, 1))
+	assert.NoError(t, forkManager.DeactivateFork(ForkB))
+	assert.Equal(t, "A", execute(HandlerA, 0))
+	assert.NoError(t, forkManager.DeactivateFork(ForkA))
+
+	assert.NoError(t, forkManager.ActivateFork(ForkB, 0))
+	assert.NoError(t, forkManager.ActivateFork(ForkC, 0))
+	assert.Equal(t, "C", execute(HandlerA, 0))
+	assert.NoError(t, forkManager.DeactivateFork(ForkC))
+	assert.Equal(t, "B", execute(HandlerA, 0))
+	assert.NoError(t, forkManager.DeactivateFork(ForkB))
 }

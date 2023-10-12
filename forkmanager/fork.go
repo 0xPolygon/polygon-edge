@@ -4,22 +4,29 @@ import "github.com/0xPolygon/polygon-edge/helper/common"
 
 const InitialFork = "initialfork"
 
-// HandlerDesc gives description for the handler
-// eq: "extra", "proposer_calculator", etc
+// HandlerDesc gives description for the handler eq: "extra", "proposer_calculator", etc
 type HandlerDesc string
+
+// HandlerContainer keeps id of a handler and actual handler
+type HandlerContainer struct {
+	// ID represents an auto-incremented identifier for a handler
+	ID uint
+	// Handler represents an actual event handler
+	Handler interface{}
+}
 
 // Fork structure defines one fork
 type Fork struct {
-	// name of the fork
+	// Name is name of the fork
 	Name string
-	// after the fork is activated, `FromBlockNumber` shows from which block is enabled
+	// FromBlockNumber indicates the block from which fork becomes enabled
 	FromBlockNumber uint64
-	// fork consensus parameters
+	// Params are fork consensus parameters
 	Params *ForkParams
-	// this value is false if fork is registered but not activated
+	// IsActive is false if fork is registered but not activated
 	IsActive bool
-	// map of all handlers registered for this fork
-	Handlers map[HandlerDesc]interface{}
+	// Handlers is a map of all handlers registered for this fork
+	Handlers map[HandlerDesc]HandlerContainer
 }
 
 // ForkParams hard-coded fork params
@@ -59,16 +66,18 @@ func (fp *ForkParams) Copy() *ForkParams {
 
 // forkHandler defines one custom handler
 type forkHandler struct {
-	// Handler should be active from block `FromBlockNumber``
-	FromBlockNumber uint64
-	// instance of some structure, function etc
-	Handler interface{}
+	// id - if two handlers start from the same block number, the one with the greater ID should take precedence.
+	id uint
+	// fromBlockNumber defines block number after handler should be active
+	fromBlockNumber uint64
+	// handler represents an actual event handler - instance of some structure, function etc
+	handler interface{}
 }
 
 // forkParamsBlock encapsulates block and actual fork params
 type forkParamsBlock struct {
-	// Params should be active from block `FromBlockNumber``
-	FromBlockNumber uint64
-	// pointer to fork params
-	Params *ForkParams
+	// fromBlockNumber defines block number after params should be active
+	fromBlockNumber uint64
+	// params is a pointer to fork params
+	params *ForkParams
 }
