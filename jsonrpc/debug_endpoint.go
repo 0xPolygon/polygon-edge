@@ -77,11 +77,12 @@ func NewDebug(store debugStore, requestsPerSecond uint64) *Debug {
 }
 
 type TraceConfig struct {
-	EnableMemory     bool    `json:"enableMemory"`
-	DisableStack     bool    `json:"disableStack"`
-	DisableStorage   bool    `json:"disableStorage"`
-	EnableReturnData bool    `json:"enableReturnData"`
-	Timeout          *string `json:"timeout"`
+	EnableMemory      bool    `json:"enableMemory"`
+	DisableStack      bool    `json:"disableStack"`
+	DisableStorage    bool    `json:"disableStorage"`
+	EnableReturnData  bool    `json:"enableReturnData"`
+	DisableStructLogs bool    `json:"disableStructLogs"`
+	Timeout           *string `json:"timeout"`
 }
 
 func (d *Debug) TraceBlockByNumber(
@@ -248,10 +249,11 @@ func newTracer(config *TraceConfig) (
 	}
 
 	tracer := structtracer.NewStructTracer(structtracer.Config{
-		EnableMemory:     config.EnableMemory,
-		EnableStack:      !config.DisableStack,
-		EnableStorage:    !config.DisableStorage,
+		EnableMemory:     config.EnableMemory && !config.DisableStructLogs,
+		EnableStack:      !config.DisableStack && !config.DisableStructLogs,
+		EnableStorage:    !config.DisableStorage && !config.DisableStructLogs,
 		EnableReturnData: config.EnableReturnData,
+		EnableStructLogs: !config.DisableStructLogs,
 	})
 
 	timeoutCtx, cancel := context.WithTimeout(context.Background(), timeout)

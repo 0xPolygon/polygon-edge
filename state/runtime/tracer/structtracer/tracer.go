@@ -18,6 +18,7 @@ type Config struct {
 	EnableStack      bool // enable stack capture
 	EnableStorage    bool // enable storage capture
 	EnableReturnData bool // enable return data capture
+	EnableStructLogs bool // enable struct logs capture
 }
 
 type StructLog struct {
@@ -305,22 +306,24 @@ func (t *StructTracer) ExecuteState(
 		errStr = err.Error()
 	}
 
-	t.logs = append(
-		t.logs,
-		StructLog{
-			Pc:            ip,
-			Op:            opCode,
-			Gas:           availableGas,
-			GasCost:       cost,
-			Memory:        memory,
-			Stack:         stack,
-			ReturnData:    returnData,
-			Storage:       storage,
-			Depth:         depth,
-			RefundCounter: host.GetRefund(),
-			Error:         errStr,
-		},
-	)
+	if t.Config.EnableStructLogs {
+		t.logs = append(
+			t.logs,
+			StructLog{
+				Pc:            ip,
+				Op:            opCode,
+				Gas:           availableGas,
+				GasCost:       cost,
+				Memory:        memory,
+				Stack:         stack,
+				ReturnData:    returnData,
+				Storage:       storage,
+				Depth:         depth,
+				RefundCounter: host.GetRefund(),
+				Error:         errStr,
+			},
+		)
+	}
 }
 
 type StructTraceResult struct {

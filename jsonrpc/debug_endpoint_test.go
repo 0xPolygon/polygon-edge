@@ -6,10 +6,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state/runtime/tracer"
+	"github.com/0xPolygon/polygon-edge/state/runtime/tracer/structtracer"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/stretchr/testify/assert"
 )
 
 type debugEndpointMockStore struct {
@@ -152,6 +155,20 @@ func TestDebugTraceConfigDecode(t *testing.T) {
 				DisableStorage:   true,
 				EnableReturnData: true,
 				Timeout:          &timeout15s,
+			},
+		},
+		{
+			input: `{
+				"disableStack": true,
+				"disableStorage": true,
+				"enableReturnData": true,
+				"disableStructLogs": true
+			}`,
+			expected: TraceConfig{
+				DisableStack:      true,
+				DisableStorage:    true,
+				EnableReturnData:  true,
+				DisableStructLogs: true,
 			},
 		},
 	}
@@ -786,5 +803,34 @@ func Test_newTracer(t *testing.T) {
 
 		assert.NotNil(t, res)
 		assert.NoError(t, err)
+	})
+
+	t.Run("should disable everything if struct logs are disabled", func(t *testing.T) {
+		t.Parallel()
+
+		tracer, cancel, err := newTracer(&TraceConfig{
+			EnableMemory:      true,
+			EnableReturnData:  true,
+			DisableStack:      false,
+			DisableStorage:    false,
+			DisableStructLogs: true,
+		})
+
+		t.Cleanup(func() {
+			cancel()
+		})
+
+		assert.NoError(t, err)
+
+		st, ok := tracer.(*structtracer.StructTracer)
+		require.True(t, ok)
+
+		assert.Equal(t, structtracer.Config{
+			EnableMemory:     false,
+			EnableStack:      false,
+			EnableStorage:    false,
+			EnableReturnData: true,
+			EnableStructLogs: false,
+		}, st.Config)
 	})
 }
