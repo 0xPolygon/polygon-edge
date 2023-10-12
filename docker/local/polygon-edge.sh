@@ -21,7 +21,6 @@ createGenesisConfig() {
   local secrets="$2"
   shift 2
   echo "Generating $consensus_type Genesis file..."
-  echo $secrets
 
   "$POLYGON_EDGE_BIN" genesis $CHAIN_CUSTOM_OPTIONS \
     --dir /data/genesis.json \
@@ -65,6 +64,7 @@ case "$1" in
               --reward-wallet 0xDEADBEEF:1000000 \
               --native-token-config "Polygon:MATIC:18:true:$(echo "$secrets" | jq -r '.[0] | .address')" \
               --proxy-contracts-admin ${proxyContractsAdmin}
+
               echo "Deploying stake manager..."
               "$POLYGON_EDGE_BIN" polybft stake-manager-deploy \
                 --jsonrpc http://rootchain:8545 \
