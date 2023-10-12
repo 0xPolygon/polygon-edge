@@ -19,7 +19,7 @@ const (
 	defaultGasPrice            = 1879048192 // 0x70000000
 	DefaultGasLimit            = 5242880    // 0x500000
 	DefaultRPCAddress          = "http://127.0.0.1:8545"
-	numRetries                 = 1000
+	defaultNumRetries          = 1000
 	gasLimitIncreasePercentage = 100
 	feeIncreasePercentage      = 100
 )
@@ -46,6 +46,7 @@ type TxRelayerImpl struct {
 	ipAddress      string
 	client         *jsonrpc.Client
 	receiptTimeout time.Duration
+	numRetries     int
 
 	lock sync.Mutex
 
@@ -56,6 +57,7 @@ func NewTxRelayer(opts ...TxRelayerOption) (TxRelayer, error) {
 	t := &TxRelayerImpl{
 		ipAddress:      DefaultRPCAddress,
 		receiptTimeout: 50 * time.Millisecond,
+		numRetries:     defaultNumRetries,
 	}
 	for _, opt := range opts {
 		opt(t)
@@ -242,9 +244,12 @@ func (t *TxRelayerImpl) sendTransactionLocalLocked(txn *ethgo.Transaction) (ethg
 }
 
 func (t *TxRelayerImpl) waitForReceipt(hash ethgo.Hash) (*ethgo.Receipt, error) {
-	count := uint(0)
+	// A negative numRetries means we don't want to receive the receipt after SendTransaction/SendTransactionLocal calls
+	if t.numRetries < 0 {
+		return nil, nil
+	}
 
-	for {
+	for count := 0; count < t.numRetries; count++ {
 		receipt, err := t.client.Eth().GetTransactionReceipt(hash)
 		if err != nil {
 			if err.Error() != "not found" {
@@ -256,13 +261,10 @@ func (t *TxRelayerImpl) waitForReceipt(hash ethgo.Hash) (*ethgo.Receipt, error) 
 			return receipt, nil
 		}
 
-		if count > numRetries {
-			return nil, fmt.Errorf("timeout while waiting for transaction %s to be processed", hash)
-		}
-
 		time.Sleep(t.receiptTimeout)
-		count++
 	}
+
+	return nil, fmt.Errorf("timeout while waiting for transaction %s to be processed", hash)
 }
 
 // ConvertTxnToCallMsg converts txn instance to call message
@@ -300,5 +302,14 @@ func WithReceiptTimeout(receiptTimeout time.Duration) TxRelayerOption {
 func WithWriter(writer io.Writer) TxRelayerOption {
 	return func(t *TxRelayerImpl) {
 		t.writer = writer
+	}
+}
+
+// WithNumRetries sets the maximum number of eth_getTransactionReceipt retries
+// before considering the transaction sending as timed out. Set to -1 to disable
+// waitForReceipt and not wait for the transaction receipt
+func WithNumRetries(numRetries int) TxRelayerOption {
+	return func(t *TxRelayerImpl) {
+		t.numRetries = numRetries
 	}
 }
