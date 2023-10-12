@@ -19,7 +19,7 @@ type forkManager struct {
 	handlersMap map[HandlerDesc][]forkHandler
 	params      []forkParamsBlock
 
-	handlerIdCnt uint
+	handlerIDCnt uint
 }
 
 // GeInstance returns fork manager singleton instance. Thread safe
@@ -67,10 +67,10 @@ func (fm *forkManager) RegisterHandler(forkName string, handlerName HandlerDesc,
 		return fmt.Errorf("fork does not exist: %s", forkName)
 	}
 
-	fm.handlerIdCnt++
+	fm.handlerIDCnt++
 
 	fork.Handlers[handlerName] = HandlerContainer{
-		ID:      fm.handlerIdCnt,
+		ID:      fm.handlerIDCnt,
 		Handler: handler,
 	}
 
