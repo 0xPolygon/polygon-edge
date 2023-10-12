@@ -15,6 +15,23 @@ CHAIN_CUSTOM_OPTIONS=$(tr "\n" " " << EOL
 EOL
 )
 
+# createGenesisConfig creates genesis configuration
+createGenesisConfig() {
+  local consensus_type="$1"
+  local secrets="$2"
+  shift 2
+  echo "Generating $consensus_type Genesis file..."
+
+  "$POLYGON_EDGE_BIN" genesis $CHAIN_CUSTOM_OPTIONS \
+    --dir /data/genesis.json \
+    --consensus $consensus_type \
+    --bootnode "/dns4/node-1/tcp/1478/p2p/$(echo "$secrets" | jq -r '.[0] | .node_id')" \
+    --bootnode "/dns4/node-2/tcp/1478/p2p/$(echo "$secrets" | jq -r '.[1] | .node_id')" \
+    --bootnode "/dns4/node-3/tcp/1478/p2p/$(echo "$secrets" | jq -r '.[2] | .node_id')" \
+    --bootnode "/dns4/node-4/tcp/1478/p2p/$(echo "$secrets" | jq -r '.[3] | .node_id')" \
+    "$@"
+}
+
 case "$1" in
    "init")
       case "$2" in 
@@ -28,15 +45,8 @@ case "$1" in
 
                   rm -f /data/genesis.json
 
-                  echo "Generating IBFT Genesis file..."
-                  "$POLYGON_EDGE_BIN" genesis $CHAIN_CUSTOM_OPTIONS \
-                    --dir /data/genesis.json \
-                    --consensus ibft \
-                    --ibft-validators-prefix-path data- \
-                    --bootnode "/dns4/node-1/tcp/1478/p2p/$(echo "$secrets" | jq -r '.[0] | .node_id')" \
-                    --bootnode "/dns4/node-2/tcp/1478/p2p/$(echo "$secrets" | jq -r '.[1] | .node_id')" \
-                    --bootnode "/dns4/node-3/tcp/1478/p2p/$(echo "$secrets" | jq -r '.[2] | .node_id')" \
-                    --bootnode "/dns4/node-4/tcp/1478/p2p/$(echo "$secrets" | jq -r '.[3] | .node_id')"
+                  createGenesisConfig "$2" "$secrets" \
+                  --ibft-validators-prefix-path data-
               fi
               ;;
           "polybft")
@@ -48,19 +58,12 @@ case "$1" in
 
               proxyContractsAdmin=0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed
 
-              echo "Generating PolyBFT genesis file..."
-              "$POLYGON_EDGE_BIN" genesis $CHAIN_CUSTOM_OPTIONS \
-                --dir /data/genesis.json \
-                --consensus polybft \
-                --validators-path /data \
-                --validators-prefix data- \
-                --reward-wallet 0xDEADBEEF:1000000 \
-                --native-token-config "Polygon:MATIC:18:true:$(echo "$secrets" | jq -r '.[0] | .address')" \
-                --proxy-contracts-admin ${proxyContractsAdmin} \
-                --bootnode "/dns4/node-1/tcp/1478/p2p/$(echo "$secrets" | jq -r '.[0] | .node_id')" \
-                --bootnode "/dns4/node-2/tcp/1478/p2p/$(echo "$secrets" | jq -r '.[1] | .node_id')" \
-                --bootnode "/dns4/node-3/tcp/1478/p2p/$(echo "$secrets" | jq -r '.[2] | .node_id')" \
-                --bootnode "/dns4/node-4/tcp/1478/p2p/$(echo "$secrets" | jq -r '.[3] | .node_id')"
+            createGenesisConfig "$2" "$secrets" \
+              --validators-path /data \
+              --validators-prefix data- \
+              --reward-wallet 0xDEADBEEF:1000000 \
+              --native-token-config "Polygon:MATIC:18:true:$(echo "$secrets" | jq -r '.[0] | .address')" \
+              --proxy-contracts-admin ${proxyContractsAdmin}
 
               echo "Deploying stake manager..."
               "$POLYGON_EDGE_BIN" polybft stake-manager-deploy \
@@ -128,6 +131,23 @@ case "$1" in
               ;;
       esac
       ;;
+  "start-node-1")
+    relayer_flag=""
+    # Start relayer only when run in polybft
+    if [ "$2" == "polybft" ]; then
+      echo "Starting relayer..."
+      relayer_flag="--relayer"
+    fi
+
+    "$POLYGON_EDGE_BIN" server \
+      --data-dir /data/data-1 \
+      --chain /data/genesis.json \
+      --grpc-address 0.0.0.0:9632 \
+      --libp2p 0.0.0.0:1478 \
+      --jsonrpc 0.0.0.0:8545 \
+      --prometheus 0.0.0.0:5001 \
+      $relayer_flag
+   ;;
    *)
       echo "Executing polygon-edge..."
       exec "$POLYGON_EDGE_BIN" "$@"

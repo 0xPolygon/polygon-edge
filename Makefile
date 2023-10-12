@@ -39,7 +39,7 @@ protoc: check-protoc
 .PHONY: build
 build: check-go check-git
 	$(eval COMMIT_HASH = $(shell git rev-parse HEAD))
-	$(eval VERSION = $(shell git tag --points-at $COMMIT_HASH))
+	$(eval VERSION = $(shell git tag --points-at ${COMMIT_HASH}))
 	$(eval BRANCH = $(shell git rev-parse --abbrev-ref HEAD | tr -d '\040\011\012\015\n'))
 	$(eval TIME = $(shell date))
 	go build -o polygon-edge -ldflags="\
