@@ -35,87 +35,117 @@ func TestCheckpointManager_SubmitCheckpoint(t *testing.T) {
 		epochSize   = 2
 	)
 
-	var aliases = []string{"A", "B", "C", "D", "E"}
+	t.Run("submit checkpoint happy path", func(t *testing.T) {
+		t.Parallel()
 
-	validators := validator.NewTestValidatorsWithAliases(t, aliases)
-	validatorsMetadata := validators.GetPublicIdentities()
-	txRelayerMock := newDummyTxRelayer(t)
-	txRelayerMock.On("Call", mock.Anything, mock.Anything, mock.Anything).
-		Return("2", error(nil)).
-		Once()
-	txRelayerMock.On("SendTransaction", mock.Anything, mock.Anything).
-		Return(&ethgo.Receipt{Status: uint64(types.ReceiptSuccess)}, error(nil)).
-		Times(4) // send transactions for checkpoint blocks: 4, 6, 8 (pending checkpoint blocks) and 10 (latest checkpoint block)
+		var aliases = []string{"A", "B", "C", "D", "E"}
 
-	backendMock := new(polybftBackendMock)
-	backendMock.On("GetValidators", mock.Anything, mock.Anything).Return(validatorsMetadata)
+		validators := validator.NewTestValidatorsWithAliases(t, aliases)
+		validatorsMetadata := validators.GetPublicIdentities()
 
-	var (
-		headersMap  = &testHeadersMap{}
-		epochNumber = uint64(1)
-		dummyMsg    = []byte("checkpoint")
-		idx         = uint64(0)
-		header      *types.Header
-		bitmap      bitmap.Bitmap
-		signatures  bls.Signatures
-	)
+		txRelayerMock := newDummyTxRelayer(t)
+		txRelayerMock.On("Call", mock.Anything, mock.Anything, mock.Anything).
+			Return("2", error(nil)).
+			Once()
+		txRelayerMock.On("SendTransaction", mock.Anything, mock.Anything).
+			Return(&ethgo.Receipt{Status: uint64(types.ReceiptSuccess)}, error(nil)).
+			Times(4) // send transactions for checkpoint blocks: 4, 6, 8 (pending checkpoint blocks) and 10 (latest checkpoint block)
 
-	validators.IterAcct(aliases, func(t *validator.TestValidator) {
-		bitmap.Set(idx)
-		signatures = append(signatures, t.MustSign(dummyMsg, bls.DomainCheckpointManager))
-		idx++
-	})
+		backendMock := new(polybftBackendMock)
+		backendMock.On("GetValidators", mock.Anything, mock.Anything).Return(validatorsMetadata)
 
-	signature, err := signatures.Aggregate().Marshal()
-	require.NoError(t, err)
+		var (
+			headersMap  = &testHeadersMap{}
+			epochNumber = uint64(1)
+			dummyMsg    = []byte("checkpoint")
+			idx         = uint64(0)
+			header      *types.Header
+			bitmap      bitmap.Bitmap
+			signatures  bls.Signatures
+		)
 
-	for i := uint64(1); i <= blocksCount; i++ {
-		if i%epochSize == 1 {
-			// epoch-beginning block
-			checkpoint := &CheckpointData{
-				BlockRound:  0,
-				EpochNumber: epochNumber,
-				EventRoot:   types.BytesToHash(generateRandomBytes(t)),
+		validators.IterAcct(aliases, func(t *validator.TestValidator) {
+			bitmap.Set(idx)
+			signatures = append(signatures, t.MustSign(dummyMsg, bls.DomainCheckpointManager))
+			idx++
+		})
+
+		signature, err := signatures.Aggregate().Marshal()
+		require.NoError(t, err)
+
+		for i := uint64(1); i <= blocksCount; i++ {
+			if i%epochSize == 1 {
+				// epoch-beginning block
+				checkpoint := &CheckpointData{
+					BlockRound:  0,
+					EpochNumber: epochNumber,
+					EventRoot:   types.BytesToHash(generateRandomBytes(t)),
+				}
+				extra := createTestExtraObject(validatorsMetadata, validatorsMetadata, 3, 3, 3)
+				extra.Checkpoint = checkpoint
+				extra.Committed = &Signature{Bitmap: bitmap, AggregatedSignature: signature}
+				header = &types.Header{
+					ExtraData: extra.MarshalRLPTo(nil),
+				}
+				epochNumber++
+			} else {
+				header = header.Copy()
 			}
-			extra := createTestExtraObject(validatorsMetadata, validatorsMetadata, 3, 3, 3)
-			extra.Checkpoint = checkpoint
-			extra.Committed = &Signature{Bitmap: bitmap, AggregatedSignature: signature}
-			header = &types.Header{
-				ExtraData: extra.MarshalRLPTo(nil),
-			}
-			epochNumber++
-		} else {
-			header = header.Copy()
+
+			header.Number = i
+			header.ComputeHash()
+			headersMap.addHeader(header)
 		}
 
-		header.Number = i
-		header.ComputeHash()
-		headersMap.addHeader(header)
-	}
+		// mock blockchain
+		blockchainMock := new(blockchainMock)
+		blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(headersMap.getHeader)
 
-	// mock blockchain
-	blockchainMock := new(blockchainMock)
-	blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(headersMap.getHeader)
+		validatorAcc := validators.GetValidator("A")
+		c := &checkpointManager{
+			key:              wallet.NewEcdsaSigner(validatorAcc.Key()),
+			rootChainRelayer: txRelayerMock,
+			consensusBackend: backendMock,
+			blockchain:       blockchainMock,
+			logger:           hclog.NewNullLogger(),
+		}
 
-	validatorAcc := validators.GetValidator("A")
-	c := &checkpointManager{
-		key:              wallet.NewEcdsaSigner(validatorAcc.Key()),
-		rootChainRelayer: txRelayerMock,
-		consensusBackend: backendMock,
-		blockchain:       blockchainMock,
-		logger:           hclog.NewNullLogger(),
-	}
+		err = c.submitCheckpoint(headersMap.getHeader(blocksCount), false)
+		require.NoError(t, err)
+		txRelayerMock.AssertExpectations(t)
 
-	err = c.submitCheckpoint(headersMap.getHeader(blocksCount), false)
-	require.NoError(t, err)
-	txRelayerMock.AssertExpectations(t)
+		// make sure that expected blocks are checkpointed (epoch-ending ones)
+		for _, checkpointBlock := range txRelayerMock.checkpointBlocks {
+			header := headersMap.getHeader(checkpointBlock)
+			require.NotNil(t, header)
+			require.True(t, isEndOfPeriod(header.Number, epochSize))
+		}
+	})
 
-	// make sure that expected blocks are checkpointed (epoch-ending ones)
-	for _, checkpointBlock := range txRelayerMock.checkpointBlocks {
-		header := headersMap.getHeader(checkpointBlock)
-		require.NotNil(t, header)
-		require.True(t, isEndOfPeriod(header.Number, epochSize))
-	}
+	t.Run("checkpoint not submitted when node is syncing", func(t *testing.T) {
+		t.Parallel()
+
+		var aliases = []string{"A"}
+
+		validators := validator.NewTestValidatorsWithAliases(t, aliases)
+
+		txRelayerMock := newDummyTxRelayer(t)
+		txRelayerMock.On("Call", mock.Anything, mock.Anything, mock.Anything).
+			Return("20", error(nil)).
+			Once()
+
+		c := &checkpointManager{
+			key:              wallet.NewEcdsaSigner(validators.GetValidator("A").Key()),
+			rootChainRelayer: txRelayerMock,
+			logger:           hclog.NewNullLogger(),
+		}
+
+		err := c.submitCheckpoint(&types.Header{Number: 19 /*lower than what Call returns*/}, false)
+		require.NoError(t, err)
+		// since transaction will not be sent to CheckpointManager, we only expect that Call
+		// will called on tx relayer, and nothing else in submitCheckpoint will be executed
+		txRelayerMock.AssertExpectations(t)
+	})
 }
 
 func TestCheckpointManager_abiEncodeCheckpointBlock(t *testing.T) {

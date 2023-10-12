@@ -126,6 +126,12 @@ func (c *checkpointManager) submitCheckpoint(latestHeader *types.Header, isEndOf
 		return err
 	}
 
+	if lastCheckpointBlockNumber > latestHeader.Number {
+		// node is out of sync (haven't reached the tip of the chain), so even though it is a proposer,
+		// it would checkpoint block that is already checkpointed and transaction would fail anyway
+		return nil
+	}
+
 	c.logger.Debug("submitCheckpoint invoked...",
 		"latest checkpoint block", lastCheckpointBlockNumber,
 		"checkpoint block", latestHeader.Number)
