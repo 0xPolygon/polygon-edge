@@ -127,12 +127,8 @@ func (c *checkpointManager) submitCheckpoint(latestHeader *types.Header, isEndOf
 	}
 
 	if lastCheckpointBlockNumber > latestHeader.Number {
-		// this node is syncing after its data was cleaned up
-		// what happened is that, node was the proposer on this block,
-		// and it already sent this checkpoint, but since its data got cleaned
-		// it started syncing from scratch, even its own minted blocks
-		// so there is no need to send a checkpoint, since it is already sent
-		// CheckpointManager will fail the transaction, so no need to spend tokens on it
+		// node is out of sync (haven't reached the tip of the chain), so even though it is a proposer,
+		// it would checkpoint block that is already checkpointed and transaction would fail anyway
 		return nil
 	}
 

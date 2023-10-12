@@ -35,13 +35,13 @@ func TestCheckpointManager_SubmitCheckpoint(t *testing.T) {
 		epochSize   = 2
 	)
 
-	var aliases = []string{"A", "B", "C", "D", "E"}
-
-	validators := validator.NewTestValidatorsWithAliases(t, aliases)
-	validatorsMetadata := validators.GetPublicIdentities()
-
 	t.Run("submit checkpoint happy path", func(t *testing.T) {
 		t.Parallel()
+
+		var aliases = []string{"A", "B", "C", "D", "E"}
+
+		validators := validator.NewTestValidatorsWithAliases(t, aliases)
+		validatorsMetadata := validators.GetPublicIdentities()
 
 		txRelayerMock := newDummyTxRelayer(t)
 		txRelayerMock.On("Call", mock.Anything, mock.Anything, mock.Anything).
@@ -124,6 +124,10 @@ func TestCheckpointManager_SubmitCheckpoint(t *testing.T) {
 
 	t.Run("checkpoint not submitted when node is syncing", func(t *testing.T) {
 		t.Parallel()
+
+		var aliases = []string{"A"}
+
+		validators := validator.NewTestValidatorsWithAliases(t, aliases)
 
 		txRelayerMock := newDummyTxRelayer(t)
 		txRelayerMock.On("Call", mock.Anything, mock.Anything, mock.Anything).
