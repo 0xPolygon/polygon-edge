@@ -88,12 +88,12 @@ func TestStateSyncRelayer_PostBlock(t *testing.T) {
 	blockhainMock.On("CurrentHeader").Return(&types.Header{
 		Hash:   block1Hash,
 		Number: 1,
-	})
+	}).Maybe()
 	// post block 2, last state sync fails
 	blockhainMock.On("GetHeaderByNumber", uint64(1)).Return(&types.Header{
 		Hash: block1Hash,
-	}).Once()
-	blockhainMock.On("GetReceiptsByHash", block1Hash).Return(receiptsBlock1, nil).Once()
+	}).Twice()
+	blockhainMock.On("GetReceiptsByHash", block1Hash).Return(receiptsBlock1, nil).Twice()
 	// fail on stateSyncID == 6 -> last one in first try
 	dummyTxRelayer.On("SendTransaction", mock.Anything, testKey).Return(
 		&ethgo.Receipt{Status: uint64(types.ReceiptSuccess)}, nil).Times(5)
@@ -154,10 +154,10 @@ func TestStateSyncRelayer_PostBlock(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, uint64(3), ssrStateData.LastBlockNumber)
 
-	events, err := state.StateSyncStore.getAllAvailableEvents()
+	event, err := state.StateSyncStore.getNextEvent()
 
 	require.NoError(t, err)
-	require.Len(t, events, 0)
+	require.Nil(t, event)
 }
 
 type mockStateSyncProofRetriever struct {

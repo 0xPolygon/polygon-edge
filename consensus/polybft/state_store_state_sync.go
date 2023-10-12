@@ -97,28 +97,6 @@ func (s *StateSyncStore) insertStateSyncEvent(event *contractsapi.StateSyncedEve
 	})
 }
 
-// removeStateSyncEventsAndProofs removes state sync events and their proofs from the buckets in db
-func (s *StateSyncStore) removeStateSyncEventsAndProofs(stateSyncEventIDs []uint64) error {
-	return s.db.Update(func(tx *bolt.Tx) error {
-		eventsBucket := tx.Bucket(stateSyncEventsBucket)
-		proofsBucket := tx.Bucket(stateSyncProofsBucket)
-
-		for _, stateSyncEventID := range stateSyncEventIDs {
-			stateSyncEventIDKey := common.EncodeUint64ToBytes(stateSyncEventID)
-
-			if err := eventsBucket.Delete(stateSyncEventIDKey); err != nil {
-				return fmt.Errorf("failed to remove state sync event (ID=%d): %w", stateSyncEventID, err)
-			}
-
-			if err := proofsBucket.Delete(stateSyncEventIDKey); err != nil {
-				return fmt.Errorf("failed to remove state sync event proof (ID=%d): %w", stateSyncEventID, err)
-			}
-		}
-
-		return nil
-	})
-}
-
 // list iterates through all events in events bucket in db, un-marshals them, and returns as array
 func (s *StateSyncStore) list() ([]*contractsapi.StateSyncedEvent, error) {
 	events := []*contractsapi.StateSyncedEvent{}
@@ -387,21 +365,43 @@ func (s *StateSyncStore) getStateSyncProof(stateSyncID uint64) (*StateSyncProof,
 	return ssp, err
 }
 
-// insertStateSyncRelayerStateData inserts the state data for state sync relayer together with new events
-func (s *StateSyncStore) insertStateSyncRelayerStateData(
+// updateStateSyncRelayerStateData inserts the state data for state sync relayer together with new events and
+// deletion of processed events
+func (s *StateSyncStore) updateStateSyncRelayerStateData(
 	data *StateSyncRelayerStateData,
-	newEvents []*StateSyncRelayerEventData) error {
+	newEvents []*StateSyncRelayerEventData,
+	deletedEventIds []uint64) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
+		relayerEventsBucket := tx.Bucket(stateSyncRelayerEventsBucket)
+		eventsBucket := tx.Bucket(stateSyncEventsBucket)
+		proofsBucket := tx.Bucket(stateSyncProofsBucket)
+
 		for _, evnt := range newEvents {
 			raw, err := json.Marshal(evnt)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to add state sync relayer event (ID=%d): %w", evnt.EventID, err)
 			}
 
 			key := common.EncodeUint64ToBytes(evnt.EventID)
 
-			if err := tx.Bucket(stateSyncRelayerEventsBucket).Put(key, raw); err != nil {
-				return err
+			if err := relayerEventsBucket.Put(key, raw); err != nil {
+				return fmt.Errorf("failed to add state sync relayer event (ID=%d): %w", evnt.EventID, err)
+			}
+		}
+
+		for _, stateSyncEventID := range deletedEventIds {
+			stateSyncEventIDKey := common.EncodeUint64ToBytes(stateSyncEventID)
+
+			if err := eventsBucket.Delete(stateSyncEventIDKey); err != nil {
+				return fmt.Errorf("failed to remove state sync event (ID=%d): %w", stateSyncEventID, err)
+			}
+
+			if err := proofsBucket.Delete(stateSyncEventIDKey); err != nil {
+				return fmt.Errorf("failed to remove state sync event proof (ID=%d): %w", stateSyncEventID, err)
+			}
+
+			if err := relayerEventsBucket.Delete(stateSyncEventIDKey); err != nil {
+				return fmt.Errorf("failed to remove state sync relayer event (ID=%d): %w", stateSyncEventID, err)
 			}
 		}
 
@@ -455,22 +455,17 @@ func (s *StateSyncStore) updateStateSyncRelayerEvent(evnt *StateSyncRelayerEvent
 }
 
 // getAllAvailableEvents retrieves all StateSyncRelayerEventData that should be sent as a transactions
-func (s *StateSyncStore) getAllAvailableEvents() (result []*StateSyncRelayerEventData, err error) {
+func (s *StateSyncStore) getNextEvent() (event *StateSyncRelayerEventData, err error) {
 	if err = s.db.View(func(tx *bolt.Tx) error {
-		return tx.Bucket(stateSyncRelayerEventsBucket).ForEach(func(k, v []byte) error {
-			var event *StateSyncRelayerEventData
-
-			if err := json.Unmarshal(v, &event); err != nil {
-				return err
-			}
-
-			result = append(result, event)
-
+		k, v := tx.Bucket(stateSyncRelayerEventsBucket).Cursor().First()
+		if k == nil {
 			return nil
-		})
+		}
+
+		return json.Unmarshal(v, &event)
 	}); err != nil {
 		return nil, err
 	}
 
-	return result, nil
+	return event, nil
 }
