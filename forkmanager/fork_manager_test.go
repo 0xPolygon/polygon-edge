@@ -216,7 +216,6 @@ func TestForkManager_Deactivate(t *testing.T) {
 	forkManager := &forkManager{
 		forkMap:     map[string]*Fork{},
 		handlersMap: map[HandlerDesc][]forkHandler{},
-		handlersIds: map[HandlerDesc]uint{},
 	}
 	mvs1, mvs2 := uint64(1), uint64(2)
 
@@ -262,7 +261,6 @@ func TestForkManager_HandlerReplacement(t *testing.T) {
 	forkManager := &forkManager{
 		forkMap:     map[string]*Fork{},
 		handlersMap: map[HandlerDesc][]forkHandler{},
-		handlersIds: map[HandlerDesc]uint{},
 	}
 
 	execute := func(name HandlerDesc, block uint64) string {
@@ -300,7 +298,6 @@ func TestForkManager_HandlerPrecedence(t *testing.T) {
 	forkManager := &forkManager{
 		forkMap:     map[string]*Fork{},
 		handlersMap: map[HandlerDesc][]forkHandler{},
-		handlersIds: map[HandlerDesc]uint{},
 	}
 
 	execute := func(name HandlerDesc, block uint64) string {

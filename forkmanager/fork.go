@@ -9,7 +9,7 @@ type HandlerDesc string
 
 // HandlerContainer keeps id of a handler and actual handler
 type HandlerContainer struct {
-	// ID is ID of a handler
+	// ID represents an auto-incremented identifier for a handler
 	ID uint
 	// Handler represents an actual event handler
 	Handler interface{}
@@ -76,8 +76,6 @@ type forkHandler struct {
 
 // forkParamsBlock encapsulates block and actual fork params
 type forkParamsBlock struct {
-	// id - if two params start from the same block number, the one with the greater ID should take precedence.
-	id uint
 	// fromBlockNumber defines block number after params should be active
 	fromBlockNumber uint64
 	// params is a pointer to fork params
