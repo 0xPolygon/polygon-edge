@@ -16,6 +16,7 @@ import (
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/tracker"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
@@ -91,6 +92,9 @@ type stateSyncManager struct {
 	nextCommittedIndex uint64
 
 	runtime Runtime
+
+	// eventsGetter gets StateSyncResult events (missed or current) from blocks
+	eventsGetter *eventsGetter[*contractsapi.StateSyncResultEvent]
 }
 
 // topic is an interface for p2p message gossiping
@@ -101,13 +105,27 @@ type topic interface {
 
 // newStateSyncManager creates a new instance of state sync manager
 func newStateSyncManager(logger hclog.Logger, state *State, config *stateSyncConfig,
-	runtime Runtime) *stateSyncManager {
+	runtime Runtime, blockchain blockchainBackend) *stateSyncManager {
+	eventsGetter := &eventsGetter[*contractsapi.StateSyncResultEvent]{
+		blockchain: blockchain,
+		isValidLogFn: func(l *types.Log) bool {
+			return l.Address == contracts.StateReceiverContract
+		},
+		parseEventFn: func(h *types.Header, l *ethgo.Log) (*contractsapi.StateSyncResultEvent, bool, error) {
+			var stateSyncResultEvent contractsapi.StateSyncResultEvent
+			matches, err := stateSyncResultEvent.ParseLog(l)
+
+			return &stateSyncResultEvent, matches, err
+		},
+	}
+
 	return &stateSyncManager{
-		logger:  logger,
-		state:   state,
-		config:  config,
-		closeCh: make(chan struct{}),
-		runtime: runtime,
+		logger:       logger,
+		state:        state,
+		config:       config,
+		closeCh:      make(chan struct{}),
+		runtime:      runtime,
+		eventsGetter: eventsGetter,
 	}
 }
 
@@ -399,14 +417,33 @@ func (s *stateSyncManager) PostEpoch(req *PostEpochRequest) error {
 }
 
 // PostBlock notifies state sync manager that a block was finalized,
-// so that it can build state sync proofs if a block has a commitment submission transaction
+// so that it can build state sync proofs if a block has a commitment submission transaction.
+// Additionally, it will remove any processed state sync events and their proofs from the store.
 func (s *stateSyncManager) PostBlock(req *PostBlockRequest) error {
+	events, err := s.eventsGetter.getEventsFromReceipts(req.FullBlock.Block.Header, req.FullBlock.Receipts)
+	if err != nil {
+		s.logger.Info("failed to retrieve processed state sync result events from block", "error", err)
+	} else {
+		processedStateSyncEventIDs := make([]uint64, 0, len(events))
+		for _, event := range events {
+			if event.Status {
+				processedStateSyncEventIDs = append(processedStateSyncEventIDs, event.Counter.Uint64())
+			}
+		}
+
+		if len(processedStateSyncEventIDs) > 0 {
+			if err = s.state.StateSyncStore.removeStateSyncEventsAndProofs(processedStateSyncEventIDs); err != nil {
+				s.logger.Info("failed to remove processed state sync events data from store", "error", err)
+			}
+		}
+	}
+
 	commitment, err := getCommitmentMessageSignedTx(req.FullBlock.Block.Transactions)
 	if err != nil {
 		return err
 	}
 
-	// no commitment message -> this is not end of epoch block
+	// no commitment message -> this is not end of sprint block
 	if commitment == nil {
 		return nil
 	}

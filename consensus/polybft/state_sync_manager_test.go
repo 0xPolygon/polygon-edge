@@ -18,6 +18,8 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
+	"github.com/0xPolygon/polygon-edge/contracts"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/merkle-tree"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -33,6 +35,7 @@ func newTestStateSyncManager(t *testing.T, key *validator.TestValidator, runtime
 
 	topic := &mockTopic{}
 
+	blockchainBackend := new(blockchainMock)
 	s := newStateSyncManager(hclog.NewNullLogger(), state,
 		&stateSyncConfig{
 			stateSenderAddr:   types.Address{},
@@ -41,7 +44,7 @@ func newTestStateSyncManager(t *testing.T, key *validator.TestValidator, runtime
 			topic:             topic,
 			key:               key.Key(),
 			maxCommitmentSize: maxCommitmentSize,
-		}, runtime)
+		}, runtime, blockchainBackend)
 
 	t.Cleanup(func() {
 		os.RemoveAll(tmpDir)
@@ -324,6 +327,90 @@ func TestStateSyncerManager_BuildProofs(t *testing.T) {
 	}
 }
 
+func TestStateSyncerManager_RemoveProcessedEventsAndProofs(t *testing.T) {
+	const stateSyncEventsCount = 5
+
+	vals := validator.NewTestValidators(t, 5)
+
+	s := newTestStateSyncManager(t, vals.GetValidator("0"), &mockRuntime{isActiveValidator: true})
+
+	for _, event := range generateStateSyncEvents(t, stateSyncEventsCount, 0) {
+		require.NoError(t, s.state.StateSyncStore.insertStateSyncEvent(event))
+	}
+
+	require.NoError(t, s.buildCommitment())
+	require.Len(t, s.pendingCommitments, 1)
+
+	mockMsg := &CommitmentMessageSigned{
+		Message: &contractsapi.StateSyncCommitment{
+			StartID: s.pendingCommitments[0].StartID,
+			EndID:   s.pendingCommitments[0].EndID,
+		},
+	}
+
+	txData, err := mockMsg.EncodeAbi()
+	require.NoError(t, err)
+
+	tx := createStateTransactionWithData(1, types.Address{}, txData)
+
+	req := &PostBlockRequest{
+		FullBlock: &types.FullBlock{
+			Block: &types.Block{
+				Header:       &types.Header{Number: 1},
+				Transactions: []*types.Transaction{tx},
+			},
+		},
+	}
+
+	// PostBlock() inserts commitment and proofs into the store
+	require.NoError(t, s.PostBlock(req))
+
+	// check the state after executing first PostBlock()
+	require.Equal(t, mockMsg.Message.EndID.Uint64()+1, s.nextCommittedIndex)
+
+	stateSyncEventsBefore, err := s.state.StateSyncStore.list()
+	require.NoError(t, err)
+	require.Equal(t, stateSyncEventsCount, len(stateSyncEventsBefore))
+
+	for i := 0; i < stateSyncEventsCount; i++ {
+		proof, err := s.state.StateSyncStore.getStateSyncProof(uint64(i))
+		require.NoError(t, err)
+		require.NotNil(t, proof)
+	}
+
+	// create second PostBlockRequest to remove processed events and proofs from the store
+	req = &PostBlockRequest{
+		FullBlock: &types.FullBlock{
+			Block: &types.Block{
+				Header: &types.Header{Number: 2},
+			},
+		},
+	}
+
+	// add receipts with executed StateSyncResult logs
+	receiptSuccess := types.ReceiptSuccess
+
+	req.FullBlock.Receipts = make([]*types.Receipt, stateSyncEventsCount)
+	for i := uint64(0); i < stateSyncEventsCount; i++ {
+		req.FullBlock.Receipts[i] = &types.Receipt{
+			Status: &receiptSuccess,
+			Logs:   []*types.Log{createTestLogForStateSyncResultEvent(t, i)}}
+	}
+
+	require.NoError(t, s.PostBlock(req))
+
+	// all state sync events and their proofs should be removed from the store
+	stateSyncEventsAfter, err := s.state.StateSyncStore.list()
+	require.NoError(t, err)
+	require.Equal(t, 0, len(stateSyncEventsAfter))
+
+	for i := uint64(0); i < stateSyncEventsCount; i++ {
+		proof, err := s.state.StateSyncStore.getStateSyncProof(i)
+		require.NoError(t, err)
+		require.Nil(t, proof)
+	}
+}
+
 func TestStateSyncerManager_AddLog_BuildCommitments(t *testing.T) {
 	t.Parallel()
 
@@ -569,6 +656,26 @@ func TestStateSyncManager_GetProofs_NoProof_BuildProofs(t *testing.T) {
 	require.NotEmpty(t, proof.Data)
 
 	require.NoError(t, commitment.VerifyStateSyncProof(proof.Data, stateSync))
+}
+
+func createTestLogForStateSyncResultEvent(t *testing.T, stateSyncEventID uint64) *types.Log {
+	t.Helper()
+
+	var stateSyncResultEvent contractsapi.StateSyncResultEvent
+
+	topics := make([]types.Hash, 3)
+	topics[0] = types.Hash(stateSyncResultEvent.Sig())
+	topics[1] = types.BytesToHash(common.EncodeUint64ToBytes(stateSyncEventID))
+	topics[2] = types.BytesToHash(common.EncodeUint64ToBytes(1)) // Status = true
+	someType := abi.MustNewType("tuple(string field1, string field2)")
+	encodedData, err := someType.Encode(map[string]string{"field1": "value1", "field2": "value2"})
+	require.NoError(t, err)
+
+	return &types.Log{
+		Address: contracts.StateReceiverContract,
+		Topics:  topics,
+		Data:    encodedData,
+	}
 }
 
 type mockTopic struct {
