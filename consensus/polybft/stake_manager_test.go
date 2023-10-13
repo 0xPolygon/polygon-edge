@@ -63,7 +63,7 @@ func TestStakeManager_PostBlock(t *testing.T) {
 
 		header := &types.Header{Number: block}
 
-		require.NoError(t, stakeManager.AddLog(header, convertLog(createTestLogForTransferEvent(
+		require.NoError(t, stakeManager.ProcessLog(header, convertLog(createTestLogForTransferEvent(
 			t,
 			validatorSetAddr,
 			validators.GetValidator(initialSetAliases[firstValidator]).Address(),
@@ -121,7 +121,7 @@ func TestStakeManager_PostBlock(t *testing.T) {
 		require.NoError(t, err)
 
 		header := &types.Header{Number: block}
-		require.NoError(t, stakeManager.AddLog(header, convertLog(createTestLogForTransferEvent(
+		require.NoError(t, stakeManager.ProcessLog(header, convertLog(createTestLogForTransferEvent(
 			t,
 			validatorSetAddr,
 			types.ZeroAddress,
@@ -190,7 +190,7 @@ func TestStakeManager_PostBlock(t *testing.T) {
 		header := &types.Header{Number: block}
 
 		for i := 0; i < len(allAliases); i++ {
-			require.NoError(t, stakeManager.AddLog(header, convertLog(createTestLogForTransferEvent(
+			require.NoError(t, stakeManager.ProcessLog(header, convertLog(createTestLogForTransferEvent(
 				t,
 				validatorSetAddr,
 				types.ZeroAddress,

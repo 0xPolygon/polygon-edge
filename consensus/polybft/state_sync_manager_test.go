@@ -35,7 +35,6 @@ func newTestStateSyncManager(t *testing.T, key *validator.TestValidator, runtime
 
 	topic := &mockTopic{}
 
-	blockchainBackend := new(blockchainMock)
 	s := newStateSyncManager(hclog.NewNullLogger(), state,
 		&stateSyncConfig{
 			stateSenderAddr:   types.Address{},
@@ -44,7 +43,7 @@ func newTestStateSyncManager(t *testing.T, key *validator.TestValidator, runtime
 			topic:             topic,
 			key:               key.Key(),
 			maxCommitmentSize: maxCommitmentSize,
-		}, runtime, blockchainBackend)
+		}, runtime)
 
 	t.Cleanup(func() {
 		os.RemoveAll(tmpDir)
@@ -333,79 +332,39 @@ func TestStateSyncerManager_RemoveProcessedEventsAndProofs(t *testing.T) {
 	vals := validator.NewTestValidators(t, 5)
 
 	s := newTestStateSyncManager(t, vals.GetValidator("0"), &mockRuntime{isActiveValidator: true})
+	stateSyncEvents := generateStateSyncEvents(t, stateSyncEventsCount, 0)
 
-	for _, event := range generateStateSyncEvents(t, stateSyncEventsCount, 0) {
+	for _, event := range stateSyncEvents {
 		require.NoError(t, s.state.StateSyncStore.insertStateSyncEvent(event))
 	}
 
-	require.NoError(t, s.buildCommitment())
-	require.Len(t, s.pendingCommitments, 1)
-
-	mockMsg := &CommitmentMessageSigned{
-		Message: &contractsapi.StateSyncCommitment{
-			StartID: s.pendingCommitments[0].StartID,
-			EndID:   s.pendingCommitments[0].EndID,
-		},
-	}
-
-	txData, err := mockMsg.EncodeAbi()
-	require.NoError(t, err)
-
-	tx := createStateTransactionWithData(1, types.Address{}, txData)
-
-	req := &PostBlockRequest{
-		FullBlock: &types.FullBlock{
-			Block: &types.Block{
-				Header:       &types.Header{Number: 1},
-				Transactions: []*types.Transaction{tx},
-			},
-		},
-	}
-
-	// PostBlock() inserts commitment and proofs into the store
-	require.NoError(t, s.PostBlock(req))
-
-	// check the state after executing first PostBlock()
-	require.Equal(t, mockMsg.Message.EndID.Uint64()+1, s.nextCommittedIndex)
+	require.NoError(t, s.buildProofs(&contractsapi.StateSyncCommitment{
+		StartID: stateSyncEvents[0].ID,
+		EndID:   stateSyncEvents[len(stateSyncEvents)-1].ID,
+	}, nil))
 
 	stateSyncEventsBefore, err := s.state.StateSyncStore.list()
 	require.NoError(t, err)
 	require.Equal(t, stateSyncEventsCount, len(stateSyncEventsBefore))
 
-	for i := 0; i < stateSyncEventsCount; i++ {
-		proof, err := s.state.StateSyncStore.getStateSyncProof(uint64(i))
+	for _, event := range stateSyncEvents {
+		proof, err := s.state.StateSyncStore.getStateSyncProof(event.ID.Uint64())
 		require.NoError(t, err)
 		require.NotNil(t, proof)
 	}
 
-	// create second PostBlockRequest to remove processed events and proofs from the store
-	req = &PostBlockRequest{
-		FullBlock: &types.FullBlock{
-			Block: &types.Block{
-				Header: &types.Header{Number: 2},
-			},
-		},
+	for _, event := range stateSyncEvents {
+		eventLog := createTestLogForStateSyncResultEvent(t, event.ID.Uint64())
+		require.NoError(t, s.ProcessLog(&types.Header{Number: 10}, convertLog(eventLog), nil))
 	}
-
-	// add receipts with executed StateSyncResult logs
-	receiptSuccess := types.ReceiptSuccess
-
-	req.FullBlock.Receipts = make([]*types.Receipt, stateSyncEventsCount)
-	for i := uint64(0); i < stateSyncEventsCount; i++ {
-		req.FullBlock.Receipts[i] = &types.Receipt{
-			Status: &receiptSuccess,
-			Logs:   []*types.Log{createTestLogForStateSyncResultEvent(t, i)}}
-	}
-
-	require.NoError(t, s.PostBlock(req))
 
 	// all state sync events and their proofs should be removed from the store
 	stateSyncEventsAfter, err := s.state.StateSyncStore.list()
 	require.NoError(t, err)
 	require.Equal(t, 0, len(stateSyncEventsAfter))
 
-	for i := uint64(0); i < stateSyncEventsCount; i++ {
-		proof, err := s.state.StateSyncStore.getStateSyncProof(i)
+	for _, event := range stateSyncEvents {
+		proof, err := s.state.StateSyncStore.getStateSyncProof(event.ID.Uint64())
 		require.NoError(t, err)
 		require.Nil(t, proof)
 	}

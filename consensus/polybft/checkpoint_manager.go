@@ -50,7 +50,7 @@ func (d *dummyCheckpointManager) GenerateExitProof(exitID uint64) (types.Proof, 
 func (d *dummyCheckpointManager) GetLogFilters() map[types.Address][]types.Hash {
 	return make(map[types.Address][]types.Hash)
 }
-func (d *dummyCheckpointManager) AddLog(header *types.Header,
+func (d *dummyCheckpointManager) ProcessLog(header *types.Header,
 	log *ethgo.Log, dbTx *bolt.Tx) error {
 	return nil
 }
@@ -433,9 +433,9 @@ func (c *checkpointManager) GetLogFilters() map[types.Address][]types.Hash {
 	}
 }
 
-// AddLog is the implementation of EventSubscriber interface,
+// ProcessLog is the implementation of EventSubscriber interface,
 // used to handle a log defined in GetLogFilters, provided by event provider
-func (c *checkpointManager) AddLog(header *types.Header, log *ethgo.Log, dbTx *bolt.Tx) error {
+func (c *checkpointManager) ProcessLog(header *types.Header, log *ethgo.Log, dbTx *bolt.Tx) error {
 	exitEvent, doesMatch, err := parseExitEvent(header, log)
 	if err != nil {
 		return err

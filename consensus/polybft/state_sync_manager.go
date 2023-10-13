@@ -37,6 +37,7 @@ type StateSyncProof struct {
 
 // StateSyncManager is an interface that defines functions for state sync workflow
 type StateSyncManager interface {
+	EventSubscriber
 	Init() error
 	Close()
 	Commitment(blockNumber uint64) (*CommitmentMessageSigned, error)
@@ -50,15 +51,24 @@ var _ StateSyncManager = (*dummyStateSyncManager)(nil)
 // dummyStateSyncManager is used when bridge is not enabled
 type dummyStateSyncManager struct{}
 
-func (n *dummyStateSyncManager) Init() error { return nil }
-func (n *dummyStateSyncManager) Close()      {}
-func (n *dummyStateSyncManager) Commitment(blockNumber uint64) (*CommitmentMessageSigned, error) {
+func (d *dummyStateSyncManager) Init() error { return nil }
+func (d *dummyStateSyncManager) Close()      {}
+func (d *dummyStateSyncManager) Commitment(blockNumber uint64) (*CommitmentMessageSigned, error) {
 	return nil, nil
 }
-func (n *dummyStateSyncManager) PostBlock(req *PostBlockRequest) error { return nil }
-func (n *dummyStateSyncManager) PostEpoch(req *PostEpochRequest) error { return nil }
-func (n *dummyStateSyncManager) GetStateSyncProof(stateSyncID uint64) (types.Proof, error) {
+func (d *dummyStateSyncManager) PostBlock(req *PostBlockRequest) error { return nil }
+func (d *dummyStateSyncManager) PostEpoch(req *PostEpochRequest) error { return nil }
+func (d *dummyStateSyncManager) GetStateSyncProof(stateSyncID uint64) (types.Proof, error) {
 	return types.Proof{}, nil
+}
+
+// EventSubscriber implementation
+func (d *dummyStateSyncManager) GetLogFilters() map[types.Address][]types.Hash {
+	return make(map[types.Address][]types.Hash)
+}
+func (d *dummyStateSyncManager) ProcessLog(header *types.Header,
+	log *ethgo.Log, dbTx *bolt.Tx) error {
+	return nil
 }
 
 // stateSyncConfig holds the configuration data of state sync manager
@@ -93,9 +103,6 @@ type stateSyncManager struct {
 	nextCommittedIndex uint64
 
 	runtime Runtime
-
-	// eventsGetter gets StateSyncResult events (missed or current) from blocks
-	eventsGetter *eventsGetter[*contractsapi.StateSyncResultEvent]
 }
 
 // topic is an interface for p2p message gossiping
@@ -106,27 +113,13 @@ type topic interface {
 
 // newStateSyncManager creates a new instance of state sync manager
 func newStateSyncManager(logger hclog.Logger, state *State, config *stateSyncConfig,
-	runtime Runtime, blockchain blockchainBackend) *stateSyncManager {
-	eventsGetter := &eventsGetter[*contractsapi.StateSyncResultEvent]{
-		blockchain: blockchain,
-		isValidLogFn: func(l *types.Log) bool {
-			return l.Address == contracts.StateReceiverContract
-		},
-		parseEventFn: func(h *types.Header, l *ethgo.Log) (*contractsapi.StateSyncResultEvent, bool, error) {
-			var stateSyncResultEvent contractsapi.StateSyncResultEvent
-			matches, err := stateSyncResultEvent.ParseLog(l)
-
-			return &stateSyncResultEvent, matches, err
-		},
-	}
-
+	runtime Runtime) *stateSyncManager {
 	return &stateSyncManager{
-		logger:       logger,
-		state:        state,
-		config:       config,
-		closeCh:      make(chan struct{}),
-		runtime:      runtime,
-		eventsGetter: eventsGetter,
+		logger:  logger,
+		state:   state,
+		config:  config,
+		closeCh: make(chan struct{}),
+		runtime: runtime,
 	}
 }
 
@@ -421,24 +414,6 @@ func (s *stateSyncManager) PostEpoch(req *PostEpochRequest) error {
 // so that it can build state sync proofs if a block has a commitment submission transaction.
 // Additionally, it will remove any processed state sync events and their proofs from the store.
 func (s *stateSyncManager) PostBlock(req *PostBlockRequest) error {
-	events, err := s.eventsGetter.getEventsFromReceipts(req.FullBlock.Block.Header, req.FullBlock.Receipts)
-	if err != nil {
-		s.logger.Info("failed to retrieve processed state sync result events from block", "error", err)
-	} else {
-		processedStateSyncEventIDs := make([]uint64, 0, len(events))
-		for _, event := range events {
-			if event.Status {
-				processedStateSyncEventIDs = append(processedStateSyncEventIDs, event.Counter.Uint64())
-			}
-		}
-
-		if len(processedStateSyncEventIDs) > 0 {
-			if err = s.state.StateSyncStore.removeStateSyncEventsAndProofs(processedStateSyncEventIDs); err != nil {
-				s.logger.Info("failed to remove processed state sync events data from store", "error", err)
-			}
-		}
-	}
-
 	commitment, err := getCommitmentMessageSignedTx(req.FullBlock.Block.Transactions)
 	if err != nil {
 		return err
@@ -640,4 +615,35 @@ func (s *stateSyncManager) multicast(msg interface{}) {
 	if err != nil {
 		s.logger.Warn("failed to gossip bridge message", "err", err)
 	}
+}
+
+// EventSubscriber implementation
+
+// GetLogFilters returns a map of log filters for getting desired events,
+// where the key is the address of contract that emits desired events,
+// and the value is a slice of signatures of events we want to get.
+// This function is the implementation of EventSubscriber interface
+func (s *stateSyncManager) GetLogFilters() map[types.Address][]types.Hash {
+	var stateSyncResultEvent contractsapi.StateSyncResultEvent
+
+	return map[types.Address][]types.Hash{
+		contracts.StateReceiverContract: {types.Hash(stateSyncResultEvent.Sig())},
+	}
+}
+
+// ProcessLog is the implementation of EventSubscriber interface,
+// used to handle a log defined in GetLogFilters, provided by event provider
+func (s *stateSyncManager) ProcessLog(header *types.Header, log *ethgo.Log, dbTx *bolt.Tx) error {
+	var stateSyncResultEvent contractsapi.StateSyncResultEvent
+
+	doesMatch, err := stateSyncResultEvent.ParseLog(log)
+	if err != nil {
+		return err
+	}
+
+	if !doesMatch {
+		return nil
+	}
+
+	return s.state.StateSyncStore.removeStateSyncEventsAndProofs([]uint64{stateSyncResultEvent.Counter.Uint64()})
 }

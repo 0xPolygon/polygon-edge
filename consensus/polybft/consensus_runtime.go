@@ -198,7 +198,6 @@ func (c *consensusRuntime) initStateSyncManager(logger hcf.Logger) error {
 				blockTrackerPollInterval: c.config.PolyBFTConfig.BlockTrackerPollInterval.Duration,
 			},
 			c,
-			c.config.blockchain,
 		)
 
 		c.stateSyncManager = stateSyncManager

@@ -123,7 +123,7 @@ func FuzzTestStakeManagerPostBlock(f *testing.F) {
 		require.NoError(t, err)
 
 		header := &types.Header{Number: data.BlockID}
-		require.NoError(t, stakeManager.AddLog(header, convertLog(createTestLogForTransferEvent(
+		require.NoError(t, stakeManager.ProcessLog(header, convertLog(createTestLogForTransferEvent(
 			t,
 			validatorSetAddr,
 			validators.GetValidator(initialSetAliases[data.ValidatorID]).Address(),

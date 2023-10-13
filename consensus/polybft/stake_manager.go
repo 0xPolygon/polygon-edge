@@ -51,7 +51,7 @@ func (d *dummyStakeManager) UpdateValidatorSet(epoch uint64,
 func (d *dummyStakeManager) GetLogFilters() map[types.Address][]types.Hash {
 	return make(map[types.Address][]types.Hash)
 }
-func (d *dummyStakeManager) AddLog(header *types.Header, log *ethgo.Log, dbTx *bolt.Tx) error {
+func (d *dummyStakeManager) ProcessLog(header *types.Header, log *ethgo.Log, dbTx *bolt.Tx) error {
 	return nil
 }
 
@@ -393,9 +393,9 @@ func (s *stakeManager) GetLogFilters() map[types.Address][]types.Hash {
 	}
 }
 
-// AddLog is the implementation of EventSubscriber interface,
+// ProcessLog is the implementation of EventSubscriber interface,
 // used to handle a log defined in GetLogFilters, provided by event provider
-func (s *stakeManager) AddLog(header *types.Header, log *ethgo.Log, dbTx *bolt.Tx) error {
+func (s *stakeManager) ProcessLog(header *types.Header, log *ethgo.Log, dbTx *bolt.Tx) error {
 	var transferEvent contractsapi.TransferEvent
 
 	doesMatch, err := transferEvent.ParseLog(log)

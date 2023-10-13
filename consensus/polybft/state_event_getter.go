@@ -15,8 +15,8 @@ type EventSubscriber interface {
 	// and the value is a slice of signatures of events we want to get.
 	GetLogFilters() map[types.Address][]types.Hash
 
-	// AddLog is used to handle a log defined in GetLogFilters, provided by event provider
-	AddLog(header *types.Header, log *ethgo.Log, dbTx *bolt.Tx) error
+	// ProcessLog is used to handle a log defined in GetLogFilters, provided by event provider
+	ProcessLog(header *types.Header, log *ethgo.Log, dbTx *bolt.Tx) error
 }
 
 // EventProvider represents an event provider in a blockchain system
@@ -133,7 +133,7 @@ func (e *EventProvider) getEventsFromReceipts(blockHeader *types.Header,
 				if log.Topics[0] == logFilter {
 					convertedLog := convertLog(log)
 					for _, subscriber := range subscribers {
-						if err := e.subscribers[subscriber].AddLog(blockHeader, convertedLog, dbTx); err != nil {
+						if err := e.subscribers[subscriber].ProcessLog(blockHeader, convertedLog, dbTx); err != nil {
 							return err
 						}
 					}
@@ -186,6 +186,7 @@ func (e *eventsGetter[T]) getEventsFromBlocksRange(from, to uint64) ([]T, error)
 		}
 
 		allEvents = append(allEvents, events...)
+
 		return nil
 	}
 
