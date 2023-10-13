@@ -22,6 +22,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/umbracle/ethgo"
+	bolt "go.etcd.io/bbolt"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -502,7 +503,7 @@ func (s *stateSyncManager) GetStateSyncProof(stateSyncID uint64) (types.Proof, e
 
 // buildProofs builds state sync proofs for the submitted commitment and saves them in boltDb for later execution
 func (s *stateSyncManager) buildProofs(commitmentMsg *contractsapi.StateSyncCommitment,
-	dbTx DBTransaction) error {
+	dbTx *bolt.Tx) error {
 	from := commitmentMsg.StartID.Uint64()
 	to := commitmentMsg.EndID.Uint64()
 
@@ -551,7 +552,7 @@ func (s *stateSyncManager) buildProofs(commitmentMsg *contractsapi.StateSyncComm
 }
 
 // buildCommitment builds a new commitment, signs it and gossips its vote for it
-func (s *stateSyncManager) buildCommitment(dbTx DBTransaction) error {
+func (s *stateSyncManager) buildCommitment(dbTx *bolt.Tx) error {
 	if !s.runtime.IsActiveValidator() {
 		// don't build commitment if not a validator
 		return nil

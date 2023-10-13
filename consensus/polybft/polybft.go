@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-hclog"
+	bolt "go.etcd.io/bbolt"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
@@ -46,7 +47,7 @@ type polybftBackend interface {
 	// GetValidators retrieves validator set for the given block
 	// Function expects that db tx is already open
 	GetValidatorsWithTx(blockNumber uint64, parents []*types.Header,
-		dbTx DBTransaction) (validator.AccountSet, error)
+		dbTx *bolt.Tx) (validator.AccountSet, error)
 }
 
 // Factory is the factory function to create a discovery consensus
@@ -729,7 +730,7 @@ func (p *Polybft) GetValidators(blockNumber uint64, parents []*types.Header) (va
 }
 
 func (p *Polybft) GetValidatorsWithTx(blockNumber uint64, parents []*types.Header,
-	dbTx DBTransaction) (validator.AccountSet, error) {
+	dbTx *bolt.Tx) (validator.AccountSet, error) {
 	return p.validatorsCache.GetSnapshot(blockNumber, parents, dbTx)
 }
 

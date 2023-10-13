@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/contract"
+	bolt "go.etcd.io/bbolt"
 )
 
 var _ blockchainBackend = (*blockchainMock)(nil)
@@ -148,7 +149,7 @@ func (p *polybftBackendMock) GetValidators(blockNumber uint64, parents []*types.
 }
 
 func (p *polybftBackendMock) GetValidatorsWithTx(blockNumber uint64, parents []*types.Header,
-	dbTx DBTransaction) (validator.AccountSet, error) {
+	dbTx *bolt.Tx) (validator.AccountSet, error) {
 	args := p.Called(blockNumber, parents, dbTx)
 	if len(args) == 1 {
 		accountSet, _ := args.Get(0).(validator.AccountSet)

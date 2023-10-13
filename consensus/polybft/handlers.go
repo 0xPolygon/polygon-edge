@@ -3,6 +3,7 @@ package polybft
 import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/types"
+	bolt "go.etcd.io/bbolt"
 )
 
 type PostBlockRequest struct {
@@ -14,7 +15,7 @@ type PostBlockRequest struct {
 	IsEpochEndingBlock bool
 	// DBTx is the opened transaction on state store (in our case boltDB)
 	// used to save necessary data on PostBlock
-	DBTx DBTransaction
+	DBTx *bolt.Tx
 }
 
 type PostEpochRequest struct {
@@ -33,5 +34,5 @@ type PostEpochRequest struct {
 
 	// DBTx is the opened transaction on state store (in our case boltDB)
 	// used to save necessary data on PostEpoch
-	DBTx DBTransaction
+	DBTx *bolt.Tx
 }

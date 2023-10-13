@@ -9,6 +9,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
+	bolt "go.etcd.io/bbolt"
 )
 
 type validatorSnapshot struct {
@@ -51,7 +52,7 @@ func newValidatorsSnapshotCache(
 // applies pending validator set deltas to it.
 // Otherwise, it builds a snapshot from scratch and applies pending validator set deltas.
 func (v *validatorsSnapshotCache) GetSnapshot(
-	blockNumber uint64, parents []*types.Header, dbTx DBTransaction) (validator.AccountSet, error) {
+	blockNumber uint64, parents []*types.Header, dbTx *bolt.Tx) (validator.AccountSet, error) {
 	tx := dbTx
 	isPassedTxNil := dbTx == nil
 
@@ -241,7 +242,7 @@ func (v *validatorsSnapshotCache) computeSnapshot(
 }
 
 // storeSnapshot stores given snapshot to the in-memory cache and database
-func (v *validatorsSnapshotCache) storeSnapshot(snapshot *validatorSnapshot, dbTx DBTransaction) error {
+func (v *validatorsSnapshotCache) storeSnapshot(snapshot *validatorSnapshot, dbTx *bolt.Tx) error {
 	copySnap := snapshot.copy()
 	v.snapshots[copySnap.Epoch] = copySnap
 
@@ -255,7 +256,7 @@ func (v *validatorsSnapshotCache) storeSnapshot(snapshot *validatorSnapshot, dbT
 }
 
 // Cleanup cleans the validators cache in memory and db
-func (v *validatorsSnapshotCache) cleanup(dbTx DBTransaction) error {
+func (v *validatorsSnapshotCache) cleanup(dbTx *bolt.Tx) error {
 	if len(v.snapshots) >= validatorSnapshotLimit {
 		latestEpoch := uint64(0)
 
@@ -287,7 +288,7 @@ func (v *validatorsSnapshotCache) cleanup(dbTx DBTransaction) error {
 // getLastCachedSnapshot gets the latest snapshot cached
 // If it doesn't have snapshot cached for desired epoch, it will return the latest one it has
 func (v *validatorsSnapshotCache) getLastCachedSnapshot(currentEpoch uint64,
-	dbTx DBTransaction) (*validatorSnapshot, error) {
+	dbTx *bolt.Tx) (*validatorSnapshot, error) {
 	cachedSnapshot := v.snapshots[currentEpoch]
 	if cachedSnapshot != nil {
 		return cachedSnapshot, nil

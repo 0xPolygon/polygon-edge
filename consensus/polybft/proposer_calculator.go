@@ -9,6 +9,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
+	bolt "go.etcd.io/bbolt"
 )
 
 var (
@@ -33,7 +34,7 @@ type ProposerSnapshot struct {
 }
 
 // NewProposerSnapshotFromState create ProposerSnapshot from state if possible or from genesis block
-func NewProposerSnapshotFromState(config *runtimeConfig, dbTx DBTransaction) (*ProposerSnapshot, error) {
+func NewProposerSnapshotFromState(config *runtimeConfig, dbTx *bolt.Tx) (*ProposerSnapshot, error) {
 	snapshot, err := config.State.ProposerSnapshotStore.getProposerSnapshot(dbTx)
 	if err != nil {
 		return nil, err
@@ -161,7 +162,7 @@ type ProposerCalculator struct {
 
 // NewProposerCalculator creates a new proposer calculator object
 func NewProposerCalculator(config *runtimeConfig, logger hclog.Logger,
-	dbTx DBTransaction) (*ProposerCalculator, error) {
+	dbTx *bolt.Tx) (*ProposerCalculator, error) {
 	snap, err := NewProposerSnapshotFromState(config, dbTx)
 
 	if err != nil {
@@ -215,7 +216,7 @@ func (pc *ProposerCalculator) PostBlock(req *PostBlockRequest) error {
 	return pc.update(blockNumber, req.DBTx)
 }
 
-func (pc *ProposerCalculator) update(blockNumber uint64, dbTx DBTransaction) error {
+func (pc *ProposerCalculator) update(blockNumber uint64, dbTx *bolt.Tx) error {
 	pc.logger.Debug("Update proposers snapshot started", "target block", blockNumber)
 
 	from := pc.snapshot.Height
@@ -242,7 +243,7 @@ func (pc *ProposerCalculator) update(blockNumber uint64, dbTx DBTransaction) err
 }
 
 // Updates ProposerSnapshot to block block with number `blockNumber`
-func (pc *ProposerCalculator) updatePerBlock(blockNumber uint64, dbTx DBTransaction) error {
+func (pc *ProposerCalculator) updatePerBlock(blockNumber uint64, dbTx *bolt.Tx) error {
 	if pc.snapshot.Height != blockNumber {
 		return fmt.Errorf("proposers snapshot update called for wrong block. block number=%d, snapshot block number=%d",
 			blockNumber, pc.snapshot.Height)

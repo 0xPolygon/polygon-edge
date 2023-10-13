@@ -122,13 +122,13 @@ func (s *StateSyncStore) list() ([]*contractsapi.StateSyncedEvent, error) {
 
 // getStateSyncEventsForCommitment returns state sync events for commitment
 func (s *StateSyncStore) getStateSyncEventsForCommitment(
-	fromIndex, toIndex uint64, dbTx DBTransaction) ([]*contractsapi.StateSyncedEvent, error) {
+	fromIndex, toIndex uint64, dbTx *bolt.Tx) ([]*contractsapi.StateSyncedEvent, error) {
 	var (
 		events []*contractsapi.StateSyncedEvent
 		err    error
 	)
 
-	getFn := func(tx DBTransaction) error {
+	getFn := func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(stateSyncEventsBucket)
 		for i := fromIndex; i <= toIndex; i++ {
 			v := bucket.Get(common.EncodeUint64ToBytes(i))
@@ -186,8 +186,8 @@ func (s *StateSyncStore) getCommitmentForStateSync(stateSyncID uint64) (*Commitm
 
 // insertCommitmentMessage inserts signed commitment to db
 func (s *StateSyncStore) insertCommitmentMessage(commitment *CommitmentMessageSigned,
-	dbTx DBTransaction) error {
-	insertFn := func(tx DBTransaction) error {
+	dbTx *bolt.Tx) error {
+	insertFn := func(tx *bolt.Tx) error {
 		raw, err := json.Marshal(commitment)
 		if err != nil {
 			return err
@@ -228,13 +228,13 @@ func (s *StateSyncStore) getCommitmentMessage(toIndex uint64) (*CommitmentMessag
 
 // insertMessageVote inserts given vote to signatures bucket of given epoch
 func (s *StateSyncStore) insertMessageVote(epoch uint64, key []byte,
-	vote *MessageSignature, dbTx DBTransaction) (int, error) {
+	vote *MessageSignature, dbTx *bolt.Tx) (int, error) {
 	var (
 		numOfSignatures int
 		err             error
 	)
 
-	insertFn := func(tx DBTransaction) error {
+	insertFn := func(tx *bolt.Tx) error {
 		signatures, err := s.getMessageVotesLocked(tx, epoch, key)
 		if err != nil {
 			return err
@@ -301,7 +301,7 @@ func (s *StateSyncStore) getMessageVotes(epoch uint64, hash []byte) ([]*MessageS
 }
 
 // getMessageVotesLocked gets all signatures from db associated with given epoch and hash
-func (s *StateSyncStore) getMessageVotesLocked(tx DBTransaction, epoch uint64,
+func (s *StateSyncStore) getMessageVotesLocked(tx *bolt.Tx, epoch uint64,
 	hash []byte) ([]*MessageSignature, error) {
 	bucket, err := getNestedBucketInEpoch(tx, epoch, messageVotesBucket)
 	if err != nil {
@@ -322,8 +322,8 @@ func (s *StateSyncStore) getMessageVotesLocked(tx DBTransaction, epoch uint64,
 }
 
 // insertStateSyncProofs inserts the provided state sync proofs to db
-func (s *StateSyncStore) insertStateSyncProofs(stateSyncProof []*StateSyncProof, dbTx DBTransaction) error {
-	insertFn := func(tx DBTransaction) error {
+func (s *StateSyncStore) insertStateSyncProofs(stateSyncProof []*StateSyncProof, dbTx *bolt.Tx) error {
+	insertFn := func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(stateSyncProofsBucket)
 
 		for _, ssp := range stateSyncProof {

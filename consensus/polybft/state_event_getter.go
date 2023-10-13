@@ -5,6 +5,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo"
+	bolt "go.etcd.io/bbolt"
 )
 
 // EventSubscriber specifies functions needed for a component to subscribe to eventProvider
@@ -15,7 +16,7 @@ type EventSubscriber interface {
 	GetLogFilters() map[types.Address][]types.Hash
 
 	// AddLog is used to handle a log defined in GetLogFilters, provided by event provider
-	AddLog(header *types.Header, log *ethgo.Log, dbTx DBTransaction) error
+	AddLog(header *types.Header, log *ethgo.Log, dbTx *bolt.Tx) error
 }
 
 // EventProvider represents an event provider in a blockchain system
@@ -74,7 +75,7 @@ func (e *EventProvider) Subscribe(subscriber EventSubscriber) {
 // - error - if a block or its receipts could not be retrieved from blockchain
 func (e *EventProvider) GetEventsFromBlocks(lastProcessedBlock uint64,
 	latestBlock *types.FullBlock,
-	dbTx DBTransaction) error {
+	dbTx *bolt.Tx) error {
 	if err := e.getEventsFromBlocksRange(lastProcessedBlock+1, latestBlock.Block.Number()-1, dbTx); err != nil {
 		return err
 	}
@@ -92,7 +93,7 @@ func (e *EventProvider) GetEventsFromBlocks(lastProcessedBlock uint64,
 // Returns:
 // - nil - if getting events finished successfully
 // - error - if a block or its receipts could not be retrieved from blockchain
-func (e *EventProvider) getEventsFromBlocksRange(from, to uint64, dbTx DBTransaction) error {
+func (e *EventProvider) getEventsFromBlocksRange(from, to uint64, dbTx *bolt.Tx) error {
 	for i := from; i <= to; i++ {
 		blockHeader, found := e.blockchain.GetHeaderByNumber(i)
 		if !found {
@@ -124,7 +125,7 @@ func (e *EventProvider) getEventsFromBlocksRange(from, to uint64, dbTx DBTransac
 // - error - if a subscriber for a certain log (event) returns an error on log (event) handling
 func (e *EventProvider) getEventsFromReceipts(blockHeader *types.Header,
 	receipts []*types.Receipt,
-	dbTx DBTransaction) error {
+	dbTx *bolt.Tx) error {
 	for _, receipt := range receipts {
 		if receipt.Status == nil || *receipt.Status != types.ReceiptSuccess {
 			continue

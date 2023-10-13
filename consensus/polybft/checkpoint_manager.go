@@ -16,6 +16,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	hclog "github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
+	bolt "go.etcd.io/bbolt"
 )
 
 var (
@@ -50,7 +51,7 @@ func (d *dummyCheckpointManager) GetLogFilters() map[types.Address][]types.Hash 
 	return make(map[types.Address][]types.Hash)
 }
 func (d *dummyCheckpointManager) AddLog(header *types.Header,
-	log *ethgo.Log, dbTx DBTransaction) error {
+	log *ethgo.Log, dbTx *bolt.Tx) error {
 	return nil
 }
 
@@ -434,7 +435,7 @@ func (c *checkpointManager) GetLogFilters() map[types.Address][]types.Hash {
 
 // AddLog is the implementation of EventSubscriber interface,
 // used to handle a log defined in GetLogFilters, provided by event provider
-func (c *checkpointManager) AddLog(header *types.Header, log *ethgo.Log, dbTx DBTransaction) error {
+func (c *checkpointManager) AddLog(header *types.Header, log *ethgo.Log, dbTx *bolt.Tx) error {
 	exitEvent, doesMatch, err := parseExitEvent(header, log)
 	if err != nil {
 		return err

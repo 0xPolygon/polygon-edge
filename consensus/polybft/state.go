@@ -13,15 +13,6 @@ var (
 	edgeEventsLastProcessedBlockKey    = []byte("EdgeEventsLastProcessedBlockKey")
 )
 
-type DBTransaction interface {
-	Commit() error
-	Rollback() error
-	Bucket(bucket []byte) *bolt.Bucket
-	DeleteBucket(bucket []byte) error
-	CreateBucket(bucket []byte) (*bolt.Bucket, error)
-	CreateBucketIfNotExists(bucket []byte) (*bolt.Bucket, error)
-}
-
 // MessageSignature encapsulates sender identifier and its signature
 type MessageSignature struct {
 	// Signer of the vote
@@ -126,8 +117,8 @@ func (s *State) initStorages() error {
 }
 
 // insertLastProcessedEventsBlock inserts the last processed block for events on Edge
-func (s *State) insertLastProcessedEventsBlock(block uint64, dbTx DBTransaction) error {
-	insertFn := func(tx DBTransaction) error {
+func (s *State) insertLastProcessedEventsBlock(block uint64, dbTx *bolt.Tx) error {
+	insertFn := func(tx *bolt.Tx) error {
 		return tx.Bucket(edgeEventsLastProcessedBlockBucket).Put(
 			edgeEventsLastProcessedBlockKey, common.EncodeUint64ToBytes(block))
 	}
@@ -142,13 +133,13 @@ func (s *State) insertLastProcessedEventsBlock(block uint64, dbTx DBTransaction)
 }
 
 // getLastProcessedEventsBlock gets the last processed block for events on Edge
-func (s *State) getLastProcessedEventsBlock(dbTx DBTransaction) (uint64, error) {
+func (s *State) getLastProcessedEventsBlock(dbTx *bolt.Tx) (uint64, error) {
 	var (
 		lastProcessed uint64
 		err           error
 	)
 
-	getFn := func(tx DBTransaction) {
+	getFn := func(tx *bolt.Tx) {
 		value := tx.Bucket(edgeEventsLastProcessedBlockBucket).Get(edgeEventsLastProcessedBlockKey)
 		if value != nil {
 			lastProcessed = common.EncodeBytesToUint64(value)
@@ -170,7 +161,7 @@ func (s *State) getLastProcessedEventsBlock(dbTx DBTransaction) (uint64, error) 
 
 // beginDBTransaction creates and begins a transaction on BoltDB
 // Note that transaction needs to be manually rollback or committed
-func (s *State) beginDBTransaction(isWriteTx bool) (DBTransaction, error) {
+func (s *State) beginDBTransaction(isWriteTx bool) (*bolt.Tx, error) {
 	return s.db.Begin(isWriteTx)
 }
 

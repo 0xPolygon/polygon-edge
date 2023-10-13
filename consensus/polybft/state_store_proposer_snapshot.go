@@ -35,13 +35,13 @@ func (s *ProposerSnapshotStore) initialize(tx *bolt.Tx) error {
 }
 
 // getProposerSnapshot gets latest proposer snapshot
-func (s *ProposerSnapshotStore) getProposerSnapshot(dbTx DBTransaction) (*ProposerSnapshot, error) {
+func (s *ProposerSnapshotStore) getProposerSnapshot(dbTx *bolt.Tx) (*ProposerSnapshot, error) {
 	var (
 		snapshot *ProposerSnapshot
 		err      error
 	)
 
-	getFn := func(tx DBTransaction) error {
+	getFn := func(tx *bolt.Tx) error {
 		value := tx.Bucket(proposerSnapshotBucket).Get(proposerSnapshotKey)
 		if value == nil {
 			return nil
@@ -62,8 +62,8 @@ func (s *ProposerSnapshotStore) getProposerSnapshot(dbTx DBTransaction) (*Propos
 }
 
 // writeProposerSnapshot writes proposer snapshot
-func (s *ProposerSnapshotStore) writeProposerSnapshot(snapshot *ProposerSnapshot, dbTx DBTransaction) error {
-	insertFn := func(tx DBTransaction) error {
+func (s *ProposerSnapshotStore) writeProposerSnapshot(snapshot *ProposerSnapshot, dbTx *bolt.Tx) error {
+	insertFn := func(tx *bolt.Tx) error {
 		raw, err := json.Marshal(snapshot)
 		if err != nil {
 			return err

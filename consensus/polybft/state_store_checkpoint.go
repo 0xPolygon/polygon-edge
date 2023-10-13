@@ -73,8 +73,8 @@ func (s *CheckpointStore) initialize(tx *bolt.Tx) error {
 }
 
 // insertExitEventWithTx inserts an exit event to db
-func (s *CheckpointStore) insertExitEvent(exitEvent *ExitEvent, dbTx DBTransaction) error {
-	insertFn := func(tx DBTransaction) error {
+func (s *CheckpointStore) insertExitEvent(exitEvent *ExitEvent, dbTx *bolt.Tx) error {
+	insertFn := func(tx *bolt.Tx) error {
 		raw, err := json.Marshal(exitEvent)
 		if err != nil {
 			return err
@@ -179,13 +179,13 @@ func (s *CheckpointStore) getExitEvents(epoch uint64, filter func(exitEvent *Exi
 }
 
 // updateLastSaved saves the last block processed for exit events
-func (s *CheckpointStore) getLastSaved(dbTx DBTransaction) (uint64, error) {
+func (s *CheckpointStore) getLastSaved(dbTx *bolt.Tx) (uint64, error) {
 	var (
 		lastSavedBlock uint64
 		err            error
 	)
 
-	getFn := func(tx DBTransaction) error {
+	getFn := func(tx *bolt.Tx) error {
 		v := tx.Bucket(exitEventLastProcessedBlockBucket).Get(lastProcessedBlockKey)
 		if v == nil {
 			return errNoLastSavedEntry

@@ -17,6 +17,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
+	bolt "go.etcd.io/bbolt"
 
 	"github.com/0xPolygon/go-ibft/messages"
 	"github.com/0xPolygon/go-ibft/messages/proto"
@@ -239,7 +240,7 @@ func (c *consensusRuntime) initCheckpointManager(logger hcf.Logger) error {
 }
 
 // initStakeManager initializes stake manager
-func (c *consensusRuntime) initStakeManager(logger hcf.Logger, dbTx DBTransaction) error {
+func (c *consensusRuntime) initStakeManager(logger hcf.Logger, dbTx *bolt.Tx) error {
 	rootRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(c.config.PolyBFTConfig.Bridge.JSONRPCEndpoint))
 	if err != nil {
 		return err
@@ -496,7 +497,7 @@ func (c *consensusRuntime) FSM() error {
 
 // restartEpoch resets the previously run epoch and moves to the next one
 // returns *epochMetadata different from nil if the lastEpoch is not the current one and everything was successful
-func (c *consensusRuntime) restartEpoch(header *types.Header, dbTx DBTransaction) (*epochMetadata, error) {
+func (c *consensusRuntime) restartEpoch(header *types.Header, dbTx *bolt.Tx) (*epochMetadata, error) {
 	lastEpoch := c.epoch
 
 	systemState, err := c.getSystemState(header)

@@ -19,6 +19,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
+	bolt "go.etcd.io/bbolt"
 )
 
 var (
@@ -50,7 +51,7 @@ func (d *dummyStakeManager) UpdateValidatorSet(epoch uint64,
 func (d *dummyStakeManager) GetLogFilters() map[types.Address][]types.Hash {
 	return make(map[types.Address][]types.Hash)
 }
-func (d *dummyStakeManager) AddLog(header *types.Header, log *ethgo.Log, dbTx DBTransaction) error {
+func (d *dummyStakeManager) AddLog(header *types.Header, log *ethgo.Log, dbTx *bolt.Tx) error {
 	return nil
 }
 
@@ -79,7 +80,7 @@ func newStakeManager(
 	blockchain blockchainBackend,
 	polybftBackend polybftBackend,
 	maxValidatorSetSize int,
-	dbTx DBTransaction,
+	dbTx *bolt.Tx,
 ) (*stakeManager, error) {
 	sm := &stakeManager{
 		logger:                  logger,
@@ -123,7 +124,7 @@ func (s *stakeManager) PostBlock(req *PostBlockRequest) error {
 	return s.state.StakeStore.insertFullValidatorSet(fullValidatorSet, req.DBTx)
 }
 
-func (s *stakeManager) init(blockchain blockchainBackend, dbTx DBTransaction) error {
+func (s *stakeManager) init(blockchain blockchainBackend, dbTx *bolt.Tx) error {
 	currentHeader := blockchain.CurrentHeader()
 	currentBlockNumber := currentHeader.Number
 
@@ -180,7 +181,7 @@ func (s *stakeManager) init(blockchain blockchainBackend, dbTx DBTransaction) er
 	return s.state.StakeStore.insertFullValidatorSet(validatorSet, dbTx)
 }
 
-func (s *stakeManager) getOrInitValidatorSet(dbTx DBTransaction) (validatorSetState, error) {
+func (s *stakeManager) getOrInitValidatorSet(dbTx *bolt.Tx) (validatorSetState, error) {
 	validatorSet, err := s.state.StakeStore.getFullValidatorSet(dbTx)
 	if err != nil {
 		if !errors.Is(err, errNoFullValidatorSet) {
@@ -392,7 +393,7 @@ func (s *stakeManager) GetLogFilters() map[types.Address][]types.Hash {
 
 // AddLog is the implementation of EventSubscriber interface,
 // used to handle a log defined in GetLogFilters, provided by event provider
-func (s *stakeManager) AddLog(header *types.Header, log *ethgo.Log, dbTx DBTransaction) error {
+func (s *stakeManager) AddLog(header *types.Header, log *ethgo.Log, dbTx *bolt.Tx) error {
 	var transferEvent contractsapi.TransferEvent
 
 	doesMatch, err := transferEvent.ParseLog(log)
