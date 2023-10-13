@@ -27,6 +27,8 @@ type EventSubscriber interface {
 // - subscribers: A map[string]eventSubscriber that stores the subscribers of the event provider.
 // - allFilters: A map[types.Address]map[types.Hash][]string that stores the filters for event logs.
 type EventProvider struct {
+	receiptsGetter
+
 	subscriberIDCounter uint64
 
 	blockchain blockchainBackend
@@ -38,7 +40,9 @@ type EventProvider struct {
 // NewEventProvider returns a new instance of eventProvider
 func NewEventProvider(blockchain blockchainBackend) *EventProvider {
 	return &EventProvider{
-		blockchain:  blockchain,
+		receiptsGetter: receiptsGetter{
+			blockchain: blockchain,
+		},
 		subscribers: make(map[uint64]EventSubscriber, 0),
 		allFilters:  make(map[types.Address]map[types.Hash][]uint64, 0),
 	}
@@ -94,23 +98,11 @@ func (e *EventProvider) GetEventsFromBlocks(lastProcessedBlock uint64,
 // - nil - if getting events finished successfully
 // - error - if a block or its receipts could not be retrieved from blockchain
 func (e *EventProvider) getEventsFromBlocksRange(from, to uint64, dbTx *bolt.Tx) error {
-	for i := from; i <= to; i++ {
-		blockHeader, found := e.blockchain.GetHeaderByNumber(i)
-		if !found {
-			return blockchain.ErrNoBlock
-		}
-
-		receipts, err := e.blockchain.GetReceiptsByHash(blockHeader.Hash)
-		if err != nil {
-			return err
-		}
-
-		if err := e.getEventsFromReceipts(blockHeader, receipts, dbTx); err != nil {
-			return err
-		}
+	receiptsHandler := func(header *types.Header, receipts []*types.Receipt) error {
+		return e.getEventsFromReceipts(header, receipts, dbTx)
 	}
 
-	return nil
+	return e.receiptsGetter.getReceiptsFromBlocksRange(from, to, receiptsHandler)
 }
 
 // getEventsFromReceipts gets all desired logs (events) for each subscriber from given block receipts
@@ -156,9 +148,7 @@ func (e *EventProvider) getEventsFromReceipts(blockHeader *types.Header,
 // eventsGetter is a struct for getting missed and current events
 // of specified type from specified blocks
 type eventsGetter[T contractsapi.EventAbi] struct {
-	// blockchain is an abstraction of blockchain that provides necessary functions
-	// for querying blockchain data (blocks, receipts, etc.)
-	blockchain blockchainBackend
+	receiptsGetter
 	// parseEventFn is a plugin function used to parse the event from transaction log
 	parseEventFn func(*types.Header, *ethgo.Log) (T, bool, error)
 	// isValidLogFn is a plugin function that validates the log
@@ -189,23 +179,18 @@ func (e *eventsGetter[T]) getFromBlocks(lastProcessedBlock uint64,
 func (e *eventsGetter[T]) getEventsFromBlocksRange(from, to uint64) ([]T, error) {
 	var allEvents []T
 
-	for i := from; i <= to; i++ {
-		blockHeader, found := e.blockchain.GetHeaderByNumber(i)
-		if !found {
-			return nil, blockchain.ErrNoBlock
-		}
-
-		receipts, err := e.blockchain.GetReceiptsByHash(blockHeader.Hash)
+	receiptsHandler := func(header *types.Header, receipts []*types.Receipt) error {
+		events, err := e.getEventsFromReceipts(header, receipts)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
-		eventsFromBlock, err := e.getEventsFromReceipts(blockHeader, receipts)
-		if err != nil {
-			return nil, err
-		}
+		allEvents = append(allEvents, events...)
+		return nil
+	}
 
-		allEvents = append(allEvents, eventsFromBlock...)
+	if err := e.receiptsGetter.getReceiptsFromBlocksRange(from, to, receiptsHandler); err != nil {
+		return nil, err
 	}
 
 	return allEvents, nil
@@ -240,4 +225,31 @@ func (e *eventsGetter[T]) getEventsFromReceipts(blockHeader *types.Header,
 	}
 
 	return events, nil
+}
+
+type receiptsGetter struct {
+	// blockchain is an abstraction of blockchain that provides necessary functions
+	// for querying blockchain data (blocks, receipts, etc.)
+	blockchain blockchainBackend
+}
+
+func (r *receiptsGetter) getReceiptsFromBlocksRange(from, to uint64,
+	receiptsHandler func(*types.Header, []*types.Receipt) error) error {
+	for i := from; i <= to; i++ {
+		blockHeader, found := r.blockchain.GetHeaderByNumber(i)
+		if !found {
+			return blockchain.ErrNoBlock
+		}
+
+		receipts, err := r.blockchain.GetReceiptsByHash(blockHeader.Hash)
+		if err != nil {
+			return err
+		}
+
+		if err := receiptsHandler(blockHeader, receipts); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

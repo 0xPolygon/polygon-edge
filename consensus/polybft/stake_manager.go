@@ -152,7 +152,9 @@ func (s *stakeManager) init(blockchain blockchainBackend, dbTx *bolt.Tx) error {
 	// we will use eventsGetter to update the fullValidatorSet if
 	// for any reason, we don't have the correct state
 	eventsGetter := &eventsGetter[*contractsapi.TransferEvent]{
-		blockchain: blockchain,
+		receiptsGetter: receiptsGetter{
+			blockchain: blockchain,
+		},
 		isValidLogFn: func(l *types.Log) bool {
 			return l.Address == s.validatorSetContract
 		},
