@@ -46,8 +46,8 @@ case "$1" in
                   rm -f /data/genesis.json
 
                   createGenesisConfig "$2" "$secrets" \
-                    --ibft-validators-path /data \
-                    --ibft-validators-prefix-path data-
+                    --validators-path /data \
+                    --validators-prefix data-
               fi
               ;;
           "polybft")

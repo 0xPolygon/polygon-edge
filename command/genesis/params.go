@@ -74,32 +74,33 @@ var (
 )
 
 type genesisParams struct {
-	genesisPath         string
-	name                string
-	consensusRaw        string
-	validatorRootPath   string
-	validatorPrefixPath string
-	premine             []string
-	bootnodes           []string
-	ibftValidators      validators.Validators
-
-	ibftValidatorsRaw []string
+	genesisPath  string
+	name         string
+	consensusRaw string
+	premine      []string
+	bootnodes    []string
 
 	chainID   uint64
 	epochSize uint64
 
 	blockGasLimit uint64
-	isPos         bool
 
 	burnContract        string
 	baseFeeConfig       string
 	parsedBaseFeeConfig *baseFeeInfo
 
-	minNumValidators uint64
-	maxNumValidators uint64
+	// PoS
+	isPos                bool
+	minNumValidators     uint64
+	maxNumValidators     uint64
+	validatorsPath       string
+	validatorsPrefixPath string
+	validators           []string
 
+	// IBFT
 	rawIBFTValidatorType string
 	ibftValidatorType    validators.ValidatorType
+	ibftValidators       validators.Validators
 
 	extraData []byte
 	consensus server.ConsensusType
@@ -109,13 +110,10 @@ type genesisParams struct {
 	genesisConfig *chain.Chain
 
 	// PolyBFT
-	validatorsPath       string
-	validatorsPrefixPath string
-	validators           []string
-	sprintSize           uint64
-	blockTime            time.Duration
-	epochReward          uint64
-	blockTimeDrift       uint64
+	sprintSize     uint64
+	blockTime      time.Duration
+	epochReward    uint64
+	blockTimeDrift uint64
 
 	initialStateRoot string
 
@@ -223,11 +221,11 @@ func (p *genesisParams) isPolyBFTConsensus() bool {
 }
 
 func (p *genesisParams) areValidatorsSetManually() bool {
-	return len(p.ibftValidatorsRaw) != 0
+	return len(p.validators) != 0
 }
 
 func (p *genesisParams) areValidatorsSetByPrefix() bool {
-	return p.validatorPrefixPath != ""
+	return p.validatorsPrefixPath != ""
 }
 
 func (p *genesisParams) getRequiredFlags() []string {
@@ -263,11 +261,11 @@ func (p *genesisParams) initRawParams() error {
 
 // setValidatorSetFromCli sets validator set from cli command
 func (p *genesisParams) setValidatorSetFromCli() error {
-	if len(p.ibftValidatorsRaw) == 0 {
+	if len(p.validators) == 0 {
 		return nil
 	}
 
-	newValidators, err := validators.ParseValidators(p.ibftValidatorType, p.ibftValidatorsRaw)
+	newValidators, err := validators.ParseValidators(p.ibftValidatorType, p.validators)
 	if err != nil {
 		return err
 	}
@@ -286,8 +284,8 @@ func (p *genesisParams) setValidatorSetFromPrefixPath() error {
 	}
 
 	validators, err := command.GetValidatorsFromPrefixPath(
-		p.validatorRootPath,
-		p.validatorPrefixPath,
+		p.validatorsPath,
+		p.validatorsPrefixPath,
 		p.ibftValidatorType,
 	)
 

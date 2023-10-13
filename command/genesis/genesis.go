@@ -3,11 +3,12 @@ package genesis
 import (
 	"fmt"
 
+	"github.com/0xPolygon/polygon-edge/helper/common"
+
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/genesis/predeploy"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft"
-	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/validators"
 	"github.com/spf13/cobra"
 )
@@ -116,46 +117,6 @@ func setFlags(cmd *cobra.Command) {
 		"admin for proxy contracts",
 	)
 
-	// IBFT Validators
-	{
-		cmd.Flags().StringVar(
-			&params.rawIBFTValidatorType,
-			command.IBFTValidatorTypeFlag,
-			string(validators.BLSValidatorType),
-			"the type of validators in IBFT",
-		)
-
-		cmd.Flags().StringVar(
-			&params.validatorRootPath,
-			command.IBFTValidatorRootFlag,
-			".",
-			"root path for validator folder directory. "+
-				"Needs to be present if ibft-validator is omitted",
-		)
-
-		cmd.Flags().StringVar(
-			&params.validatorPrefixPath,
-			command.IBFTValidatorPrefixFlag,
-			"",
-			"prefix path for validator folder directory. "+
-				"Needs to be present if ibft-validator is omitted",
-		)
-
-		cmd.Flags().StringArrayVar(
-			&params.ibftValidatorsRaw,
-			command.IBFTValidatorFlag,
-			[]string{},
-			"addresses to be used as IBFT validators, can be used multiple times. "+
-				"Needs to be present if ibft-validators-prefix-path is omitted",
-		)
-
-		// --ibft-validator-prefix-path & --ibft-validator can't be given at same time
-		cmd.MarkFlagsMutuallyExclusive(command.IBFTValidatorPrefixFlag, command.IBFTValidatorFlag)
-
-		// --ibft-validator-path & --ibft-validator can't be given at same time
-		cmd.MarkFlagsMutuallyExclusive(command.IBFTValidatorRootFlag, command.IBFTValidatorFlag)
-	}
-
 	// PoS
 	{
 		cmd.Flags().BoolVar(
@@ -179,34 +140,44 @@ func setFlags(cmd *cobra.Command) {
 			common.MaxSafeJSInt,
 			"the maximum number of validators in the validator set for PoS",
 		)
-	}
 
-	// PolyBFT
-	{
 		cmd.Flags().StringVar(
 			&params.validatorsPath,
-			validatorsPathFlag,
-			"./",
-			"root path containing polybft validators secrets",
+			command.ValidatorRootFlag,
+			command.DefaultValidatorRoot,
+			"root path containing validators secrets",
 		)
 
 		cmd.Flags().StringVar(
 			&params.validatorsPrefixPath,
-			validatorsPrefixFlag,
-			defaultValidatorPrefixPath,
-			"folder prefix names for polybft validators secrets",
+			command.ValidatorPrefixFlag,
+			command.DefaultValidatorPrefix,
+			"folder prefix names for validators secrets",
 		)
 
 		cmd.Flags().StringArrayVar(
 			&params.validators,
-			validatorsFlag,
+			command.ValidatorFlag,
 			[]string{},
-			"validators defined by user (format: <P2P multi address>:<ECDSA address>:<public BLS key>)",
+			"validators defined by user (polybft format: <P2P multi address>:<ECDSA address>:<public BLS key>)",
 		)
 
-		cmd.MarkFlagsMutuallyExclusive(validatorsFlag, validatorsPathFlag)
-		cmd.MarkFlagsMutuallyExclusive(validatorsFlag, validatorsPrefixFlag)
+		cmd.MarkFlagsMutuallyExclusive(command.ValidatorFlag, command.ValidatorRootFlag)
+		cmd.MarkFlagsMutuallyExclusive(command.ValidatorFlag, command.ValidatorPrefixFlag)
+	}
 
+	// IBFT Validators
+	{
+		cmd.Flags().StringVar(
+			&params.rawIBFTValidatorType,
+			command.IBFTValidatorTypeFlag,
+			string(validators.BLSValidatorType),
+			"the type of validators in IBFT",
+		)
+	}
+
+	// PolyBFT
+	{
 		cmd.Flags().Uint64Var(
 			&params.sprintSize,
 			sprintSizeFlag,

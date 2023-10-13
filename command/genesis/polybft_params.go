@@ -25,12 +25,6 @@ import (
 )
 
 const (
-	validatorsFlag       = "validators"
-	validatorsPathFlag   = "validators-path"
-	validatorsPrefixFlag = "validators-prefix"
-
-	defaultValidatorPrefixPath = "test-chain-"
-
 	sprintSizeFlag = "sprint-size"
 	blockTimeFlag  = "block-time"
 	trieRootFlag   = "trieroot"

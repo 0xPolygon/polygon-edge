@@ -15,16 +15,23 @@ import (
 	"github.com/hashicorp/go-hclog"
 )
 
+// Flags shared across multiple spaces
 const (
 	ConsensusFlag  = "consensus"
 	NoDiscoverFlag = "no-discover"
 	BootnodeFlag   = "bootnode"
 	LogLevelFlag   = "log-level"
 
-	IBFTValidatorTypeFlag   = "ibft-validator-type"
-	IBFTValidatorFlag       = "ibft-validator"
-	IBFTValidatorRootFlag   = "ibft-validators-path"
-	IBFTValidatorPrefixFlag = "ibft-validators-prefix-path"
+	ValidatorFlag       = "validators"
+	ValidatorRootFlag   = "validators-path"
+	ValidatorPrefixFlag = "validators-prefix"
+
+	IBFTValidatorTypeFlag = "ibft-validator-type"
+)
+
+const (
+	DefaultValidatorRoot   = "./"
+	DefaultValidatorPrefix = "test-chain-"
 )
 
 var (
