@@ -298,18 +298,18 @@ func createTestStateSync(index int64) *contractsapi.StateSyncedEvent {
 	}
 }
 
-func TestState_StateSync_StateSyncRelayerStateData(t *testing.T) {
+func TestState_StateSync_StateSyncRelayerDataAndEvents(t *testing.T) {
 	t.Parallel()
 
 	state := newTestState(t)
 
-	// get before insert - should return initialized values
+	// get before update
 	ssrStateData, err := state.StateSyncStore.getStateSyncRelayerStateData()
 
 	require.NoError(t, err)
 	assert.Nil(t, ssrStateData)
 
-	// insert
+	// update
 	require.NoError(t, state.StateSyncStore.updateStateSyncRelayerStateData(
 		&StateSyncRelayerStateData{
 			LastBlockNumber: 100,
@@ -322,15 +322,62 @@ func TestState_StateSync_StateSyncRelayerStateData(t *testing.T) {
 		[]uint64{},
 	))
 
-	// get after insert
+	// get after update
 	ssrStateData, err = state.StateSyncStore.getStateSyncRelayerStateData()
 
 	require.NoError(t, err)
 	assert.Equal(t, uint64(100), ssrStateData.LastBlockNumber)
 
 	// get available events
-	event, err := state.StateSyncStore.getNextEvent()
+	events, err := state.StateSyncStore.getAllAvailableEvents(0)
 
 	require.NoError(t, err)
-	require.Equal(t, uint64(2), event.EventID)
+	require.Len(t, events, 3)
+	require.Equal(t, uint64(2), events[0].EventID)
+	require.Equal(t, uint64(4), events[1].EventID)
+	require.Equal(t, uint64(7), events[2].EventID)
+
+	// update again
+	require.NoError(t, state.StateSyncStore.updateStateSyncRelayerStateData(
+		&StateSyncRelayerStateData{
+			LastBlockNumber: 200,
+		},
+		[]*StateSyncRelayerEventData{
+			{EventID: 10},
+			{EventID: 12},
+			{EventID: 11},
+		},
+		[]uint64{4, 7},
+	))
+
+	// get after update
+	ssrStateData, err = state.StateSyncStore.getStateSyncRelayerStateData()
+
+	require.NoError(t, err)
+	assert.Equal(t, uint64(200), ssrStateData.LastBlockNumber)
+
+	// get available events
+	events, err = state.StateSyncStore.getAllAvailableEvents(1000)
+
+	require.NoError(t, err)
+	require.Len(t, events, 4)
+	require.Equal(t, uint64(2), events[0].EventID)
+	require.Equal(t, uint64(10), events[1].EventID)
+	require.Equal(t, false, events[1].SentStatus)
+	require.Equal(t, uint64(11), events[2].EventID)
+	require.Equal(t, uint64(12), events[3].EventID)
+
+	events[1].SentStatus = true
+	require.NoError(t, state.StateSyncStore.updateStateSyncRelayerEvent(events[1]))
+
+	require.NoError(t, state.StateSyncStore.removeStateSyncRelayerEvent(2))
+
+	// get available events with limit
+	events, err = state.StateSyncStore.getAllAvailableEvents(2)
+
+	require.NoError(t, err)
+	require.Len(t, events, 2)
+	require.Equal(t, uint64(10), events[0].EventID)
+	require.Equal(t, true, events[0].SentStatus)
+	require.Equal(t, uint64(11), events[1].EventID)
 }

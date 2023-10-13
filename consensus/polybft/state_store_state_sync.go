@@ -436,6 +436,14 @@ func (s *StateSyncStore) removeStateSyncRelayerEvent(eventID uint64) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
 		key := common.EncodeUint64ToBytes(eventID)
 
+		if err := tx.Bucket(stateSyncEventsBucket).Delete(key); err != nil {
+			return fmt.Errorf("failed to remove state sync event (ID=%d): %w", eventID, err)
+		}
+
+		if err := tx.Bucket(stateSyncProofsBucket).Delete(key); err != nil {
+			return fmt.Errorf("failed to remove state sync event proof (ID=%d): %w", eventID, err)
+		}
+
 		return tx.Bucket(stateSyncRelayerEventsBucket).Delete(key)
 	})
 }
@@ -455,17 +463,28 @@ func (s *StateSyncStore) updateStateSyncRelayerEvent(evnt *StateSyncRelayerEvent
 }
 
 // getAllAvailableEvents retrieves all StateSyncRelayerEventData that should be sent as a transactions
-func (s *StateSyncStore) getNextEvent() (event *StateSyncRelayerEventData, err error) {
+func (s *StateSyncStore) getAllAvailableEvents(limit int) (result []*StateSyncRelayerEventData, err error) {
 	if err = s.db.View(func(tx *bolt.Tx) error {
-		k, v := tx.Bucket(stateSyncRelayerEventsBucket).Cursor().First()
-		if k == nil {
-			return nil
+		cursor := tx.Bucket(stateSyncRelayerEventsBucket).Cursor()
+
+		for k, v := cursor.First(); k != nil; k, v = cursor.Next() {
+			var event *StateSyncRelayerEventData
+
+			if err := json.Unmarshal(v, &event); err != nil {
+				return err
+			}
+
+			result = append(result, event)
+
+			if limit > 0 && len(result) >= limit {
+				break
+			}
 		}
 
-		return json.Unmarshal(v, &event)
+		return nil
 	}); err != nil {
 		return nil, err
 	}
 
-	return event, nil
+	return result, nil
 }

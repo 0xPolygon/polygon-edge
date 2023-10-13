@@ -1,6 +1,7 @@
 package polybft
 
 import (
+	"errors"
 	"math/big"
 	"testing"
 	"time"
@@ -21,37 +22,53 @@ func TestStateSyncRelayer_PostBlock(t *testing.T) {
 	successStatus := types.ReceiptSuccess
 	block1Hash := types.StringToHash("x087887823ff23423")
 	stateSyncAddr := types.StringToAddress("0x56563")
-	commitment1Log := createTestLogForNewCommitmentEvent(t, stateSyncAddr, 1, 2, types.StringToHash("0x1"))
-	commitment2Log := createTestLogForNewCommitmentEvent(t, stateSyncAddr, 3, 3, types.StringToHash("0x2"))
-	commitment3Log := createTestLogForNewCommitmentEvent(t, stateSyncAddr, 4, 6, types.StringToHash("0x3"))
-	commitment4Log := createTestLogForNewCommitmentEvent(t, stateSyncAddr, 7, 7, types.StringToHash("0x4"))
-	receiptsBlock1 := []*types.Receipt{
+
+	result1Log := createTestLogForStateSyncResultEvent(t, 1)
+	result2Log := createTestLogForStateSyncResultEvent(t, 2)
+	result3Log := createTestLogForStateSyncResultEvent(t, 3)
+	result4Log := createTestLogForStateSyncResultEvent(t, 4)
+	commitment1Log := createTestLogForNewCommitmentEvent(t, stateSyncAddr, 2, 3, types.StringToHash("0x2"))
+	commitment2Log := createTestLogForNewCommitmentEvent(t, stateSyncAddr, 4, 4, types.StringToHash("0x3"))
+	receipts := [][]*types.Receipt{
 		{
-			Status: &successStatus,
-			Logs: []*types.Log{
-				{}, commitment1Log,
-			},
-		},
-	}
-	receiptsBlock2 := []*types.Receipt{
-		{
-			Status: &successStatus,
-			Logs: []*types.Log{
-				{}, commitment2Log,
+			{
+				Status: &successStatus,
+				Logs: []*types.Log{
+					{}, commitment1Log, result1Log,
+				},
 			},
 		},
 		{
-			Status: &successStatus,
-			Logs: []*types.Log{
-				commitment3Log,
+			{
+				Status: &successStatus,
+				Logs: []*types.Log{
+					{}, commitment2Log,
+				},
 			},
 		},
-	}
-	receiptsBlock3 := []*types.Receipt{
 		{
-			Status: &successStatus,
-			Logs: []*types.Log{
-				{}, commitment4Log,
+			{
+				Status: &successStatus,
+				Logs: []*types.Log{
+					result2Log,
+				},
+			},
+		},
+		{
+			{
+				Status: &successStatus,
+				Logs: []*types.Log{
+					result3Log,
+				},
+			},
+		},
+		{},
+		{
+			{
+				Status: &successStatus,
+				Logs: []*types.Log{
+					result4Log,
+				},
 			},
 		},
 	}
@@ -82,29 +99,26 @@ func TestStateSyncRelayer_PostBlock(t *testing.T) {
 		proofMock,
 		blockhainMock,
 		testKey,
+		&stateSyncRelayerConfig{
+			maxAttemptsToSend:        6,
+			maxBlocksToWaitForResend: 1,
+		},
 		hclog.Default(),
 	)
 
-	blockhainMock.On("CurrentHeader").Return(&types.Header{
-		Hash:   block1Hash,
-		Number: 1,
-	}).Maybe()
-	// post block 2, last state sync fails
-	blockhainMock.On("GetHeaderByNumber", uint64(1)).Return(&types.Header{
-		Hash: block1Hash,
-	}).Twice()
-	blockhainMock.On("GetReceiptsByHash", block1Hash).Return(receiptsBlock1, nil).Twice()
-	// fail on stateSyncID == 6 -> last one in first try
-	dummyTxRelayer.On("SendTransaction", mock.Anything, testKey).Return(
-		&ethgo.Receipt{Status: uint64(types.ReceiptSuccess)}, nil).Times(5)
-	dummyTxRelayer.On("SendTransaction", mock.Anything, testKey).Return(
-		&ethgo.Receipt{
-			Status: uint64(types.ReceiptFailed),
-		}, nil).Once()
+	blockhainMock.On("CurrentHeader").Return(&types.Header{Number: 2}).Once()
+	blockhainMock.On("CurrentHeader").Return(&types.Header{Number: 3}).Once()
+	blockhainMock.On("CurrentHeader").Return(&types.Header{Number: 4}).Once()
+	blockhainMock.On("CurrentHeader").Return(&types.Header{Number: 6}).Once()
+	blockhainMock.On("GetReceiptsByHash", block1Hash).Return(receipts[0], nil).Twice()
+	blockhainMock.On("GetHeaderByNumber", uint64(1)).Return(&types.Header{Hash: block1Hash}).Twice()
+	dummyTxRelayer.On("SendTransaction", mock.Anything, testKey).Return((*ethgo.Receipt)(nil), nil).Times(2)
+	dummyTxRelayer.On("SendTransaction", mock.Anything, testKey).Return((*ethgo.Receipt)(nil), errors.New("e")).Once()
+	dummyTxRelayer.On("SendTransaction", mock.Anything, testKey).Return((*ethgo.Receipt)(nil), nil).Once()
 
 	require.NoError(t, stateSyncRelayer.Init())
 
-	// post first block
+	// post first block (number 2)
 	require.NoError(t, stateSyncRelayer.PostBlock(&PostBlockRequest{
 		FullBlock: &types.FullBlock{
 			Block: &types.Block{
@@ -112,52 +126,68 @@ func TestStateSyncRelayer_PostBlock(t *testing.T) {
 					Number: 2,
 				},
 			},
-			Receipts: receiptsBlock2,
+			Receipts: receipts[1],
 		},
 	}))
 
 	time.Sleep(time.Second * 2) // wait for some time
 
-	// we need to be sure that 5 events are processed and last one failed
+	// check if everything is correct, 3 events should be in database, first one should be marked as sent
 	ssrStateData, err := state.StateSyncStore.getStateSyncRelayerStateData()
 
-	blockhainMock.AssertExpectations(t)
 	require.NoError(t, err)
 	require.Equal(t, uint64(2), ssrStateData.LastBlockNumber)
 
-	time.Sleep(time.Second * 2) // wait for some time
+	events, err := state.StateSyncStore.getAllAvailableEvents(0)
 
-	// post block 3, all the events should be processed and everything should pass
-	dummyTxRelayer.On("SendTransaction", mock.Anything, testKey).Return(
-		&ethgo.Receipt{Status: uint64(types.ReceiptSuccess)}, nil).Times(2)
+	require.NoError(t, err)
+	require.Len(t, events, 3)
+	require.True(t, events[0].SentStatus)
+	require.False(t, events[1].SentStatus)
+	require.False(t, events[2].SentStatus)
 
-	// post another block
-	require.NoError(t, stateSyncRelayer.PostBlock(&PostBlockRequest{
-		FullBlock: &types.FullBlock{
-			Block: &types.Block{
-				Header: &types.Header{
-					Number: 3,
+	for bn := uint64(3); bn <= uint64(6); bn++ {
+		t.Logf("processing block %d", bn)
+
+		// post second block
+		require.NoError(t, stateSyncRelayer.PostBlock(&PostBlockRequest{
+			FullBlock: &types.FullBlock{
+				Block: &types.Block{
+					Header: &types.Header{
+						Number: bn,
+					},
 				},
+				Receipts: receipts[bn-1],
 			},
-			Receipts: receiptsBlock3,
-		},
-	}))
+		}))
+		time.Sleep(time.Second * 2) // wait for some time
+
+		// check if everything is correct, 3 events should be in database, first one should be marked as sent
+		ssrStateData, err := state.StateSyncStore.getStateSyncRelayerStateData()
+
+		require.NoError(t, err)
+		require.Equal(t, bn, ssrStateData.LastBlockNumber)
+
+		events, err := state.StateSyncStore.getAllAvailableEvents(0)
+
+		require.NoError(t, err)
+
+		if bn < 5 { // on block 5 sending fails
+			require.Len(t, events, 5-int(bn))
+		} else {
+			require.Len(t, events, 6-int(bn))
+		}
+
+		for i, e := range events {
+			require.Equal(t, i == 0, e.SentStatus)
+		}
+	}
 
 	stateSyncRelayer.Close()
-
-	time.Sleep(time.Second * 2) // wait for some time
-
-	// we need to be sure that 5 events are processed and last one failed
-	ssrStateData, err = state.StateSyncStore.getStateSyncRelayerStateData()
+	time.Sleep(time.Second)
 
 	blockhainMock.AssertExpectations(t)
-	require.NoError(t, err)
-	require.Equal(t, uint64(3), ssrStateData.LastBlockNumber)
-
-	event, err := state.StateSyncStore.getNextEvent()
-
-	require.NoError(t, err)
-	require.Nil(t, event)
+	dummyTxRelayer.AssertExpectations(t)
 }
 
 type mockStateSyncProofRetriever struct {

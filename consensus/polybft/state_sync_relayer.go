@@ -16,10 +16,11 @@ import (
 )
 
 const (
-	// maxBlocksToWaitForResend specifies how many blocks should be wait in order to try again to send transaction
-	maxBlocksToWaitForResend = uint64(30)
-	// maxAttemptsToSend specifies how many sending retries for one transaction
-	maxAttemptsToSend = 6
+	// defaultMaxBlocksToWaitForResend specifies how many blocks should be wait
+	// in order to try again to send transaction
+	defaultMaxBlocksToWaitForResend = uint64(30)
+	// defaultMaxAttemptsToSend specifies how many sending retries for one transaction
+	defaultMaxAttemptsToSend = 6
 )
 
 var (
@@ -57,11 +58,19 @@ type StateSyncRelayerStateData struct {
 
 // StateSyncRelayerEventData keeps information about an event
 type StateSyncRelayerEventData struct {
-	EventID    uint64 `json:"eventID"`
-	CountTries uint64 `json:"countTries"`
-	// block when state sync is sent
-	BlockNumber uint64 `json:"blockNumber"`
+	EventID     uint64 `json:"eventID"`
+	CountTries  uint64 `json:"countTries"`
+	BlockNumber uint64 `json:"blockNumber"` // block when state sync is sent
 	SentStatus  bool   `json:"sentStatus"`
+}
+
+func (ed StateSyncRelayerEventData) String() string {
+	return fmt.Sprintf("%d", ed.EventID)
+}
+
+type stateSyncRelayerConfig struct {
+	maxBlocksToWaitForResend uint64
+	maxAttemptsToSend        uint64
 }
 
 type stateSyncRelayerImpl struct {
@@ -74,6 +83,8 @@ type stateSyncRelayerImpl struct {
 
 	notifyCh chan struct{}
 	closeCh  chan struct{}
+
+	config *stateSyncRelayerConfig
 
 	// eventsGetter gets contractsapi.NewCommitmentEvent from blocks
 	eventsGetter *eventsGetter[*contractsapi.NewCommitmentEvent]
@@ -88,8 +99,16 @@ func NewStateSyncRelayer(
 	store stateSyncProofRetriever,
 	blockchain blockchainBackend,
 	key ethgo.Key,
+	config *stateSyncRelayerConfig,
 	logger hclog.Logger,
 ) StateSyncRelayer {
+	if config == nil {
+		config = &stateSyncRelayerConfig{
+			maxBlocksToWaitForResend: defaultMaxBlocksToWaitForResend,
+			maxAttemptsToSend:        defaultMaxAttemptsToSend,
+		}
+	}
+
 	return &stateSyncRelayerImpl{
 		txRelayer:  txRelayer,
 		key:        key,
@@ -123,6 +142,7 @@ func NewStateSyncRelayer(
 				return &stateSyncResultEvent, matches, err
 			},
 		},
+		config: config,
 		logger: logger,
 	}
 }
@@ -135,11 +155,7 @@ func (ssr *stateSyncRelayerImpl) Init() error {
 			case <-ssr.closeCh:
 				return
 			case <-ssr.notifyCh:
-				if ed, err := ssr.processEvent(); err != nil {
-					ssr.logger.Error("failed to process event", "event", ed.EventID, "err", err)
-				} else if ed != nil {
-					ssr.logger.Info("event has been successfully sent", "event", ed.EventID)
-				}
+				ssr.processEvents()
 			}
 		}
 	}()
@@ -154,7 +170,7 @@ func (ssr *stateSyncRelayerImpl) Close() {
 func (ssr *stateSyncRelayerImpl) PostBlock(req *PostBlockRequest) error {
 	state, err := ssr.state.StateSyncStore.getStateSyncRelayerStateData()
 	if err != nil {
-		return fmt.Errorf("state sync relayer get state failed: %w", err)
+		return fmt.Errorf("failed to get state sync relayer data: %w", err)
 	}
 
 	// create default state data if this is the first time
@@ -167,36 +183,45 @@ func (ssr *stateSyncRelayerImpl) PostBlock(req *PostBlockRequest) error {
 		return fmt.Errorf("failed to retrieve processed state sync result events from block: %w", err)
 	}
 
-	processedStateSyncEventIDs := make([]uint64, 0, len(resultEvents))
-	failedStateSyncEventIDs := make([]uint64, 0, len(resultEvents))
+	events, err := ssr.eventsGetter.getFromBlocks(state.LastBlockNumber, req.FullBlock)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve events from block: %w", err)
+	}
+
+	newEvents := make([]*StateSyncRelayerEventData, 0)
+	processedEventIDs := make([]uint64, 0, len(resultEvents))
+	failedEventIDs := make([]uint64, 0, len(resultEvents))
 	failedReasons := make([]string, 0, len(resultEvents))
 
+	// process new events
+	for _, event := range events {
+		for i := event.StartID.Uint64(); i <= event.EndID.Uint64(); i++ {
+			newEvents = append(newEvents, &StateSyncRelayerEventData{EventID: i})
+		}
+	}
+
+	// process results
 	for _, event := range resultEvents {
 		if event.Status {
-			processedStateSyncEventIDs = append(processedStateSyncEventIDs, event.Counter.Uint64())
+			processedEventIDs = append(processedEventIDs, event.Counter.Uint64())
 		} else {
-			failedStateSyncEventIDs = append(failedStateSyncEventIDs, event.Counter.Uint64())
+			// maybe add failed events as new ones (that would overwrite in db)
+			// newEvents = append(newEvents, &StateSyncRelayerEventData{EventID: event.Counter.Uint64()})
+			failedEventIDs = append(failedEventIDs, event.Counter.Uint64())
 			failedReasons = append(failedReasons, string(event.Message))
 		}
 	}
 
-	events, err := ssr.eventsGetter.getFromBlocks(state.LastBlockNumber, req.FullBlock)
-	if err != nil {
-		return fmt.Errorf("state sync relayer: %w", err)
-	}
-
 	state.LastBlockNumber = req.FullBlock.Block.Number()
 
-	if err = ssr.state.StateSyncStore.updateStateSyncRelayerStateData(
-		state,
-		getConvertedEvents(events), processedStateSyncEventIDs); err != nil {
+	err = ssr.state.StateSyncStore.updateStateSyncRelayerStateData(state, newEvents, processedEventIDs)
+	if err != nil {
 		return fmt.Errorf("state sync relayer insert state failed: %w", err)
 	}
 
-	// maybe change state of failed events to Sent=false
 	ssr.logger.Info("state sync relayer updated state", "block", state.LastBlockNumber,
-		"processed", processedStateSyncEventIDs,
-		"failed", failedStateSyncEventIDs, "reasons", failedReasons)
+		"new", newEvents, "processed", processedEventIDs,
+		"failed", failedEventIDs, "reasons", failedReasons)
 
 	select {
 	case ssr.notifyCh <- struct{}{}:
@@ -206,45 +231,63 @@ func (ssr *stateSyncRelayerImpl) PostBlock(req *PostBlockRequest) error {
 	return nil
 }
 
-func (ssr *stateSyncRelayerImpl) processEvent() (*StateSyncRelayerEventData, error) {
-	eventData, err := ssr.state.StateSyncStore.getNextEvent()
+func (ssr *stateSyncRelayerImpl) processEvents() {
+	// we need two events because the first one is possible tried maxAttemptsToSend times
+	events, err := ssr.state.StateSyncStore.getAllAvailableEvents(2)
 	if err != nil {
-		return eventData, err
-	} else if eventData == nil {
-		return nil, nil // nothing to process right now
-	} else if eventData.SentStatus &&
-		eventData.BlockNumber+maxBlocksToWaitForResend > ssr.blockchain.CurrentHeader().Number {
-		return nil, nil // nothing to process right now, still waiting for confirmation
-	} else if eventData.CountTries+1 > maxAttemptsToSend {
-		_ = ssr.state.StateSyncStore.removeStateSyncRelayerEvent(eventData.EventID)
+		ssr.logger.Error("retrieving events failed", "err", err)
 
-		ssr.logger.Info("failed to send event too many times", "eventID", eventData.EventID)
-
-		return ssr.processEvent() // process next
+		return
 	}
 
-	ssr.logger.Info("state sync relayer processing event", "eventID", eventData.EventID)
-
-	txn, err := ssr.createTx(eventData.EventID)
-	if err != nil {
-		_ = ssr.state.StateSyncStore.updateStateSyncRelayerEvent(eventData)
-
-		return eventData, fmt.Errorf("failed to create tx: %w", err)
+	if len(events) == 0 {
+		return // nothing to process
 	}
 
+	currentBlockNumber := ssr.blockchain.CurrentHeader().Number
+	eventData := events[0]
+	// return if we are still waiting for confirmation for the event
+	if eventData.SentStatus && eventData.BlockNumber+ssr.config.maxBlocksToWaitForResend > currentBlockNumber {
+		return
+	}
+
+	// if current event is processed to many times, remove it and try the next one
+	if eventData.CountTries+1 > ssr.config.maxAttemptsToSend {
+		err = ssr.state.StateSyncStore.removeStateSyncRelayerEvent(eventData.EventID)
+
+		ssr.logger.Info("failed to send event too many times", "eventID", eventData.EventID, "err", err)
+		// return if there is no next
+		if len(events) == 1 {
+			return
+		}
+
+		eventData = events[1] // next one to process
+	}
+
+	if err := ssr.sendEventTx(eventData, currentBlockNumber); err != nil {
+		ssr.logger.Error("failed to send tx event", "event", eventData.EventID, "err", err)
+	} else {
+		ssr.logger.Info("event tx has been successfully sent", "event", eventData.EventID)
+	}
+}
+
+func (ssr *stateSyncRelayerImpl) sendEventTx(eventData *StateSyncRelayerEventData, blockNumber uint64) error {
 	eventData.CountTries++
-	eventData.BlockNumber = ssr.blockchain.CurrentHeader().Number
+	eventData.BlockNumber = blockNumber
 	eventData.SentStatus = true
 
 	if err := ssr.state.StateSyncStore.updateStateSyncRelayerEvent(eventData); err != nil {
-		return eventData, fmt.Errorf("failed to move to sent: %w", err)
+		return fmt.Errorf("failed to update event: %w", err)
 	}
 
-	ssr.logger.Info("state sync relayer sending event", "eventID", eventData.EventID)
+	txn, err := ssr.createTx(eventData.EventID)
+	if err != nil {
+		return fmt.Errorf("failed to create tx: %w", err)
+	}
 
 	_, err = ssr.txRelayer.SendTransaction(txn, ssr.key)
 
-	return eventData, err
+	return err
 }
 
 func (ssr *stateSyncRelayerImpl) createTx(eventID uint64) (*ethgo.Transaction, error) {
@@ -298,14 +341,4 @@ func getStateSyncTxRelayer(rpcEndpoint string, logger hclog.Logger) (txrelayer.T
 	return txrelayer.NewTxRelayer(
 		txrelayer.WithIPAddress(rpcEndpoint), txrelayer.WithNumRetries(-1),
 		txrelayer.WithWriter(logger.StandardWriter(&hclog.StandardLoggerOptions{})))
-}
-
-func getConvertedEvents(events []*contractsapi.NewCommitmentEvent) (newEvents []*StateSyncRelayerEventData) {
-	for _, event := range events {
-		for i := event.StartID.Uint64(); i <= event.EndID.Uint64(); i++ {
-			newEvents = append(newEvents, &StateSyncRelayerEventData{EventID: i})
-		}
-	}
-
-	return newEvents
 }

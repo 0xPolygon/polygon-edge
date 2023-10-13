@@ -265,6 +265,7 @@ func (c *consensusRuntime) initStateSyncRelayer(logger hcf.Logger) error {
 			c,
 			c.config.blockchain,
 			wallet.NewEcdsaSigner(c.config.Key),
+			nil,
 			logger.Named("state_sync_relayer"))
 	} else {
 		c.stateSyncRelayer = &dummyStakeSyncRelayer{}
