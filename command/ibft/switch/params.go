@@ -49,6 +49,7 @@ type switchParams struct {
 	ibftValidatorType    validators.ValidatorType
 
 	// PoA
+	ibftValidatorRootPath   string
 	ibftValidatorPrefixPath string
 	ibftValidatorsRaw       []string
 	ibftValidators          validators.Validators
@@ -178,6 +179,7 @@ func (p *switchParams) setValidatorSetFromPrefixPath() error {
 	}
 
 	validators, err := command.GetValidatorsFromPrefixPath(
+		p.ibftValidatorRootPath,
 		p.ibftValidatorPrefixPath,
 		p.ibftValidatorType,
 	)

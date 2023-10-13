@@ -46,7 +46,8 @@ case "$1" in
                   rm -f /data/genesis.json
 
                   createGenesisConfig "$2" "$secrets" \
-                  --ibft-validators-prefix-path data-
+                    --ibft-validators-path /data \
+                    --ibft-validators-prefix-path data-
               fi
               ;;
           "polybft")
@@ -58,12 +59,12 @@ case "$1" in
 
               proxyContractsAdmin=0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed
 
-            createGenesisConfig "$2" "$secrets" \
-              --validators-path /data \
-              --validators-prefix data- \
-              --reward-wallet 0xDEADBEEF:1000000 \
-              --native-token-config "Polygon:MATIC:18:true:$(echo "$secrets" | jq -r '.[0] | .address')" \
-              --proxy-contracts-admin ${proxyContractsAdmin}
+              createGenesisConfig "$2" "$secrets" \
+                --validators-path /data \
+                --validators-prefix data- \
+                --reward-wallet 0xDEADBEEF:1000000 \
+                --native-token-config "Polygon:MATIC:18:true:$(echo "$secrets" | jq -r '.[0] | .address')" \
+                --proxy-contracts-admin ${proxyContractsAdmin}
 
               echo "Deploying stake manager..."
               "$POLYGON_EDGE_BIN" polybft stake-manager-deploy \

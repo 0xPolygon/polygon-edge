@@ -66,6 +66,14 @@ func setFlags(cmd *cobra.Command) {
 	{
 		// PoA Configuration
 		cmd.Flags().StringVar(
+			&params.ibftValidatorRootPath,
+			command.IBFTValidatorRootFlag,
+			".",
+			"root path for validator folder directory. "+
+				"Needs to be present if ibft-validator is omitted",
+		)
+
+		cmd.Flags().StringVar(
 			&params.ibftValidatorPrefixPath,
 			command.IBFTValidatorPrefixFlag,
 			"",
@@ -82,6 +90,7 @@ func setFlags(cmd *cobra.Command) {
 		)
 
 		cmd.MarkFlagsMutuallyExclusive(command.IBFTValidatorPrefixFlag, command.IBFTValidatorFlag)
+		cmd.MarkFlagsMutuallyExclusive(command.IBFTValidatorRootFlag, command.IBFTValidatorFlag)
 	}
 
 	{

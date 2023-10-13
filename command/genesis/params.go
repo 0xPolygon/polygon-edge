@@ -77,6 +77,7 @@ type genesisParams struct {
 	genesisPath         string
 	name                string
 	consensusRaw        string
+	validatorRootPath   string
 	validatorPrefixPath string
 	premine             []string
 	bootnodes           []string
@@ -285,6 +286,7 @@ func (p *genesisParams) setValidatorSetFromPrefixPath() error {
 	}
 
 	validators, err := command.GetValidatorsFromPrefixPath(
+		p.validatorRootPath,
 		p.validatorPrefixPath,
 		p.ibftValidatorType,
 	)

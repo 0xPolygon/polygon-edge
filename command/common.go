@@ -3,6 +3,7 @@ package command
 import (
 	"errors"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/0xPolygon/polygon-edge/crypto"
@@ -22,6 +23,7 @@ const (
 
 	IBFTValidatorTypeFlag   = "ibft-validator-type"
 	IBFTValidatorFlag       = "ibft-validator"
+	IBFTValidatorRootFlag   = "ibft-validators-path"
 	IBFTValidatorPrefixFlag = "ibft-validators-prefix-path"
 )
 
@@ -56,10 +58,16 @@ func ValidateMinMaxValidatorsNumber(minValidatorCount uint64, maxValidatorCount 
 // GetValidatorsFromPrefixPath extracts the addresses of the validators based on the directory
 // prefix. It scans the directories for validator private keys and compiles a list of addresses
 func GetValidatorsFromPrefixPath(
+	root string,
 	prefix string,
 	validatorType validators.ValidatorType,
 ) (validators.Validators, error) {
-	files, err := os.ReadDir(".")
+	files, err := os.ReadDir(root)
+	if err != nil {
+		return nil, err
+	}
+
+	fullRootPath, err := filepath.Abs(root)
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +86,7 @@ func GetValidatorsFromPrefixPath(
 			&secrets.SecretsManagerParams{
 				Logger: hclog.NewNullLogger(),
 				Extra: map[string]interface{}{
-					secrets.Path: path,
+					secrets.Path: filepath.Join(fullRootPath, path),
 				},
 			},
 		)
