@@ -163,7 +163,7 @@ func (s *stakeManager) init(blockchain blockchainBackend, dbTx DBTransaction) er
 		},
 	}
 
-	transferEvents, err := eventsGetter.getEventsFromBlocks(validatorSet.BlockNumber+1, currentBlockNumber)
+	transferEvents, err := eventsGetter.getEventsFromBlocksRange(validatorSet.BlockNumber+1, currentBlockNumber)
 	if err != nil {
 		return err
 	}
@@ -375,8 +375,6 @@ func (s *stakeManager) getBlsKey(address types.Address) (*bls.PublicKey, error) 
 
 	return pubKey, nil
 }
-
-// EventSubscriber implementation
 
 // EventSubscriber implementation
 

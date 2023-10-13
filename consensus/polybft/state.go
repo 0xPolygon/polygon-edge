@@ -94,7 +94,6 @@ func (s *State) initStorages() error {
 		if err := s.ProposerSnapshotStore.initialize(tx); err != nil {
 			return err
 		}
-
 		if err := s.StakeStore.initialize(tx); err != nil {
 			return err
 		}

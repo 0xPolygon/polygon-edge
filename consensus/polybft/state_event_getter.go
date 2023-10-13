@@ -1,8 +1,6 @@
 package polybft
 
 import (
-	"sync"
-
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -11,7 +9,12 @@ import (
 
 // EventSubscriber specifies functions needed for a component to subscribe to eventProvider
 type EventSubscriber interface {
+	// GetLogFilters returns a map of log filters for getting desired events,
+	// where the key is the address of contract that emits desired events,
+	// and the value is a slice of signatures of events we want to get.
 	GetLogFilters() map[types.Address][]types.Hash
+
+	// AddLog is used to handle a log defined in GetLogFilters, provided by event provider
 	AddLog(header *types.Header, log *ethgo.Log, dbTx DBTransaction) error
 }
 
@@ -23,7 +26,6 @@ type EventSubscriber interface {
 // - subscribers: A map[string]eventSubscriber that stores the subscribers of the event provider.
 // - allFilters: A map[types.Address]map[types.Hash][]string that stores the filters for event logs.
 type EventProvider struct {
-	lock                sync.Mutex
 	subscriberIDCounter uint64
 
 	blockchain blockchainBackend
@@ -43,11 +45,9 @@ func NewEventProvider(blockchain blockchainBackend) *EventProvider {
 
 // Subscribe subscribes given EventSubscriber to desired logs (events)
 func (e *EventProvider) Subscribe(subscriber EventSubscriber) {
-	e.lock.Lock()
 	e.subscriberIDCounter++
 	subscriberID := e.subscriberIDCounter
-	e.subscribers[e.subscriberIDCounter] = subscriber
-	e.lock.Unlock()
+	e.subscribers[subscriberID] = subscriber
 
 	for address, filters := range subscriber.GetLogFilters() {
 		existingAddressFilters, exist := e.allFilters[address]
@@ -67,6 +67,7 @@ func (e *EventProvider) Subscribe(subscriber EventSubscriber) {
 // Inputs:
 // - lastProcessedBlock - last finalized block that was processed for desired events
 // - latestBlock - latest finalized block
+// - dbTx - database transaction under which events are gathered
 //
 // Returns:
 // - nil - if getting events finished successfully
@@ -74,23 +75,24 @@ func (e *EventProvider) Subscribe(subscriber EventSubscriber) {
 func (e *EventProvider) GetEventsFromBlocks(lastProcessedBlock uint64,
 	latestBlock *types.FullBlock,
 	dbTx DBTransaction) error {
-	if err := e.getEventsFromBlocks(lastProcessedBlock+1, latestBlock.Block.Number()-1, dbTx); err != nil {
+	if err := e.getEventsFromBlocksRange(lastProcessedBlock+1, latestBlock.Block.Number()-1, dbTx); err != nil {
 		return err
 	}
 
 	return e.getEventsFromReceipts(latestBlock.Block.Header, latestBlock.Receipts, dbTx)
 }
 
-// getEventsFromBlocks gets all desired logs (events) for each subscriber in given block range
+// getEventsFromBlocksRange gets all desired logs (events) for each subscriber in given block range
 //
 // Inputs:
 // - from - block from which log (event) retrieval should start
 // - to - last block from which log (event) retrieval should be done
+// - dbTx - database transaction under which events are gathered
 //
 // Returns:
 // - nil - if getting events finished successfully
 // - error - if a block or its receipts could not be retrieved from blockchain
-func (e *EventProvider) getEventsFromBlocks(from, to uint64, dbTx DBTransaction) error {
+func (e *EventProvider) getEventsFromBlocksRange(from, to uint64, dbTx DBTransaction) error {
 	for i := from; i <= to; i++ {
 		blockHeader, found := e.blockchain.GetHeaderByNumber(i)
 		if !found {
@@ -115,6 +117,7 @@ func (e *EventProvider) getEventsFromBlocks(from, to uint64, dbTx DBTransaction)
 // Inputs:
 // - blockHeader - header of block from whose receipts the function will retrieve logs (events)
 // - receipts - given block receipts from which the function will retrieve logs (events)
+// - dbTx - database transaction under which events are gathered
 //
 // Returns:
 // - nil - if getting events finished successfully
@@ -166,7 +169,7 @@ type eventsGetter[T contractsapi.EventAbi] struct {
 // and saves them using the provided saveEventsFn
 func (e *eventsGetter[T]) getFromBlocks(lastProcessedBlock uint64,
 	currentBlock *types.FullBlock) ([]T, error) {
-	allEvents, err := e.getEventsFromBlocks(lastProcessedBlock+1, currentBlock.Block.Number()-1)
+	allEvents, err := e.getEventsFromBlocksRange(lastProcessedBlock+1, currentBlock.Block.Number()-1)
 	if err != nil {
 		return nil, err
 	}
@@ -181,8 +184,8 @@ func (e *eventsGetter[T]) getFromBlocks(lastProcessedBlock uint64,
 	return allEvents, nil
 }
 
-// getEventsFromBlocks gets events of specified type from all the blocks specified [from, to]
-func (e *eventsGetter[T]) getEventsFromBlocks(from, to uint64) ([]T, error) {
+// getEventsFromBlocksRange gets events of specified type from all the blocks specified [from, to]
+func (e *eventsGetter[T]) getEventsFromBlocksRange(from, to uint64) ([]T, error) {
 	var allEvents []T
 
 	for i := from; i <= to; i++ {
