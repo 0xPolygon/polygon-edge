@@ -244,13 +244,13 @@ func (t *TestServer) SecretsInit() (*InitIBFTResult, error) {
 
 	if t.Config.ValidatorType == validators.BLSValidatorType {
 		// Generate the BLS Key
-		_, bksKeyEncoded, keyErr := crypto.GenerateAndEncodeBLSSecretKey()
+		_, blsKeyEncoded, keyErr := crypto.GenerateAndEncodeBLSSecretKey()
 		if keyErr != nil {
 			return nil, keyErr
 		}
 
 		// Write the networking private key to the secrets manager storage
-		if setErr := localSecretsManager.SetSecret(secrets.ValidatorBLSKey, bksKeyEncoded); setErr != nil {
+		if setErr := localSecretsManager.SetSecret(secrets.ValidatorBLSKey, blsKeyEncoded); setErr != nil {
 			return nil, setErr
 		}
 	}
