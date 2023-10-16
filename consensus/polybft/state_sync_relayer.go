@@ -24,7 +24,8 @@ const (
 )
 
 var (
-	errFailedToExecuteStateSync = errors.New("failed to execute state sync")
+	errFailedToExecuteStateSync    = errors.New("failed to execute state sync")
+	errUnkownStateSyncRelayerEvent = errors.New("unknown event")
 )
 
 // StateSyncRelayer is an interface that defines functions for state sync relayer
@@ -86,10 +87,8 @@ type stateSyncRelayerImpl struct {
 
 	config *stateSyncRelayerConfig
 
-	// eventsGetter gets contractsapi.NewCommitmentEvent from blocks
-	eventsGetter *eventsGetter[*contractsapi.NewCommitmentEvent]
-	// eventsGetter gets StateSyncResult events (missed or current) from blocks
-	eventsGetterResults *eventsGetter[*contractsapi.StateSyncResultEvent]
+	// eventsGetter gets contractsapi.NewCommitmentEvent and contractsapi.StateSyncResultEvent from blocks
+	eventsGetter *eventsGetter[contractsapi.EventAbi]
 }
 
 func NewStateSyncRelayer(
@@ -117,29 +116,29 @@ func NewStateSyncRelayer(
 		closeCh:    make(chan struct{}),
 		notifyCh:   make(chan struct{}, 1),
 		blockchain: blockchain,
-		eventsGetter: &eventsGetter[*contractsapi.NewCommitmentEvent]{
+		eventsGetter: &eventsGetter[contractsapi.EventAbi]{
 			blockchain: blockchain,
 			isValidLogFn: func(l *types.Log) bool {
-				return l.Address == stateReceiverAddr
+				return l.Address == stateReceiverAddr || l.Address == contracts.StateReceiverContract
 			},
-			parseEventFn: func(_ *types.Header, log *ethgo.Log) (*contractsapi.NewCommitmentEvent, bool, error) {
-				var commitEvent contractsapi.NewCommitmentEvent
+			parseEventFn: func(_ *types.Header, log *ethgo.Log) (contractsapi.EventAbi, bool, error) {
+				var (
+					commitEvent          contractsapi.NewCommitmentEvent
+					stateSyncResultEvent contractsapi.StateSyncResultEvent
+				)
 
-				doesMatch, err := commitEvent.ParseLog(log)
+				switch log.Topics[0] {
+				case commitEvent.Sig():
+					doesMatch, err := commitEvent.ParseLog(log)
 
-				return &commitEvent, doesMatch, err
-			},
-		},
-		eventsGetterResults: &eventsGetter[*contractsapi.StateSyncResultEvent]{
-			blockchain: blockchain,
-			isValidLogFn: func(l *types.Log) bool {
-				return l.Address == contracts.StateReceiverContract
-			},
-			parseEventFn: func(h *types.Header, l *ethgo.Log) (*contractsapi.StateSyncResultEvent, bool, error) {
-				var stateSyncResultEvent contractsapi.StateSyncResultEvent
-				matches, err := stateSyncResultEvent.ParseLog(l)
+					return &commitEvent, doesMatch, err
+				case stateSyncResultEvent.Sig():
+					doesMatch, err := stateSyncResultEvent.ParseLog(log)
 
-				return &stateSyncResultEvent, matches, err
+					return &stateSyncResultEvent, doesMatch, err
+				default:
+					return nil, false, errUnkownStateSyncRelayerEvent
+				}
 			},
 		},
 		config: config,
@@ -178,37 +177,33 @@ func (ssr *stateSyncRelayerImpl) PostBlock(req *PostBlockRequest) error {
 		state = &StateSyncRelayerStateData{LastBlockNumber: 0}
 	}
 
-	resultEvents, err := ssr.eventsGetterResults.getFromBlocks(state.LastBlockNumber, req.FullBlock)
-	if err != nil {
-		return fmt.Errorf("failed to retrieve processed state sync result events from block: %w", err)
-	}
-
-	events, err := ssr.eventsGetter.getFromBlocks(state.LastBlockNumber, req.FullBlock)
+	allEvents, err := ssr.eventsGetter.getFromBlocks(state.LastBlockNumber, req.FullBlock)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve events from block: %w", err)
 	}
 
 	newEvents := make([]*StateSyncRelayerEventData, 0)
-	processedEventIDs := make([]uint64, 0, len(resultEvents))
-	failedEventIDs := make([]uint64, 0, len(resultEvents))
-	failedReasons := make([]string, 0, len(resultEvents))
+	processedEventIDs := make([]uint64, 0)
+	failedEventIDs := make([]uint64, 0)
+	failedReasons := make([]string, 0)
 
 	// process new events
-	for _, event := range events {
-		for i := event.StartID.Uint64(); i <= event.EndID.Uint64(); i++ {
-			newEvents = append(newEvents, &StateSyncRelayerEventData{EventID: i})
-		}
-	}
+	for _, genEvent := range allEvents {
+		switch event := genEvent.(type) {
+		case *contractsapi.NewCommitmentEvent:
+			for i := event.StartID.Uint64(); i <= event.EndID.Uint64(); i++ {
+				newEvents = append(newEvents, &StateSyncRelayerEventData{EventID: i})
+			}
 
-	// process results
-	for _, event := range resultEvents {
-		if event.Status {
-			processedEventIDs = append(processedEventIDs, event.Counter.Uint64())
-		} else {
-			// maybe add failed events as new ones (that would overwrite in db)
-			// newEvents = append(newEvents, &StateSyncRelayerEventData{EventID: event.Counter.Uint64()})
-			failedEventIDs = append(failedEventIDs, event.Counter.Uint64())
-			failedReasons = append(failedReasons, string(event.Message))
+		case *contractsapi.StateSyncResultEvent:
+			if event.Status {
+				processedEventIDs = append(processedEventIDs, event.Counter.Uint64())
+			} else {
+				// maybe add failed events as new ones (that would overwrite in db)
+				// newEvents = append(newEvents, &StateSyncRelayerEventData{EventID: event.Counter.Uint64()})
+				failedEventIDs = append(failedEventIDs, event.Counter.Uint64())
+				failedReasons = append(failedReasons, string(event.Message))
+			}
 		}
 	}
 
