@@ -35,29 +35,48 @@ func (s *ProposerSnapshotStore) initialize(tx *bolt.Tx) error {
 }
 
 // getProposerSnapshot gets latest proposer snapshot
-func (s *ProposerSnapshotStore) getProposerSnapshot() (*ProposerSnapshot, error) {
-	var snapshot *ProposerSnapshot
+func (s *ProposerSnapshotStore) getProposerSnapshot(dbTx *bolt.Tx) (*ProposerSnapshot, error) {
+	var (
+		snapshot *ProposerSnapshot
+		err      error
+	)
 
-	err := s.db.View(func(tx *bolt.Tx) error {
+	getFn := func(tx *bolt.Tx) error {
 		value := tx.Bucket(proposerSnapshotBucket).Get(proposerSnapshotKey)
 		if value == nil {
 			return nil
 		}
 
 		return json.Unmarshal(value, &snapshot)
-	})
+	}
+
+	if dbTx == nil {
+		err = s.db.View(func(tx *bolt.Tx) error {
+			return getFn(tx)
+		})
+	} else {
+		err = getFn(dbTx)
+	}
 
 	return snapshot, err
 }
 
 // writeProposerSnapshot writes proposer snapshot
-func (s *ProposerSnapshotStore) writeProposerSnapshot(snapshot *ProposerSnapshot) error {
-	raw, err := json.Marshal(snapshot)
-	if err != nil {
-		return err
+func (s *ProposerSnapshotStore) writeProposerSnapshot(snapshot *ProposerSnapshot, dbTx *bolt.Tx) error {
+	insertFn := func(tx *bolt.Tx) error {
+		raw, err := json.Marshal(snapshot)
+		if err != nil {
+			return err
+		}
+
+		return tx.Bucket(proposerSnapshotBucket).Put(proposerSnapshotKey, raw)
 	}
 
-	return s.db.Update(func(tx *bolt.Tx) error {
-		return tx.Bucket(proposerSnapshotBucket).Put(proposerSnapshotKey, raw)
-	})
+	if dbTx == nil {
+		return s.db.Update(func(tx *bolt.Tx) error {
+			return insertFn(tx)
+		})
+	}
+
+	return insertFn(dbTx)
 }

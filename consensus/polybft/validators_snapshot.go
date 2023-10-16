@@ -9,6 +9,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
+	bolt "go.etcd.io/bbolt"
 )
 
 type validatorSnapshot struct {
@@ -51,9 +52,31 @@ func newValidatorsSnapshotCache(
 // applies pending validator set deltas to it.
 // Otherwise, it builds a snapshot from scratch and applies pending validator set deltas.
 func (v *validatorsSnapshotCache) GetSnapshot(
-	blockNumber uint64, parents []*types.Header) (validator.AccountSet, error) {
+	blockNumber uint64, parents []*types.Header, dbTx *bolt.Tx) (validator.AccountSet, error) {
+	tx := dbTx
+	isPassedTxNil := dbTx == nil
+
+	if isPassedTxNil {
+		// if no tx is passed, we need to open one, because,
+		// GetSnapshot is called from multiple routines (new sequence, fsm, OnBlockInserted, etc)
+		// and what can happen is that one routine takes its lock, and without a global tx,
+		// a deadlock can happen between that routine and OnBlockInserted, because it to
+		// is calling GetSnapshot, but it also opens a global db tx, resulting in a deadlock
+		// between one routine waiting to get a transaction on db, and OnBlockInserted waiting
+		// to get the validatorsSnapshotCache lock
+		t, err := v.state.beginDBTransaction(true)
+		if err != nil {
+			return nil, err
+		}
+
+		tx = t
+		defer tx.Rollback() //nolint:errcheck
+	}
+
 	v.lock.Lock()
-	defer v.lock.Unlock()
+	defer func() {
+		v.lock.Unlock()
+	}()
 
 	_, extra, err := getBlockData(blockNumber, v.blockchain)
 	if err != nil {
@@ -75,7 +98,7 @@ func (v *validatorsSnapshotCache) GetSnapshot(
 
 	v.logger.Trace("Retrieving snapshot started...", "Block", blockNumber, "Epoch", epochToGetSnapshot)
 
-	latestValidatorSnapshot, err := v.getLastCachedSnapshot(epochToGetSnapshot)
+	latestValidatorSnapshot, err := v.getLastCachedSnapshot(epochToGetSnapshot, tx)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +116,7 @@ func (v *validatorsSnapshotCache) GetSnapshot(
 			return nil, fmt.Errorf("failed to compute snapshot for epoch 0: %w", err)
 		}
 
-		err = v.storeSnapshot(genesisBlockSnapshot)
+		err = v.storeSnapshot(genesisBlockSnapshot, tx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to store validators snapshot for epoch 0: %w", err)
 		}
@@ -123,7 +146,7 @@ func (v *validatorsSnapshotCache) GetSnapshot(
 		}
 
 		latestValidatorSnapshot = intermediateSnapshot
-		if err = v.storeSnapshot(latestValidatorSnapshot); err != nil {
+		if err = v.storeSnapshot(latestValidatorSnapshot, tx); err != nil {
 			return nil, fmt.Errorf("failed to store validators snapshot for epoch %d: %w", latestValidatorSnapshot.Epoch, err)
 		}
 
@@ -135,9 +158,15 @@ func (v *validatorsSnapshotCache) GetSnapshot(
 		"Epoch", latestValidatorSnapshot.Epoch,
 	)
 
-	if err := v.cleanup(); err != nil {
+	if err := v.cleanup(tx); err != nil {
 		// error on cleanup should not block or fail any action
 		v.logger.Error("could not clean validator snapshots from cache and db", "err", err)
+	}
+
+	if isPassedTxNil {
+		if err := tx.Commit(); err != nil {
+			return nil, err
+		}
 	}
 
 	return latestValidatorSnapshot.Snapshot, nil
@@ -213,11 +242,11 @@ func (v *validatorsSnapshotCache) computeSnapshot(
 }
 
 // storeSnapshot stores given snapshot to the in-memory cache and database
-func (v *validatorsSnapshotCache) storeSnapshot(snapshot *validatorSnapshot) error {
+func (v *validatorsSnapshotCache) storeSnapshot(snapshot *validatorSnapshot, dbTx *bolt.Tx) error {
 	copySnap := snapshot.copy()
 	v.snapshots[copySnap.Epoch] = copySnap
 
-	if err := v.state.EpochStore.insertValidatorSnapshot(copySnap); err != nil {
+	if err := v.state.EpochStore.insertValidatorSnapshot(copySnap, dbTx); err != nil {
 		return fmt.Errorf("failed to insert validator snapshot for epoch %d to the database: %w", copySnap.Epoch, err)
 	}
 
@@ -227,7 +256,7 @@ func (v *validatorsSnapshotCache) storeSnapshot(snapshot *validatorSnapshot) err
 }
 
 // Cleanup cleans the validators cache in memory and db
-func (v *validatorsSnapshotCache) cleanup() error {
+func (v *validatorsSnapshotCache) cleanup(dbTx *bolt.Tx) error {
 	if len(v.snapshots) >= validatorSnapshotLimit {
 		latestEpoch := uint64(0)
 
@@ -250,7 +279,7 @@ func (v *validatorsSnapshotCache) cleanup() error {
 
 		v.snapshots = cache
 
-		return v.state.EpochStore.cleanValidatorSnapshotsFromDB(latestEpoch)
+		return v.state.EpochStore.cleanValidatorSnapshotsFromDB(latestEpoch, dbTx)
 	}
 
 	return nil
@@ -258,7 +287,8 @@ func (v *validatorsSnapshotCache) cleanup() error {
 
 // getLastCachedSnapshot gets the latest snapshot cached
 // If it doesn't have snapshot cached for desired epoch, it will return the latest one it has
-func (v *validatorsSnapshotCache) getLastCachedSnapshot(currentEpoch uint64) (*validatorSnapshot, error) {
+func (v *validatorsSnapshotCache) getLastCachedSnapshot(currentEpoch uint64,
+	dbTx *bolt.Tx) (*validatorSnapshot, error) {
 	cachedSnapshot := v.snapshots[currentEpoch]
 	if cachedSnapshot != nil {
 		return cachedSnapshot, nil
@@ -278,7 +308,7 @@ func (v *validatorsSnapshotCache) getLastCachedSnapshot(currentEpoch uint64) (*v
 		}
 	}
 
-	dbSnapshot, err := v.state.EpochStore.getLastSnapshot()
+	dbSnapshot, err := v.state.EpochStore.getLastSnapshot(dbTx)
 	if err != nil {
 		return nil, err
 	}

@@ -9,6 +9,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
+	bolt "go.etcd.io/bbolt"
 )
 
 var (
@@ -33,15 +34,15 @@ type ProposerSnapshot struct {
 }
 
 // NewProposerSnapshotFromState create ProposerSnapshot from state if possible or from genesis block
-func NewProposerSnapshotFromState(config *runtimeConfig) (*ProposerSnapshot, error) {
-	snapshot, err := config.State.ProposerSnapshotStore.getProposerSnapshot()
+func NewProposerSnapshotFromState(config *runtimeConfig, dbTx *bolt.Tx) (*ProposerSnapshot, error) {
+	snapshot, err := config.State.ProposerSnapshotStore.getProposerSnapshot(dbTx)
 	if err != nil {
 		return nil, err
 	}
 
 	if snapshot == nil {
 		// pick validator set from genesis block if snapshot is not saved in db
-		genesisValidatorsSet, err := config.polybftBackend.GetValidators(0, nil)
+		genesisValidatorsSet, err := config.polybftBackend.GetValidatorsWithTx(0, nil, dbTx)
 		if err != nil {
 			return nil, err
 		}
@@ -160,8 +161,9 @@ type ProposerCalculator struct {
 }
 
 // NewProposerCalculator creates a new proposer calculator object
-func NewProposerCalculator(config *runtimeConfig, logger hclog.Logger) (*ProposerCalculator, error) {
-	snap, err := NewProposerSnapshotFromState(config)
+func NewProposerCalculator(config *runtimeConfig, logger hclog.Logger,
+	dbTx *bolt.Tx) (*ProposerCalculator, error) {
+	snap, err := NewProposerSnapshotFromState(config, dbTx)
 
 	if err != nil {
 		return nil, err
@@ -178,7 +180,7 @@ func NewProposerCalculator(config *runtimeConfig, logger hclog.Logger) (*Propose
 	// proposer calculator needs to be updated.
 	blockNumber := config.blockchain.CurrentHeader().Number
 	if pc.snapshot.Height <= blockNumber {
-		if err = pc.update(blockNumber); err != nil {
+		if err = pc.update(blockNumber, dbTx); err != nil {
 			return nil, err
 		}
 	}
@@ -211,10 +213,10 @@ func (pc *ProposerCalculator) GetSnapshot() (*ProposerSnapshot, bool) {
 func (pc *ProposerCalculator) PostBlock(req *PostBlockRequest) error {
 	blockNumber := req.FullBlock.Block.Number()
 
-	return pc.update(blockNumber)
+	return pc.update(blockNumber, req.DBTx)
 }
 
-func (pc *ProposerCalculator) update(blockNumber uint64) error {
+func (pc *ProposerCalculator) update(blockNumber uint64, dbTx *bolt.Tx) error {
 	pc.logger.Debug("Update proposers snapshot started", "target block", blockNumber)
 
 	from := pc.snapshot.Height
@@ -223,7 +225,7 @@ func (pc *ProposerCalculator) update(blockNumber uint64) error {
 	// so that we can recalculate it to have accurate priorities.
 	// Note, this will change once we introduce component wide global transaction
 	for height := from; height <= blockNumber; height++ {
-		if err := pc.updatePerBlock(height); err != nil {
+		if err := pc.updatePerBlock(height, dbTx); err != nil {
 			return err
 		}
 
@@ -231,7 +233,7 @@ func (pc *ProposerCalculator) update(blockNumber uint64) error {
 			"validators count", len(pc.snapshot.Validators))
 	}
 
-	if err := pc.state.ProposerSnapshotStore.writeProposerSnapshot(pc.snapshot); err != nil {
+	if err := pc.state.ProposerSnapshotStore.writeProposerSnapshot(pc.snapshot, dbTx); err != nil {
 		return fmt.Errorf("cannot save proposers snapshot for block %d: %w", blockNumber, err)
 	}
 
@@ -241,7 +243,7 @@ func (pc *ProposerCalculator) update(blockNumber uint64) error {
 }
 
 // Updates ProposerSnapshot to block block with number `blockNumber`
-func (pc *ProposerCalculator) updatePerBlock(blockNumber uint64) error {
+func (pc *ProposerCalculator) updatePerBlock(blockNumber uint64, dbTx *bolt.Tx) error {
 	if pc.snapshot.Height != blockNumber {
 		return fmt.Errorf("proposers snapshot update called for wrong block. block number=%d, snapshot block number=%d",
 			blockNumber, pc.snapshot.Height)
@@ -255,7 +257,7 @@ func (pc *ProposerCalculator) updatePerBlock(blockNumber uint64) error {
 	var newValidatorSet validator.AccountSet = nil
 
 	if extra.Validators != nil && !extra.Validators.IsEmpty() {
-		newValidatorSet, err = pc.config.polybftBackend.GetValidators(blockNumber, nil)
+		newValidatorSet, err = pc.config.polybftBackend.GetValidatorsWithTx(blockNumber, nil, dbTx)
 		if err != nil {
 			return fmt.Errorf("cannot get validators for block %d: %w", blockNumber, err)
 		}

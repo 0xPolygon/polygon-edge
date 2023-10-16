@@ -66,7 +66,7 @@ func TestValidatorsSnapshotCache_GetSnapshot_Build(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		snapshot, err := testValidatorsCache.GetSnapshot(c.blockNumber, c.parents)
+		snapshot, err := testValidatorsCache.GetSnapshot(c.blockNumber, c.parents, nil)
 
 		assertions.NoError(err)
 		assertions.Len(snapshot, c.expectedSnapshot.Len())
@@ -115,11 +115,11 @@ func TestValidatorsSnapshotCache_GetSnapshot_FetchFromCache(t *testing.T) {
 		validatorsSnapshotCache: newValidatorsSnapshotCache(hclog.NewNullLogger(), newTestState(t), blockchainMock),
 	}
 
-	require.NoError(testValidatorsCache.storeSnapshot(&validatorSnapshot{1, 10, epochOneValidators}))
-	require.NoError(testValidatorsCache.storeSnapshot(&validatorSnapshot{2, 20, epochTwoValidators}))
+	require.NoError(testValidatorsCache.storeSnapshot(&validatorSnapshot{1, 10, epochOneValidators}, nil))
+	require.NoError(testValidatorsCache.storeSnapshot(&validatorSnapshot{2, 20, epochTwoValidators}, nil))
 
 	// Fetch snapshot from in memory cache
-	snapshot, err := testValidatorsCache.GetSnapshot(10, nil)
+	snapshot, err := testValidatorsCache.GetSnapshot(10, nil, nil)
 	require.NoError(err)
 	require.Equal(epochOneValidators, snapshot)
 
@@ -127,11 +127,11 @@ func TestValidatorsSnapshotCache_GetSnapshot_FetchFromCache(t *testing.T) {
 	testValidatorsCache.snapshots = map[uint64]*validatorSnapshot{}
 	require.NoError(testValidatorsCache.state.EpochStore.removeAllValidatorSnapshots())
 	// Fetch snapshot from database
-	snapshot, err = testValidatorsCache.GetSnapshot(10, nil)
+	snapshot, err = testValidatorsCache.GetSnapshot(10, nil, nil)
 	require.NoError(err)
 	require.Equal(epochOneValidators, snapshot)
 
-	snapshot, err = testValidatorsCache.GetSnapshot(20, nil)
+	snapshot, err = testValidatorsCache.GetSnapshot(20, nil, nil)
 	require.NoError(err)
 	require.Equal(epochTwoValidators, snapshot)
 }
@@ -148,11 +148,11 @@ func TestValidatorsSnapshotCache_Cleanup(t *testing.T) {
 	maxEpoch := uint64(0)
 
 	for i := uint64(0); i < validatorSnapshotLimit; i++ {
-		require.NoError(cache.storeSnapshot(&validatorSnapshot{i, i * 10, snapshot}))
+		require.NoError(cache.storeSnapshot(&validatorSnapshot{i, i * 10, snapshot}, nil))
 		maxEpoch++
 	}
 
-	require.NoError(cache.cleanup())
+	require.NoError(cache.cleanup(nil))
 
 	// assertions for remaining snapshots in the in memory cache
 	require.Len(cache.snapshots, numberOfSnapshotsToLeaveInMemory)
@@ -278,7 +278,7 @@ func TestValidatorsSnapshotCache_Empty(t *testing.T) {
 		validatorsSnapshotCache: newValidatorsSnapshotCache(hclog.NewNullLogger(), newTestState(t), blockchainMock),
 	}
 
-	_, err := testValidatorsCache.GetSnapshot(1, nil)
+	_, err := testValidatorsCache.GetSnapshot(1, nil, nil)
 	assert.ErrorContains(t, err, "validator snapshot is empty for block")
 }
 

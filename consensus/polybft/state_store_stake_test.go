@@ -12,7 +12,7 @@ func TestState_Insert_And_Get_FullValidatorSet(t *testing.T) {
 	state := newTestState(t)
 
 	t.Run("No full validator set", func(t *testing.T) {
-		_, err := state.StakeStore.getFullValidatorSet()
+		_, err := state.StakeStore.getFullValidatorSet(nil)
 
 		require.ErrorIs(t, err, errNoFullValidatorSet)
 	})
@@ -24,9 +24,9 @@ func TestState_Insert_And_Get_FullValidatorSet(t *testing.T) {
 			BlockNumber: 100,
 			EpochID:     10,
 			Validators:  newValidatorStakeMap(validators),
-		}))
+		}, nil))
 
-		fullValidatorSet, err := state.StakeStore.getFullValidatorSet()
+		fullValidatorSet, err := state.StakeStore.getFullValidatorSet(nil)
 		require.NoError(t, err)
 		assert.Equal(t, uint64(100), fullValidatorSet.BlockNumber)
 		assert.Equal(t, uint64(10), fullValidatorSet.EpochID)
@@ -40,9 +40,9 @@ func TestState_Insert_And_Get_FullValidatorSet(t *testing.T) {
 			BlockNumber: 40,
 			EpochID:     4,
 			Validators:  newValidatorStakeMap(validators),
-		}))
+		}, nil))
 
-		fullValidatorSet, err := state.StakeStore.getFullValidatorSet()
+		fullValidatorSet, err := state.StakeStore.getFullValidatorSet(nil)
 		require.NoError(t, err)
 		assert.Len(t, fullValidatorSet.Validators, len(validators))
 		assert.Equal(t, uint64(40), fullValidatorSet.BlockNumber)

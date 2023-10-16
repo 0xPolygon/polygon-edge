@@ -3,8 +3,14 @@ package polybft
 import (
 	"fmt"
 
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/hashicorp/go-hclog"
 	bolt "go.etcd.io/bbolt"
+)
+
+var (
+	edgeEventsLastProcessedBlockBucket = []byte("EdgeEventsLastProcessedBlock")
+	edgeEventsLastProcessedBlockKey    = []byte("EdgeEventsLastProcessedBlockKey")
 )
 
 // MessageSignature encapsulates sender identifier and its signature
@@ -79,9 +85,84 @@ func (s *State) initStorages() error {
 		if err := s.ProposerSnapshotStore.initialize(tx); err != nil {
 			return err
 		}
+		if err := s.StakeStore.initialize(tx); err != nil {
+			return err
+		}
 
-		return s.StakeStore.initialize(tx)
+		_, err := tx.CreateBucketIfNotExists(edgeEventsLastProcessedBlockBucket)
+		if err != nil {
+			return fmt.Errorf("failed to create bucket=%s: %w", string(edgeEventsLastProcessedBlockBucket), err)
+		}
+
+		lastProcessedBlock, err := s.getLastProcessedEventsBlock(tx)
+		if err != nil {
+			return fmt.Errorf("failed to get last processed block: %w", err)
+		}
+
+		if lastProcessedBlock == 0 {
+			// we do this for already existing chains, which just updated their Edge binary,
+			// to not get events from scratch, but start from what other stores have
+			lastSaved, err := s.CheckpointStore.getLastSaved(tx)
+			if err != nil {
+				return fmt.Errorf("could not initialize last processed block bucket: %w", err)
+			}
+
+			if lastSaved > 0 {
+				return s.insertLastProcessedEventsBlock(lastSaved, tx)
+			}
+		}
+
+		return nil
 	})
+}
+
+// insertLastProcessedEventsBlock inserts the last processed block for events on Edge
+func (s *State) insertLastProcessedEventsBlock(block uint64, dbTx *bolt.Tx) error {
+	insertFn := func(tx *bolt.Tx) error {
+		return tx.Bucket(edgeEventsLastProcessedBlockBucket).Put(
+			edgeEventsLastProcessedBlockKey, common.EncodeUint64ToBytes(block))
+	}
+
+	if dbTx == nil {
+		return s.db.Update(func(tx *bolt.Tx) error {
+			return insertFn(tx)
+		})
+	}
+
+	return insertFn(dbTx)
+}
+
+// getLastProcessedEventsBlock gets the last processed block for events on Edge
+func (s *State) getLastProcessedEventsBlock(dbTx *bolt.Tx) (uint64, error) {
+	var (
+		lastProcessed uint64
+		err           error
+	)
+
+	getFn := func(tx *bolt.Tx) {
+		value := tx.Bucket(edgeEventsLastProcessedBlockBucket).Get(edgeEventsLastProcessedBlockKey)
+		if value != nil {
+			lastProcessed = common.EncodeBytesToUint64(value)
+		}
+	}
+
+	if dbTx == nil {
+		err = s.db.View(func(tx *bolt.Tx) error {
+			getFn(tx)
+
+			return nil
+		})
+	} else {
+		getFn(dbTx)
+	}
+
+	return lastProcessed, err
+}
+
+// beginDBTransaction creates and begins a transaction on BoltDB
+// Note that transaction needs to be manually rollback or committed
+func (s *State) beginDBTransaction(isWriteTx bool) (*bolt.Tx, error) {
+	return s.db.Begin(isWriteTx)
 }
 
 // bucketStats returns stats for the given bucket in db

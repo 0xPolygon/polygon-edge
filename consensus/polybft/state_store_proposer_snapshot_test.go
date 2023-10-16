@@ -16,14 +16,14 @@ func TestState_getProposerSnapshot_writeProposerSnapshot(t *testing.T) {
 
 	state := newTestState(t)
 
-	snap, err := state.ProposerSnapshotStore.getProposerSnapshot()
+	snap, err := state.ProposerSnapshotStore.getProposerSnapshot(nil)
 	require.NoError(t, err)
 	require.Nil(t, snap)
 
 	newSnapshot := &ProposerSnapshot{Height: height, Round: round}
-	require.NoError(t, state.ProposerSnapshotStore.writeProposerSnapshot(newSnapshot))
+	require.NoError(t, state.ProposerSnapshotStore.writeProposerSnapshot(newSnapshot, nil))
 
-	snap, err = state.ProposerSnapshotStore.getProposerSnapshot()
+	snap, err = state.ProposerSnapshotStore.getProposerSnapshot(nil)
 	require.NoError(t, err)
 	require.Equal(t, newSnapshot, snap)
 }

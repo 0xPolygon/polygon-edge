@@ -72,43 +72,33 @@ func (s *CheckpointStore) initialize(tx *bolt.Tx) error {
 	return tx.Bucket(exitEventLastProcessedBlockBucket).Put(lastProcessedBlockKey, common.EncodeUint64ToBytes(0))
 }
 
-// insertExitEvents inserts a slice of exit events to exit event bucket in bolt db
-func (s *CheckpointStore) insertExitEvents(exitEvents []*ExitEvent) error {
-	if len(exitEvents) == 0 {
-		// small optimization
-		return nil
-	}
-
-	return s.db.Update(func(tx *bolt.Tx) error {
-		exitEventBucket := tx.Bucket(exitEventsBucket)
-		lookupBucket := tx.Bucket(exitEventToEpochLookupBucket)
-		for i := 0; i < len(exitEvents); i++ {
-			if err := insertExitEventToBucket(exitEventBucket, lookupBucket, exitEvents[i]); err != nil {
-				return err
-			}
+// insertExitEventWithTx inserts an exit event to db
+func (s *CheckpointStore) insertExitEvent(exitEvent *ExitEvent, dbTx *bolt.Tx) error {
+	insertFn := func(tx *bolt.Tx) error {
+		raw, err := json.Marshal(exitEvent)
+		if err != nil {
+			return err
 		}
 
-		return nil
-	})
-}
+		epochBytes := common.EncodeUint64ToBytes(exitEvent.EpochNumber)
+		exitIDBytes := common.EncodeUint64ToBytes(exitEvent.ID.Uint64())
 
-// insertExitEventToBucket inserts exit event to exit event bucket
-func insertExitEventToBucket(exitEventBucket, lookupBucket *bolt.Bucket, exitEvent *ExitEvent) error {
-	raw, err := json.Marshal(exitEvent)
-	if err != nil {
-		return err
+		err = tx.Bucket(exitEventsBucket).Put(bytes.Join([][]byte{epochBytes,
+			exitIDBytes, common.EncodeUint64ToBytes(exitEvent.BlockNumber)}, nil), raw)
+		if err != nil {
+			return err
+		}
+
+		return tx.Bucket(exitEventToEpochLookupBucket).Put(exitIDBytes, epochBytes)
 	}
 
-	epochBytes := common.EncodeUint64ToBytes(exitEvent.EpochNumber)
-	exitIDBytes := common.EncodeUint64ToBytes(exitEvent.ID.Uint64())
-
-	err = exitEventBucket.Put(bytes.Join([][]byte{epochBytes,
-		exitIDBytes, common.EncodeUint64ToBytes(exitEvent.BlockNumber)}, nil), raw)
-	if err != nil {
-		return err
+	if dbTx == nil {
+		return s.db.Update(func(tx *bolt.Tx) error {
+			return insertFn(tx)
+		})
 	}
 
-	return lookupBucket.Put(exitIDBytes, epochBytes)
+	return insertFn(dbTx)
 }
 
 // getExitEvent returns exit event with given id, which happened in given epoch and given block number
@@ -189,18 +179,13 @@ func (s *CheckpointStore) getExitEvents(epoch uint64, filter func(exitEvent *Exi
 }
 
 // updateLastSaved saves the last block processed for exit events
-func (s *CheckpointStore) updateLastSaved(blockNumber uint64) error {
-	return s.db.Update(func(tx *bolt.Tx) error {
-		return tx.Bucket(exitEventLastProcessedBlockBucket).Put(lastProcessedBlockKey,
-			common.EncodeUint64ToBytes(blockNumber))
-	})
-}
+func (s *CheckpointStore) getLastSaved(dbTx *bolt.Tx) (uint64, error) {
+	var (
+		lastSavedBlock uint64
+		err            error
+	)
 
-// updateLastSaved saves the last block processed for exit events
-func (s *CheckpointStore) getLastSaved() (uint64, error) {
-	var lastSavedBlock uint64
-
-	err := s.db.View(func(tx *bolt.Tx) error {
+	getFn := func(tx *bolt.Tx) error {
 		v := tx.Bucket(exitEventLastProcessedBlockBucket).Get(lastProcessedBlockKey)
 		if v == nil {
 			return errNoLastSavedEntry
@@ -209,7 +194,15 @@ func (s *CheckpointStore) getLastSaved() (uint64, error) {
 		lastSavedBlock = common.EncodeBytesToUint64(v)
 
 		return nil
-	})
+	}
+
+	if dbTx == nil {
+		err = s.db.View(func(tx *bolt.Tx) error {
+			return getFn(tx)
+		})
+	} else {
+		err = getFn(dbTx)
+	}
 
 	return lastSavedBlock, err
 }

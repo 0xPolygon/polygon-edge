@@ -8,6 +8,7 @@ import (
 	"sort"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
@@ -16,6 +17,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
+	bolt "go.etcd.io/bbolt"
 
 	"github.com/0xPolygon/go-ibft/messages"
 	"github.com/0xPolygon/go-ibft/messages/proto"
@@ -117,13 +119,22 @@ type consensusRuntime struct {
 	// manager for handling validator stake change and updating validator set
 	stakeManager StakeManager
 
+	eventProvider *EventProvider
+
 	// logger instance
 	logger hcf.Logger
 }
 
 // newConsensusRuntime creates and starts a new consensus runtime instance with event tracking
 func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRuntime, error) {
-	proposerCalculator, err := NewProposerCalculator(config, log.Named("proposer_calculator"))
+	dbTx, err := config.State.beginDBTransaction(true)
+	if err != nil {
+		return nil, fmt.Errorf("could not begin dbTx to init consensus runtime: %w", err)
+	}
+
+	defer dbTx.Rollback() //nolint:errcheck
+
+	proposerCalculator, err := NewProposerCalculator(config, log.Named("proposer_calculator"), dbTx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create consensus runtime, error while creating proposer calculator %w", err)
 	}
@@ -134,6 +145,7 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 		lastBuiltBlock:     config.blockchain.CurrentHeader(),
 		proposerCalculator: proposerCalculator,
 		logger:             log.Named("consensus_runtime"),
+		eventProvider:      NewEventProvider(config.blockchain),
 	}
 
 	if err := runtime.initStateSyncManager(log); err != nil {
@@ -144,14 +156,18 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 		return nil, err
 	}
 
-	if err := runtime.initStakeManager(log); err != nil {
+	if err := runtime.initStakeManager(log, dbTx); err != nil {
 		return nil, err
 	}
 
 	// we need to call restart epoch on runtime to initialize epoch state
-	runtime.epoch, err = runtime.restartEpoch(runtime.lastBuiltBlock)
+	runtime.epoch, err = runtime.restartEpoch(runtime.lastBuiltBlock, dbTx)
 	if err != nil {
 		return nil, fmt.Errorf("consensus runtime creation - restart epoch failed: %w", err)
+	}
+
+	if err := dbTx.Commit(); err != nil {
+		return nil, fmt.Errorf("could not commit db tx to init consensus runtime: %w", err)
 	}
 
 	return runtime, nil
@@ -182,7 +198,6 @@ func (c *consensusRuntime) initStateSyncManager(logger hcf.Logger) error {
 				blockTrackerPollInterval: c.config.PolyBFTConfig.BlockTrackerPollInterval.Duration,
 			},
 			c,
-			c.config.blockchain,
 		)
 
 		c.stateSyncManager = stateSyncManager
@@ -218,11 +233,13 @@ func (c *consensusRuntime) initCheckpointManager(logger hcf.Logger) error {
 		c.checkpointManager = &dummyCheckpointManager{}
 	}
 
+	c.eventProvider.Subscribe(c.checkpointManager)
+
 	return nil
 }
 
 // initStakeManager initializes stake manager
-func (c *consensusRuntime) initStakeManager(logger hcf.Logger) error {
+func (c *consensusRuntime) initStakeManager(logger hcf.Logger, dbTx *bolt.Tx) error {
 	rootRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(c.config.PolyBFTConfig.Bridge.JSONRPCEndpoint))
 	if err != nil {
 		return err
@@ -238,7 +255,10 @@ func (c *consensusRuntime) initStakeManager(logger hcf.Logger) error {
 		c.config.blockchain,
 		c.config.polybftBackend,
 		int(c.config.PolyBFTConfig.MaxValidatorSetSize),
+		dbTx,
 	)
+
+	c.eventProvider.Subscribe(c.stakeManager)
 
 	return err
 }
@@ -270,6 +290,8 @@ func (c *consensusRuntime) IsBridgeEnabled() bool {
 
 // OnBlockInserted is called whenever fsm or syncer inserts new block
 func (c *consensusRuntime) OnBlockInserted(fullBlock *types.FullBlock) {
+	startTime := time.Now().UTC()
+
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -295,39 +317,94 @@ func (c *consensusRuntime) OnBlockInserted(fullBlock *types.FullBlock) {
 		isEndOfEpoch = c.isFixedSizeOfEpochMet(fullBlock.Block.Header.Number, epoch)
 	)
 
-	postBlock := &PostBlockRequest{FullBlock: fullBlock, Epoch: epoch.Number, IsEpochEndingBlock: isEndOfEpoch}
+	// begin DB transaction
+	dbTx, err := c.state.beginDBTransaction(true)
+	if err != nil {
+		c.logger.Error("failed to begin db transaction on block finalization",
+			"block", fullBlock.Block.Number(), "err", err)
 
-	// handle commitment and proofs creation
-	if err := c.stateSyncManager.PostBlock(postBlock); err != nil {
-		c.logger.Error("failed to post block state sync", "err", err)
+		return
 	}
 
-	// handle exit events that happened in block
-	if err := c.checkpointManager.PostBlock(postBlock); err != nil {
-		c.logger.Error("failed to post block in checkpoint manager", "err", err)
+	defer dbTx.Rollback() //nolint:errcheck
+
+	lastProcessedEventsBlock, err := c.state.getLastProcessedEventsBlock(dbTx)
+	if err != nil {
+		c.logger.Error("failed to get last processed events block on block finalization",
+			"block", fullBlock.Block.Number(), "err", err)
+
+		return
+	}
+
+	if err := c.eventProvider.GetEventsFromBlocks(lastProcessedEventsBlock, fullBlock, dbTx); err != nil {
+		c.logger.Error("failed to process events on block finalization", "block", fullBlock.Block.Number(), "err", err)
+
+		return
+	}
+
+	postBlock := &PostBlockRequest{
+		FullBlock:          fullBlock,
+		Epoch:              epoch.Number,
+		IsEpochEndingBlock: isEndOfEpoch,
+		DBTx:               dbTx,
+	}
+
+	if err := c.stateSyncManager.PostBlock(postBlock); err != nil {
+		c.logger.Error("failed to post block state sync", "err", err)
+
+		return
 	}
 
 	// update proposer priorities
 	if err := c.proposerCalculator.PostBlock(postBlock); err != nil {
 		c.logger.Error("Could not update proposer calculator", "err", err)
+
+		return
 	}
 
 	// handle transfer events that happened in block
 	if err := c.stakeManager.PostBlock(postBlock); err != nil {
 		c.logger.Error("failed to post block in stake manager", "err", err)
+
+		return
 	}
 
 	if isEndOfEpoch {
-		if epoch, err = c.restartEpoch(fullBlock.Block.Header); err != nil {
+		if epoch, err = c.restartEpoch(fullBlock.Block.Header, dbTx); err != nil {
 			c.logger.Error("failed to restart epoch after block inserted", "error", err)
 
 			return
 		}
 	}
 
+	if err := c.state.insertLastProcessedEventsBlock(fullBlock.Block.Number(), dbTx); err != nil {
+		c.logger.Error("failed to update the last processed events block in db", "error", err)
+
+		return
+	}
+
+	// commit DB transaction
+	if err := dbTx.Commit(); err != nil {
+		c.logger.Error("failed to commit transaction on PostBlock",
+			"block", fullBlock.Block.Number(), "error", err)
+
+		return
+	}
+
 	// finally update runtime state (lastBuiltBlock, epoch, proposerSnapshot)
 	c.epoch = epoch
 	c.lastBuiltBlock = fullBlock.Block.Header
+
+	// we will do PostBlock on checkpoint manager at the end, because it only
+	// sends a checkpoint in a separate routine. It doesn't do any db operations
+	if err := c.checkpointManager.PostBlock(postBlock); err != nil {
+		c.logger.Error("failed to post block in checkpoint manager", "err", err)
+	}
+
+	endTime := time.Now().UTC()
+
+	c.logger.Debug("OnBlockInserted finished", "elapsedTime", endTime.Sub(startTime),
+		"epoch", epoch.Number, "block", fullBlock.Block.Number())
 }
 
 // FSM creates a new instance of fsm
@@ -419,7 +496,7 @@ func (c *consensusRuntime) FSM() error {
 
 // restartEpoch resets the previously run epoch and moves to the next one
 // returns *epochMetadata different from nil if the lastEpoch is not the current one and everything was successful
-func (c *consensusRuntime) restartEpoch(header *types.Header) (*epochMetadata, error) {
+func (c *consensusRuntime) restartEpoch(header *types.Header, dbTx *bolt.Tx) (*epochMetadata, error) {
 	lastEpoch := c.epoch
 
 	systemState, err := c.getSystemState(header)
@@ -440,7 +517,7 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) (*epochMetadata, e
 		}
 	}
 
-	validatorSet, err := c.config.polybftBackend.GetValidators(header.Number, nil)
+	validatorSet, err := c.config.polybftBackend.GetValidatorsWithTx(header.Number, nil, dbTx)
 	if err != nil {
 		return nil, fmt.Errorf("restart epoch - cannot get validators: %w", err)
 	}
@@ -455,11 +532,11 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) (*epochMetadata, e
 		return nil, err
 	}
 
-	if err := c.state.EpochStore.cleanEpochsFromDB(); err != nil {
+	if err := c.state.EpochStore.cleanEpochsFromDB(dbTx); err != nil {
 		c.logger.Error("Could not clean previous epochs from db.", "error", err)
 	}
 
-	if err := c.state.EpochStore.insertEpoch(epochNumber); err != nil {
+	if err := c.state.EpochStore.insertEpoch(epochNumber, dbTx); err != nil {
 		return nil, fmt.Errorf("an error occurred while inserting new epoch in db. Reason: %w", err)
 	}
 
@@ -476,6 +553,7 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) (*epochMetadata, e
 		NewEpochID:        epochNumber,
 		FirstBlockOfEpoch: firstBlockInEpoch,
 		ValidatorSet:      validator.NewValidatorSet(validatorSet, c.logger),
+		DBTx:              dbTx,
 	}
 
 	if err := c.stateSyncManager.PostEpoch(reqObj); err != nil {

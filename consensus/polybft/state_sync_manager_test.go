@@ -31,11 +31,10 @@ func newTestStateSyncManager(t *testing.T, key *validator.TestValidator, runtime
 	require.NoError(t, err)
 
 	state := newTestState(t)
-	require.NoError(t, state.EpochStore.insertEpoch(0))
+	require.NoError(t, state.EpochStore.insertEpoch(0, nil))
 
 	topic := &mockTopic{}
 
-	blockchainBackend := new(blockchainMock)
 	s := newStateSyncManager(hclog.NewNullLogger(), state,
 		&stateSyncConfig{
 			stateSenderAddr:   types.Address{},
@@ -44,7 +43,7 @@ func newTestStateSyncManager(t *testing.T, key *validator.TestValidator, runtime
 			topic:             topic,
 			key:               key.Key(),
 			maxCommitmentSize: maxCommitmentSize,
-		}, runtime, blockchainBackend)
+		}, runtime)
 
 	t.Cleanup(func() {
 		os.RemoveAll(tmpDir)
@@ -64,7 +63,7 @@ func TestStateSyncManager_PostEpoch_BuildCommitment(t *testing.T) {
 		s := newTestStateSyncManager(t, vals.GetValidator("0"), &mockRuntime{isActiveValidator: true})
 
 		// there are no state syncs
-		require.NoError(t, s.buildCommitment())
+		require.NoError(t, s.buildCommitment(nil))
 		require.Nil(t, s.pendingCommitments)
 
 		stateSyncs10 := generateStateSyncEvents(t, 10, 0)
@@ -74,7 +73,7 @@ func TestStateSyncManager_PostEpoch_BuildCommitment(t *testing.T) {
 			require.NoError(t, s.state.StateSyncStore.insertStateSyncEvent(stateSyncs10[i]))
 		}
 
-		require.NoError(t, s.buildCommitment())
+		require.NoError(t, s.buildCommitment(nil))
 		require.Len(t, s.pendingCommitments, 1)
 		require.Equal(t, uint64(0), s.pendingCommitments[0].StartID.Uint64())
 		require.Equal(t, uint64(4), s.pendingCommitments[0].EndID.Uint64())
@@ -85,7 +84,7 @@ func TestStateSyncManager_PostEpoch_BuildCommitment(t *testing.T) {
 			require.NoError(t, s.state.StateSyncStore.insertStateSyncEvent(stateSyncs10[i]))
 		}
 
-		require.NoError(t, s.buildCommitment())
+		require.NoError(t, s.buildCommitment(nil))
 		require.Len(t, s.pendingCommitments, 2)
 		require.Equal(t, uint64(0), s.pendingCommitments[1].StartID.Uint64())
 		require.Equal(t, uint64(9), s.pendingCommitments[1].EndID.Uint64())
@@ -108,7 +107,7 @@ func TestStateSyncManager_PostEpoch_BuildCommitment(t *testing.T) {
 		}
 
 		// I am not a validator so no commitments should be built
-		require.NoError(t, s.buildCommitment())
+		require.NoError(t, s.buildCommitment(nil))
 		require.Len(t, s.pendingCommitments, 0)
 	})
 }
@@ -294,7 +293,7 @@ func TestStateSyncerManager_BuildProofs(t *testing.T) {
 		require.NoError(t, s.state.StateSyncStore.insertStateSyncEvent(evnt))
 	}
 
-	require.NoError(t, s.buildCommitment())
+	require.NoError(t, s.buildCommitment(nil))
 	require.Len(t, s.pendingCommitments, 1)
 
 	mockMsg := &CommitmentMessageSigned{
@@ -333,79 +332,39 @@ func TestStateSyncerManager_RemoveProcessedEventsAndProofs(t *testing.T) {
 	vals := validator.NewTestValidators(t, 5)
 
 	s := newTestStateSyncManager(t, vals.GetValidator("0"), &mockRuntime{isActiveValidator: true})
+	stateSyncEvents := generateStateSyncEvents(t, stateSyncEventsCount, 0)
 
-	for _, event := range generateStateSyncEvents(t, stateSyncEventsCount, 0) {
+	for _, event := range stateSyncEvents {
 		require.NoError(t, s.state.StateSyncStore.insertStateSyncEvent(event))
 	}
 
-	require.NoError(t, s.buildCommitment())
-	require.Len(t, s.pendingCommitments, 1)
-
-	mockMsg := &CommitmentMessageSigned{
-		Message: &contractsapi.StateSyncCommitment{
-			StartID: s.pendingCommitments[0].StartID,
-			EndID:   s.pendingCommitments[0].EndID,
-		},
-	}
-
-	txData, err := mockMsg.EncodeAbi()
-	require.NoError(t, err)
-
-	tx := createStateTransactionWithData(1, types.Address{}, txData)
-
-	req := &PostBlockRequest{
-		FullBlock: &types.FullBlock{
-			Block: &types.Block{
-				Header:       &types.Header{Number: 1},
-				Transactions: []*types.Transaction{tx},
-			},
-		},
-	}
-
-	// PostBlock() inserts commitment and proofs into the store
-	require.NoError(t, s.PostBlock(req))
-
-	// check the state after executing first PostBlock()
-	require.Equal(t, mockMsg.Message.EndID.Uint64()+1, s.nextCommittedIndex)
+	require.NoError(t, s.buildProofs(&contractsapi.StateSyncCommitment{
+		StartID: stateSyncEvents[0].ID,
+		EndID:   stateSyncEvents[len(stateSyncEvents)-1].ID,
+	}, nil))
 
 	stateSyncEventsBefore, err := s.state.StateSyncStore.list()
 	require.NoError(t, err)
 	require.Equal(t, stateSyncEventsCount, len(stateSyncEventsBefore))
 
-	for i := 0; i < stateSyncEventsCount; i++ {
-		proof, err := s.state.StateSyncStore.getStateSyncProof(uint64(i))
+	for _, event := range stateSyncEvents {
+		proof, err := s.state.StateSyncStore.getStateSyncProof(event.ID.Uint64())
 		require.NoError(t, err)
 		require.NotNil(t, proof)
 	}
 
-	// create second PostBlockRequest to remove processed events and proofs from the store
-	req = &PostBlockRequest{
-		FullBlock: &types.FullBlock{
-			Block: &types.Block{
-				Header: &types.Header{Number: 2},
-			},
-		},
+	for _, event := range stateSyncEvents {
+		eventLog := createTestLogForStateSyncResultEvent(t, event.ID.Uint64())
+		require.NoError(t, s.ProcessLog(&types.Header{Number: 10}, convertLog(eventLog), nil))
 	}
-
-	// add receipts with executed StateSyncResult logs
-	receiptSuccess := types.ReceiptSuccess
-
-	req.FullBlock.Receipts = make([]*types.Receipt, stateSyncEventsCount)
-	for i := uint64(0); i < stateSyncEventsCount; i++ {
-		req.FullBlock.Receipts[i] = &types.Receipt{
-			Status: &receiptSuccess,
-			Logs:   []*types.Log{createTestLogForStateSyncResultEvent(t, i)}}
-	}
-
-	require.NoError(t, s.PostBlock(req))
 
 	// all state sync events and their proofs should be removed from the store
 	stateSyncEventsAfter, err := s.state.StateSyncStore.list()
 	require.NoError(t, err)
 	require.Equal(t, 0, len(stateSyncEventsAfter))
 
-	for i := uint64(0); i < stateSyncEventsCount; i++ {
-		proof, err := s.state.StateSyncStore.getStateSyncProof(i)
+	for _, event := range stateSyncEvents {
+		proof, err := s.state.StateSyncStore.getStateSyncProof(event.ID.Uint64())
 		require.NoError(t, err)
 		require.Nil(t, proof)
 	}
@@ -455,7 +414,7 @@ func TestStateSyncerManager_AddLog_BuildCommitments(t *testing.T) {
 
 		require.NoError(t, s.AddLog(goodLog))
 
-		stateSyncs, err = s.state.StateSyncStore.getStateSyncEventsForCommitment(0, 0)
+		stateSyncs, err = s.state.StateSyncStore.getStateSyncEventsForCommitment(0, 0, nil)
 		require.NoError(t, err)
 		require.Len(t, stateSyncs, 1)
 		require.Len(t, s.pendingCommitments, 1)
@@ -509,7 +468,7 @@ func TestStateSyncerManager_AddLog_BuildCommitments(t *testing.T) {
 		require.NoError(t, s.AddLog(goodLog))
 
 		// node should have inserted given state sync event, but it shouldn't build any commitment
-		stateSyncs, err := s.state.StateSyncStore.getStateSyncEventsForCommitment(0, 0)
+		stateSyncs, err := s.state.StateSyncStore.getStateSyncEventsForCommitment(0, 0, nil)
 		require.NoError(t, err)
 		require.Len(t, stateSyncs, 1)
 		require.Equal(t, uint64(0), stateSyncs[0].ID.Uint64())
@@ -555,7 +514,7 @@ func TestStateSyncerManager_EventTracker_Sync(t *testing.T) {
 
 	time.Sleep(2 * time.Second)
 
-	events, err := s.state.StateSyncStore.getStateSyncEventsForCommitment(1, 10)
+	events, err := s.state.StateSyncStore.getStateSyncEventsForCommitment(1, 10, nil)
 	require.NoError(t, err)
 	require.Len(t, events, 10)
 }
@@ -609,7 +568,7 @@ func TestStateSyncManager_GetProofs_NoProof_HasCommitment_NoStateSyncs(t *testin
 	)
 
 	state := newTestState(t)
-	require.NoError(t, state.StateSyncStore.insertCommitmentMessage(createTestCommitmentMessage(t, 1)))
+	require.NoError(t, state.StateSyncStore.insertCommitmentMessage(createTestCommitmentMessage(t, 1), nil))
 
 	stateSyncManager := &stateSyncManager{state: state, logger: hclog.NewNullLogger()}
 
@@ -643,7 +602,7 @@ func TestStateSyncManager_GetProofs_NoProof_BuildProofs(t *testing.T) {
 		require.NoError(t, state.StateSyncStore.insertStateSyncEvent(sse))
 	}
 
-	require.NoError(t, state.StateSyncStore.insertCommitmentMessage(commitment))
+	require.NoError(t, state.StateSyncStore.insertCommitmentMessage(commitment, nil))
 
 	stateSyncManager := &stateSyncManager{state: state, logger: hclog.NewNullLogger()}
 
