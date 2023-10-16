@@ -15,62 +15,25 @@ import (
 	"github.com/umbracle/ethgo/abi"
 )
 
-func TestStateSyncRelayer_PostBlock(t *testing.T) {
+func TestStateSyncRelayer_FullWorkflow(t *testing.T) {
 	t.Parallel()
 
 	testKey := createTestKey(t)
-	successStatus := types.ReceiptSuccess
-	block1Hash := types.StringToHash("x087887823ff23423")
 	stateSyncAddr := types.StringToAddress("0x56563")
 
-	result1Log := createTestLogForStateSyncResultEvent(t, 1)
-	result2Log := createTestLogForStateSyncResultEvent(t, 2)
-	result3Log := createTestLogForStateSyncResultEvent(t, 3)
-	result4Log := createTestLogForStateSyncResultEvent(t, 4)
-	commitment1Log := createTestLogForNewCommitmentEvent(t, stateSyncAddr, 2, 3, types.StringToHash("0x2"))
-	commitment2Log := createTestLogForNewCommitmentEvent(t, stateSyncAddr, 4, 4, types.StringToHash("0x3"))
-	receipts := [][]*types.Receipt{
-		{
-			{
-				Status: &successStatus,
-				Logs: []*types.Log{
-					{}, commitment1Log, result1Log,
-				},
-			},
-		},
-		{
-			{
-				Status: &successStatus,
-				Logs: []*types.Log{
-					{}, commitment2Log,
-				},
-			},
-		},
-		{
-			{
-				Status: &successStatus,
-				Logs: []*types.Log{
-					result2Log,
-				},
-			},
-		},
-		{
-			{
-				Status: &successStatus,
-				Logs: []*types.Log{
-					result3Log,
-				},
-			},
-		},
-		{},
-		{
-			{
-				Status: &successStatus,
-				Logs: []*types.Log{
-					result4Log,
-				},
-			},
-		},
+	resultLogs := []*types.Log{
+		createTestLogForStateSyncResultEvent(t, 1), createTestLogForStateSyncResultEvent(t, 2),
+		createTestLogForStateSyncResultEvent(t, 3), createTestLogForStateSyncResultEvent(t, 4),
+		createTestLogForStateSyncResultEvent(t, 5),
+	}
+	commitmentLogs := []*types.Log{
+		createTestLogForNewCommitmentEvent(t, stateSyncAddr, 1, 1, types.StringToHash("0x2")),
+		createTestLogForNewCommitmentEvent(t, stateSyncAddr, 2, 3, types.StringToHash("0x2")),
+		createTestLogForNewCommitmentEvent(t, stateSyncAddr, 4, 5, types.StringToHash("0x2")),
+	}
+
+	headers := []*types.Header{
+		{Number: 2}, {Number: 3}, {Number: 4}, {Number: 5}, {Number: 5},
 	}
 
 	proofMock := &mockStateSyncProofRetriever{
@@ -107,30 +70,24 @@ func TestStateSyncRelayer_PostBlock(t *testing.T) {
 		hclog.Default(),
 	)
 
-	blockhainMock.On("CurrentHeader").Return(&types.Header{Number: 2}).Once()
-	blockhainMock.On("CurrentHeader").Return(&types.Header{Number: 3}).Once()
-	blockhainMock.On("CurrentHeader").Return(&types.Header{Number: 4}).Once()
-	blockhainMock.On("CurrentHeader").Return(&types.Header{Number: 5}).Once()
-	blockhainMock.On("CurrentHeader").Return(&types.Header{Number: 6}).Once()
-	blockhainMock.On("GetReceiptsByHash", block1Hash).Return(receipts[0], nil).Once()
-	blockhainMock.On("GetHeaderByNumber", uint64(1)).Return(&types.Header{Hash: block1Hash}).Once()
+	for _, h := range headers {
+		blockhainMock.On("CurrentHeader").Return(h).Once()
+	}
+
+	// send first two events without errors
 	dummyTxRelayer.On("SendTransaction", mock.Anything, testKey).Return((*ethgo.Receipt)(nil), nil).Times(2)
-	dummyTxRelayer.On("SendTransaction", mock.Anything, testKey).Return((*ethgo.Receipt)(nil), errors.New("e")).Once()
+	// fail 3rd time
+	dummyTxRelayer.On("SendTransaction", mock.Anything, testKey).Return(
+		(*ethgo.Receipt)(nil), errors.New("e")).Once()
+	// send 3 events all at once at the end
 	dummyTxRelayer.On("SendTransaction", mock.Anything, testKey).Return((*ethgo.Receipt)(nil), nil).Once()
 
 	require.NoError(t, stateSyncRelayer.Init())
 
-	// post first block (number 2)
-	require.NoError(t, stateSyncRelayer.PostBlock(&PostBlockRequest{
-		FullBlock: &types.FullBlock{
-			Block: &types.Block{
-				Header: &types.Header{
-					Number: 2,
-				},
-			},
-			Receipts: receipts[1],
-		},
-	}))
+	// post 1st block
+	require.NoError(t, stateSyncRelayer.ProcessLog(headers[0], convertLog(commitmentLogs[0]), nil))
+	require.NoError(t, stateSyncRelayer.ProcessLog(headers[0], convertLog(commitmentLogs[1]), nil))
+	require.NoError(t, stateSyncRelayer.PostBlock(&PostBlockRequest{}))
 
 	time.Sleep(time.Second * 2) // wait for some time
 
@@ -138,40 +95,66 @@ func TestStateSyncRelayer_PostBlock(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Len(t, events, 3)
+	require.Equal(t, uint64(1), events[0].EventID)
 	require.True(t, events[0].SentStatus)
 	require.False(t, events[1].SentStatus)
 	require.False(t, events[2].SentStatus)
 
-	for bn := uint64(3); bn <= uint64(6); bn++ {
-		t.Logf("processing block %d", bn)
+	// post 2nd block
+	require.NoError(t, stateSyncRelayer.ProcessLog(headers[1], convertLog(resultLogs[0]), nil))
+	require.NoError(t, stateSyncRelayer.ProcessLog(headers[1], convertLog(commitmentLogs[2]), nil))
+	require.NoError(t, stateSyncRelayer.PostBlock(&PostBlockRequest{}))
 
-		// post second block
-		require.NoError(t, stateSyncRelayer.PostBlock(&PostBlockRequest{
-			FullBlock: &types.FullBlock{
-				Block: &types.Block{
-					Header: &types.Header{
-						Number: bn,
-					},
-				},
-				Receipts: receipts[bn-1],
-			},
-		}))
-		time.Sleep(time.Second * 2) // wait for some time
+	time.Sleep(time.Second * 2) // wait for some time
 
-		events, err := state.StateSyncStore.getAllAvailableEvents(0)
+	events, err = state.StateSyncStore.getAllAvailableEvents(0)
 
-		require.NoError(t, err)
+	require.NoError(t, err)
+	require.Len(t, events, 4)
+	require.True(t, events[0].SentStatus)
+	require.Equal(t, uint64(2), events[0].EventID)
+	require.False(t, events[1].SentStatus)
+	require.False(t, events[2].SentStatus)
 
-		if bn < 5 { // on block 5 sending fails
-			require.Len(t, events, 5-int(bn))
-		} else {
-			require.Len(t, events, 6-int(bn))
-		}
+	// post 3rd block
+	require.NoError(t, stateSyncRelayer.ProcessLog(headers[2], convertLog(resultLogs[1]), nil))
+	require.NoError(t, stateSyncRelayer.PostBlock(&PostBlockRequest{}))
 
-		for i, e := range events {
-			require.Equal(t, i == 0, e.SentStatus)
-		}
-	}
+	time.Sleep(time.Second * 2) // wait for some time
+
+	events, err = state.StateSyncStore.getAllAvailableEvents(0)
+
+	require.NoError(t, err)
+	require.Len(t, events, 3)
+	require.True(t, events[0].SentStatus)
+	require.Equal(t, uint64(3), events[0].EventID)
+	require.False(t, events[1].SentStatus)
+
+	// post 4th block - will not provide result, so one more SendTransaction will be triggered
+	stateSyncRelayer.config.maxEventsPerBatch = 3 // send all 3 left events at once
+
+	require.NoError(t, stateSyncRelayer.PostBlock(&PostBlockRequest{}))
+
+	time.Sleep(time.Second * 2) // wait for some time
+
+	events, err = state.StateSyncStore.getAllAvailableEvents(0)
+
+	require.NoError(t, err)
+	require.Len(t, events, 3)
+	require.True(t, events[0].SentStatus && events[1].SentStatus && events[2].SentStatus)
+
+	// post 5th block
+	require.NoError(t, stateSyncRelayer.ProcessLog(headers[4], convertLog(resultLogs[2]), nil))
+	require.NoError(t, stateSyncRelayer.ProcessLog(headers[4], convertLog(resultLogs[3]), nil))
+	require.NoError(t, stateSyncRelayer.ProcessLog(headers[4], convertLog(resultLogs[4]), nil))
+	require.NoError(t, stateSyncRelayer.PostBlock(&PostBlockRequest{}))
+
+	time.Sleep(time.Second * 2) // wait for some time
+
+	events, err = state.StateSyncStore.getAllAvailableEvents(0)
+
+	require.NoError(t, err)
+	require.Len(t, events, 0)
 
 	stateSyncRelayer.Close()
 	time.Sleep(time.Second)
