@@ -33,11 +33,15 @@ func NewMockSubscription() *MockSubscription {
 func (m *MockSubscription) Push(e *Event) {
 	m.updateCh <- e
 }
+func (m *MockSubscription) Close() {
+	close(m.closeCh)
+}
 
 // subscription is the Blockchain event subscription object
 type subscription struct {
-	updateCh chan *Event // Channel for update information
-	closeCh  chan void   // Channel for close signals
+	updateCh    chan *Event  // Channel for update information
+	closeCh     chan void    // Channel for close signals
+	eventStream *eventStream // event stream for unsubscribing
 }
 
 // GetEventCh creates a new event channel, and returns it
@@ -58,7 +62,7 @@ func (s *subscription) GetEvent() *Event {
 
 // Close closes the subscription
 func (s *subscription) Close() {
-	close(s.closeCh)
+	s.eventStream.unsubscribe(s)
 }
 
 type EventType int
@@ -127,33 +131,44 @@ func (b *Blockchain) SubscribeEvents() Subscription {
 	return b.stream.subscribe()
 }
 
-// eventStream is the structure that contains the event list,
-// as well as the update channel which it uses to notify of updates
+// eventStream is the structure that contains the subscribers
+// which it uses to notify of updates
 type eventStream struct {
 	sync.Mutex
-
-	// channel to notify updates
-	updateCh []chan *Event
+	subscriptions map[*subscription]struct{}
 }
 
-// subscribe Creates a new blockchain event subscription
-func (e *eventStream) subscribe() *subscription {
-	return &subscription{
-		updateCh: e.newUpdateCh(),
-		closeCh:  make(chan void),
+// newEventStream creates event stream and initializes subscriptions map
+func newEventStream() *eventStream {
+	return &eventStream{
+		subscriptions: make(map[*subscription]struct{}),
 	}
 }
 
-// newUpdateCh returns the event update channel
-func (e *eventStream) newUpdateCh() chan *Event {
+// subscribe creates a new blockchain event subscription
+func (e *eventStream) subscribe() *subscription {
+	sub := &subscription{
+		updateCh:    make(chan *Event, 5),
+		closeCh:     make(chan void),
+		eventStream: e,
+	}
+
+	e.Lock()
+	e.subscriptions[sub] = struct{}{}
+	e.Unlock()
+
+	return sub
+}
+
+func (e *eventStream) unsubscribe(sub *subscription) {
 	e.Lock()
 	defer e.Unlock()
 
-	ch := make(chan *Event, 5)
-
-	e.updateCh = append(e.updateCh, ch)
-
-	return ch
+	// Check if the subscription exists in the map
+	if _, exists := e.subscriptions[sub]; exists {
+		delete(e.subscriptions, sub)
+		close(sub.closeCh)
+	}
 }
 
 // push adds a new Event, and notifies listeners
@@ -162,7 +177,7 @@ func (e *eventStream) push(event *Event) {
 	defer e.Unlock()
 
 	// Notify the listeners
-	for _, update := range e.updateCh {
-		update <- event
+	for sub := range e.subscriptions {
+		sub.updateCh <- event
 	}
 }
