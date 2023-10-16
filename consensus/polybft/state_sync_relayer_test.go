@@ -102,6 +102,7 @@ func TestStateSyncRelayer_PostBlock(t *testing.T) {
 		&stateSyncRelayerConfig{
 			maxAttemptsToSend:        6,
 			maxBlocksToWaitForResend: 1,
+			maxEventsPerBatch:        1,
 		},
 		hclog.Default(),
 	)
@@ -109,6 +110,7 @@ func TestStateSyncRelayer_PostBlock(t *testing.T) {
 	blockhainMock.On("CurrentHeader").Return(&types.Header{Number: 2}).Once()
 	blockhainMock.On("CurrentHeader").Return(&types.Header{Number: 3}).Once()
 	blockhainMock.On("CurrentHeader").Return(&types.Header{Number: 4}).Once()
+	blockhainMock.On("CurrentHeader").Return(&types.Header{Number: 5}).Once()
 	blockhainMock.On("CurrentHeader").Return(&types.Header{Number: 6}).Once()
 	blockhainMock.On("GetReceiptsByHash", block1Hash).Return(receipts[0], nil).Once()
 	blockhainMock.On("GetHeaderByNumber", uint64(1)).Return(&types.Header{Hash: block1Hash}).Once()

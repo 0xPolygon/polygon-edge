@@ -365,16 +365,14 @@ func (s *StateSyncStore) getStateSyncProof(stateSyncID uint64) (*StateSyncProof,
 	return ssp, err
 }
 
-// updateStateSyncRelayerStateData inserts the state data for state sync relayer together with new events and
-// deletion of processed events
+// updateStateSyncRelayerStateData inserts the state data for state sync relayer together
+// with insertion of a new events and deletion of processed events
 func (s *StateSyncStore) updateStateSyncRelayerStateData(
 	data *StateSyncRelayerStateData,
 	newEvents []*StateSyncRelayerEventData,
-	deletedEventIds []uint64) error {
+	deletedEventIDs []uint64) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
 		relayerEventsBucket := tx.Bucket(stateSyncRelayerEventsBucket)
-		eventsBucket := tx.Bucket(stateSyncEventsBucket)
-		proofsBucket := tx.Bucket(stateSyncProofsBucket)
 
 		for _, evnt := range newEvents {
 			raw, err := json.Marshal(evnt)
@@ -389,20 +387,8 @@ func (s *StateSyncStore) updateStateSyncRelayerStateData(
 			}
 		}
 
-		for _, stateSyncEventID := range deletedEventIds {
-			stateSyncEventIDKey := common.EncodeUint64ToBytes(stateSyncEventID)
-
-			if err := eventsBucket.Delete(stateSyncEventIDKey); err != nil {
-				return fmt.Errorf("failed to remove state sync event (ID=%d): %w", stateSyncEventID, err)
-			}
-
-			if err := proofsBucket.Delete(stateSyncEventIDKey); err != nil {
-				return fmt.Errorf("failed to remove state sync event proof (ID=%d): %w", stateSyncEventID, err)
-			}
-
-			if err := relayerEventsBucket.Delete(stateSyncEventIDKey); err != nil {
-				return fmt.Errorf("failed to remove state sync relayer event (ID=%d): %w", stateSyncEventID, err)
-			}
+		if err := s.removeEvents(tx, deletedEventIDs); err != nil {
+			return err
 		}
 
 		raw, err := json.Marshal(data)
@@ -431,34 +417,26 @@ func (s *StateSyncStore) getStateSyncRelayerStateData() (*StateSyncRelayerStateD
 	return data, err
 }
 
-// updateStateSyncRelayerEvent removes StateSyncRelayerEventData from database
-func (s *StateSyncStore) removeStateSyncRelayerEvent(eventID uint64) error {
+// updateStateSyncRelayerEvents updates/remove desired events
+func (s *StateSyncStore) updateStateSyncRelayerEvents(
+	events []*StateSyncRelayerEventData, removeIDs []uint64) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
-		key := common.EncodeUint64ToBytes(eventID)
+		bucket := tx.Bucket(stateSyncRelayerEventsBucket)
 
-		if err := tx.Bucket(stateSyncEventsBucket).Delete(key); err != nil {
-			return fmt.Errorf("failed to remove state sync event (ID=%d): %w", eventID, err)
+		for _, evnt := range events {
+			raw, err := json.Marshal(evnt)
+			if err != nil {
+				return err
+			}
+
+			key := common.EncodeUint64ToBytes(evnt.EventID)
+
+			if err := bucket.Put(key, raw); err != nil {
+				return err
+			}
 		}
 
-		if err := tx.Bucket(stateSyncProofsBucket).Delete(key); err != nil {
-			return fmt.Errorf("failed to remove state sync event proof (ID=%d): %w", eventID, err)
-		}
-
-		return tx.Bucket(stateSyncRelayerEventsBucket).Delete(key)
-	})
-}
-
-// updateStateSyncRelayerEvent updates StateSyncRelayerEventData
-func (s *StateSyncStore) updateStateSyncRelayerEvent(evnt *StateSyncRelayerEventData) error {
-	return s.db.Update(func(tx *bolt.Tx) error {
-		raw, err := json.Marshal(evnt)
-		if err != nil {
-			return err
-		}
-
-		key := common.EncodeUint64ToBytes(evnt.EventID)
-
-		return tx.Bucket(stateSyncRelayerEventsBucket).Put(key, raw)
+		return s.removeEvents(tx, removeIDs)
 	})
 }
 
@@ -487,4 +465,28 @@ func (s *StateSyncStore) getAllAvailableEvents(limit int) (result []*StateSyncRe
 	}
 
 	return result, nil
+}
+
+func (s *StateSyncStore) removeEvents(tx *bolt.Tx, eventIDs []uint64) error {
+	eventsBucket := tx.Bucket(stateSyncEventsBucket)
+	proofsBucket := tx.Bucket(stateSyncProofsBucket)
+	relayerEventsBucket := tx.Bucket(stateSyncRelayerEventsBucket)
+
+	for _, stateSyncEventID := range eventIDs {
+		stateSyncEventIDKey := common.EncodeUint64ToBytes(stateSyncEventID)
+
+		if err := eventsBucket.Delete(stateSyncEventIDKey); err != nil {
+			return fmt.Errorf("failed to remove state sync event (ID=%d): %w", stateSyncEventID, err)
+		}
+
+		if err := proofsBucket.Delete(stateSyncEventIDKey); err != nil {
+			return fmt.Errorf("failed to remove state sync event proof (ID=%d): %w", stateSyncEventID, err)
+		}
+
+		if err := relayerEventsBucket.Delete(stateSyncEventIDKey); err != nil {
+			return fmt.Errorf("failed to remove state sync relayer event (ID=%d): %w", stateSyncEventID, err)
+		}
+	}
+
+	return nil
 }

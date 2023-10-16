@@ -368,9 +368,7 @@ func TestState_StateSync_StateSyncRelayerDataAndEvents(t *testing.T) {
 	require.Equal(t, uint64(12), events[3].EventID)
 
 	events[1].SentStatus = true
-	require.NoError(t, state.StateSyncStore.updateStateSyncRelayerEvent(events[1]))
-
-	require.NoError(t, state.StateSyncStore.removeStateSyncRelayerEvent(2))
+	require.NoError(t, state.StateSyncStore.updateStateSyncRelayerEvents(events[1:2], []uint64{2}))
 
 	// get available events with limit
 	events, err = state.StateSyncStore.getAllAvailableEvents(2)

@@ -21,6 +21,8 @@ const (
 	defaultMaxBlocksToWaitForResend = uint64(30)
 	// defaultMaxAttemptsToSend specifies how many sending retries for one transaction
 	defaultMaxAttemptsToSend = 6
+	// defaultMaxEventsPerBatch specifies maximum events per one batchExecute tx
+	defaultMaxEventsPerBatch = 10
 )
 
 var (
@@ -72,6 +74,7 @@ func (ed StateSyncRelayerEventData) String() string {
 type stateSyncRelayerConfig struct {
 	maxBlocksToWaitForResend uint64
 	maxAttemptsToSend        uint64
+	maxEventsPerBatch        uint64
 }
 
 type stateSyncRelayerImpl struct {
@@ -105,6 +108,7 @@ func NewStateSyncRelayer(
 		config = &stateSyncRelayerConfig{
 			maxBlocksToWaitForResend: defaultMaxBlocksToWaitForResend,
 			maxAttemptsToSend:        defaultMaxAttemptsToSend,
+			maxEventsPerBatch:        defaultMaxEventsPerBatch,
 		}
 	}
 
@@ -187,7 +191,7 @@ func (ssr *stateSyncRelayerImpl) PostBlock(req *PostBlockRequest) error {
 	failedEventIDs := make([]uint64, 0)
 	failedReasons := make([]string, 0)
 
-	// process new events
+	// process all the events
 	for _, genEvent := range allEvents {
 		switch event := genEvent.(type) {
 		case *contractsapi.NewCommitmentEvent:
@@ -227,100 +231,105 @@ func (ssr *stateSyncRelayerImpl) PostBlock(req *PostBlockRequest) error {
 }
 
 func (ssr *stateSyncRelayerImpl) processEvents() {
-	// we need two events because the first one is possible tried maxAttemptsToSend times
-	events, err := ssr.state.StateSyncStore.getAllAvailableEvents(2)
+	// we need twice as batch size because events from first batch are possible already sent maxAttemptsToSend times
+	events, err := ssr.state.StateSyncStore.getAllAvailableEvents(int(ssr.config.maxEventsPerBatch) * 2)
 	if err != nil {
 		ssr.logger.Error("retrieving events failed", "err", err)
 
 		return
 	}
 
-	if len(events) == 0 {
-		return // nothing to process
-	}
-
+	removedEventIDs := []uint64{}
+	sendingEvents := []*StateSyncRelayerEventData{}
 	currentBlockNumber := ssr.blockchain.CurrentHeader().Number
-	eventData := events[0]
-	// return if we are still waiting for confirmation for the event
-	if eventData.SentStatus && eventData.BlockNumber+ssr.config.maxBlocksToWaitForResend > currentBlockNumber {
-		return
-	}
 
-	// if current event is processed to many times, remove it and try the next one
-	if eventData.CountTries+1 > ssr.config.maxAttemptsToSend {
-		err = ssr.state.StateSyncStore.removeStateSyncRelayerEvent(eventData.EventID)
-
-		ssr.logger.Info("failed to send event too many times", "eventID", eventData.EventID, "err", err)
-		// return if there is no next
-		if len(events) == 1 {
+	// check already processed events
+	for _, evnt := range events {
+		// quit if we are still waiting for some old event confirmation (there is no paralelization right now!)
+		if evnt.SentStatus && evnt.BlockNumber+ssr.config.maxBlocksToWaitForResend > currentBlockNumber {
 			return
 		}
 
-		eventData = events[1] // next one to process
+		// remove event if it is processed too many times
+		if evnt.CountTries+1 > ssr.config.maxAttemptsToSend {
+			removedEventIDs = append(removedEventIDs, evnt.EventID)
+		} else {
+			evnt.CountTries++
+			evnt.BlockNumber = currentBlockNumber
+			evnt.SentStatus = true
+
+			sendingEvents = append(sendingEvents, evnt)
+			if len(sendingEvents) == int(ssr.config.maxEventsPerBatch) {
+				break
+			}
+		}
 	}
 
-	if err := ssr.sendEventTx(eventData, currentBlockNumber); err != nil {
-		ssr.logger.Error("failed to send tx event", "event", eventData.EventID, "err", err)
-	} else {
-		ssr.logger.Info("event tx has been successfully sent", "event", eventData.EventID)
+	// update state only if needed
+	if len(sendingEvents)+len(removedEventIDs) > 0 {
+		ssr.logger.Info("sending events", "events", sendingEvents, "removed", removedEventIDs)
+
+		if err := ssr.state.StateSyncStore.updateStateSyncRelayerEvents(sendingEvents, removedEventIDs); err != nil {
+			ssr.logger.Error("updating events failed",
+				"events", sendingEvents, "removed", removedEventIDs, "err", err)
+
+			return
+		}
+	}
+
+	// send tx only if needed
+	if len(sendingEvents) > 0 {
+		if err := ssr.sendTx(sendingEvents); err != nil {
+			ssr.logger.Error("failed to send tx", "events", sendingEvents, "err", err)
+		} else {
+			ssr.logger.Info("tx has been successfully sent", "events", sendingEvents)
+		}
 	}
 }
 
-func (ssr *stateSyncRelayerImpl) sendEventTx(eventData *StateSyncRelayerEventData, blockNumber uint64) error {
-	eventData.CountTries++
-	eventData.BlockNumber = blockNumber
-	eventData.SentStatus = true
+func (ssr *stateSyncRelayerImpl) sendTx(events []*StateSyncRelayerEventData) error {
+	proofs := make([][]types.Hash, len(events))
+	objs := make([]*contractsapi.StateSync, len(events))
 
-	if err := ssr.state.StateSyncStore.updateStateSyncRelayerEvent(eventData); err != nil {
-		return fmt.Errorf("failed to update event: %w", err)
+	for i, event := range events {
+		proof, err := ssr.store.GetStateSyncProof(event.EventID)
+		if err != nil {
+			return fmt.Errorf("failed to get proof for %d: %w", event.EventID, err)
+		}
+
+		// since state sync event is a map in the jsonrpc response,
+		// to not have custom logic of converting the map to state sync event
+		// json encoding is used, since it manages to successfully unmarshal the
+		// event from the marshaled map
+		raw, err := json.Marshal(proof.Metadata["StateSync"])
+		if err != nil {
+			return fmt.Errorf("failed to marshal event %d: %w", event.EventID, err)
+		}
+
+		if err = json.Unmarshal(raw, &objs[i]); err != nil {
+			return fmt.Errorf("failed to unmarshal event %d: %w", event.EventID, err)
+		}
+
+		proofs[i] = proof.Data
 	}
 
-	txn, err := ssr.createTx(eventData.EventID)
-	if err != nil {
-		return fmt.Errorf("failed to create tx: %w", err)
-	}
-
-	_, err = ssr.txRelayer.SendTransaction(txn, ssr.key)
-
-	return err
-}
-
-func (ssr *stateSyncRelayerImpl) createTx(eventID uint64) (*ethgo.Transaction, error) {
-	var sse *contractsapi.StateSync
-
-	proof, err := ssr.store.GetStateSyncProof(eventID)
-	if err != nil {
-		return nil, err
-	}
-
-	// since state sync event is a map in the jsonrpc response,
-	// to not have custom logic of converting the map to state sync event
-	// json encoding is used, since it manages to successfully unmarshal the
-	// event from the marshaled map
-	raw, err := json.Marshal(proof.Metadata["StateSync"])
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal: %w", err)
-	}
-
-	if err = json.Unmarshal(raw, &sse); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal: %w", err)
-	}
-
-	input, err := (&contractsapi.ExecuteStateReceiverFn{
-		Proof: proof.Data,
-		Obj:   sse,
+	input, err := (&contractsapi.BatchExecuteStateReceiverFn{
+		Proofs: proofs,
+		Objs:   objs,
 	}).EncodeAbi()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	// execute the state sync
-	return &ethgo.Transaction{
+	// send batchExecute state sync
+	_, err = ssr.txRelayer.SendTransaction(&ethgo.Transaction{
 		From:  ssr.key.Address(),
 		To:    (*ethgo.Address)(&contracts.StateReceiverContract),
 		Gas:   types.StateTransactionGasLimit,
 		Input: input,
-	}, nil
+	}, ssr.key)
+
+	return err
 }
 
 func getStateSyncTxRelayer(rpcEndpoint string, logger hclog.Logger) (txrelayer.TxRelayer, error) {

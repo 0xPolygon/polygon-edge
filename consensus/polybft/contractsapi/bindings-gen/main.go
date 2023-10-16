@@ -48,6 +48,7 @@ func main() {
 			[]string{
 				"commit",
 				"execute",
+				"batchExecute",
 			},
 			[]string{
 				"StateSyncResult",
