@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	bls "github.com/0xPolygon/polygon-edge/bls"
+	"github.com/0xPolygon/polygon-edge/bls"
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"

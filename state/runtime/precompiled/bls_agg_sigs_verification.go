@@ -3,7 +3,7 @@ package precompiled
 import (
 	"errors"
 
-	bls "github.com/0xPolygon/polygon-edge/bls"
+	"github.com/0xPolygon/polygon-edge/bls"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/state/runtime"

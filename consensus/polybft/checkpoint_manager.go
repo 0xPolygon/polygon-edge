@@ -6,7 +6,7 @@ import (
 	"math/big"
 	"strconv"
 
-	bls "github.com/0xPolygon/polygon-edge/bls"
+	"github.com/0xPolygon/polygon-edge/bls"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/contracts"

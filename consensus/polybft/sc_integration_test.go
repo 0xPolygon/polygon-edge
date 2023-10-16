@@ -11,7 +11,7 @@ import (
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
 
-	bls "github.com/0xPolygon/polygon-edge/bls"
+	"github.com/0xPolygon/polygon-edge/bls"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"

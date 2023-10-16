@@ -16,7 +16,7 @@ import (
 	bolt "go.etcd.io/bbolt"
 	"google.golang.org/protobuf/proto"
 
-	bls "github.com/0xPolygon/polygon-edge/bls"
+	"github.com/0xPolygon/polygon-edge/bls"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	polybftProto "github.com/0xPolygon/polygon-edge/consensus/polybft/proto"
