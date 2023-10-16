@@ -271,6 +271,8 @@ func (c *consensusRuntime) initStateSyncRelayer(logger hcf.Logger) error {
 		c.stateSyncRelayer = &dummyStakeSyncRelayer{}
 	}
 
+	c.eventProvider.Subscribe(c.stateSyncRelayer)
+
 	return c.stateSyncRelayer.Init()
 }
 

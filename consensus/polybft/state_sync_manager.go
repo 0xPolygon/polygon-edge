@@ -36,7 +36,6 @@ type StateSyncProof struct {
 
 // StateSyncManager is an interface that defines functions for state sync workflow
 type StateSyncManager interface {
-	EventSubscriber
 	Init() error
 	Close()
 	Commitment(blockNumber uint64) (*CommitmentMessageSigned, error)
@@ -59,15 +58,6 @@ func (d *dummyStateSyncManager) PostBlock(req *PostBlockRequest) error { return 
 func (d *dummyStateSyncManager) PostEpoch(req *PostEpochRequest) error { return nil }
 func (d *dummyStateSyncManager) GetStateSyncProof(stateSyncID uint64) (types.Proof, error) {
 	return types.Proof{}, nil
-}
-
-// EventSubscriber implementation
-func (d *dummyStateSyncManager) GetLogFilters() map[types.Address][]types.Hash {
-	return make(map[types.Address][]types.Hash)
-}
-func (d *dummyStateSyncManager) ProcessLog(header *types.Header,
-	log *ethgo.Log, dbTx *bolt.Tx) error {
-	return nil
 }
 
 // stateSyncConfig holds the configuration data of state sync manager
@@ -614,35 +604,4 @@ func (s *stateSyncManager) multicast(msg interface{}) {
 	if err != nil {
 		s.logger.Warn("failed to gossip bridge message", "err", err)
 	}
-}
-
-// EventSubscriber implementation
-
-// GetLogFilters returns a map of log filters for getting desired events,
-// where the key is the address of contract that emits desired events,
-// and the value is a slice of signatures of events we want to get.
-// This function is the implementation of EventSubscriber interface
-func (s *stateSyncManager) GetLogFilters() map[types.Address][]types.Hash {
-	var stateSyncResultEvent contractsapi.StateSyncResultEvent
-
-	return map[types.Address][]types.Hash{
-		contracts.StateReceiverContract: {types.Hash(stateSyncResultEvent.Sig())},
-	}
-}
-
-// ProcessLog is the implementation of EventSubscriber interface,
-// used to handle a log defined in GetLogFilters, provided by event provider
-func (s *stateSyncManager) ProcessLog(header *types.Header, log *ethgo.Log, dbTx *bolt.Tx) error {
-	var stateSyncResultEvent contractsapi.StateSyncResultEvent
-
-	doesMatch, err := stateSyncResultEvent.ParseLog(log)
-	if err != nil {
-		return err
-	}
-
-	if !doesMatch {
-		return nil
-	}
-
-	return s.state.StateSyncStore.removeStateSyncEventsAndProofs([]uint64{stateSyncResultEvent.Counter.Uint64()})
 }

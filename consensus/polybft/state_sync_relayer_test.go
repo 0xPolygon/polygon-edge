@@ -134,12 +134,6 @@ func TestStateSyncRelayer_PostBlock(t *testing.T) {
 
 	time.Sleep(time.Second * 2) // wait for some time
 
-	// check if everything is correct, 3 events should be in database, first one should be marked as sent
-	ssrStateData, err := state.StateSyncStore.getStateSyncRelayerStateData()
-
-	require.NoError(t, err)
-	require.Equal(t, uint64(2), ssrStateData.LastBlockNumber)
-
 	events, err := state.StateSyncStore.getAllAvailableEvents(0)
 
 	require.NoError(t, err)
@@ -163,12 +157,6 @@ func TestStateSyncRelayer_PostBlock(t *testing.T) {
 			},
 		}))
 		time.Sleep(time.Second * 2) // wait for some time
-
-		// check if everything is correct, 3 events should be in database, first one should be marked as sent
-		ssrStateData, err := state.StateSyncStore.getStateSyncRelayerStateData()
-
-		require.NoError(t, err)
-		require.Equal(t, bn, ssrStateData.LastBlockNumber)
 
 		events, err := state.StateSyncStore.getAllAvailableEvents(0)
 

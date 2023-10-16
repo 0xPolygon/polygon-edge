@@ -303,30 +303,12 @@ func TestState_StateSync_StateSyncRelayerDataAndEvents(t *testing.T) {
 
 	state := newTestState(t)
 
-	// get before update
-	ssrStateData, err := state.StateSyncStore.getStateSyncRelayerStateData()
-
-	require.NoError(t, err)
-	assert.Nil(t, ssrStateData)
-
 	// update
-	require.NoError(t, state.StateSyncStore.updateStateSyncRelayerStateData(
-		&StateSyncRelayerStateData{
-			LastBlockNumber: 100,
-		},
-		[]*StateSyncRelayerEventData{
-			{EventID: 2},
-			{EventID: 4},
-			{EventID: 7, SentStatus: true, BlockNumber: 100},
-		},
-		[]uint64{},
-	))
-
-	// get after update
-	ssrStateData, err = state.StateSyncStore.getStateSyncRelayerStateData()
-
-	require.NoError(t, err)
-	assert.Equal(t, uint64(100), ssrStateData.LastBlockNumber)
+	require.NoError(t, state.StateSyncStore.updateStateSyncRelayerEvents([]*StateSyncRelayerEventData{
+		{EventID: 2},
+		{EventID: 4},
+		{EventID: 7, SentStatus: true, BlockNumber: 100},
+	}, []uint64{}, nil))
 
 	// get available events
 	events, err := state.StateSyncStore.getAllAvailableEvents(0)
@@ -338,23 +320,15 @@ func TestState_StateSync_StateSyncRelayerDataAndEvents(t *testing.T) {
 	require.Equal(t, uint64(7), events[2].EventID)
 
 	// update again
-	require.NoError(t, state.StateSyncStore.updateStateSyncRelayerStateData(
-		&StateSyncRelayerStateData{
-			LastBlockNumber: 200,
-		},
+	require.NoError(t, state.StateSyncStore.updateStateSyncRelayerEvents(
 		[]*StateSyncRelayerEventData{
 			{EventID: 10},
 			{EventID: 12},
 			{EventID: 11},
 		},
 		[]uint64{4, 7},
+		nil,
 	))
-
-	// get after update
-	ssrStateData, err = state.StateSyncStore.getStateSyncRelayerStateData()
-
-	require.NoError(t, err)
-	assert.Equal(t, uint64(200), ssrStateData.LastBlockNumber)
 
 	// get available events
 	events, err = state.StateSyncStore.getAllAvailableEvents(1000)
@@ -368,7 +342,7 @@ func TestState_StateSync_StateSyncRelayerDataAndEvents(t *testing.T) {
 	require.Equal(t, uint64(12), events[3].EventID)
 
 	events[1].SentStatus = true
-	require.NoError(t, state.StateSyncStore.updateStateSyncRelayerEvents(events[1:2], []uint64{2}))
+	require.NoError(t, state.StateSyncStore.updateStateSyncRelayerEvents(events[1:2], []uint64{2}, nil))
 
 	// get available events with limit
 	events, err = state.StateSyncStore.getAllAvailableEvents(2)
