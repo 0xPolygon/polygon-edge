@@ -16,6 +16,9 @@ var parserPool fastrlp.ParserPool
 var (
 	// codePrefix is the code prefix for leveldb
 	codePrefix = []byte("code")
+
+	// leveldb not found error message
+	levelDBNotFoundMsg = "leveldb: not found"
 )
 
 // Batch is batch write interface
@@ -31,7 +34,7 @@ type Storage interface {
 	Put(k, v []byte) error
 	Get(k []byte) ([]byte, bool, error)
 	Batch() Batch
-	SetCode(hash types.Hash, code []byte)
+	SetCode(hash types.Hash, code []byte) error
 	GetCode(hash types.Hash) ([]byte, bool)
 
 	Close() error
@@ -56,12 +59,12 @@ func (b *KVBatch) Write() error {
 	return b.db.Write(b.batch, nil)
 }
 
-func (kv *KVStorage) SetCode(hash types.Hash, code []byte) {
-	kv.Put(append(codePrefix, hash.Bytes()...), code)
+func (kv *KVStorage) SetCode(hash types.Hash, code []byte) error {
+	return kv.Put(GetCodeKey(hash), code)
 }
 
 func (kv *KVStorage) GetCode(hash types.Hash) ([]byte, bool) {
-	res, ok, err := kv.Get(append(codePrefix, hash.Bytes()...))
+	res, ok, err := kv.Get(GetCodeKey(hash))
 	if err != nil {
 		return nil, false
 	}
@@ -80,7 +83,11 @@ func (kv *KVStorage) Put(k, v []byte) error {
 func (kv *KVStorage) Get(k []byte) ([]byte, bool, error) {
 	data, err := kv.db.Get(k, nil)
 	if err != nil {
-		return nil, false, err // check if err.Error() == "leveldb: not found"  should return nil, false, nil
+		if err.Error() == levelDBNotFoundMsg {
+			return nil, false, nil
+		}
+
+		return nil, false, err
 	}
 
 	return data, true, nil
@@ -138,20 +145,17 @@ func (m *memStorage) Get(p []byte) ([]byte, bool, error) {
 	return v, true, nil
 }
 
-func (m *memStorage) SetCode(hash types.Hash, code []byte) {
-	m.l.Lock()
-	defer m.l.Unlock()
-
-	m.code[hash.String()] = code
+func (m *memStorage) SetCode(hash types.Hash, code []byte) error {
+	return m.Put(append(codePrefix, hash.Bytes()...), code)
 }
 
 func (m *memStorage) GetCode(hash types.Hash) ([]byte, bool) {
-	m.l.Lock()
-	defer m.l.Unlock()
+	res, ok, err := m.Get(GetCodeKey(hash))
+	if err != nil {
+		return nil, false
+	}
 
-	code, ok := m.code[hash.String()]
-
-	return code, ok
+	return res, ok
 }
 
 func (m *memStorage) Batch() Batch {
@@ -271,4 +275,8 @@ func decodeNode(v *fastrlp.Value, s Storage) (Node, error) {
 	}
 
 	return nil, fmt.Errorf("node has incorrect number of leafs")
+}
+
+func GetCodeKey(hash types.Hash) []byte {
+	return append(codePrefix, hash.Bytes()...)
 }

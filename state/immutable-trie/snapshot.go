@@ -123,7 +123,7 @@ func (s *Snapshot) Commit(objs []*state.Object) (state.Snapshot, []byte, error) 
 			}
 
 			if obj.DirtyCode {
-				s.state.SetCode(obj.CodeHash, obj.Code)
+				batch.Put(GetCodeKey(obj.CodeHash), obj.Code)
 			}
 
 			vv := account.MarshalWith(arena)

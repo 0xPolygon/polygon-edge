@@ -44,26 +44,34 @@ func getCustomNode(hash []byte, storage Storage) (Node, []byte, error) {
 }
 
 func CopyTrie(nodeHash []byte, storage Storage, newStorage Storage, agg []byte, isStorage bool) error {
+	batchWriter := newStorage.Batch()
+
+	if err := copyTrieHash(nodeHash, storage, batchWriter, agg, isStorage); err != nil {
+		return err
+	}
+
+	return batchWriter.Write()
+}
+
+func copyTrieHash(nodeHash []byte, storage Storage, batchWriter Batch, agg []byte, isStorage bool) error {
 	node, data, err := getCustomNode(nodeHash, storage)
 	if err != nil {
 		return err
 	}
 
 	//copy whole bytes of nodes
-	if err := newStorage.Put(nodeHash, data); err != nil {
-		return err
-	}
+	batchWriter.Put(nodeHash, data)
 
-	return copyTrie(node, storage, newStorage, agg, isStorage)
+	return copyTrieNode(node, storage, batchWriter, agg, isStorage)
 }
 
-func copyTrie(node Node, storage Storage, newStorage Storage, agg []byte, isStorage bool) error {
+func copyTrieNode(node Node, storage Storage, batchWriter Batch, agg []byte, isStorage bool) error {
 	switch n := node.(type) {
 	case nil:
 		return nil
 	case *FullNode:
 		if len(n.hash) > 0 {
-			return CopyTrie(n.hash, storage, newStorage, agg, isStorage)
+			return copyTrieHash(n.hash, storage, batchWriter, agg, isStorage)
 		}
 
 		for i := range n.children {
@@ -71,7 +79,7 @@ func copyTrie(node Node, storage Storage, newStorage Storage, agg []byte, isStor
 				continue
 			}
 
-			err := copyTrie(n.children[i], storage, newStorage, append(agg, uint8(i)), isStorage)
+			err := copyTrieNode(n.children[i], storage, batchWriter, append(agg, uint8(i)), isStorage)
 			if err != nil {
 				return err
 			}
@@ -80,7 +88,7 @@ func copyTrie(node Node, storage Storage, newStorage Storage, agg []byte, isStor
 	case *ValueNode:
 		//if node represens stored value, then we need to copy it
 		if n.hash {
-			return CopyTrie(n.buf, storage, newStorage, agg, isStorage)
+			return copyTrieHash(n.buf, storage, batchWriter, agg, isStorage)
 		}
 
 		if !isStorage {
@@ -89,26 +97,28 @@ func copyTrie(node Node, storage Storage, newStorage Storage, agg []byte, isStor
 				return fmt.Errorf("can't parse account %s: %w", hex.EncodeToString(encodeCompact(agg)), err)
 			} else {
 				if account.CodeHash != nil && bytes.Equal(account.CodeHash, emptyCodeHash) == false {
-					code, ok := storage.GetCode(types.BytesToHash(account.CodeHash))
+					hash := types.BytesToHash(account.CodeHash)
+
+					code, ok := storage.GetCode(hash)
 					if ok {
-						newStorage.SetCode(types.BytesToHash(account.CodeHash), code)
+						batchWriter.Put(GetCodeKey(hash), code)
 					} else {
 						return fmt.Errorf("can't find code %s", hex.EncodeToString(account.CodeHash))
 					}
 				}
 
 				if account.Root != types.EmptyRootHash {
-					return CopyTrie(account.Root[:], storage, newStorage, nil, true)
+					return copyTrieHash(account.Root[:], storage, batchWriter, nil, true)
 				}
 			}
 		}
 
 	case *ShortNode:
 		if len(n.hash) > 0 {
-			return CopyTrie(n.hash, storage, newStorage, agg, isStorage)
+			return copyTrieHash(n.hash, storage, batchWriter, agg, isStorage)
 		}
 
-		return copyTrie(n.child, storage, newStorage, append(agg, n.key...), isStorage)
+		return copyTrieNode(n.child, storage, batchWriter, append(agg, n.key...), isStorage)
 	}
 
 	return nil
