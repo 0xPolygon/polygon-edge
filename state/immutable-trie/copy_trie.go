@@ -17,8 +17,10 @@ import (
 var emptyCodeHash = crypto.Keccak256(nil)
 
 func getCustomNode(hash []byte, storage Storage) (Node, []byte, error) {
-	data, ok := storage.Get(hash)
-	if !ok {
+	data, ok, err := storage.Get(hash)
+	if err != nil {
+		return nil, nil, err
+	} else if !ok {
 		return nil, nil, nil
 	}
 
@@ -48,7 +50,9 @@ func CopyTrie(nodeHash []byte, storage Storage, newStorage Storage, agg []byte, 
 	}
 
 	//copy whole bytes of nodes
-	newStorage.Put(nodeHash, data)
+	if err := newStorage.Put(nodeHash, data); err != nil {
+		return err
+	}
 
 	return copyTrie(node, storage, newStorage, agg, isStorage)
 }
