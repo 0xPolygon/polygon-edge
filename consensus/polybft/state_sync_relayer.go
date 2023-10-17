@@ -29,6 +29,9 @@ const (
 var (
 	errFailedToExecuteStateSync     = errors.New("failed to execute state sync")
 	errUnknownStateSyncRelayerEvent = errors.New("unknown event")
+
+	commitmentEventSignature       = new(contractsapi.NewCommitmentEvent).Sig()
+	stateSyncResultEventSignnature = new(contractsapi.StateSyncResultEvent).Sig()
 )
 
 // StateSyncRelayer is an interface that defines functions for state sync relayer
@@ -44,21 +47,21 @@ type stateSyncProofRetriever interface {
 	GetStateSyncProof(stateSyncID uint64) (types.Proof, error)
 }
 
-var _ StateSyncRelayer = (*dummyStakeSyncRelayer)(nil)
+var _ StateSyncRelayer = (*dummyStateSyncRelayer)(nil)
 
-// dummyStakeSyncRelayer is a dummy implementation of a StateSyncRelayer
-type dummyStakeSyncRelayer struct{}
+// dummyStateSyncRelayer is a dummy implementation of a StateSyncRelayer
+type dummyStateSyncRelayer struct{}
 
-func (d *dummyStakeSyncRelayer) PostBlock(req *PostBlockRequest) error { return nil }
+func (d *dummyStateSyncRelayer) PostBlock(req *PostBlockRequest) error { return nil }
 
-func (d *dummyStakeSyncRelayer) Init() error { return nil }
-func (d *dummyStakeSyncRelayer) Close()      {}
+func (d *dummyStateSyncRelayer) Init() error { return nil }
+func (d *dummyStateSyncRelayer) Close()      {}
 
 // EventSubscriber implementation
-func (d *dummyStakeSyncRelayer) GetLogFilters() map[types.Address][]types.Hash {
+func (d *dummyStateSyncRelayer) GetLogFilters() map[types.Address][]types.Hash {
 	return make(map[types.Address][]types.Hash)
 }
-func (d *dummyStakeSyncRelayer) ProcessLog(header *types.Header, log *ethgo.Log, dbTx *bolt.Tx) error {
+func (d *dummyStateSyncRelayer) ProcessLog(header *types.Header, log *ethgo.Log, dbTx *bolt.Tx) error {
 	return nil
 }
 
@@ -86,7 +89,7 @@ type stateSyncRelayerImpl struct {
 	txRelayer      txrelayer.TxRelayer
 	key            ethgo.Key
 	proofRetriever stateSyncProofRetriever
-	state          *State
+	state          *StateSyncStore
 	logger         hclog.Logger
 	blockchain     blockchainBackend
 
@@ -99,7 +102,7 @@ type stateSyncRelayerImpl struct {
 func NewStateSyncRelayer(
 	txRelayer txrelayer.TxRelayer,
 	stateReceiverAddr types.Address,
-	state *State,
+	state *StateSyncStore,
 	store stateSyncProofRetriever,
 	blockchain blockchainBackend,
 	key ethgo.Key,
@@ -158,7 +161,7 @@ func (ssr *stateSyncRelayerImpl) PostBlock(req *PostBlockRequest) error {
 
 func (ssr *stateSyncRelayerImpl) processEvents() {
 	// we need twice as batch size because events from first batch are possible already sent maxAttemptsToSend times
-	events, err := ssr.state.StateSyncStore.getAllAvailableEvents(int(ssr.config.maxEventsPerBatch) * 2)
+	events, err := ssr.state.getAllAvailableEvents(int(ssr.config.maxEventsPerBatch) * 2)
 	if err != nil {
 		ssr.logger.Error("retrieving events failed", "err", err)
 
@@ -195,8 +198,7 @@ func (ssr *stateSyncRelayerImpl) processEvents() {
 	if len(sendingEvents)+len(removedEventIDs) > 0 {
 		ssr.logger.Info("sending events", "events", sendingEvents, "removed", removedEventIDs)
 
-		if err := ssr.state.StateSyncStore.updateStateSyncRelayerEvents(
-			sendingEvents, removedEventIDs, nil); err != nil {
+		if err := ssr.state.updateStateSyncRelayerEvents(sendingEvents, removedEventIDs, nil); err != nil {
 			ssr.logger.Error("updating events failed",
 				"events", sendingEvents, "removed", removedEventIDs, "err", err)
 
@@ -288,23 +290,24 @@ func (ssr *stateSyncRelayerImpl) ProcessLog(header *types.Header, log *ethgo.Log
 	)
 
 	switch log.Topics[0] {
-	case commitEvent.Sig():
+	case commitmentEventSignature:
 		_, err := commitEvent.ParseLog(log)
 		if err != nil {
 			return err
 		}
 
-		newEvents := []*StateSyncRelayerEventData{}
+		firstID, lastID := commitEvent.StartID.Uint64(), commitEvent.EndID.Uint64()
+		newEvents := make([]*StateSyncRelayerEventData, lastID-firstID+1)
 
-		for i := commitEvent.StartID.Uint64(); i <= commitEvent.EndID.Uint64(); i++ {
-			newEvents = append(newEvents, &StateSyncRelayerEventData{EventID: i})
+		for eventID := firstID; eventID <= lastID; eventID++ {
+			newEvents[eventID-firstID] = &StateSyncRelayerEventData{EventID: eventID}
 		}
 
 		ssr.logger.Info("new events has been arrived", "block", header.Number, "events", newEvents)
 
-		return ssr.state.StateSyncStore.updateStateSyncRelayerEvents(newEvents, nil, dbTx)
+		return ssr.state.updateStateSyncRelayerEvents(newEvents, nil, dbTx)
 
-	case stateSyncResultEvent.Sig():
+	case stateSyncResultEventSignnature:
 		_, err := stateSyncResultEvent.ParseLog(log)
 		if err != nil {
 			return err
@@ -315,7 +318,7 @@ func (ssr *stateSyncRelayerImpl) ProcessLog(header *types.Header, log *ethgo.Log
 		if stateSyncResultEvent.Status {
 			ssr.logger.Info("event has been processed", "block", header.Number, "event", eventID)
 
-			return ssr.state.StateSyncStore.updateStateSyncRelayerEvents(nil, []uint64{eventID}, dbTx)
+			return ssr.state.updateStateSyncRelayerEvents(nil, []uint64{eventID}, dbTx)
 		}
 
 		ssr.logger.Info("event has been failed to process", "block", header.Number,

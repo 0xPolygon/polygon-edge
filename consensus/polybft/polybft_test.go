@@ -210,7 +210,7 @@ func TestPolybft_Close(t *testing.T) {
 		syncer:  syncer,
 		runtime: &consensusRuntime{
 			stateSyncManager: &dummyStateSyncManager{},
-			stateSyncRelayer: &dummyStakeSyncRelayer{},
+			stateSyncRelayer: &dummyStateSyncRelayer{},
 		},
 	}
 

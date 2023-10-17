@@ -58,7 +58,7 @@ func TestStateSyncRelayer_FullWorkflow(t *testing.T) {
 	stateSyncRelayer := NewStateSyncRelayer(
 		dummyTxRelayer,
 		stateSyncAddr,
-		state,
+		state.StateSyncStore,
 		proofMock,
 		blockhainMock,
 		testKey,

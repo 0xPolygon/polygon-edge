@@ -249,10 +249,9 @@ func (c *consensusRuntime) initCheckpointManager(logger hcf.Logger) error {
 }
 
 // initStateSyncRelayer initializes state sync relayer
-// if not enabled, then a dummy checkpoint manager will be used
+// if not enabled, then a dummy state sync relayer will be used
 func (c *consensusRuntime) initStateSyncRelayer(logger hcf.Logger) error {
 	if c.config.IsRelayer {
-		// enable checkpoint manager
 		txRelayer, err := getStateSyncTxRelayer(c.config.RPCEndpoint, logger)
 		if err != nil {
 			return err
@@ -261,14 +260,14 @@ func (c *consensusRuntime) initStateSyncRelayer(logger hcf.Logger) error {
 		c.stateSyncRelayer = NewStateSyncRelayer(
 			txRelayer,
 			contracts.StateReceiverContract,
-			c.state,
+			c.state.StateSyncStore,
 			c,
 			c.config.blockchain,
 			wallet.NewEcdsaSigner(c.config.Key),
 			nil,
 			logger.Named("state_sync_relayer"))
 	} else {
-		c.stateSyncRelayer = &dummyStakeSyncRelayer{}
+		c.stateSyncRelayer = &dummyStateSyncRelayer{}
 	}
 
 	c.eventProvider.Subscribe(c.stateSyncRelayer)
