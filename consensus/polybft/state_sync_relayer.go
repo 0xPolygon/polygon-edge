@@ -21,17 +21,17 @@ const (
 	// in order to try again to send transaction
 	defaultMaxBlocksToWaitForResend = uint64(30)
 	// defaultMaxAttemptsToSend specifies how many sending retries for one transaction
-	defaultMaxAttemptsToSend = 6
+	defaultMaxAttemptsToSend = uint64(15)
 	// defaultMaxEventsPerBatch specifies maximum events per one batchExecute tx
-	defaultMaxEventsPerBatch = 10
+	defaultMaxEventsPerBatch = uint64(10)
 )
 
 var (
 	errFailedToExecuteStateSync     = errors.New("failed to execute state sync")
 	errUnknownStateSyncRelayerEvent = errors.New("unknown event")
 
-	commitmentEventSignature       = new(contractsapi.NewCommitmentEvent).Sig()
-	stateSyncResultEventSignnature = new(contractsapi.StateSyncResultEvent).Sig()
+	commitmentEventSignature      = new(contractsapi.NewCommitmentEvent).Sig()
+	stateSyncResultEventSignature = new(contractsapi.StateSyncResultEvent).Sig()
 )
 
 // StateSyncRelayer is an interface that defines functions for state sync relayer
@@ -307,7 +307,7 @@ func (ssr *stateSyncRelayerImpl) ProcessLog(header *types.Header, log *ethgo.Log
 
 		return ssr.state.updateStateSyncRelayerEvents(newEvents, nil, dbTx)
 
-	case stateSyncResultEventSignnature:
+	case stateSyncResultEventSignature:
 		_, err := stateSyncResultEvent.ParseLog(log)
 		if err != nil {
 			return err

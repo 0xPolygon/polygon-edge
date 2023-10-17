@@ -42,9 +42,6 @@ commitments/
 stateSyncProofs/
 |--> stateSyncProof.StateSync.Id -> *StateSyncProof (json marshalled)
 
-relayerData/
-|--> data -> *StateSyncRelayerStateData (json marshalled)
-
 relayerEvents/
 |--> StateSyncRelayerEventData.EventID -> *StateSyncRelayerEventData (json marshalled)
 */
