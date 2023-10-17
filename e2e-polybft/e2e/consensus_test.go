@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"bytes"
 	"fmt"
 	"math/big"
 	"path"
@@ -59,22 +60,40 @@ func TestE2E_Consensus_Basic_WithNonValidators(t *testing.T) {
 	})
 
 	t.Run("sync protocol, drop single validator node", func(t *testing.T) {
-		// query the current block number, as it is a starting point for the test
-		currentBlockNum, err := cluster.Servers[0].JSONRPC().Eth().BlockNumber()
+		validatorSrv := cluster.Servers[0]
+		validatorAcc, err := sidechain.GetAccountFromDir(validatorSrv.DataDir())
 		require.NoError(t, err)
 
+		// query the current block number, as it is a starting point for the test
+		currentBlockNum, err := validatorSrv.JSONRPC().Eth().BlockNumber()
+		require.NoError(t, err)
+
+		// wait for 2 epochs to elapse, before we stop the node
+		require.NoError(t, cluster.WaitForBlock(currentBlockNum+2*epochSize, 2*time.Minute))
+
 		// stop one node
-		node := cluster.Servers[0]
-		node.Stop()
+		validatorSrv.Stop()
+
+		// check what is the current block on the running nodes
+		currentBlockNum, err = cluster.Servers[1].JSONRPC().Eth().BlockNumber()
+		require.NoError(t, err)
 
 		// wait for 2 epochs to elapse, so that rest of the network progresses
 		require.NoError(t, cluster.WaitForBlock(currentBlockNum+2*epochSize, 2*time.Minute))
 
 		// start the node again
-		node.Start()
+		validatorSrv.Start()
 
 		// wait 2 more epochs to elapse and make sure that stopped node managed to catch up
 		require.NoError(t, cluster.WaitForBlock(currentBlockNum+4*epochSize, 2*time.Minute))
+
+		// wait until the validator mines one block to check if he is back in consensus
+		require.NoError(t, cluster.WaitUntil(3*time.Minute, 2*time.Second, func() bool {
+			latestBlock, err := cluster.Servers[0].JSONRPC().Eth().GetBlockByNumber(ethgo.Latest, false)
+			require.NoError(t, err)
+
+			return bytes.Equal(validatorAcc.Address().Bytes(), latestBlock.Miner.Bytes())
+		}))
 	})
 
 	t.Run("sync protocol, drop single non-validator node", func(t *testing.T) {
@@ -93,7 +112,12 @@ func TestE2E_Consensus_Basic_WithNonValidators(t *testing.T) {
 		node.Start()
 
 		// wait 2 more epochs to elapse and make sure that stopped node managed to catch up
-		require.NoError(t, cluster.WaitForBlock(currentBlockNum+4*epochSize, 2*time.Minute))
+		blockToWait := currentBlockNum + 4*epochSize
+		require.NoError(t, cluster.WaitForBlock(blockToWait, 2*time.Minute))
+
+		latestBlockOnDroppedNode, err := node.JSONRPC().Eth().GetBlockByNumber(ethgo.Latest, false)
+		require.NoError(t, err)
+		require.GreaterOrEqual(t, latestBlockOnDroppedNode.Number, blockToWait)
 	})
 }
 
