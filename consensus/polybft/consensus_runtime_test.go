@@ -232,6 +232,7 @@ func TestConsensusRuntime_OnBlockInserted_EndOfEpoch(t *testing.T) {
 		checkpointManager: &dummyCheckpointManager{},
 		stakeManager:      &dummyStakeManager{},
 		eventProvider:     NewEventProvider(blockchainMock),
+		stateSyncRelayer:  &dummyStateSyncRelayer{},
 	}
 	runtime.OnBlockInserted(&types.FullBlock{Block: builtBlock})
 
@@ -474,13 +475,14 @@ func Test_NewConsensusRuntime(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	config := &runtimeConfig{
-		polybftBackend: polybftBackendMock,
-		State:          newTestState(t),
-		PolyBFTConfig:  polyBftConfig,
-		DataDir:        tmpDir,
-		Key:            createTestKey(t),
-		blockchain:     blockchainMock,
-		bridgeTopic:    &mockTopic{},
+		polybftBackend:  polybftBackendMock,
+		State:           newTestState(t),
+		PolyBFTConfig:   polyBftConfig,
+		DataDir:         tmpDir,
+		Key:             createTestKey(t),
+		blockchain:      blockchainMock,
+		bridgeTopic:     &mockTopic{},
+		consensusConfig: &consensus.Config{},
 	}
 
 	require.NoError(t, config.State.StakeStore.insertFullValidatorSet(validatorSetState{

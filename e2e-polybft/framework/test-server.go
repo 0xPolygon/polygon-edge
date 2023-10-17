@@ -27,18 +27,17 @@ import (
 )
 
 type TestServerConfig struct {
-	Name                       string
-	JSONRPCPort                int64
-	GRPCPort                   int64
-	P2PPort                    int64
-	Validator                  bool
-	DataDir                    string
-	Chain                      string
-	LogLevel                   string
-	Relayer                    bool
-	NumBlockConfirmations      uint64
-	BridgeJSONRPC              string
-	RelayerTrackerPollInterval time.Duration
+	Name                  string
+	JSONRPCPort           int64
+	GRPCPort              int64
+	P2PPort               int64
+	Validator             bool
+	DataDir               string
+	Chain                 string
+	LogLevel              string
+	Relayer               bool
+	NumBlockConfirmations uint64
+	BridgeJSONRPC         string
 }
 
 type TestServerConfigCallback func(*TestServerConfig)
@@ -175,11 +174,6 @@ func (t *TestServer) Start() {
 
 	if config.Relayer {
 		args = append(args, "--relayer")
-
-		if config.RelayerTrackerPollInterval != 0 {
-			// only relayer node should have this setup if
-			args = append(args, "--relayer-poll-interval", config.RelayerTrackerPollInterval.String())
-		}
 	}
 
 	// Start the server

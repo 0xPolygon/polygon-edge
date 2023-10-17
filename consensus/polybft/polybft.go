@@ -552,6 +552,7 @@ func (p *Polybft) initRuntime() error {
 		txPool:                p.txPool,
 		bridgeTopic:           p.bridgeTopic,
 		numBlockConfirmations: p.config.NumBlockConfirmations,
+		consensusConfig:       p.config.Config,
 	}
 
 	runtime, err := newConsensusRuntime(p.logger, runtimeConfig)

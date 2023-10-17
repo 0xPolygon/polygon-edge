@@ -23,8 +23,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/statesyncrelayer"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/common"
@@ -44,7 +42,6 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/umbracle/ethgo"
 	"google.golang.org/grpc"
 )
 
@@ -88,9 +85,6 @@ type Server struct {
 
 	// restore
 	restoreProgression *progress.ProgressionWrapper
-
-	// stateSyncRelayer is handling state syncs execution (Polybft exclusive)
-	stateSyncRelayer *statesyncrelayer.StateSyncRelayer
 
 	// gasHelper is providing functions regarding gas and fees
 	gasHelper *gasprice.GasHelper
@@ -409,13 +403,6 @@ func NewServer(config *Config) (*Server, error) {
 		return nil, err
 	}
 
-	// start relayer
-	if config.Relayer {
-		if err := m.setupRelayer(); err != nil {
-			return nil, err
-		}
-	}
-
 	m.txpool.SetBaseFee(m.blockchain.Header())
 	m.txpool.Start()
 
@@ -567,9 +554,11 @@ func (s *Server) setupConsensus() error {
 	}
 
 	config := &consensus.Config{
-		Params: s.config.Chain.Params,
-		Config: engineConfig,
-		Path:   filepath.Join(s.config.DataDir, "consensus"),
+		Params:      s.config.Chain.Params,
+		Config:      engineConfig,
+		Path:        filepath.Join(s.config.DataDir, "consensus"),
+		IsRelayer:   s.config.Relayer,
+		RPCEndpoint: s.config.JSONRPC.JSONRPCAddr.String(),
 	}
 
 	consensus, err := engine(
@@ -622,41 +611,6 @@ func extractBlockTime(engineConfig map[string]interface{}) (common.Duration, err
 	}
 
 	return blockTime, nil
-}
-
-// setupRelayer sets up the relayer
-func (s *Server) setupRelayer() error {
-	account, err := wallet.NewAccountFromSecret(s.secretsManager)
-	if err != nil {
-		return fmt.Errorf("failed to create account from secret: %w", err)
-	}
-
-	polyBFTConfig, err := consensusPolyBFT.GetPolyBFTConfig(s.config.Chain)
-	if err != nil {
-		return fmt.Errorf("failed to extract polybft config: %w", err)
-	}
-
-	trackerStartBlockConfig := map[types.Address]uint64{}
-	if polyBFTConfig.Bridge != nil {
-		trackerStartBlockConfig = polyBFTConfig.Bridge.EventTrackerStartBlocks
-	}
-
-	relayer := statesyncrelayer.NewRelayer(
-		s.config.DataDir,
-		s.config.JSONRPC.JSONRPCAddr.String(),
-		ethgo.Address(contracts.StateReceiverContract),
-		trackerStartBlockConfig[contracts.StateReceiverContract],
-		s.logger.Named("relayer"),
-		wallet.NewEcdsaSigner(wallet.NewKey(account)),
-		s.config.RelayerTrackerPollInterval,
-	)
-
-	// start relayer
-	if err := relayer.Start(); err != nil {
-		return fmt.Errorf("failed to start relayer: %w", err)
-	}
-
-	return nil
 }
 
 type jsonRPCHub struct {
@@ -984,11 +938,6 @@ func (s *Server) Close() {
 		if err := s.prometheusServer.Shutdown(context.Background()); err != nil {
 			s.logger.Error("Prometheus server shutdown error", err)
 		}
-	}
-
-	// Stop state sync relayer
-	if s.stateSyncRelayer != nil {
-		s.stateSyncRelayer.Stop()
 	}
 
 	// Close the txpool's main loop

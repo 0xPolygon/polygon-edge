@@ -77,6 +77,23 @@ func (e *ExecuteStateReceiverFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(StateReceiver.Abi.Methods["execute"], buf, e)
 }
 
+type BatchExecuteStateReceiverFn struct {
+	Proofs [][]types.Hash `abi:"proofs"`
+	Objs   []*StateSync   `abi:"objs"`
+}
+
+func (b *BatchExecuteStateReceiverFn) Sig() []byte {
+	return StateReceiver.Abi.Methods["batchExecute"].ID()
+}
+
+func (b *BatchExecuteStateReceiverFn) EncodeAbi() ([]byte, error) {
+	return StateReceiver.Abi.Methods["batchExecute"].Encode(b)
+}
+
+func (b *BatchExecuteStateReceiverFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(StateReceiver.Abi.Methods["batchExecute"], buf, b)
+}
+
 type StateSyncResultEvent struct {
 	Counter *big.Int `abi:"counter"`
 	Status  bool     `abi:"status"`

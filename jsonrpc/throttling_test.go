@@ -59,7 +59,7 @@ func TestThrottling(t *testing.T) {
 	}()
 
 	go func() {
-		time.Sleep(time.Millisecond * 600)
+		time.Sleep(time.Millisecond * 620)
 
 		defer wg.Done()
 
@@ -70,7 +70,7 @@ func TestThrottling(t *testing.T) {
 	}()
 
 	go func() {
-		time.Sleep(time.Millisecond * 610)
+		time.Sleep(time.Millisecond * 640)
 
 		defer wg.Done()
 
@@ -81,7 +81,7 @@ func TestThrottling(t *testing.T) {
 	}()
 
 	go func() {
-		time.Sleep(time.Millisecond * 950)
+		time.Sleep(time.Millisecond * 1000)
 
 		defer wg.Done()
 

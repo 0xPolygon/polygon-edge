@@ -19,6 +19,8 @@ var (
 	stateSyncProofsBucket = []byte("stateSyncProofs")
 	// bucket to store message votes (signatures)
 	messageVotesBucket = []byte("votes")
+	// bucket to store all state sync relayer events
+	stateSyncRelayerEventsBucket = []byte("relayerEvents")
 
 	// errNotEnoughStateSyncs error message
 	errNotEnoughStateSyncs = errors.New("there is either a gap or not enough sync events")
@@ -39,6 +41,9 @@ commitments/
 
 stateSyncProofs/
 |--> stateSyncProof.StateSync.Id -> *StateSyncProof (json marshalled)
+
+relayerEvents/
+|--> StateSyncRelayerEventData.EventID -> *StateSyncRelayerEventData (json marshalled)
 */
 
 type StateSyncStore struct {
@@ -57,6 +62,10 @@ func (s *StateSyncStore) initialize(tx *bolt.Tx) error {
 
 	if _, err := tx.CreateBucketIfNotExists(stateSyncProofsBucket); err != nil {
 		return fmt.Errorf("failed to create bucket=%s: %w", string(stateSyncProofsBucket), err)
+	}
+
+	if _, err := tx.CreateBucketIfNotExists(stateSyncRelayerEventsBucket); err != nil {
+		return fmt.Errorf("failed to create bucket=%s: %w", string(stateSyncRelayerEventsBucket), err)
 	}
 
 	return nil
@@ -364,4 +373,70 @@ func (s *StateSyncStore) getStateSyncProof(stateSyncID uint64) (*StateSyncProof,
 	})
 
 	return ssp, err
+}
+
+// updateStateSyncRelayerEvents updates/remove desired events
+func (s *StateSyncStore) updateStateSyncRelayerEvents(
+	events []*StateSyncRelayerEventData, removeIDs []uint64, dbTx *bolt.Tx) error {
+	updateFn := func(tx *bolt.Tx) error {
+		relayerEventsBucket := tx.Bucket(stateSyncRelayerEventsBucket)
+
+		for _, evnt := range events {
+			raw, err := json.Marshal(evnt)
+			if err != nil {
+				return err
+			}
+
+			key := common.EncodeUint64ToBytes(evnt.EventID)
+
+			if err := relayerEventsBucket.Put(key, raw); err != nil {
+				return err
+			}
+		}
+
+		for _, stateSyncEventID := range removeIDs {
+			stateSyncEventIDKey := common.EncodeUint64ToBytes(stateSyncEventID)
+
+			if err := relayerEventsBucket.Delete(stateSyncEventIDKey); err != nil {
+				return fmt.Errorf("failed to remove state sync relayer event (ID=%d): %w", stateSyncEventID, err)
+			}
+		}
+
+		return nil
+	}
+
+	if dbTx == nil {
+		return s.db.Update(func(tx *bolt.Tx) error {
+			return updateFn(tx)
+		})
+	}
+
+	return updateFn(dbTx)
+}
+
+// getAllAvailableEvents retrieves all StateSyncRelayerEventData that should be sent as a transactions
+func (s *StateSyncStore) getAllAvailableEvents(limit int) (result []*StateSyncRelayerEventData, err error) {
+	if err = s.db.View(func(tx *bolt.Tx) error {
+		cursor := tx.Bucket(stateSyncRelayerEventsBucket).Cursor()
+
+		for k, v := cursor.First(); k != nil; k, v = cursor.Next() {
+			var event *StateSyncRelayerEventData
+
+			if err := json.Unmarshal(v, &event); err != nil {
+				return err
+			}
+
+			result = append(result, event)
+
+			if limit > 0 && len(result) >= limit {
+				break
+			}
+		}
+
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }
