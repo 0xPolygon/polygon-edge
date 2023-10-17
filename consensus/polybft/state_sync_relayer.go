@@ -83,12 +83,12 @@ type stateSyncRelayerConfig struct {
 }
 
 type stateSyncRelayerImpl struct {
-	txRelayer  txrelayer.TxRelayer
-	key        ethgo.Key
-	store      stateSyncProofRetriever
-	state      *State
-	logger     hclog.Logger
-	blockchain blockchainBackend
+	txRelayer      txrelayer.TxRelayer
+	key            ethgo.Key
+	proofRetriever stateSyncProofRetriever
+	state          *State
+	logger         hclog.Logger
+	blockchain     blockchainBackend
 
 	notifyCh chan struct{}
 	closeCh  chan struct{}
@@ -115,15 +115,15 @@ func NewStateSyncRelayer(
 	}
 
 	return &stateSyncRelayerImpl{
-		txRelayer:  txRelayer,
-		key:        key,
-		store:      store,
-		state:      state,
-		closeCh:    make(chan struct{}),
-		notifyCh:   make(chan struct{}, 1),
-		blockchain: blockchain,
-		config:     config,
-		logger:     logger,
+		txRelayer:      txRelayer,
+		key:            key,
+		proofRetriever: store,
+		state:          state,
+		closeCh:        make(chan struct{}),
+		notifyCh:       make(chan struct{}, 1),
+		blockchain:     blockchain,
+		config:         config,
+		logger:         logger,
 	}
 }
 
@@ -219,7 +219,7 @@ func (ssr *stateSyncRelayerImpl) sendTx(events []*StateSyncRelayerEventData) err
 	objs := make([]*contractsapi.StateSync, len(events))
 
 	for i, event := range events {
-		proof, err := ssr.store.GetStateSyncProof(event.EventID)
+		proof, err := ssr.proofRetriever.GetStateSyncProof(event.EventID)
 		if err != nil {
 			return fmt.Errorf("failed to get proof for %d: %w", event.EventID, err)
 		}
@@ -318,9 +318,6 @@ func (ssr *stateSyncRelayerImpl) ProcessLog(header *types.Header, log *ethgo.Log
 			return ssr.state.StateSyncStore.updateStateSyncRelayerEvents(nil, []uint64{eventID}, dbTx)
 		}
 
-		// maybe add failed events as new ones (that would overwrite in db)
-		// return ssr.state.StateSyncStore.updateStateSyncRelayerEvents(
-		//	&StateSyncRelayerEventData{EventID: eventID}, nil, dbTx)
 		ssr.logger.Info("event has been failed to process", "block", header.Number,
 			"event", eventID, "reason", string(stateSyncResultEvent.Message))
 
