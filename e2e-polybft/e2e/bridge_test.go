@@ -1538,7 +1538,6 @@ func TestE2E_Bridge_Transfers_WithRootTrackerPollInterval(t *testing.T) {
 		epochSize             = 30
 		sprintSize            = uint64(5)
 		rootPollInterval      = 5 * time.Second
-		relayerPollInterval   = 5 * time.Second
 		numberOfAttempts      = uint64(4)
 		stateSyncedLogsCount  = 1
 	)
@@ -1547,7 +1546,6 @@ func TestE2E_Bridge_Transfers_WithRootTrackerPollInterval(t *testing.T) {
 		framework.WithEpochSize(epochSize),
 		framework.WithNumBlockConfirmations(numBlockConfirmations),
 		framework.WithRootTrackerPollInterval(rootPollInterval),
-		framework.WithRootTrackerPollInterval(relayerPollInterval),
 	)
 	defer cluster.Stop()
 
