@@ -1531,3 +1531,75 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 		}
 	})
 }
+
+func TestE2E_Bridge_Transfers_WithRootTrackerPollInterval(t *testing.T) {
+	var (
+		numBlockConfirmations = uint64(2)
+		epochSize             = 30
+		sprintSize            = uint64(5)
+		rootPollInterval      = 5 * time.Second
+		relayerPollInterval   = 5 * time.Second
+		numberOfAttempts      = uint64(4)
+		stateSyncedLogsCount  = 1
+	)
+
+	cluster := framework.NewTestCluster(t, 5,
+		framework.WithEpochSize(epochSize),
+		framework.WithNumBlockConfirmations(numBlockConfirmations),
+		framework.WithRootTrackerPollInterval(rootPollInterval),
+		framework.WithRootTrackerPollInterval(relayerPollInterval),
+	)
+	defer cluster.Stop()
+
+	cluster.WaitForReady(t)
+
+	polybftCfg, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
+	require.NoError(t, err)
+
+	validatorSrv := cluster.Servers[0]
+	senderAccount, err := sidechain.GetAccountFromDir(validatorSrv.DataDir())
+	require.NoError(t, err)
+
+	childEthEndpoint := validatorSrv.JSONRPC().Eth()
+
+	// bridge some tokens for first validator to child chain
+	tokensToDeposit := ethgo.Ether(10)
+
+	require.NoError(t, cluster.Bridge.Deposit(
+		common.ERC20,
+		polybftCfg.Bridge.RootNativeERC20Addr,
+		polybftCfg.Bridge.RootERC20PredicateAddr,
+		rootHelper.TestAccountPrivKey,
+		senderAccount.Address().String(),
+		tokensToDeposit.String(),
+		"",
+		cluster.Bridge.JSONRPCAddr(),
+		rootHelper.TestAccountPrivKey,
+		false),
+	)
+
+	// wait for a couple of sprints
+	finalBlockNum := 5 * sprintSize
+
+	// the transaction is processed and there should be a success event
+	var stateSyncedResult contractsapi.StateSyncResultEvent
+
+	for i := uint64(0); i < numberOfAttempts; i++ {
+		logs, err := getFilteredLogs(stateSyncedResult.Sig(), 0, finalBlockNum+i*sprintSize, childEthEndpoint)
+		require.NoError(t, err)
+
+		if len(logs) == stateSyncedLogsCount || i == numberOfAttempts-1 {
+			// assert that all deposits are executed successfully
+			checkStateSyncResultLogs(t, logs, stateSyncedLogsCount)
+
+			break
+		}
+
+		require.NoError(t, cluster.WaitForBlock(finalBlockNum+(i+1)*sprintSize, 2*time.Minute))
+	}
+
+	// check validator balance got increased by deposited amount
+	balance, err := childEthEndpoint.GetBalance(ethgo.Address(senderAccount.Address()), ethgo.Latest)
+	require.NoError(t, err)
+	require.Equal(t, tokensToDeposit, balance)
+}

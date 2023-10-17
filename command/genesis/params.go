@@ -534,6 +534,16 @@ func (p *genesisParams) validatePremineInfo() error {
 	return errReserveAccMustBePremined
 }
 
+// validateBlockTrackerPollInterval validates block tracker block interval
+// which can not be 0
+func (p *genesisParams) validateBlockTrackerPollInterval() error {
+	if p.blockTrackerPollInterval == 0 {
+		return helper.ErrBlockTrackerPollInterval
+	}
+
+	return nil
+}
+
 // validateBurnContract validates burn contract. If native token is mintable,
 // burn contract flag must not be set. If native token is non mintable only one burn contract
 // can be set and the specified address will be used to predeploy default EIP1559 burn contract.

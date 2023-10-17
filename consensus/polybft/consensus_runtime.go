@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
@@ -82,8 +83,7 @@ type runtimeConfig struct {
 	txPool                txPoolInterface
 	bridgeTopic           topic
 	numBlockConfirmations uint64
-	IsRelayer             bool
-	RPCEndpoint           string
+	consensusConfig       *consensus.Config
 }
 
 // consensusRuntime is a struct that provides consensus runtime features like epoch, state and event management
@@ -251,8 +251,8 @@ func (c *consensusRuntime) initCheckpointManager(logger hcf.Logger) error {
 // initStateSyncRelayer initializes state sync relayer
 // if not enabled, then a dummy state sync relayer will be used
 func (c *consensusRuntime) initStateSyncRelayer(logger hcf.Logger) error {
-	if c.config.IsRelayer {
-		txRelayer, err := getStateSyncTxRelayer(c.config.RPCEndpoint, logger)
+	if c.config.consensusConfig.IsRelayer {
+		txRelayer, err := getStateSyncTxRelayer(c.config.consensusConfig.RPCEndpoint, logger)
 		if err != nil {
 			return err
 		}

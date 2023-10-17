@@ -499,6 +499,11 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 				cluster.Config.BlockTime.String())
 		}
 
+		if cluster.Config.RootTrackerPollInterval != 0 {
+			args = append(args, "--block-tracker-poll-interval",
+				cluster.Config.RootTrackerPollInterval.String())
+		}
+
 		if cluster.Config.TestRewardToken != "" {
 			args = append(args, "--reward-token-code", cluster.Config.TestRewardToken)
 		}

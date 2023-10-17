@@ -37,6 +37,7 @@ type StateSyncProof struct {
 
 // StateSyncManager is an interface that defines functions for state sync workflow
 type StateSyncManager interface {
+	EventSubscriber
 	Init() error
 	Close()
 	Commitment(blockNumber uint64) (*CommitmentMessageSigned, error)
@@ -59,6 +60,15 @@ func (d *dummyStateSyncManager) PostBlock(req *PostBlockRequest) error { return 
 func (d *dummyStateSyncManager) PostEpoch(req *PostEpochRequest) error { return nil }
 func (d *dummyStateSyncManager) GetStateSyncProof(stateSyncID uint64) (types.Proof, error) {
 	return types.Proof{}, nil
+}
+
+// EventSubscriber implementation
+func (d *dummyStateSyncManager) GetLogFilters() map[types.Address][]types.Hash {
+	return make(map[types.Address][]types.Hash)
+}
+func (d *dummyStateSyncManager) ProcessLog(header *types.Header,
+	log *ethgo.Log, dbTx *bolt.Tx) error {
+	return nil
 }
 
 // stateSyncConfig holds the configuration data of state sync manager
