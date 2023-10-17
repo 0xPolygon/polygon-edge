@@ -326,6 +326,50 @@ func TestStateSyncerManager_BuildProofs(t *testing.T) {
 	}
 }
 
+func TestStateSyncerManager_RemoveProcessedEventsAndProofs(t *testing.T) {
+	const stateSyncEventsCount = 5
+
+	vals := validator.NewTestValidators(t, 5)
+
+	s := newTestStateSyncManager(t, vals.GetValidator("0"), &mockRuntime{isActiveValidator: true})
+	stateSyncEvents := generateStateSyncEvents(t, stateSyncEventsCount, 0)
+
+	for _, event := range stateSyncEvents {
+		require.NoError(t, s.state.StateSyncStore.insertStateSyncEvent(event))
+	}
+
+	require.NoError(t, s.buildProofs(&contractsapi.StateSyncCommitment{
+		StartID: stateSyncEvents[0].ID,
+		EndID:   stateSyncEvents[len(stateSyncEvents)-1].ID,
+	}, nil))
+
+	stateSyncEventsBefore, err := s.state.StateSyncStore.list()
+	require.NoError(t, err)
+	require.Equal(t, stateSyncEventsCount, len(stateSyncEventsBefore))
+
+	for _, event := range stateSyncEvents {
+		proof, err := s.state.StateSyncStore.getStateSyncProof(event.ID.Uint64())
+		require.NoError(t, err)
+		require.NotNil(t, proof)
+	}
+
+	for _, event := range stateSyncEvents {
+		eventLog := createTestLogForStateSyncResultEvent(t, event.ID.Uint64())
+		require.NoError(t, s.ProcessLog(&types.Header{Number: 10}, convertLog(eventLog), nil))
+	}
+
+	// all state sync events and their proofs should be removed from the store
+	stateSyncEventsAfter, err := s.state.StateSyncStore.list()
+	require.NoError(t, err)
+	require.Equal(t, 0, len(stateSyncEventsAfter))
+
+	for _, event := range stateSyncEvents {
+		proof, err := s.state.StateSyncStore.getStateSyncProof(event.ID.Uint64())
+		require.NoError(t, err)
+		require.Nil(t, proof)
+	}
+}
+
 func TestStateSyncerManager_AddLog_BuildCommitments(t *testing.T) {
 	t.Parallel()
 

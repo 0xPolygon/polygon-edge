@@ -88,6 +88,28 @@ func (s *StateSyncStore) insertStateSyncEvent(event *contractsapi.StateSyncedEve
 	})
 }
 
+// removeStateSyncEventsAndProofs removes state sync events and their proofs from the buckets in db
+func (s *StateSyncStore) removeStateSyncEventsAndProofs(stateSyncEventIDs []uint64) error {
+	return s.db.Update(func(tx *bolt.Tx) error {
+		eventsBucket := tx.Bucket(stateSyncEventsBucket)
+		proofsBucket := tx.Bucket(stateSyncProofsBucket)
+
+		for _, stateSyncEventID := range stateSyncEventIDs {
+			stateSyncEventIDKey := common.EncodeUint64ToBytes(stateSyncEventID)
+
+			if err := eventsBucket.Delete(stateSyncEventIDKey); err != nil {
+				return fmt.Errorf("failed to remove state sync event (ID=%d): %w", stateSyncEventID, err)
+			}
+
+			if err := proofsBucket.Delete(stateSyncEventIDKey); err != nil {
+				return fmt.Errorf("failed to remove state sync event proof (ID=%d): %w", stateSyncEventID, err)
+			}
+		}
+
+		return nil
+	})
+}
+
 // list iterates through all events in events bucket in db, un-marshals them, and returns as array
 func (s *StateSyncStore) list() ([]*contractsapi.StateSyncedEvent, error) {
 	events := []*contractsapi.StateSyncedEvent{}
@@ -375,19 +397,8 @@ func (s *StateSyncStore) updateStateSyncRelayerEvents(
 			}
 		}
 
-		eventsBucket := tx.Bucket(stateSyncEventsBucket)
-		proofsBucket := tx.Bucket(stateSyncProofsBucket)
-
 		for _, stateSyncEventID := range removeIDs {
 			stateSyncEventIDKey := common.EncodeUint64ToBytes(stateSyncEventID)
-
-			if err := eventsBucket.Delete(stateSyncEventIDKey); err != nil {
-				return fmt.Errorf("failed to remove state sync event (ID=%d): %w", stateSyncEventID, err)
-			}
-
-			if err := proofsBucket.Delete(stateSyncEventIDKey); err != nil {
-				return fmt.Errorf("failed to remove state sync event proof (ID=%d): %w", stateSyncEventID, err)
-			}
 
 			if err := relayerEventsBucket.Delete(stateSyncEventIDKey); err != nil {
 				return fmt.Errorf("failed to remove state sync relayer event (ID=%d): %w", stateSyncEventID, err)
