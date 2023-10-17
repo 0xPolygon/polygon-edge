@@ -3,8 +3,8 @@ package framework
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"math/big"
+	"os"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -120,7 +120,7 @@ func NewTestServer(t *testing.T, clusterConfig *TestClusterConfig,
 	}
 
 	if config.DataDir == "" {
-		dataDir, err := ioutil.TempDir("/tmp", "edge-e2e-")
+		dataDir, err := os.MkdirTemp("/tmp", "edge-e2e-")
 		require.NoError(t, err)
 
 		config.DataDir = dataDir

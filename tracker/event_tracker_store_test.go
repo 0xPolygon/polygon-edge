@@ -2,7 +2,6 @@ package tracker
 
 import (
 	"encoding/hex"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -19,7 +18,7 @@ func createSetupDB(subscriber eventSubscription, numBlockConfirmations uint64) s
 	return func(t *testing.T) (store.Store, func()) {
 		t.Helper()
 
-		dir, err := ioutil.TempDir("/tmp", "boltdb-test")
+		dir, err := os.MkdirTemp("/tmp", "boltdb-test")
 		require.NoError(t, err)
 
 		path := filepath.Join(dir, "test.db")

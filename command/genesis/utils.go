@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -219,7 +218,7 @@ func GetValidatorKeyFiles(rootDir, filePrefix string) ([]string, error) {
 		rootDir = "."
 	}
 
-	files, err := ioutil.ReadDir(rootDir)
+	files, err := os.ReadDir(rootDir)
 	if err != nil {
 		return nil, err
 	}

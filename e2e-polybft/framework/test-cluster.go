@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/big"
 	"os"
 	"os/exec"
@@ -1085,11 +1084,11 @@ func CopyDir(source, destination string) error {
 			return nil
 		}
 
-		data, err := ioutil.ReadFile(filepath.Join(source, relPath))
+		data, err := os.ReadFile(filepath.Join(source, relPath))
 		if err != nil {
 			return err
 		}
 
-		return ioutil.WriteFile(filepath.Join(destination, relPath), data, 0600)
+		return os.WriteFile(filepath.Join(destination, relPath), data, 0600)
 	})
 }

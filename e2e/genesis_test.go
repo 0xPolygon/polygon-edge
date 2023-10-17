@@ -3,8 +3,8 @@ package e2e
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"math/big"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -229,7 +229,7 @@ func TestGenesis_Predeployment(t *testing.T) {
 	clt := srv.JSONRPC()
 
 	// Extract the contract ABI from the metadata test file
-	content, err := ioutil.ReadFile(artifactPath)
+	content, err := os.ReadFile(artifactPath)
 	if err != nil {
 		t.Fatalf("unable to open JSON file, %v", err)
 	}
