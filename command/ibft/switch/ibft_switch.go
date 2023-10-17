@@ -83,7 +83,7 @@ func setFlags(cmd *cobra.Command) {
 		)
 
 		cmd.Flags().StringVar(
-			&params.ibftValidatorRootPath,
+			&params.validatorRootPath,
 			command.ValidatorRootFlag,
 			command.DefaultValidatorRoot,
 			"root path for validator folder directory. "+
@@ -91,7 +91,7 @@ func setFlags(cmd *cobra.Command) {
 		)
 
 		cmd.Flags().StringVar(
-			&params.ibftValidatorPrefixPath,
+			&params.validatorPrefixPath,
 			command.ValidatorPrefixFlag,
 			command.DefaultValidatorPrefix,
 			"prefix path for validator folder directory. "+
@@ -99,7 +99,7 @@ func setFlags(cmd *cobra.Command) {
 		)
 
 		cmd.Flags().StringArrayVar(
-			&params.ibftValidatorsRaw,
+			&params.validatorsRaw,
 			command.ValidatorFlag,
 			[]string{},
 			"addresses to be used as IBFT validators, can be used multiple times. "+
