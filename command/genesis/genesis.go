@@ -129,14 +129,14 @@ func setFlags(cmd *cobra.Command) {
 
 		cmd.Flags().Uint64Var(
 			&params.minNumValidators,
-			minValidatorCount,
+			command.MinValidatorCountFlag,
 			1,
 			"the minimum number of validators in the validator set for PoS",
 		)
 
 		cmd.Flags().Uint64Var(
 			&params.maxNumValidators,
-			maxValidatorCount,
+			command.MaxValidatorCountFlag,
 			common.MaxSafeJSInt,
 			"the maximum number of validators in the validator set for PoS",
 		)

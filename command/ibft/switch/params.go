@@ -14,12 +14,10 @@ import (
 )
 
 const (
-	chainFlag         = "chain"
-	typeFlag          = "type"
-	deploymentFlag    = "deployment"
-	fromFlag          = "from"
-	minValidatorCount = "min-validator-count"
-	maxValidatorCount = "max-validator-count"
+	chainFlag      = "chain"
+	typeFlag       = "type"
+	deploymentFlag = "deployment"
+	fromFlag       = "from"
 )
 
 var (
@@ -248,7 +246,11 @@ func (p *switchParams) initPoSConfig() error {
 		p.maxValidatorCount = &value
 	}
 
-	return p.validateMinMaxValidatorNumber()
+	if err := p.validateMinMaxValidatorNumber(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (p *switchParams) validateMinMaxValidatorNumber() error {

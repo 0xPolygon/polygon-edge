@@ -22,9 +22,11 @@ const (
 	BootnodeFlag   = "bootnode"
 	LogLevelFlag   = "log-level"
 
-	ValidatorFlag       = "validators"
-	ValidatorRootFlag   = "validators-path"
-	ValidatorPrefixFlag = "validators-prefix"
+	ValidatorFlag         = "validators"
+	ValidatorRootFlag     = "validators-path"
+	ValidatorPrefixFlag   = "validators-prefix"
+	MinValidatorCountFlag = "min-validator-count"
+	MaxValidatorCountFlag = "max-validator-count"
 
 	IBFTValidatorTypeFlag = "ibft-validator-type"
 )

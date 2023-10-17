@@ -70,14 +70,14 @@ func setFlags(cmd *cobra.Command) {
 		// PoS Configuration
 		cmd.Flags().StringVar(
 			&params.minValidatorCountRaw,
-			minValidatorCount,
+			command.MinValidatorCountFlag,
 			"",
 			"the minimum number of validators in the validator set for PoS",
 		)
 
 		cmd.Flags().StringVar(
 			&params.maxValidatorCountRaw,
-			maxValidatorCount,
+			command.MaxValidatorCountFlag,
 			"",
 			"the maximum number of validators in the validator set for PoS",
 		)

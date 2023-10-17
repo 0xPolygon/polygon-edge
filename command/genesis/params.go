@@ -36,8 +36,6 @@ const (
 	burnContractFlag             = "burn-contract"
 	genesisBaseFeeConfigFlag     = "base-fee-config"
 	posFlag                      = "pos"
-	minValidatorCount            = "min-validator-count"
-	maxValidatorCount            = "max-validator-count"
 	nativeTokenConfigFlag        = "native-token-config"
 	rewardTokenCodeFlag          = "reward-token-code"
 	rewardWalletFlag             = "reward-wallet"
