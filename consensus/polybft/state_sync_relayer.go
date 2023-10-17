@@ -64,11 +64,6 @@ func (d *dummyStakeSyncRelayer) ProcessLog(header *types.Header, log *ethgo.Log,
 
 var _ StateSyncRelayer = (*stateSyncRelayerImpl)(nil)
 
-// StateSyncRelayerStateData is used to keep state of state sync relayer
-type StateSyncRelayerStateData struct {
-	LastBlockNumber uint64 `json:"lastBlockNumber"`
-}
-
 // StateSyncRelayerEventData keeps information about an event
 type StateSyncRelayerEventData struct {
 	EventID     uint64 `json:"eventID"`
