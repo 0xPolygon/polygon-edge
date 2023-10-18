@@ -21,6 +21,8 @@ const syncerMetrics = "syncer"
 type Blockchain interface {
 	// SubscribeEvents subscribes new blockchain event
 	SubscribeEvents() blockchain.Subscription
+	// UnsubscribeEvents unsubscribes from new blockchain event
+	UnsubscribeEvents(blockchain.Subscription)
 	// Header returns get latest header
 	Header() *types.Header
 	// GetBlockByNumber returns block by number

@@ -27,7 +27,7 @@ func TestSubscription(t *testing.T) {
 		wg sync.WaitGroup
 	)
 
-	defer sub.Close()
+	defer e.unsubscribe(sub)
 
 	updateCh := sub.GetEventCh()
 
@@ -93,20 +93,14 @@ func TestSubscription_BufferedChannel_MultipleSubscriptions(t *testing.T) {
 
 	// Send the events to the channels
 	for i := 0; i < numOfEvents; i++ {
-		e.push(&Event{
-			NewChain: []*types.Header{
-				{
-					Number: uint64(i),
-				},
-			},
-		})
+		e.push(&Event{})
 	}
 
 	// Wait for the events to be processed
 	wg.Wait()
 
 	for _, s := range subscriptions {
-		s.Close()
+		e.unsubscribe(s)
 	}
 }
 
@@ -114,14 +108,7 @@ func TestSubscription_AfterOneUnsubscribe(t *testing.T) {
 	t.Parallel()
 
 	var (
-		e     = newEventStream()
-		event = &Event{
-			NewChain: []*types.Header{
-				{
-					Number: 100,
-				},
-			},
-		}
+		e = newEventStream()
 
 		wg sync.WaitGroup
 	)
@@ -142,12 +129,12 @@ func TestSubscription_AfterOneUnsubscribe(t *testing.T) {
 			case <-updateCh:
 				receivedBlockCount++
 				if receivedBlockCount == expectedBlockCount {
-					sub.Close()
+					e.unsubscribe(sub)
 
 					return
 				}
 			case <-time.After(10 * time.Second):
-				sub.Close()
+				e.unsubscribe(sub)
 				t.Errorf("subscription did not caught all events")
 			}
 		}
@@ -158,7 +145,7 @@ func TestSubscription_AfterOneUnsubscribe(t *testing.T) {
 
 	// Send the events to the channels
 	for i := 0; i < 20; i++ {
-		e.push(event)
+		e.push(&Event{})
 		time.Sleep(time.Millisecond)
 	}
 
@@ -170,14 +157,7 @@ func TestSubscription_NilEventAfterClosingSubscription(t *testing.T) {
 	t.Parallel()
 
 	var (
-		e     = newEventStream()
-		event = &Event{
-			NewChain: []*types.Header{
-				{
-					Number: 100,
-				},
-			},
-		}
+		e = newEventStream()
 
 		wg sync.WaitGroup
 	)
@@ -215,11 +195,11 @@ func TestSubscription_NilEventAfterClosingSubscription(t *testing.T) {
 
 	// Send the events to the channels
 	for i := 0; i < 2; i++ {
-		e.push(event)
+		e.push(&Event{})
 		time.Sleep(time.Millisecond)
 	}
 
-	sub.Close()
+	e.unsubscribe(sub)
 
 	// Wait for the event to be parsed
 	wg.Wait()

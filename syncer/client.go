@@ -92,7 +92,7 @@ func (m *syncPeerClient) Close() {
 	}
 
 	if m.subscription != nil {
-		m.subscription.Close()
+		m.blockchain.UnsubscribeEvents(m.subscription)
 
 		m.subscription = nil
 	}

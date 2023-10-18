@@ -55,7 +55,11 @@ type blockchainBackend interface {
 	// GetSystemState creates a new instance of SystemState interface
 	GetSystemState(provider contract.Provider) SystemState
 
+	// SubscribeEvents subscribes to blockchain events
 	SubscribeEvents() blockchain.Subscription
+
+	// UnubscribeEvents unsubscribes from blockchain events
+	UnubscribeEvents(subscription blockchain.Subscription)
 
 	// GetChainID returns chain id of the current blockchain
 	GetChainID() uint64
@@ -180,6 +184,10 @@ func (p *blockchainWrapper) GetSystemState(provider contract.Provider) SystemSta
 
 func (p *blockchainWrapper) SubscribeEvents() blockchain.Subscription {
 	return p.blockchain.SubscribeEvents()
+}
+
+func (p *blockchainWrapper) UnubscribeEvents(subscription blockchain.Subscription) {
+	p.blockchain.UnsubscribeEvents(subscription)
 }
 
 func (p *blockchainWrapper) GetChainID() uint64 {

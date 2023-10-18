@@ -19,6 +19,7 @@ const (
 
 type blockchainInterface interface {
 	SubscribeEvents() blockchain.Subscription
+	UnsubscribeEvents(blockchain.Subscription)
 	Genesis() types.Hash
 	GetBlockByNumber(uint64, bool) (*types.Block, bool)
 	GetHashByNumber(uint64) types.Hash
@@ -68,9 +69,13 @@ func importBlocks(chain blockchainInterface, blockStream *blockStream, progressi
 	}
 
 	// Create a blockchain subscription for the sync progression and start tracking
-	progression.StartProgression(firstBlock.Number(), chain.SubscribeEvents())
+	subscription := chain.SubscribeEvents()
+	progression.StartProgression(firstBlock.Number(), subscription)
 	// Stop monitoring the sync progression upon exit
-	defer progression.StopProgression()
+	defer func() {
+		progression.StopProgression()
+		chain.UnsubscribeEvents(subscription)
+	}()
 
 	// Set the goal
 	progression.UpdateHighestProgression(metadata.Latest)

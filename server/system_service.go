@@ -83,7 +83,7 @@ func (s *systemService) Subscribe(req *empty.Empty, stream proto.System_Subscrib
 		}
 	}
 
-	sub.Close()
+	s.server.blockchain.UnsubscribeEvents(sub)
 
 	return nil
 }
