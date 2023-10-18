@@ -1,6 +1,7 @@
 package jsonrpc
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -24,6 +25,37 @@ func createTestHeader(height uint64) *types.Header {
 	h.ComputeHash()
 
 	return h
+}
+
+func createTestReceipt(logs []*types.Log, cumulativeGasUsed, gasUsed uint64, txHash types.Hash) *types.Receipt {
+	success := types.ReceiptSuccess
+
+	return &types.Receipt{
+		Root:              types.ZeroHash,
+		CumulativeGasUsed: cumulativeGasUsed,
+		Status:            &success,
+		LogsBloom:         types.CreateBloom(nil),
+		Logs:              logs,
+		GasUsed:           gasUsed,
+		TxHash:            txHash,
+		TransactionType:   types.DynamicFeeTx,
+	}
+}
+
+func createTestLogs(logsCount int, address types.Address) []*types.Log {
+	logs := make([]*types.Log, 0, logsCount)
+	for i := 0; i < logsCount; i++ {
+		logs = append(logs, &types.Log{
+			Address: address,
+			Topics: []types.Hash{
+				types.StringToHash("100"),
+				types.StringToHash("ABCD"),
+			},
+			Data: types.StringToBytes(hex.EncodeToString([]byte("Lorem Ipsum Dolor"))),
+		})
+	}
+
+	return logs
 }
 
 func wrapHeaderWithTestBlock(h *types.Header) *types.Block {

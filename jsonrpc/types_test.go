@@ -295,3 +295,46 @@ func TestTransaction_Encoding(t *testing.T) {
 		testTransaction("testsuite/transaction-eip1559.json", tt)
 	})
 }
+
+func Test_toReceipt(t *testing.T) {
+	testReceipt := func(name string, r *receipt) {
+		res, err := json.Marshal(r)
+		require.NoError(t, err)
+
+		data, err := testsuite.ReadFile(name)
+		require.NoError(t, err)
+		require.JSONEq(t, string(data), string(res))
+	}
+
+	t.Run("no logs", func(t *testing.T) {
+		tx := createTestTransaction(types.StringToHash("tx1"))
+		recipient := types.StringToAddress("2")
+		tx.From = types.StringToAddress("1")
+		tx.To = &recipient
+		h := createTestHeader(15)
+		rec := createTestReceipt(nil, 28000, 26000, tx.Hash)
+		testReceipt("testsuite/receipt-no-logs.json", toReceipt(rec, tx, 0, h, nil))
+	})
+
+	t.Run("with contract address", func(t *testing.T) {
+		tx := createTestTransaction(types.StringToHash("tx1"))
+		contractAddr := types.StringToAddress("3")
+		h := createTestHeader(20)
+		rec := createTestReceipt(nil, 28000, 26000, tx.Hash)
+		rec.ContractAddress = &contractAddr
+		testReceipt("testsuite/receipt-contract-deployment.json", toReceipt(rec, tx, 0, h, nil))
+	})
+
+	t.Run("with logs", func(t *testing.T) {
+		tx := createTestTransaction(types.StringToHash("tx1"))
+		recipient := types.StringToAddress("2")
+		tx.From = types.StringToAddress("1")
+		tx.To = &recipient
+		h := createTestHeader(30)
+		srcLogs := createTestLogs(2, recipient)
+		srcReceipt := createTestReceipt(srcLogs, 28000, 26000, tx.Hash)
+		rec := toReceipt(srcReceipt, tx, 0, h, toLogs(srcLogs, 0, h, tx.Hash))
+		testReceipt("testsuite/receipt-with-logs.json", rec)
+	})
+
+}
