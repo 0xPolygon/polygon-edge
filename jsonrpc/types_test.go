@@ -297,6 +297,11 @@ func TestTransaction_Encoding(t *testing.T) {
 }
 
 func Test_toReceipt(t *testing.T) {
+	const (
+		cumulativeGasUsed = 28000
+		gasUsed           = 26000
+	)
+
 	testReceipt := func(name string, r *receipt) {
 		res, err := json.Marshal(r)
 		require.NoError(t, err)
@@ -311,18 +316,20 @@ func Test_toReceipt(t *testing.T) {
 		recipient := types.StringToAddress("2")
 		tx.From = types.StringToAddress("1")
 		tx.To = &recipient
-		h := createTestHeader(15)
-		rec := createTestReceipt(nil, 28000, 26000, tx.Hash)
-		testReceipt("testsuite/receipt-no-logs.json", toReceipt(rec, tx, 0, h, nil))
+
+		header := createTestHeader(15)
+		rec := createTestReceipt(nil, cumulativeGasUsed, gasUsed, tx.Hash)
+		testReceipt("testsuite/receipt-no-logs.json", toReceipt(rec, tx, 0, header, nil))
 	})
 
 	t.Run("with contract address", func(t *testing.T) {
 		tx := createTestTransaction(types.StringToHash("tx1"))
+
 		contractAddr := types.StringToAddress("3")
-		h := createTestHeader(20)
-		rec := createTestReceipt(nil, 28000, 26000, tx.Hash)
+		header := createTestHeader(20)
+		rec := createTestReceipt(nil, cumulativeGasUsed, gasUsed, tx.Hash)
 		rec.ContractAddress = &contractAddr
-		testReceipt("testsuite/receipt-contract-deployment.json", toReceipt(rec, tx, 0, h, nil))
+		testReceipt("testsuite/receipt-contract-deployment.json", toReceipt(rec, tx, 0, header, nil))
 	})
 
 	t.Run("with logs", func(t *testing.T) {
@@ -330,11 +337,12 @@ func Test_toReceipt(t *testing.T) {
 		recipient := types.StringToAddress("2")
 		tx.From = types.StringToAddress("1")
 		tx.To = &recipient
-		h := createTestHeader(30)
-		srcLogs := createTestLogs(2, recipient)
-		srcReceipt := createTestReceipt(srcLogs, 28000, 26000, tx.Hash)
+
+		header := createTestHeader(30)
+		logs := createTestLogs(2, recipient)
+		originReceipt := createTestReceipt(logs, cumulativeGasUsed, gasUsed, tx.Hash)
 		txIdx := uint64(1)
-		rec := toReceipt(srcReceipt, tx, txIdx, h, toLogs(srcLogs, 0, txIdx, h, tx.Hash))
-		testReceipt("testsuite/receipt-with-logs.json", rec)
+		receipt := toReceipt(originReceipt, tx, txIdx, header, toLogs(logs, 0, txIdx, header, tx.Hash))
+		testReceipt("testsuite/receipt-with-logs.json", receipt)
 	})
 }
