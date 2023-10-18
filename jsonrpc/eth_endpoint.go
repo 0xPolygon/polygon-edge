@@ -339,9 +339,9 @@ func (e *Eth) GetTransactionReceipt(hash types.Hash) (interface{}, error) {
 	}
 
 	raw := receipts[txIndex]
-	logs := toLogs(raw.Logs, uint64(logIndex), block.Header, hash)
+	logs := toLogs(raw.Logs, uint64(logIndex), uint64(txIndex), block.Header, hash)
 
-	return toReceipt(raw, txn, txIndex, block.Header, logs), nil
+	return toReceipt(raw, txn, uint64(txIndex), block.Header, logs), nil
 }
 
 // GetStorageAt returns the contract storage at the index position

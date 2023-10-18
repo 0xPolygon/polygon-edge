@@ -209,7 +209,7 @@ type receipt struct {
 }
 
 func toReceipt(src *types.Receipt, tx *types.Transaction,
-	txIndex int, header *types.Header, logs []*Log) *receipt {
+	txIndex uint64, header *types.Header, logs []*Log) *receipt {
 	return &receipt{
 		Root:              src.Root,
 		CumulativeGasUsed: argUint64(src.CumulativeGasUsed),
@@ -239,16 +239,16 @@ type Log struct {
 	Removed     bool          `json:"removed"`
 }
 
-func toLogs(srcLogs []*types.Log, baseIdx uint64, header *types.Header, txHash types.Hash) []*Log {
+func toLogs(srcLogs []*types.Log, baseIdx, txIdx uint64, header *types.Header, txHash types.Hash) []*Log {
 	logs := make([]*Log, len(srcLogs))
 	for i, srcLog := range srcLogs {
-		logs[i] = toLog(srcLog, baseIdx+uint64(i), header, txHash)
+		logs[i] = toLog(srcLog, baseIdx+uint64(i), txIdx, header, txHash)
 	}
 
 	return logs
 }
 
-func toLog(src *types.Log, logIdx uint64, header *types.Header, txHash types.Hash) *Log {
+func toLog(src *types.Log, logIdx, txIdx uint64, header *types.Header, txHash types.Hash) *Log {
 	return &Log{
 		Address:     src.Address,
 		Topics:      src.Topics,
@@ -256,7 +256,7 @@ func toLog(src *types.Log, logIdx uint64, header *types.Header, txHash types.Has
 		BlockNumber: argUint64(header.Number),
 		BlockHash:   header.Hash,
 		TxHash:      txHash,
-		TxIndex:     argUint64(logIdx),
+		TxIndex:     argUint64(txIdx),
 		LogIndex:    argUint64(logIdx),
 	}
 }

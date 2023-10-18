@@ -333,8 +333,8 @@ func Test_toReceipt(t *testing.T) {
 		h := createTestHeader(30)
 		srcLogs := createTestLogs(2, recipient)
 		srcReceipt := createTestReceipt(srcLogs, 28000, 26000, tx.Hash)
-		rec := toReceipt(srcReceipt, tx, 0, h, toLogs(srcLogs, 0, h, tx.Hash))
+		txIdx := uint64(1)
+		rec := toReceipt(srcReceipt, tx, txIdx, h, toLogs(srcLogs, 0, txIdx, h, tx.Hash))
 		testReceipt("testsuite/receipt-with-logs.json", rec)
 	})
-
 }

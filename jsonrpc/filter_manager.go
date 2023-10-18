@@ -495,7 +495,7 @@ func (f *FilterManager) getLogsFromBlock(query *LogQuery, block *types.Block) ([
 	for idx, receipt := range receipts {
 		for _, log := range receipt.Logs {
 			if query.Match(log) {
-				logs = append(logs, toLog(log, logIdx, block.Header, block.Transactions[idx].Hash))
+				logs = append(logs, toLog(log, logIdx, uint64(idx), block.Header, block.Transactions[idx].Hash))
 			}
 
 			logIdx++
@@ -808,7 +808,7 @@ func (f *FilterManager) appendLogsToFilters(header *block) error {
 		for _, log := range receipt.Logs {
 			for _, f := range logFilters {
 				if f.query.Match(log) {
-					f.appendLog(toLog(log, logIndex, block.Header, receipt.TxHash))
+					f.appendLog(toLog(log, logIndex, uint64(indx), block.Header, receipt.TxHash))
 				}
 			}
 
