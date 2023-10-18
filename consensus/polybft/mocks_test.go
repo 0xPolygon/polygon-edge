@@ -112,6 +112,9 @@ func (m *blockchainMock) SubscribeEvents() blockchain.Subscription {
 	return nil
 }
 
+func (m *blockchainMock) UnubscribeEvents(blockchain.Subscription) {
+}
+
 func (m *blockchainMock) CalculateGasLimit(number uint64) (uint64, error) {
 	return 0, nil
 }

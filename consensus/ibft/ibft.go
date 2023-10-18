@@ -274,7 +274,7 @@ func (i *backendIBFT) startConsensus() {
 		}
 	}()
 
-	defer newBlockSub.Close()
+	defer i.blockchain.UnsubscribeEvents(newBlockSub)
 
 	var (
 		sequenceCh  = make(<-chan struct{})

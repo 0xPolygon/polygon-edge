@@ -48,6 +48,9 @@ func (m *mockBlockchain) SubscribeEvents() blockchain.Subscription {
 	return m.subscription
 }
 
+func (m *mockBlockchain) UnsubscribeEvents(blockchain.Subscription) {
+}
+
 func (m *mockBlockchain) Header() *types.Header {
 	return m.headerHandler()
 }

@@ -200,7 +200,7 @@ func NewBlockchain(
 		db:        db,
 		executor:  executor,
 		txSigner:  txSigner,
-		stream:    &eventStream{},
+		stream:    newEventStream(),
 		gpAverage: &gasPriceAverage{
 			price: big.NewInt(0),
 			count: big.NewInt(0),

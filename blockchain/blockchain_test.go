@@ -1455,7 +1455,7 @@ func TestBlockchain_WriteFullBlock(t *testing.T) {
 				BaseFeeEM: 4,
 			},
 		},
-		stream: &eventStream{},
+		stream: newEventStream(),
 	}
 
 	bc.headersCache, _ = lru.New(10)

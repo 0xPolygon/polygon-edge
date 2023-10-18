@@ -63,6 +63,9 @@ func (m *mockChain) SubscribeEvents() blockchain.Subscription {
 	return blockchain.NewMockSubscription()
 }
 
+func (m *mockChain) UnsubscribeEvents(subscription blockchain.Subscription) {
+}
+
 func getLatestBlockFromMockChain(m *mockChain) *types.Block {
 	if l := len(m.blocks); l != 0 {
 		return m.blocks[l-1]
