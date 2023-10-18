@@ -14,12 +14,10 @@ import (
 )
 
 const (
-	chainFlag         = "chain"
-	typeFlag          = "type"
-	deploymentFlag    = "deployment"
-	fromFlag          = "from"
-	minValidatorCount = "min-validator-count"
-	maxValidatorCount = "max-validator-count"
+	chainFlag      = "chain"
+	typeFlag       = "type"
+	deploymentFlag = "deployment"
+	fromFlag       = "from"
 )
 
 var (
@@ -49,9 +47,10 @@ type switchParams struct {
 	ibftValidatorType    validators.ValidatorType
 
 	// PoA
-	ibftValidatorPrefixPath string
-	ibftValidatorsRaw       []string
-	ibftValidators          validators.Validators
+	validatorRootPath   string
+	validatorPrefixPath string
+	validatorsRaw       []string
+	ibftValidators      validators.Validators
 
 	// PoS
 	maxValidatorCountRaw string
@@ -173,12 +172,13 @@ func (p *switchParams) initPoAConfig() error {
 }
 
 func (p *switchParams) setValidatorSetFromPrefixPath() error {
-	if p.ibftValidatorPrefixPath == "" {
+	if p.validatorPrefixPath == "" {
 		return nil
 	}
 
 	validators, err := command.GetValidatorsFromPrefixPath(
-		p.ibftValidatorPrefixPath,
+		p.validatorRootPath,
+		p.validatorPrefixPath,
 		p.ibftValidatorType,
 	)
 	if err != nil {
@@ -194,11 +194,11 @@ func (p *switchParams) setValidatorSetFromPrefixPath() error {
 
 // setValidatorSetFromCli sets validator set from cli command
 func (p *switchParams) setValidatorSetFromCli() error {
-	if len(p.ibftValidatorsRaw) == 0 {
+	if len(p.validatorsRaw) == 0 {
 		return nil
 	}
 
-	newSet, err := validators.ParseValidators(p.ibftValidatorType, p.ibftValidatorsRaw)
+	newSet, err := validators.ParseValidators(p.ibftValidatorType, p.validatorsRaw)
 	if err != nil {
 		return err
 	}
@@ -246,7 +246,18 @@ func (p *switchParams) initPoSConfig() error {
 		p.maxValidatorCount = &value
 	}
 
-	return p.validateMinMaxValidatorNumber()
+	if err := p.validateMinMaxValidatorNumber(); err != nil {
+		return err
+	}
+
+	// Validate validatorRootPath only if validators information were not provided via CLI flag
+	if len(p.validatorsRaw) == 0 {
+		if _, err := os.Stat(p.validatorRootPath); err != nil {
+			return fmt.Errorf("invalid validators path ('%s') provided. Error: %w", p.validatorRootPath, err)
+		}
+	}
+
+	return nil
 }
 
 func (p *switchParams) validateMinMaxValidatorNumber() error {

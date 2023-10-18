@@ -54,7 +54,7 @@ function initIbftConsensus() {
   node1_id=$(./polygon-edge secrets output --data-dir test-chain-1 | grep Node | head -n 1 | awk -F ' ' '{print $4}')
   node2_id=$(./polygon-edge secrets output --data-dir test-chain-2 | grep Node | head -n 1 | awk -F ' ' '{print $4}')
 
-  genesis_params="--consensus ibft --ibft-validators-prefix-path test-chain- \
+  genesis_params="--consensus ibft --validators-prefix test-chain- \
     --bootnode /ip4/127.0.0.1/tcp/30301/p2p/$node1_id \
     --bootnode /ip4/127.0.0.1/tcp/30302/p2p/$node2_id"
 }

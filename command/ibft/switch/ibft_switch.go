@@ -3,10 +3,11 @@ package ibftswitch
 import (
 	"fmt"
 
+	"github.com/spf13/cobra"
+
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/validators"
-	"github.com/spf13/cobra"
 )
 
 func GetCommand() *cobra.Command {
@@ -55,50 +56,58 @@ func setFlags(cmd *cobra.Command) {
 		)
 	}
 
-	// Validator Configurations
-	cmd.Flags().StringVar(
-		&params.rawIBFTValidatorType,
-		command.IBFTValidatorTypeFlag,
-		string(validators.BLSValidatorType),
-		"the type of validators in IBFT",
-	)
-
+	// IBFT
 	{
-		// PoA Configuration
 		cmd.Flags().StringVar(
-			&params.ibftValidatorPrefixPath,
-			command.IBFTValidatorPrefixFlag,
-			"",
-			"prefix path for validator folder directory. "+
-				"Needs to be present if ibft-validator is omitted",
+			&params.rawIBFTValidatorType,
+			command.IBFTValidatorTypeFlag,
+			string(validators.BLSValidatorType),
+			"the type of validators in IBFT",
 		)
-
-		cmd.Flags().StringArrayVar(
-			&params.ibftValidatorsRaw,
-			command.IBFTValidatorFlag,
-			[]string{},
-			"addresses to be used as IBFT validators, can be used multiple times. "+
-				"Needs to be present if ibft-validators-prefix-path is omitted",
-		)
-
-		cmd.MarkFlagsMutuallyExclusive(command.IBFTValidatorPrefixFlag, command.IBFTValidatorFlag)
 	}
 
 	{
 		// PoS Configuration
 		cmd.Flags().StringVar(
 			&params.minValidatorCountRaw,
-			minValidatorCount,
+			command.MinValidatorCountFlag,
 			"",
 			"the minimum number of validators in the validator set for PoS",
 		)
 
 		cmd.Flags().StringVar(
 			&params.maxValidatorCountRaw,
-			maxValidatorCount,
+			command.MaxValidatorCountFlag,
 			"",
 			"the maximum number of validators in the validator set for PoS",
 		)
+
+		cmd.Flags().StringVar(
+			&params.validatorRootPath,
+			command.ValidatorRootFlag,
+			command.DefaultValidatorRoot,
+			"root path for validator folder directory. "+
+				"Needs to be present if validators is omitted",
+		)
+
+		cmd.Flags().StringVar(
+			&params.validatorPrefixPath,
+			command.ValidatorPrefixFlag,
+			command.DefaultValidatorPrefix,
+			"prefix path for validator folder directory. "+
+				"Needs to be present if validators is omitted",
+		)
+
+		cmd.Flags().StringArrayVar(
+			&params.validatorsRaw,
+			command.ValidatorFlag,
+			[]string{},
+			"addresses to be used as IBFT validators, can be used multiple times. "+
+				"Needs to be present if validators-prefix is omitted",
+		)
+
+		cmd.MarkFlagsMutuallyExclusive(command.ValidatorPrefixFlag, command.ValidatorFlag)
+		cmd.MarkFlagsMutuallyExclusive(command.ValidatorRootFlag, command.ValidatorFlag)
 	}
 }
 

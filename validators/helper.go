@@ -78,7 +78,7 @@ func ParseValidator(validatorType ValidatorType, validator string) (Validator, e
 	}
 }
 
-// ParseValidator parses an array of validator represented in string
+// ParseValidators parses an array of validator represented in string
 func ParseValidators(validatorType ValidatorType, rawValidators []string) (Validators, error) {
 	set := NewValidatorSetFromType(validatorType)
 	if set == nil {

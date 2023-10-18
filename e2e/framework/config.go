@@ -145,7 +145,7 @@ func (t *TestServerConfig) SetDevInterval(interval int) {
 }
 
 // SetDevStakingAddresses sets the Staking smart contract staker addresses for the dev mode.
-// These addresses should be passed into the `ibft-validator` flag in genesis generation.
+// These addresses should be passed into the `validators` flag in genesis generation.
 // Since invoking the dev consensus will not generate the ibft base folders, this is the only way
 // to signalize to the genesis creation process who the validators are
 func (t *TestServerConfig) SetDevStakingAddresses(stakingAddresses []types.Address) {
