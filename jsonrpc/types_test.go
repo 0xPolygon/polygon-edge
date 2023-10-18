@@ -103,7 +103,7 @@ func TestToTransaction_Returns_V_R_S_ValuesWithoutLeading0(t *testing.T) {
 	v, _ := hex.DecodeHex(hexWithLeading0)
 	r, _ := hex.DecodeHex(hexWithLeading0)
 	s, _ := hex.DecodeHex(hexWithLeading0)
-	txn := types.Transaction{
+	txn := &types.Transaction{
 		Nonce:    0,
 		GasPrice: big.NewInt(0),
 		Gas:      0,
@@ -117,7 +117,7 @@ func TestToTransaction_Returns_V_R_S_ValuesWithoutLeading0(t *testing.T) {
 		From:     types.Address{},
 	}
 
-	jsonTx := toTransaction(&txn, nil, nil, nil)
+	jsonTx := toTransaction(txn, nil, nil, nil)
 
 	jsonV, _ := jsonTx.V.MarshalText()
 	jsonR, _ := jsonTx.R.MarshalText()
@@ -134,7 +134,7 @@ func TestToTransaction_EIP1559(t *testing.T) {
 	v, _ := hex.DecodeHex(hexWithLeading0)
 	r, _ := hex.DecodeHex(hexWithLeading0)
 	s, _ := hex.DecodeHex(hexWithLeading0)
-	txn := types.Transaction{
+	txn := &types.Transaction{
 		Nonce:     0,
 		GasPrice:  nil,
 		GasTipCap: big.NewInt(10),
@@ -150,7 +150,7 @@ func TestToTransaction_EIP1559(t *testing.T) {
 		From:      types.Address{},
 	}
 
-	jsonTx := toTransaction(&txn, nil, nil, nil)
+	jsonTx := toTransaction(txn, nil, nil, nil)
 
 	jsonV, _ := jsonTx.V.MarshalText()
 	jsonR, _ := jsonTx.R.MarshalText()
@@ -235,7 +235,7 @@ func TestBlock_Encoding(t *testing.T) {
 }
 
 func mockTxn() *transaction {
-	to := types.Address{}
+	to := types.StringToAddress("0x4")
 
 	tt := &transaction{
 		Nonce:       1,
