@@ -25,7 +25,12 @@ const (
 )
 
 var (
-	errNoAccounts = errors.New("no accounts registered")
+	errNoAccounts     = errors.New("no accounts registered")
+	errMethodNotFound = errors.New("method not found")
+
+	// dynamicFeeTxFallbackErrs represents known errors which are the reason to fallback
+	// from sending dynamic fee tx to legacy tx
+	dynamicFeeTxFallbackErrs = []error{types.ErrTxTypeNotSupported, errMethodNotFound}
 )
 
 type TxRelayer interface {
@@ -90,13 +95,18 @@ func (t *TxRelayerImpl) Call(from ethgo.Address, to ethgo.Address, input []byte)
 func (t *TxRelayerImpl) SendTransaction(txn *ethgo.Transaction, key ethgo.Key) (*ethgo.Receipt, error) {
 	txnHash, err := t.sendTransactionLocked(txn, key)
 	if err != nil {
-		if txn.Type != ethgo.TransactionLegacy &&
-			strings.Contains(err.Error(), types.ErrTxTypeNotSupported.Error()) {
-			// downgrade transaction to legacy tx type and resend it
-			txn.Type = ethgo.TransactionLegacy
-			txn.GasPrice = 0
+		if txn.Type != ethgo.TransactionLegacy {
+			for _, fallbackErr := range dynamicFeeTxFallbackErrs {
+				if strings.Contains(
+					strings.ToLower(fallbackErr.Error()),
+					strings.ToLower(err.Error())) {
+					// "downgrade" transaction to the legacy tx type and resend it
+					txn.Type = ethgo.TransactionLegacy
+					txn.GasPrice = 0
 
-			return t.SendTransaction(txn, key)
+					return t.SendTransaction(txn, key)
+				}
+			}
 		}
 
 		return nil, err
