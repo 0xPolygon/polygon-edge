@@ -570,13 +570,12 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 	}
 
 	var (
-		standardGas = state.TxGas
-		lowEnd      = standardGas
-		highEnd     uint64
+		lowEnd  = state.TxGas
+		highEnd uint64
 	)
 
 	// If the gas limit was passed in, use it as a ceiling
-	if transaction.Gas != 0 && transaction.Gas >= standardGas {
+	if transaction.Gas != 0 && transaction.Gas >= lowEnd {
 		highEnd = transaction.Gas
 	} else {
 		// If not, use the referenced block number
