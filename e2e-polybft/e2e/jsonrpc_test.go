@@ -13,6 +13,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
+	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -124,6 +125,40 @@ func TestE2E_JsonRPC(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.Equal(t, uint64(0x56a3), resp)
+	})
+
+	t.Run("eth_estimateGas by zero-balance account - simple value transfer", func(t *testing.T) {
+		acctZeroBalance, err := wallet.GenerateKey()
+		require.NoError(t, err)
+
+		fundedAccountAddress := acct.Address()
+		nonFundedAccountAddress := acctZeroBalance.Address()
+
+		estimateGasFn := func(value *big.Int) {
+			resp, err := client.EstimateGas(&ethgo.CallMsg{
+				From:  nonFundedAccountAddress,
+				To:    &fundedAccountAddress,
+				Value: value,
+			})
+
+			require.NoError(t, err)
+			require.Equal(t, state.TxGas, resp)
+		}
+
+		estimateGasFn(ethgo.Gwei(1))
+
+		// transfer some funds to zero balance account
+		valueTransferTxn := cluster.SendTxn(t, acct, &ethgo.Transaction{
+			From:  fundedAccountAddress,
+			To:    &nonFundedAccountAddress,
+			Value: ethgo.Gwei(10),
+		})
+
+		require.NoError(t, valueTransferTxn.Wait())
+		require.True(t, valueTransferTxn.Succeed())
+
+		// now call estimate gas again for the now funded account
+		estimateGasFn(ethgo.Gwei(1))
 	})
 
 	t.Run("eth_getBalance", func(t *testing.T) {

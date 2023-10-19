@@ -74,6 +74,14 @@ func (t *Transaction) IsContractCreation() bool {
 	return t.To == nil
 }
 
+// IsValueTransfer checks if tx is a value transfer
+func (t *Transaction) IsValueTransfer() bool {
+	return t.Value != nil &&
+		t.Value.Sign() > 0 &&
+		len(t.Input) == 0 &&
+		!t.IsContractCreation()
+}
+
 // ComputeHash computes the hash of the transaction
 func (t *Transaction) ComputeHash(blockNumber uint64) *Transaction {
 	GetTransactionHashHandler(blockNumber).ComputeHash(t)
