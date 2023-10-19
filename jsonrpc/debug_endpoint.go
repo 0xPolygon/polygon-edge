@@ -8,6 +8,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state/runtime/tracer"
+	"github.com/0xPolygon/polygon-edge/state/runtime/tracer/calltracer"
 	"github.com/0xPolygon/polygon-edge/state/runtime/tracer/structtracer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -83,6 +84,7 @@ type TraceConfig struct {
 	EnableReturnData  bool    `json:"enableReturnData"`
 	DisableStructLogs bool    `json:"disableStructLogs"`
 	Timeout           *string `json:"timeout"`
+	Tracer            string  `json:"tracer"`
 }
 
 func (d *Debug) TraceBlockByNumber(
@@ -248,13 +250,19 @@ func newTracer(config *TraceConfig) (
 		}
 	}
 
-	tracer := structtracer.NewStructTracer(structtracer.Config{
-		EnableMemory:     config.EnableMemory && !config.DisableStructLogs,
-		EnableStack:      !config.DisableStack && !config.DisableStructLogs,
-		EnableStorage:    !config.DisableStorage && !config.DisableStructLogs,
-		EnableReturnData: config.EnableReturnData,
-		EnableStructLogs: !config.DisableStructLogs,
-	})
+	var tracer tracer.Tracer
+
+	if config.Tracer == "callTracer" {
+		tracer = calltracer.NewCallTracer()
+	} else {
+		tracer = structtracer.NewStructTracer(structtracer.Config{
+			EnableMemory:     config.EnableMemory && !config.DisableStructLogs,
+			EnableStack:      !config.DisableStack && !config.DisableStructLogs,
+			EnableStorage:    !config.DisableStorage && !config.DisableStructLogs,
+			EnableReturnData: config.EnableReturnData,
+			EnableStructLogs: !config.DisableStructLogs,
+		})
+	}
 
 	timeoutCtx, cancel := context.WithTimeout(context.Background(), timeout)
 
