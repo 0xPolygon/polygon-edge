@@ -551,23 +551,28 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 		return nil, err
 	}
 
+	forksInTime := e.store.GetForksInTime(header.Number)
+
+	if transaction.IsValueTransfer() || transaction.IsContractCreation() {
+		// if it is a simple value transfer or a contract creation,
+		// we already know what is the transaction gas cost, no need to apply transaction
+		gasCost, err := state.TransactionGasCost(transaction, forksInTime.Homestead, forksInTime.Istanbul)
+		if err != nil {
+			return nil, err
+		}
+
+		return argUint64(gasCost), nil
+	}
+
 	// Force transaction gas price if empty
 	if err = e.fillTransactionGasPrice(transaction); err != nil {
 		return nil, err
 	}
 
-	forksInTime := e.store.GetForksInTime(header.Number)
-
-	var standardGas uint64
-	if transaction.IsContractCreation() && forksInTime.Homestead {
-		standardGas = state.TxGasContractCreation
-	} else {
-		standardGas = state.TxGas
-	}
-
 	var (
-		lowEnd  = standardGas
-		highEnd uint64
+		standardGas = state.TxGas
+		lowEnd      = standardGas
+		highEnd     uint64
 	)
 
 	// If the gas limit was passed in, use it as a ceiling
@@ -579,7 +584,6 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 	}
 
 	gasPriceInt := new(big.Int).Set(transaction.GasPrice)
-	valueInt := new(big.Int).Set(transaction.Value)
 
 	var availableBalance *big.Int
 
@@ -602,14 +606,6 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 		}
 
 		availableBalance = new(big.Int).Set(accountBalance)
-
-		if transaction.Value != nil {
-			if valueInt.Cmp(availableBalance) > 0 {
-				return 0, ErrInsufficientFunds
-			}
-
-			availableBalance.Sub(availableBalance, valueInt)
-		}
 	}
 
 	// Recalculate the gas ceiling based on the available funds (if any)
@@ -663,7 +659,7 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 
 		transaction.Gas = gas
 
-		result, applyErr := e.store.ApplyTxn(header, transaction, nil, false)
+		result, applyErr := e.store.ApplyTxn(header, transaction, nil, true)
 
 		if result != nil {
 			data = []byte(hex.EncodeToString(result.ReturnValue))

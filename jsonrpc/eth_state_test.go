@@ -772,7 +772,7 @@ func TestEth_EstimateGas_Reverts(t *testing.T) {
 	}
 }
 
-func TestEth_EstimateGas_Errors(t *testing.T) {
+func TestEth_EstimateGas_ValueTransfer(t *testing.T) {
 	store := getExampleStore()
 	ethEndpoint := newTestEthEndpoint(store)
 
@@ -780,19 +780,51 @@ func TestEth_EstimateGas_Errors(t *testing.T) {
 	store.account.account.Balance = big.NewInt(0)
 
 	// The transaction has a value > 0
+	from := types.StringToAddress("0xSenderAddress")
+	to := types.StringToAddress("0xReceiverAddress")
 	mockTx := constructMockTx(nil, nil)
 	mockTx.Value = argBytesPtr([]byte{0x1})
+	mockTx.From = &from
+	mockTx.To = &to
 
 	// Run the estimation
-	estimate, estimateErr := ethEndpoint.EstimateGas(
+	estimate, err := ethEndpoint.EstimateGas(
 		mockTx,
 		nil,
 	)
 
-	assert.Equal(t, 0, estimate)
+	assert.NotNil(t, estimate)
+	estimateUint64, ok := estimate.(argUint64)
+	assert.True(t, ok)
+	assert.NoError(t, err)
+	assert.Equal(t, state.TxGas, uint64(estimateUint64)) // simple value transfers are 21000wei always
+}
 
-	// Make sure the insufficient funds error message is contained
-	assert.ErrorIs(t, estimateErr, ErrInsufficientFunds)
+func TestEth_EstimateGas_ContractCreation(t *testing.T) {
+	store := getExampleStore()
+	ethEndpoint := newTestEthEndpoint(store)
+
+	// Account doesn't have any balance
+	store.account.account.Balance = big.NewInt(0)
+
+	// The transaction has a value > 0
+	from := types.StringToAddress("0xSenderAddress")
+	mockTx := constructMockTx(nil, nil)
+	mockTx.From = &from
+	mockTx.Input = argBytesPtr([]byte{})
+	mockTx.To = nil
+
+	// Run the estimation
+	estimate, err := ethEndpoint.EstimateGas(
+		mockTx,
+		nil,
+	)
+
+	assert.NotNil(t, estimate)
+	estimateUint64, ok := estimate.(argUint64)
+	assert.True(t, ok)
+	assert.NoError(t, err)
+	assert.Equal(t, state.TxGasContractCreation, uint64(estimateUint64))
 }
 
 type mockSpecialStore struct {
@@ -867,7 +899,7 @@ func (m *mockSpecialStore) GetCode(root types.Hash, addr types.Address) ([]byte,
 }
 
 func (m *mockSpecialStore) GetForksInTime(blockNumber uint64) chain.ForksInTime {
-	return chain.ForksInTime{}
+	return chain.AllForksEnabled.At(0)
 }
 
 func (m *mockSpecialStore) ApplyTxn(header *types.Header, txn *types.Transaction, _ types.StateOverride, _ bool) (*runtime.ExecutionResult, error) {
