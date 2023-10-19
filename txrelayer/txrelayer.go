@@ -98,8 +98,8 @@ func (t *TxRelayerImpl) SendTransaction(txn *ethgo.Transaction, key ethgo.Key) (
 		if txn.Type != ethgo.TransactionLegacy {
 			for _, fallbackErr := range dynamicFeeTxFallbackErrs {
 				if strings.Contains(
-					strings.ToLower(fallbackErr.Error()),
-					strings.ToLower(err.Error())) {
+					strings.ToLower(err.Error()),
+					strings.ToLower(fallbackErr.Error())) {
 					// "downgrade" transaction to the legacy tx type and resend it
 					txn.Type = ethgo.TransactionLegacy
 					txn.GasPrice = 0
