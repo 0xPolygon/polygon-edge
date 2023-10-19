@@ -77,7 +77,7 @@ func (t *Transaction) IsContractCreation() bool {
 // IsValueTransfer checks if tx is a value transfer
 func (t *Transaction) IsValueTransfer() bool {
 	return t.Value != nil &&
-		t.Value.Sign() != 0 &&
+		t.Value.Sign() > 0 &&
 		len(t.Input) == 0 &&
 		!t.IsContractCreation()
 }

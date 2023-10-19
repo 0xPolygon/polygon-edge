@@ -553,7 +553,7 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 
 	forksInTime := e.store.GetForksInTime(header.Number)
 
-	if transaction.IsValueTransfer() || transaction.IsContractCreation() {
+	if transaction.IsValueTransfer() {
 		// if it is a simple value transfer or a contract creation,
 		// we already know what is the transaction gas cost, no need to apply transaction
 		gasCost, err := state.TransactionGasCost(transaction, forksInTime.Homestead, forksInTime.Istanbul)
@@ -569,13 +569,20 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 		return nil, err
 	}
 
+	var standardGas uint64
+	if transaction.IsContractCreation() && forksInTime.Homestead {
+		standardGas = state.TxGasContractCreation
+	} else {
+		standardGas = state.TxGas
+	}
+
 	var (
-		lowEnd  = state.TxGas
+		lowEnd  = standardGas
 		highEnd uint64
 	)
 
 	// If the gas limit was passed in, use it as a ceiling
-	if transaction.Gas != 0 && transaction.Gas >= lowEnd {
+	if transaction.Gas != 0 && transaction.Gas >= standardGas {
 		highEnd = transaction.Gas
 	} else {
 		// If not, use the referenced block number
