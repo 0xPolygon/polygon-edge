@@ -182,10 +182,8 @@ func (m *memBatch) Write() error {
 // GetNode retrieves a node from storage
 func GetNode(root []byte, storage Storage) (Node, bool, error) {
 	data, ok, err := storage.Get(root)
-	if err != nil {
+	if err != nil || !ok || len(data) == 0 {
 		return nil, false, err
-	} else if !ok || len(data) == 0 {
-		return nil, false, nil
 	}
 
 	// NOTE. We dont need to make copies of the bytes because the nodes
