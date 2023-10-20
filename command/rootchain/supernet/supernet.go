@@ -138,7 +138,6 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 
 		txn := rootHelper.CreateTransaction(ownerKey.Address(), &supernetAddr, encoded, nil, true)
 
-		// TODO: Strange, there might be different approach to figure out if genesis set is already finalized?
 		if _, err = txRelayer.Call(ownerKey.Address(), supernetAddr, encoded); err == nil {
 			receipt, err := txRelayer.SendTransaction(txn, ownerKey)
 			if err != nil {

@@ -467,7 +467,6 @@ func (t *TestBridge) finalizeGenesis(genesisPath string, polybftConfig polybft.P
 		"--private-key", rootHelper.TestAccountPrivKey,
 		"--genesis", genesisPath,
 		"--supernet-manager", polybftConfig.Bridge.CustomSupernetManagerAddr.String(),
-		"--stake-manager", polybftConfig.Bridge.StakeManagerAddr.String(),
 		"--finalize-genesis-set",
 		"--enable-staking",
 	}
