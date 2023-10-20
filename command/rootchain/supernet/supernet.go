@@ -1,9 +1,13 @@
 package supernet
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 	"strings"
+
+	"github.com/spf13/cobra"
+	"github.com/umbracle/ethgo"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
@@ -14,14 +18,25 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
-	"github.com/0xPolygon/polygon-edge/helper/common"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/spf13/cobra"
-	"github.com/umbracle/ethgo"
 )
 
-var params supernetParams
+type genesisAccount struct {
+	Address types.Address
+	Stake   *big.Int
+	Balance *big.Int
+}
+
+func (g *genesisAccount) String() string {
+	return fmt.Sprintf("%s %d %d", g.Address, g.Stake, g.Balance)
+}
+
+var (
+	params          supernetParams
+	genesisSetABIFn = contractsapi.CustomSupernetManager.Abi.Methods["genesisSet"]
+)
 
 func GetCommand() *cobra.Command {
 	registerCmd := &cobra.Command{
@@ -78,13 +93,6 @@ func setFlags(cmd *cobra.Command) {
 		rootHelper.SupernetManagerFlagDesc,
 	)
 
-	cmd.Flags().StringVar(
-		&params.stakeManagerAddress,
-		rootHelper.StakeManagerFlag,
-		"",
-		rootHelper.StakeManagerFlagDesc,
-	)
-
 	cmd.Flags().BoolVar(
 		&params.finalizeGenesisSet,
 		finalizeGenesisSetFlag,
@@ -130,6 +138,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 
 		txn := rootHelper.CreateTransaction(ownerKey.Address(), &supernetAddr, encoded, nil, true)
 
+		// TODO: Strange, there might be different approach to figure out if genesis set is already finalized?
 		if _, err = txRelayer.Call(ownerKey.Address(), supernetAddr, encoded); err == nil {
 			receipt, err := txRelayer.SendTransaction(txn, ownerKey)
 			if err != nil {
@@ -153,21 +162,43 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 			return fmt.Errorf("failed to retrieve consensus configuration: %w", err)
 		}
 
-		stakeManager := types.StringToAddress(params.stakeManagerAddress)
-		callerAddr := types.Address(ownerKey.Address())
-
 		validatorMetadata := make([]*validator.ValidatorMetadata, len(consensusConfig.InitialValidatorSet))
+
+		genesisSetInput, err := genesisSetABIFn.Encode([]interface{}{})
+		if err != nil {
+			return fmt.Errorf("failed to encode genesis set input: %w", err)
+		}
+
+		genesisSetHexOut, err := txRelayer.Call(ethgo.ZeroAddress, supernetAddr, genesisSetInput)
+		if err != nil {
+			return fmt.Errorf("failed to retrieve genesis set: %w", err)
+		}
+
+		genesisAccounts, err := decodeGenesisAccounts(genesisSetHexOut)
+		if err != nil {
+			return err
+		}
+
+		genesisAccsMap := make(map[types.Address]*genesisAccount, len(genesisAccounts))
+		for _, genesisAcc := range genesisAccounts {
+			genesisAccsMap[genesisAcc.Address] = genesisAcc
+
+			if genesisAcc.Balance.Sign() > 0 {
+				// premine genesis accounts
+				chainConfig.Genesis.Alloc[genesisAcc.Address] =
+					&chain.GenesisAccount{Balance: genesisAcc.Balance}
+			}
+		}
 
 		// update Stake field of validators in genesis file
 		// based on their finalized stake on rootchain
 		for i, v := range consensusConfig.InitialValidatorSet {
-			finalizedStake, err := getFinalizedStake(callerAddr, v.Address, stakeManager,
-				consensusConfig.SupernetID, txRelayer)
-			if err != nil {
-				return fmt.Errorf("could not get finalized stake for validator: %v. Error: %w", v.Address, err)
+			genesisAcc, exists := genesisAccsMap[v.Address]
+			if !exists {
+				return fmt.Errorf("validator with address %s not found among genesis accounts", v.Address)
 			}
 
-			v.Stake = finalizedStake
+			v.Stake = genesisAcc.Stake
 
 			metadata, err := v.ToValidatorMetadata()
 			if err != nil {
@@ -227,25 +258,60 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	return nil
 }
 
-// geFinalizedStake returns finalized stake of given validator for given supernet on StakeManager
-func getFinalizedStake(owner, validator, stakeManager types.Address, chainID int64,
-	txRelayer txrelayer.TxRelayer) (*big.Int, error) {
-	stakeOfFn := &contractsapi.StakeOfStakeManagerFn{
-		Validator: validator,
-		ID:        new(big.Int).SetInt64(chainID),
+// decodeGenesisAccounts decodes genesis set retrieved from CustomSupernetManager contract
+func decodeGenesisAccounts(genesisSetRaw string) ([]*genesisAccount, error) {
+	decodeAccount := func(rawAccount map[string]interface{}) (*genesisAccount, error) {
+		addr, ok := rawAccount["validator"].(ethgo.Address)
+		if !ok {
+			return nil, errors.New("failed to retrieve genesis account address")
+		}
+
+		stake, ok := rawAccount["initialStake"].(*big.Int)
+		if !ok {
+			return nil, errors.New("failed to retrieve genesis account stake")
+		}
+
+		balance, ok := rawAccount["balance"].(*big.Int)
+		if !ok {
+			return nil, errors.New("failed to retrieve genesis account balance")
+		}
+
+		return &genesisAccount{
+			Address: types.Address(addr),
+			Stake:   stake,
+			Balance: balance,
+		}, nil
 	}
 
-	encode, err := stakeOfFn.EncodeAbi()
+	genesisSetRawOut, err := hex.DecodeHex(genesisSetRaw)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to decode genesis set from hex format: %w", err)
 	}
 
-	response, err := txRelayer.Call(ethgo.Address(owner), ethgo.Address(stakeManager), encode)
+	decodedGenesisSet, err := genesisSetABIFn.Outputs.Decode(genesisSetRawOut)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to decode genesis set from raw format: %w", err)
 	}
 
-	return common.ParseUint256orHex(&response)
+	decodedGenesisSetMap, ok := decodedGenesisSet.(map[string]interface{})
+	if !ok {
+		return nil, errors.New("failed to convert genesis set to map")
+	}
+
+	decodedGenesisSetSliceMap, ok := decodedGenesisSetMap["0"].([]map[string]interface{})
+	if !ok {
+		return nil, errors.New("failed to convert genesis set to slice")
+	}
+
+	genesisAccounts := make([]*genesisAccount, len(decodedGenesisSetSliceMap))
+	for i, rawGenesisAccount := range decodedGenesisSetSliceMap {
+		genesisAccounts[i], err = decodeAccount(rawGenesisAccount)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return genesisAccounts, nil
 }
 
 // validatorSetToABISlice converts given validators to generic map

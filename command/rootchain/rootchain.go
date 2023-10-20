@@ -5,6 +5,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/command/rootchain/deploy"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/fund"
+	"github.com/0xPolygon/polygon-edge/command/rootchain/premine"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/server"
 )
 
@@ -22,6 +23,8 @@ func GetCommand() *cobra.Command {
 		deploy.GetCommand(),
 		// rootchain fund
 		fund.GetCommand(),
+		// rootchain premine
+		premine.GetCommand(),
 	)
 
 	return rootchainCmd

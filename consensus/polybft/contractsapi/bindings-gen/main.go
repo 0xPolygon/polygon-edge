@@ -352,6 +352,7 @@ func main() {
 				"whitelistValidators",
 				"register",
 				"getValidator",
+				"premine",
 			},
 			[]string{
 				"ValidatorRegistered",

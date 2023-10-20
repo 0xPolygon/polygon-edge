@@ -1222,13 +1222,14 @@ func (o *OwnerOfChildERC721Fn) DecodeAbi(buf []byte) error {
 }
 
 type InitializeCustomSupernetManagerFn struct {
-	NewStakeManager      types.Address `abi:"newStakeManager"`
-	NewBls               types.Address `abi:"newBls"`
-	NewStateSender       types.Address `abi:"newStateSender"`
-	NewMatic             types.Address `abi:"newMatic"`
-	NewChildValidatorSet types.Address `abi:"newChildValidatorSet"`
-	NewExitHelper        types.Address `abi:"newExitHelper"`
-	NewDomain            string        `abi:"newDomain"`
+	NewStakeManager       types.Address `abi:"newStakeManager"`
+	NewBls                types.Address `abi:"newBls"`
+	NewStateSender        types.Address `abi:"newStateSender"`
+	NewMatic              types.Address `abi:"newMatic"`
+	NewChildValidatorSet  types.Address `abi:"newChildValidatorSet"`
+	NewExitHelper         types.Address `abi:"newExitHelper"`
+	NewRootERC20Predicate types.Address `abi:"newRootERC20Predicate"`
+	NewDomain             string        `abi:"newDomain"`
 }
 
 func (i *InitializeCustomSupernetManagerFn) Sig() []byte {
@@ -1290,6 +1291,22 @@ func (g *GetValidatorCustomSupernetManagerFn) EncodeAbi() ([]byte, error) {
 
 func (g *GetValidatorCustomSupernetManagerFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(CustomSupernetManager.Abi.Methods["getValidator"], buf, g)
+}
+
+type PremineCustomSupernetManagerFn struct {
+	Amount *big.Int `abi:"amount"`
+}
+
+func (p *PremineCustomSupernetManagerFn) Sig() []byte {
+	return CustomSupernetManager.Abi.Methods["premine"].ID()
+}
+
+func (p *PremineCustomSupernetManagerFn) EncodeAbi() ([]byte, error) {
+	return CustomSupernetManager.Abi.Methods["premine"].Encode(p)
+}
+
+func (p *PremineCustomSupernetManagerFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(CustomSupernetManager.Abi.Methods["premine"], buf, p)
 }
 
 type ValidatorRegisteredEvent struct {
