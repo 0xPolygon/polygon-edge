@@ -70,7 +70,7 @@ require (
 	github.com/sethvargo/go-retry v0.2.4
 	golang.org/x/sync v0.4.0
 	google.golang.org/genproto v0.0.0-20230711160842-782d3b101e98
-	gopkg.in/DataDog/dd-trace-go.v1 v1.55.0
+	gopkg.in/DataDog/dd-trace-go.v1 v1.56.0
 	pgregory.net/rapid v1.1.0
 )
 
@@ -212,7 +212,7 @@ require (
 	github.com/trailofbits/go-fuzz-utils v0.0.0-20210901195358-9657fcfd256c
 	github.com/tyler-smith/go-bip39 v1.1.0 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
-	github.com/valyala/fasthttp v1.48.0 // indirect
+	github.com/valyala/fasthttp v1.49.0 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
