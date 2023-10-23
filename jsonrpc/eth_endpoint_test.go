@@ -8,6 +8,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestEth_DecodeTxn(t *testing.T) {
@@ -363,4 +364,30 @@ func TestEth_HeaderResolveBlock(t *testing.T) {
 			assert.Equal(t, header.Number, uint64(10))
 		}
 	}
+}
+
+func TestOverrideAccount_ToType(t *testing.T) {
+	t.Parallel()
+
+	nonce := uint64(10)
+	code := []byte("SC code")
+	balance := uint64(10000)
+	state := map[types.Hash]types.Hash{types.StringToHash("1"): types.StringToHash("2")}
+	stateDiff := map[types.Hash]types.Hash{types.StringToHash("3"): types.StringToHash("4")}
+
+	overrideAcc := &overrideAccount{
+		Nonce:     toArgUint64Ptr(nonce),
+		Code:      toArgBytesPtr(code),
+		Balance:   toArgUint64Ptr(balance),
+		State:     &state,
+		StateDiff: &stateDiff,
+	}
+
+	convertedAcc := overrideAcc.ToType()
+	require.NotNil(t, convertedAcc)
+	require.Equal(t, nonce, *convertedAcc.Nonce)
+	require.Equal(t, code, convertedAcc.Code)
+	require.Equal(t, new(big.Int).SetUint64(balance), convertedAcc.Balance)
+	require.Equal(t, state, convertedAcc.State)
+	require.Equal(t, stateDiff, convertedAcc.StateDiff)
 }
