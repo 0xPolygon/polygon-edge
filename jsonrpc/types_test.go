@@ -202,9 +202,8 @@ func TestBlock_Encoding(t *testing.T) {
 		res, err := json.Marshal(b)
 		require.NoError(t, err)
 
-		data, err := testsuite.ReadFile(name)
-		require.NoError(t, err)
-		require.JSONEq(t, string(data), string(res))
+		expectedData := loadTestData(t, name)
+		require.JSONEq(t, expectedData, string(res))
 	}
 
 	t.Run("empty block", func(t *testing.T) {
@@ -263,9 +262,8 @@ func TestTransaction_Encoding(t *testing.T) {
 		res, err := json.Marshal(tt)
 		require.NoError(t, err)
 
-		data, err := testsuite.ReadFile(name)
-		require.NoError(t, err)
-		require.JSONEq(t, string(data), string(res))
+		expectedData := loadTestData(t, name)
+		require.JSONEq(t, expectedData, string(res))
 	}
 
 	t.Run("sealed", func(t *testing.T) {
@@ -306,9 +304,8 @@ func Test_toReceipt(t *testing.T) {
 		res, err := json.Marshal(r)
 		require.NoError(t, err)
 
-		data, err := testsuite.ReadFile(name)
-		require.NoError(t, err)
-		require.JSONEq(t, string(data), string(res))
+		expectedData := loadTestData(t, name)
+		require.JSONEq(t, expectedData, string(res))
 	}
 
 	t.Run("no logs", func(t *testing.T) {
@@ -317,16 +314,17 @@ func Test_toReceipt(t *testing.T) {
 		tx.From = types.StringToAddress("1")
 		tx.To = &recipient
 
-		header := createTestHeader(15)
+		header := createTestHeader(15, nil)
 		rec := createTestReceipt(nil, cumulativeGasUsed, gasUsed, tx.Hash)
 		testReceipt("testsuite/receipt-no-logs.json", toReceipt(rec, tx, 0, header, nil))
 	})
 
 	t.Run("with contract address", func(t *testing.T) {
 		tx := createTestTransaction(types.StringToHash("tx1"))
+		tx.To = nil
 
 		contractAddr := types.StringToAddress("3")
-		header := createTestHeader(20)
+		header := createTestHeader(20, nil)
 		rec := createTestReceipt(nil, cumulativeGasUsed, gasUsed, tx.Hash)
 		rec.ContractAddress = &contractAddr
 		testReceipt("testsuite/receipt-contract-deployment.json", toReceipt(rec, tx, 0, header, nil))
@@ -338,11 +336,44 @@ func Test_toReceipt(t *testing.T) {
 		tx.From = types.StringToAddress("1")
 		tx.To = &recipient
 
-		header := createTestHeader(30)
+		header := createTestHeader(30, nil)
 		logs := createTestLogs(2, recipient)
 		originReceipt := createTestReceipt(logs, cumulativeGasUsed, gasUsed, tx.Hash)
 		txIdx := uint64(1)
 		receipt := toReceipt(originReceipt, tx, txIdx, header, toLogs(logs, 0, txIdx, header, tx.Hash))
 		testReceipt("testsuite/receipt-with-logs.json", receipt)
 	})
+}
+
+func Test_toBlock(t *testing.T) {
+	h := createTestHeader(20, func(h *types.Header) {
+		h.BaseFee = 200
+		h.ParentHash = types.BytesToHash([]byte("ParentHash"))
+	})
+
+	block := &types.Block{
+		Header: h,
+		Transactions: []*types.Transaction{
+			createTestTransaction(types.StringToHash("tx1")),
+			createTestTransaction(types.StringToHash("tx2")),
+		},
+	}
+
+	b := toBlock(block, true)
+	require.NotNil(t, b)
+
+	res, err := json.Marshal(b)
+	require.NoError(t, err)
+
+	expectedJSON := loadTestData(t, "testsuite/block-with-txn-full.json")
+	require.JSONEq(t, expectedJSON, string(res))
+}
+
+func loadTestData(t *testing.T, name string) string {
+	t.Helper()
+
+	data, err := testsuite.ReadFile(name)
+	require.NoError(t, err)
+
+	return string(data)
 }

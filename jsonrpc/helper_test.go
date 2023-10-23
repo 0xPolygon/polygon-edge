@@ -12,14 +12,27 @@ import (
 )
 
 func createTestTransaction(hash types.Hash) *types.Transaction {
+	recipient := types.StringToAddress("2")
+
 	return &types.Transaction{
-		Hash: hash,
+		Hash:     hash,
+		From:     types.StringToAddress("1"),
+		To:       &recipient,
+		GasPrice: big.NewInt(400),
+		Value:    big.NewInt(100),
+		V:        big.NewInt(1),
+		R:        big.NewInt(2),
+		S:        big.NewInt(3),
 	}
 }
 
-func createTestHeader(height uint64) *types.Header {
+func createTestHeader(height uint64, setterFn func(h *types.Header)) *types.Header {
 	h := &types.Header{
 		Number: height,
+	}
+
+	if setterFn != nil {
+		setterFn(h)
 	}
 
 	h.ComputeHash()
@@ -68,13 +81,13 @@ var (
 	testTxHash1 = types.BytesToHash([]byte{1})
 	testTx1     = createTestTransaction(testTxHash1)
 
-	testGenesisHeader = createTestHeader(0)
+	testGenesisHeader = createTestHeader(0, nil)
 	testGenesisBlock  = wrapHeaderWithTestBlock(testGenesisHeader)
 
-	testLatestHeader = createTestHeader(100)
+	testLatestHeader = createTestHeader(100, nil)
 	testLatestBlock  = wrapHeaderWithTestBlock(testLatestHeader)
 
-	testHeader10 = createTestHeader(10)
+	testHeader10 = createTestHeader(10, nil)
 	testBlock10  = wrapHeaderWithTestBlock(testHeader10)
 
 	testHash11 = types.BytesToHash([]byte{11})
