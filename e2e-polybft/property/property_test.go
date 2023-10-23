@@ -124,10 +124,6 @@ func TestProperty_DropValidators(t *testing.T) {
 			node.Start()
 		}
 
-		time.Sleep(2 * blockTime)
-		currentBlock, err = activeValidator.JSONRPC().Eth().GetBlockByNumber(ethgo.Latest, false)
-		require.NoError(t, err)
-		// check that block production is restarted
-		require.True(t, oldBlockNumber < currentBlock.Number)
+		require.NoError(t, cluster.WaitForBlock(oldBlockNumber+1, 30*time.Second))
 	})
 }
