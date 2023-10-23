@@ -47,8 +47,8 @@ func (m *mockSnapshot) GetCode(hash types.Hash) ([]byte, bool) {
 	return nil, false
 }
 
-func (m *mockSnapshot) Commit(objs []*Object) (Snapshot, []byte) {
-	return nil, nil
+func (m *mockSnapshot) Commit(objs []*Object) (Snapshot, []byte, error) {
+	return nil, nil, nil
 }
 
 func newStateWithPreState(preState map[types.Address]*PreState) Snapshot {

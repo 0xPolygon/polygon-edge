@@ -2,6 +2,7 @@ package itrie
 
 import (
 	"bytes"
+	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/state"
@@ -73,7 +74,7 @@ func (s *Snapshot) GetCode(hash types.Hash) ([]byte, bool) {
 	return s.state.GetCode(hash)
 }
 
-func (s *Snapshot) Commit(objs []*state.Object) (state.Snapshot, []byte) {
+func (s *Snapshot) Commit(objs []*state.Object) (state.Snapshot, []byte, error) {
 	batch := s.state.storage.Batch()
 
 	tt := s.trie.Txn(s.state.storage)
@@ -96,7 +97,7 @@ func (s *Snapshot) Commit(objs []*state.Object) (state.Snapshot, []byte) {
 			if len(obj.Storage) != 0 {
 				trie, err := s.state.newTrieAt(obj.Root)
 				if err != nil {
-					panic(err) //nolint:gocritic
+					return nil, types.ZeroHash[:], fmt.Errorf("snapshot commit failed to create trie: %w", err)
 				}
 
 				localTxn := trie.Txn(s.state.storage)
@@ -122,7 +123,7 @@ func (s *Snapshot) Commit(objs []*state.Object) (state.Snapshot, []byte) {
 			}
 
 			if obj.DirtyCode {
-				s.state.SetCode(obj.CodeHash, obj.Code)
+				batch.Put(GetCodeKey(obj.CodeHash), obj.Code)
 			}
 
 			vv := account.MarshalWith(arena)
@@ -133,14 +134,19 @@ func (s *Snapshot) Commit(objs []*state.Object) (state.Snapshot, []byte) {
 		}
 	}
 
-	root, _ := tt.Hash()
+	root, err := tt.Hash()
+	if err != nil {
+		return nil, types.ZeroHash[:], fmt.Errorf("snapshot commit can not retrieve hash: %w", err)
+	}
 
 	nTrie := tt.Commit()
 
 	// Write all the entries to db
-	batch.Write()
+	if err := batch.Write(); err != nil {
+		return nil, types.ZeroHash[:], fmt.Errorf("snapshot commit db write error: %w", err)
+	}
 
 	s.state.AddState(types.BytesToHash(root), nTrie)
 
-	return &Snapshot{trie: nTrie, state: s.state}, root
+	return &Snapshot{trie: nTrie, state: s.state}, root, nil
 }

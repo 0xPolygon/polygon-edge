@@ -211,9 +211,9 @@ func buildState(
 		return nil, nil, types.ZeroHash, err
 	}
 
-	snap, root := snap.Commit(objs)
+	snap, root, err := snap.Commit(objs)
 
-	return s, snap, types.BytesToHash(root), nil
+	return s, snap, types.BytesToHash(root), err
 }
 
 type indexes struct {
