@@ -2,13 +2,14 @@ package property
 
 import (
 	"fmt"
-	"math"
 	"math/big"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/umbracle/ethgo"
 	"pgregory.net/rapid"
 
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
@@ -20,7 +21,7 @@ func TestProperty_DifferentVotingPower(t *testing.T) {
 
 	const (
 		blockTime = time.Second * 6
-		maxStake  = math.MaxUint64
+		maxStake  = 20
 	)
 
 	rapid.Check(t, func(tt *rapid.T) {
@@ -53,5 +54,80 @@ func TestProperty_DifferentVotingPower(t *testing.T) {
 
 		// wait for single epoch to process withdrawal
 		require.NoError(t, cluster.WaitForBlock(numBlocks, blockTime*time.Duration(numBlocks)))
+	})
+}
+
+func TestProperty_DropValidators(t *testing.T) {
+	t.Parallel()
+
+	const (
+		blockTime = time.Second * 4
+	)
+
+	rapid.Check(t, func(tt *rapid.T) {
+		var (
+			numNodes  = rapid.Uint64Range(5, 8).Draw(tt, "number of cluster nodes")
+			epochSize = rapid.OneOf(rapid.Just(4), rapid.Just(10)).Draw(tt, "epoch size")
+		)
+
+		cluster := framework.NewPropertyTestCluster(t, int(numNodes),
+			framework.WithEpochSize(epochSize),
+			framework.WithSecretsCallback(func(adresses []types.Address, config *framework.TestClusterConfig) {
+				for range adresses {
+					config.StakeAmounts = append(config.StakeAmounts, big.NewInt(20))
+				}
+			}))
+		defer cluster.Stop()
+
+		t.Logf("Test %v, run with %d nodes, epoch size: %d",
+			filepath.Base(cluster.Config.LogsDir), numNodes, epochSize)
+
+		cluster.WaitForReady(t)
+
+		// stop first validator, block production should continue
+		cluster.Servers[0].Stop()
+		activeValidator := cluster.Servers[numNodes-1]
+		currentBlock, err := activeValidator.JSONRPC().Eth().GetBlockByNumber(ethgo.Latest, false)
+		require.NoError(t, err)
+		require.NoError(t, cluster.WaitForBlock(currentBlock.Number+1, 2*blockTime))
+
+		// drop all validator nodes, leaving one node alive
+		numNodesToDrop := int(numNodes - 1)
+
+		var wg sync.WaitGroup
+		// drop bulk of nodes from cluster
+		for i := 1; i < numNodesToDrop; i++ {
+			node := cluster.Servers[i]
+
+			wg.Add(1)
+
+			go func(node *framework.TestServer) {
+				defer wg.Done()
+				node.Stop()
+			}(node)
+		}
+
+		wg.Wait()
+
+		// check that block production is stoped
+		currentBlock, err = activeValidator.JSONRPC().Eth().GetBlockByNumber(ethgo.Latest, false)
+		require.NoError(t, err)
+		oldBlockNumber := currentBlock.Number
+		time.Sleep(2 * blockTime)
+		currentBlock, err = activeValidator.JSONRPC().Eth().GetBlockByNumber(ethgo.Latest, false)
+		require.NoError(t, err)
+		require.Equal(t, oldBlockNumber, currentBlock.Number)
+
+		// start dropped nodes again
+		for i := 0; i < numNodesToDrop; i++ {
+			node := cluster.Servers[i]
+			node.Start()
+		}
+
+		time.Sleep(2 * blockTime)
+		currentBlock, err = activeValidator.JSONRPC().Eth().GetBlockByNumber(ethgo.Latest, false)
+		require.NoError(t, err)
+		// check that block production is restarted
+		require.True(t, oldBlockNumber < currentBlock.Number)
 	})
 }

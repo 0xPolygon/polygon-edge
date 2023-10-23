@@ -25,6 +25,11 @@ type PrioritizedValidator struct {
 	ProposerPriority *big.Int
 }
 
+func (pv PrioritizedValidator) String() string {
+	return fmt.Sprintf("[%v, voting power %v, priority %v]", pv.Metadata.Address.String(),
+		pv.Metadata.VotingPower, pv.ProposerPriority)
+}
+
 // ProposerSnapshot represents snapshot of one proposer calculation
 type ProposerSnapshot struct {
 	Height     uint64
@@ -211,9 +216,7 @@ func (pc *ProposerCalculator) GetSnapshot() (*ProposerSnapshot, bool) {
 // PostBlock is called on every insert of finalized block (either from consensus or syncer)
 // It will update priorities and save the updated snapshot to db
 func (pc *ProposerCalculator) PostBlock(req *PostBlockRequest) error {
-	blockNumber := req.FullBlock.Block.Number()
-
-	return pc.update(blockNumber, req.DBTx)
+	return pc.update(req.FullBlock.Block.Number(), req.DBTx)
 }
 
 func (pc *ProposerCalculator) update(blockNumber uint64, dbTx *bolt.Tx) error {
@@ -229,15 +232,16 @@ func (pc *ProposerCalculator) update(blockNumber uint64, dbTx *bolt.Tx) error {
 			return err
 		}
 
-		pc.logger.Debug("Proposers snapshot has been updated", "current block", blockNumber+1,
-			"validators count", len(pc.snapshot.Validators))
+		pc.logger.Debug("Proposer snapshot has been updated",
+			"block", height, "validators", pc.snapshot.Validators)
 	}
 
 	if err := pc.state.ProposerSnapshotStore.writeProposerSnapshot(pc.snapshot, dbTx); err != nil {
 		return fmt.Errorf("cannot save proposers snapshot for block %d: %w", blockNumber, err)
 	}
 
-	pc.logger.Debug("Update proposers snapshot finished", "target block", blockNumber)
+	pc.logger.Info("Proposer snapshot update has been finished",
+		"target block", blockNumber+1, "validators", len(pc.snapshot.Validators))
 
 	return nil
 }
