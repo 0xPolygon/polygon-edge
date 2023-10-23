@@ -113,7 +113,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 
 	approveTxn, err := rootHelper.CreateApproveERC20Txn(
 		params.amountValue,
-		types.StringToAddress(params.rootERC20Predicate),
+		types.StringToAddress(params.customSupernetManager),
 		types.StringToAddress(params.nativeTokenRoot), true)
 	if err != nil {
 		return err
