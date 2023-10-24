@@ -17,8 +17,6 @@ import (
 )
 
 func TestProperty_DifferentVotingPower(t *testing.T) {
-	t.Parallel()
-
 	const (
 		blockTime = time.Second * 6
 		maxStake  = 20
@@ -58,8 +56,6 @@ func TestProperty_DifferentVotingPower(t *testing.T) {
 }
 
 func TestProperty_DropValidators(t *testing.T) {
-	t.Parallel()
-
 	const (
 		blockTime = time.Second * 4
 	)
