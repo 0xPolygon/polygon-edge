@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/umbracle/ethgo"
 	"pgregory.net/rapid"
 
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
@@ -17,8 +16,6 @@ import (
 )
 
 func TestProperty_DifferentVotingPower(t *testing.T) {
-	t.Parallel()
-
 	const (
 		blockTime = time.Second * 6
 		maxStake  = 20
@@ -42,6 +39,7 @@ func TestProperty_DifferentVotingPower(t *testing.T) {
 
 		cluster := framework.NewPropertyTestCluster(t, int(numNodes),
 			framework.WithEpochSize(epochSize),
+			framework.WithBlockTime(blockTime),
 			framework.WithSecretsCallback(func(adresses []types.Address, config *framework.TestClusterConfig) {
 				for i := range adresses {
 					config.StakeAmounts = append(config.StakeAmounts, stakes[i])
@@ -58,8 +56,6 @@ func TestProperty_DifferentVotingPower(t *testing.T) {
 }
 
 func TestProperty_DropValidators(t *testing.T) {
-	t.Parallel()
-
 	const (
 		blockTime = time.Second * 4
 	)
@@ -72,6 +68,7 @@ func TestProperty_DropValidators(t *testing.T) {
 
 		cluster := framework.NewPropertyTestCluster(t, int(numNodes),
 			framework.WithEpochSize(epochSize),
+			framework.WithBlockTime(blockTime),
 			framework.WithSecretsCallback(func(adresses []types.Address, config *framework.TestClusterConfig) {
 				for range adresses {
 					config.StakeAmounts = append(config.StakeAmounts, big.NewInt(20))
@@ -87,9 +84,9 @@ func TestProperty_DropValidators(t *testing.T) {
 		// stop first validator, block production should continue
 		cluster.Servers[0].Stop()
 		activeValidator := cluster.Servers[numNodes-1]
-		currentBlock, err := activeValidator.JSONRPC().Eth().GetBlockByNumber(ethgo.Latest, false)
+		currentBlock, err := activeValidator.JSONRPC().Eth().BlockNumber()
 		require.NoError(t, err)
-		require.NoError(t, cluster.WaitForBlock(currentBlock.Number+1, 2*blockTime))
+		require.NoError(t, cluster.WaitForBlock(currentBlock+1, 2*blockTime))
 
 		// drop all validator nodes, leaving one node alive
 		numNodesToDrop := int(numNodes - 1)
@@ -110,13 +107,13 @@ func TestProperty_DropValidators(t *testing.T) {
 		wg.Wait()
 
 		// check that block production is stoped
-		currentBlock, err = activeValidator.JSONRPC().Eth().GetBlockByNumber(ethgo.Latest, false)
+		currentBlock, err = activeValidator.JSONRPC().Eth().BlockNumber()
 		require.NoError(t, err)
-		oldBlockNumber := currentBlock.Number
+		oldBlockNumber := currentBlock
 		time.Sleep(2 * blockTime)
-		currentBlock, err = activeValidator.JSONRPC().Eth().GetBlockByNumber(ethgo.Latest, false)
+		currentBlock, err = activeValidator.JSONRPC().Eth().BlockNumber()
 		require.NoError(t, err)
-		require.Equal(t, oldBlockNumber, currentBlock.Number)
+		require.Equal(t, oldBlockNumber, currentBlock)
 
 		// start dropped nodes again
 		for i := 0; i < numNodesToDrop; i++ {
@@ -124,6 +121,6 @@ func TestProperty_DropValidators(t *testing.T) {
 			node.Start()
 		}
 
-		require.NoError(t, cluster.WaitForBlock(oldBlockNumber+1, 30*time.Second))
+		require.NoError(t, cluster.WaitForBlock(oldBlockNumber+1, 3*blockTime))
 	})
 }
