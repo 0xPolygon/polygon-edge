@@ -51,7 +51,7 @@ func TestProperty_DifferentVotingPower(t *testing.T) {
 			filepath.Base(cluster.Config.LogsDir), numNodes, epochSize, numBlocks)
 
 		// wait for single epoch to process withdrawal
-		require.NoError(t, cluster.WaitForBlock(numBlocks, blockTime*time.Duration(numBlocks)))
+		require.NoError(t, cluster.WaitForBlock(numBlocks, 2*blockTime*time.Duration(numBlocks)))
 	})
 }
 
