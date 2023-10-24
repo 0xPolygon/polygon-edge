@@ -146,8 +146,6 @@ func (c *CallTracer) CaptureState(memory []byte, stack []*big.Int, opCode int,
 	contractAddress types.Address, sp int, host tracer.RuntimeHost, state tracer.VMState) {
 	if c.cancelled() {
 		state.Halt()
-
-		return
 	}
 }
 

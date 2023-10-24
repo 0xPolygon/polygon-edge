@@ -13,6 +13,8 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
+const callTracerName = "callTracer"
+
 var (
 	defaultTraceTimeout = 5 * time.Second
 
@@ -252,7 +254,7 @@ func newTracer(config *TraceConfig) (
 
 	var tracer tracer.Tracer
 
-	if config.Tracer == "callTracer" {
+	if config.Tracer == callTracerName {
 		tracer = calltracer.NewCallTracer()
 	} else {
 		tracer = structtracer.NewStructTracer(structtracer.Config{
