@@ -546,6 +546,10 @@ func (s *Server) setupConsensus() error {
 		err       error
 	)
 
+	if engineName == string(IBFTConsensus) {
+		s.logger.Info(common.IBFTImportantNotice)
+	}
+
 	if engineName != string(DummyConsensus) && engineName != string(DevConsensus) {
 		blockTime, err = extractBlockTime(engineConfig)
 		if err != nil {
