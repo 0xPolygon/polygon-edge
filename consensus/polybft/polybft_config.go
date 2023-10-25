@@ -2,7 +2,11 @@ package polybft
 
 import (
 	"encoding/json"
+	"errors"
+	"math"
 	"math/big"
+	"strconv"
+	"strings"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
@@ -10,7 +14,27 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-const ConsensusName = "polybft"
+const (
+	ConsensusName              = "polybft"
+	minNativeTokenParamsNumber = 4
+
+	defaultNativeTokenName     = "Polygon"
+	defaultNativeTokenSymbol   = "MATIC"
+	defaultNativeTokenDecimals = uint8(18)
+)
+
+var (
+	DefaultTokenConfig = &TokenConfig{
+		Name:       defaultNativeTokenName,
+		Symbol:     defaultNativeTokenSymbol,
+		Decimals:   defaultNativeTokenDecimals,
+		IsMintable: false,
+		Owner:      types.ZeroAddress,
+	}
+
+	errInvalidTokenParams = errors.New("native token params were not submitted in proper format " +
+		"(<name:symbol:decimals count:mintable flag:[mintable token owner address]>)")
+)
 
 // PolyBFTConfig is the configuration file for the Polybft consensus protocol.
 type PolyBFTConfig struct {
@@ -180,6 +204,60 @@ type TokenConfig struct {
 	Decimals   uint8         `json:"decimals"`
 	IsMintable bool          `json:"isMintable"`
 	Owner      types.Address `json:"owner"`
+}
+
+func ParseRawTokenConfig(rawConfig string) (*TokenConfig, error) {
+	if rawConfig == "" {
+		return DefaultTokenConfig, nil
+	}
+
+	params := strings.Split(rawConfig, ":")
+	if len(params) < minNativeTokenParamsNumber {
+		return nil, errInvalidTokenParams
+	}
+
+	// name
+	name := strings.TrimSpace(params[0])
+	if name == "" {
+		return nil, errInvalidTokenParams
+	}
+
+	// symbol
+	symbol := strings.TrimSpace(params[1])
+	if symbol == "" {
+		return nil, errInvalidTokenParams
+	}
+
+	// decimals
+	decimals, err := strconv.ParseUint(strings.TrimSpace(params[2]), 10, 8)
+	if err != nil || decimals > math.MaxUint8 {
+		return nil, errInvalidTokenParams
+	}
+
+	// is mintable native token used
+	isMintable, err := strconv.ParseBool(strings.TrimSpace(params[3]))
+	if err != nil {
+		return nil, errInvalidTokenParams
+	}
+
+	// in case it is mintable native token, it is expected to have 5 parameters provided
+	if isMintable && len(params) != minNativeTokenParamsNumber+1 {
+		return nil, errInvalidTokenParams
+	}
+
+	// owner address
+	owner := types.ZeroAddress
+	if isMintable {
+		owner = types.StringToAddress(strings.TrimSpace(params[4]))
+	}
+
+	return &TokenConfig{
+		Name:       name,
+		Symbol:     symbol,
+		Decimals:   uint8(decimals),
+		IsMintable: isMintable,
+		Owner:      owner,
+	}, nil
 }
 
 type RewardsConfig struct {

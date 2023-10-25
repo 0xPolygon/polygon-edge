@@ -9,9 +9,9 @@ import (
 	sidechainHelper "github.com/0xPolygon/polygon-edge/command/sidechain"
 )
 
-var (
+const (
 	rootERC20PredicateFlag = "root-erc20-predicate"
-	erc20NativeTokenFlag   = "erc20-native-token" //nolint:gosec
+	erc20NativeTokenFlag   = "erc20-token" //nolint:gosec
 )
 
 type premineParams struct {

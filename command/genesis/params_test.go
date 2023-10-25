@@ -8,6 +8,7 @@ import (
 	"github.com/umbracle/ethgo"
 
 	"github.com/0xPolygon/polygon-edge/command"
+	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -22,16 +23,10 @@ func Test_extractNativeTokenMetadata(t *testing.T) {
 		expectErr   bool
 	}{
 		{
-			name:      "default token config",
-			rawConfig: "",
-			expectedCfg: &polybft.TokenConfig{
-				Name:       defaultNativeTokenName,
-				Symbol:     defaultNativeTokenSymbol,
-				Decimals:   defaultNativeTokenDecimals,
-				IsMintable: false,
-				Owner:      types.ZeroAddress,
-			},
-			expectErr: false,
+			name:        "default token config",
+			rawConfig:   "",
+			expectedCfg: polybft.DefaultTokenConfig,
+			expectErr:   false,
 		},
 		{
 			name:      "not enough params provided",
@@ -126,21 +121,21 @@ func Test_validatePremineInfo(t *testing.T) {
 	cases := []struct {
 		name                 string
 		premineRaw           []string
-		expectedPremines     []*premineInfo
+		expectedPremines     []*helper.PremineInfo
 		expectValidateErrMsg string
 		expectedParseErrMsg  string
 	}{
 		{
 			name:                "invalid premine balance",
 			premineRaw:          []string{"0x12345:loremIpsum"},
-			expectedPremines:    []*premineInfo{},
+			expectedPremines:    []*helper.PremineInfo{},
 			expectedParseErrMsg: "invalid premine balance amount provided",
 		},
 		{
 			name:       "missing zero address premine",
 			premineRaw: []string{types.StringToAddress("12").String()},
-			expectedPremines: []*premineInfo{
-				{address: types.StringToAddress("12"), amount: command.DefaultPremineBalance},
+			expectedPremines: []*helper.PremineInfo{
+				{Address: types.StringToAddress("12"), Amount: command.DefaultPremineBalance},
 			},
 			expectValidateErrMsg: errReserveAccMustBePremined.Error(),
 		},
@@ -150,9 +145,9 @@ func Test_validatePremineInfo(t *testing.T) {
 				fmt.Sprintf("%s:%d", types.StringToAddress("1"), ethgo.Ether(10)),
 				fmt.Sprintf("%s:%d", types.ZeroAddress, ethgo.Ether(10000)),
 			},
-			expectedPremines: []*premineInfo{
-				{address: types.StringToAddress("1"), amount: ethgo.Ether(10)},
-				{address: types.ZeroAddress, amount: ethgo.Ether(10000)},
+			expectedPremines: []*helper.PremineInfo{
+				{Address: types.StringToAddress("1"), Amount: ethgo.Ether(10)},
+				{Address: types.ZeroAddress, Amount: ethgo.Ether(10000)},
 			},
 			expectValidateErrMsg: "",
 		},

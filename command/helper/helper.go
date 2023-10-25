@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"net"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/chain"
@@ -275,4 +276,40 @@ func ValidateProxyContractsAdmin(proxyContractsAdmin string) error {
 	}
 
 	return nil
+}
+
+type PremineInfo struct {
+	Address types.Address
+	Amount  *big.Int
+	Key     string // only used for tests
+}
+
+// parsePremineInfo parses provided premine information and returns premine address and amount
+func ParsePremineInfo(premineInfoRaw string) (*PremineInfo, error) {
+	var (
+		address types.Address
+		amount  = command.DefaultPremineBalance
+		key     string
+		err     error
+	)
+
+	parts := strings.Split(premineInfoRaw, ":")
+
+	if len(parts) > 1 { // <addr>:<balance>
+		amount, err = common.ParseUint256orHex(&parts[1])
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse amount %s: %w", parts[1], err)
+		}
+
+		address = types.StringToAddress(parts[0])
+
+		if len(parts) == 3 { // <addr>:<balance>:<key>
+			key = parts[2]
+		}
+	} else {
+		// <addr>
+		address = types.StringToAddress(premineInfoRaw)
+	}
+
+	return &PremineInfo{Address: address, Amount: amount, Key: key}, nil
 }

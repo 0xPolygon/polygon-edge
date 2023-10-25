@@ -72,13 +72,13 @@ type contractInfo struct {
 // generatePolyBftChainConfig creates and persists polybft chain configuration to the provided file path
 func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) error {
 	// populate premine balance map
-	premineBalances := make(map[types.Address]*premineInfo, len(p.premine))
+	premineBalances := make(map[types.Address]*helper.PremineInfo, len(p.premine))
 
 	for _, premine := range p.premineInfos {
-		premineBalances[premine.address] = premine
+		premineBalances[premine.Address] = premine
 	}
 
-	walletPremineInfo, err := parsePremineInfo(p.rewardWallet)
+	walletPremineInfo, err := helper.ParsePremineInfo(p.rewardWallet)
 	if err != nil {
 		return fmt.Errorf("invalid reward wallet configuration provided '%s' : %w", p.rewardWallet, err)
 	}
@@ -87,7 +87,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		// validate premine map, no premine is allowed if token is not mintable,
 		// except for the reward wallet (if native token is used as reward token) and zero address
 		for a := range premineBalances {
-			if a != types.ZeroAddress && (p.rewardTokenCode != "" || a != walletPremineInfo.address) {
+			if a != types.ZeroAddress && (p.rewardTokenCode != "" || a != walletPremineInfo.Address) {
 				return errNoPremineAllowed
 			}
 		}
@@ -102,7 +102,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		// native token is used as a reward token, and reward wallet is not a zero address
 		if p.epochReward > 0 {
 			// epoch reward is non zero so premine reward wallet
-			premineBalances[walletPremineInfo.address] = walletPremineInfo
+			premineBalances[walletPremineInfo.Address] = walletPremineInfo
 		}
 	} else {
 		bytes, err := hex.DecodeString(p.rewardTokenCode)
@@ -147,8 +147,8 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		MaxValidatorSetSize: p.maxNumValidators,
 		RewardConfig: &polybft.RewardsConfig{
 			TokenAddress:  rewardTokenAddr,
-			WalletAddress: walletPremineInfo.address,
-			WalletAmount:  walletPremineInfo.amount,
+			WalletAddress: walletPremineInfo.Address,
+			WalletAmount:  walletPremineInfo.Amount,
 		},
 		BlockTimeDrift:           p.blockTimeDrift,
 		BlockTrackerPollInterval: common.Duration{Duration: p.blockTrackerPollInterval},
@@ -203,12 +203,12 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 	// premine other accounts
 	for _, premine := range premineBalances {
 		// validators have already been premined, so no need to premine them again
-		if _, ok := allocs[premine.address]; ok {
+		if _, ok := allocs[premine.Address]; ok {
 			continue
 		}
 
-		allocs[premine.address] = &chain.GenesisAccount{
-			Balance: premine.amount,
+		allocs[premine.Address] = &chain.GenesisAccount{
+			Balance: premine.Amount,
 		}
 	}
 

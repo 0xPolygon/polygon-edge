@@ -39,6 +39,8 @@ const (
 	StakeTokenFlagDesc      = "address of ERC20 token used for staking on rootchain"
 	ProxyContractsAdminFlag = "proxy-contracts-admin"
 	ProxyContractsAdminDesc = "admin for proxy contracts"
+	AddressesFlag           = "addresses"
+	AmountsFlag             = "amounts"
 )
 
 var (
@@ -46,6 +48,9 @@ var (
 	ErrRootchainPortBind   = errors.New("port 8545 is not bind with localhost")
 	ErrMandatoryStakeToken = errors.New("stake token address is mandatory")
 	errTestModeSecrets     = errors.New("rootchain test mode does not imply specifying secrets parameters")
+
+	ErrNoAddressesProvided = errors.New("no addresses provided")
+	ErrInconsistentLength  = errors.New("addresses and amounts must be equal length")
 
 	rootchainAccountKey *wallet.Key
 )

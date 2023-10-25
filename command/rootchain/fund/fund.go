@@ -35,14 +35,14 @@ func GetCommand() *cobra.Command {
 func setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringSliceVar(
 		&params.addresses,
-		addressesFlag,
+		helper.AddressesFlag,
 		nil,
 		"validator addresses",
 	)
 
 	cmd.Flags().StringSliceVar(
 		&params.amounts,
-		amountsFlag,
+		helper.AmountsFlag,
 		nil,
 		"token amounts which is funded to validator on a root chain",
 	)

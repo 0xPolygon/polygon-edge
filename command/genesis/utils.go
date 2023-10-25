@@ -65,37 +65,6 @@ func verifyGenesisExistence(genesisPath string) *GenesisGenError {
 	return nil
 }
 
-type premineInfo struct {
-	address types.Address
-	amount  *big.Int
-}
-
-// parsePremineInfo parses provided premine information and returns premine address and amount
-func parsePremineInfo(premineInfoRaw string) (*premineInfo, error) {
-	var (
-		address types.Address
-		amount  = command.DefaultPremineBalance
-		err     error
-	)
-
-	if delimiterIdx := strings.Index(premineInfoRaw, ":"); delimiterIdx != -1 {
-		// <addr>:<balance>
-		valueRaw := premineInfoRaw[delimiterIdx+1:]
-
-		amount, err = common.ParseUint256orHex(&valueRaw)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse amount %s: %w", valueRaw, err)
-		}
-
-		address = types.StringToAddress(premineInfoRaw[:delimiterIdx])
-	} else {
-		// <addr>
-		address = types.StringToAddress(premineInfoRaw)
-	}
-
-	return &premineInfo{address: address, amount: amount}, nil
-}
-
 // parseTrackerStartBlocks parses provided event tracker start blocks configuration.
 // It is set in a following format: <contractAddress>:<startBlock>.
 // In case smart contract address isn't provided in the string, it is assumed its starting block is 0 implicitly.
