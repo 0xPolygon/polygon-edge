@@ -41,7 +41,7 @@ type CallTracer struct {
 	activeGas          uint64
 	activeAvailableGas uint64
 
-	cancelLock sync.Mutex
+	cancelLock sync.RWMutex
 	reason     error
 	stop       bool
 }
@@ -55,8 +55,8 @@ func (c *CallTracer) Cancel(err error) {
 }
 
 func (c *CallTracer) cancelled() bool {
-	c.cancelLock.Lock()
-	defer c.cancelLock.Unlock()
+	c.cancelLock.RLock()
+	defer c.cancelLock.RUnlock()
 
 	return c.stop
 }
@@ -67,8 +67,8 @@ func (c *CallTracer) Clear() {
 }
 
 func (c *CallTracer) GetResult() (interface{}, error) {
-	c.cancelLock.Lock()
-	defer c.cancelLock.Unlock()
+	c.cancelLock.RLock()
+	defer c.cancelLock.RUnlock()
 
 	if c.reason != nil {
 		return nil, c.reason
