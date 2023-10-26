@@ -255,7 +255,7 @@ func newTracer(config *TraceConfig) (
 	var tracer tracer.Tracer
 
 	if config.Tracer == callTracerName {
-		tracer = calltracer.NewCallTracer()
+		tracer = &calltracer.CallTracer{}
 	} else {
 		tracer = structtracer.NewStructTracer(structtracer.Config{
 			EnableMemory:     config.EnableMemory && !config.DisableStructLogs,

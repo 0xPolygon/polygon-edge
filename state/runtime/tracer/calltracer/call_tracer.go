@@ -41,15 +41,9 @@ type CallTracer struct {
 	activeGas          uint64
 	activeAvailableGas uint64
 
-	cancelLock *sync.Mutex
+	cancelLock sync.Mutex
 	reason     error
 	stop       bool
-}
-
-func NewCallTracer() *CallTracer {
-	return &CallTracer{
-		cancelLock: &sync.Mutex{},
-	}
 }
 
 func (c *CallTracer) Cancel(err error) {
@@ -73,6 +67,13 @@ func (c *CallTracer) Clear() {
 }
 
 func (c *CallTracer) GetResult() (interface{}, error) {
+	c.cancelLock.Lock()
+	defer c.cancelLock.Unlock()
+
+	if c.reason != nil {
+		return nil, c.reason
+	}
+
 	return c.call, nil
 }
 
@@ -124,7 +125,7 @@ func (c *CallTracer) CallStart(depth int, from, to types.Address, callType int,
 func (c *CallTracer) CallEnd(depth int, output []byte, err error) {
 	c.activeCall.Output = hex.EncodeToHex(output)
 
-	var gasUsed uint64 = 0
+	gasUsed := uint64(0)
 
 	if c.activeCall.startGas > c.activeAvailableGas {
 		gasUsed = c.activeCall.startGas - c.activeAvailableGas

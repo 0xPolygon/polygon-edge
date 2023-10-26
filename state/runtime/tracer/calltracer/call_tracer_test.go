@@ -15,7 +15,7 @@ func TestCallTracer_Cancel(t *testing.T) {
 
 	err := errors.New("timeout")
 
-	tracer := NewCallTracer()
+	tracer := &CallTracer{}
 
 	require.Nil(t, tracer.reason)
 	require.False(t, tracer.stop)
@@ -31,7 +31,7 @@ func TestCallTracer_Cancel(t *testing.T) {
 func TestCallTracer_Clear(t *testing.T) {
 	t.Parallel()
 
-	tracer := NewCallTracer()
+	tracer := &CallTracer{}
 	tracer.call = &Call{}
 
 	tracer.Clear()
@@ -46,7 +46,7 @@ func TestCallTracer_CallStart(t *testing.T) {
 	t.Run("call_start_initializes_call_object", func(t *testing.T) {
 		t.Parallel()
 
-		c := NewCallTracer()
+		c := &CallTracer{}
 
 		var (
 			depth    = 1
@@ -79,7 +79,7 @@ func TestCallTracer_CallStart(t *testing.T) {
 	t.Run("call_start_sets_parent_when_depth_greater_than_1", func(t *testing.T) {
 		t.Parallel()
 
-		c := NewCallTracer()
+		c := &CallTracer{}
 
 		var (
 			depth    = 2
@@ -128,7 +128,7 @@ func TestCallTracer_CallStart(t *testing.T) {
 	t.Run("call_start_handles_nil_value_parameter_for_value_and_input", func(t *testing.T) {
 		t.Parallel()
 
-		c := NewCallTracer()
+		c := &CallTracer{}
 
 		var (
 			depth    = 1
@@ -159,7 +159,7 @@ func TestCallTracer_CallStart(t *testing.T) {
 	t.Run("call_start_handles_unknown_call_type", func(t *testing.T) {
 		t.Parallel()
 
-		c := NewCallTracer()
+		c := &CallTracer{}
 
 		var (
 			depth    = 1
@@ -199,7 +199,7 @@ func TestCallTracer_CallEnd(t *testing.T) {
 	t.Run("call_end_when_depth_is_1_no_error_activeAvailableGas_higher_than_start_gas", func(t *testing.T) {
 		t.Parallel()
 
-		tracer := NewCallTracer()
+		tracer := &CallTracer{}
 		tracer.activeAvailableGas = 2000
 		tracer.activeCall = &Call{
 			startGas: 1000,
@@ -215,7 +215,7 @@ func TestCallTracer_CallEnd(t *testing.T) {
 	t.Run("call_end_when_depth_is_1_error_activeAvailableGas_higher_than_start_gas", func(t *testing.T) {
 		t.Parallel()
 
-		tracer := NewCallTracer()
+		tracer := &CallTracer{}
 		tracer.activeAvailableGas = 2000
 		tracer.activeCall = &Call{
 			startGas: 1000,
@@ -233,7 +233,7 @@ func TestCallTracer_CallEnd(t *testing.T) {
 	t.Run("call_end_when_depth_is_1_no_error_activeAvailableGas_lower_than_start_gas", func(t *testing.T) {
 		t.Parallel()
 
-		tracer := NewCallTracer()
+		tracer := &CallTracer{}
 		tracer.activeAvailableGas = 1000
 		tracer.activeCall = &Call{
 			startGas: 2000,
@@ -249,7 +249,7 @@ func TestCallTracer_CallEnd(t *testing.T) {
 	t.Run("call_end_when_depth_is_1_error_activeAvailableGas_lower_than_start_gas", func(t *testing.T) {
 		t.Parallel()
 
-		tracer := NewCallTracer()
+		tracer := &CallTracer{}
 		tracer.activeAvailableGas = 1000
 		tracer.activeCall = &Call{
 			startGas: 2000,
@@ -267,7 +267,7 @@ func TestCallTracer_CallEnd(t *testing.T) {
 	t.Run("call_end_when_depth_is_2_no_error", func(t *testing.T) {
 		t.Parallel()
 
-		tracer := NewCallTracer()
+		tracer := &CallTracer{}
 		tracer.activeAvailableGas = 2000
 		tracer.activeCall = &Call{
 			startGas: 1000,
