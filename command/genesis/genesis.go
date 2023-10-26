@@ -365,6 +365,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	if params.isPolyBFTConsensus() {
 		err = params.generatePolyBftChainConfig(outputter)
 	} else {
+		_, _ = outputter.Write([]byte(fmt.Sprintf("%s\n", common.IBFTImportantNotice)))
 		err = params.generateGenesis()
 	}
 
