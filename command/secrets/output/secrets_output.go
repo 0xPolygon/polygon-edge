@@ -5,6 +5,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	outputFlagDesc = "output the %s from the provided secrets manager"
+)
+
 func GetCommand() *cobra.Command {
 	secretsOutputCmd := &cobra.Command{
 		Use:     "output",

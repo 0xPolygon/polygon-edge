@@ -869,7 +869,13 @@ func Test_appendLogsToFilters(t *testing.T) {
 		defer f.Close()
 	})
 
-	b := toBlock(&types.Block{Header: block.Header}, false)
+	txs := []*types.Transaction{
+		createTestTransaction(types.StringToHash("tx1")),
+		createTestTransaction(types.StringToHash("tx2")),
+		createTestTransaction(types.StringToHash("tx3")),
+	}
+
+	b := toBlock(&types.Block{Header: block.Header, Transactions: txs}, false)
 	err := f.appendLogsToFilters(b)
 
 	require.NoError(t, err)
