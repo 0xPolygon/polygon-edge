@@ -65,6 +65,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 	}
 
 	cluster := framework.NewTestCluster(t, 5,
+		framework.WithTestRewardToken(),
 		framework.WithNumBlockConfirmations(numBlockConfirmations),
 		framework.WithEpochSize(epochSize))
 	defer cluster.Stop()
@@ -1152,7 +1153,7 @@ func TestE2E_Bridge_ChildChainMintableTokensTransfer(t *testing.T) {
 
 func TestE2E_CheckpointSubmission(t *testing.T) {
 	// spin up a cluster with epoch size set to 5 blocks
-	cluster := framework.NewTestCluster(t, 5, framework.WithEpochSize(5))
+	cluster := framework.NewTestCluster(t, 5, framework.WithEpochSize(5), framework.WithTestRewardToken())
 	defer cluster.Stop()
 
 	// initialize tx relayer used to query CheckpointManager smart contract
@@ -1206,9 +1207,15 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 		epochSize          = 5
 	)
 
+	minter, err := wallet.GenerateKey()
+	require.NoError(t, err)
+
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithEpochSize(epochSize),
-		framework.WithEpochReward(1000000))
+		framework.WithEpochReward(1000000),
+		framework.WithNativeTokenConfig(fmt.Sprintf(nativeTokenMintableTestCfg, minter.Address())),
+		framework.WithPremine(types.Address(minter.Address())),
+	)
 	defer cluster.Stop()
 
 	// load polybft config
@@ -1335,6 +1342,7 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithNumBlockConfirmations(0),
 		framework.WithEpochSize(epochSize),
+		framework.WithTestRewardToken(),
 		framework.WithBridgeAllowListAdmin(adminAddr),
 		framework.WithBridgeBlockListAdmin(adminAddr),
 		framework.WithSecretsCallback(func(a []types.Address, tcc *framework.TestClusterConfig) {
@@ -1546,6 +1554,7 @@ func TestE2E_Bridge_Transfers_WithRootTrackerPollInterval(t *testing.T) {
 		framework.WithEpochSize(epochSize),
 		framework.WithNumBlockConfirmations(numBlockConfirmations),
 		framework.WithRootTrackerPollInterval(rootPollInterval),
+		framework.WithTestRewardToken(),
 	)
 	defer cluster.Stop()
 

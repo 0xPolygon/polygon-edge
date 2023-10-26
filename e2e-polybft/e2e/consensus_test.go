@@ -32,7 +32,10 @@ func TestE2E_Consensus_Basic_WithNonValidators(t *testing.T) {
 	const epochSize = 4
 
 	cluster := framework.NewTestCluster(t, 5,
-		framework.WithEpochSize(epochSize), framework.WithNonValidators(2))
+		framework.WithEpochSize(epochSize),
+		framework.WithNonValidators(2),
+		framework.WithTestRewardToken(),
+	)
 	defer cluster.Stop()
 
 	cluster.WaitForReady(t)
@@ -100,7 +103,9 @@ func TestE2E_Consensus_BulkDrop(t *testing.T) {
 
 	cluster := framework.NewTestCluster(t, clusterSize,
 		framework.WithEpochSize(epochSize),
-		framework.WithBlockTime(time.Second))
+		framework.WithBlockTime(time.Second),
+		framework.WithTestRewardToken(),
+	)
 	defer cluster.Stop()
 
 	// wait for cluster to start
