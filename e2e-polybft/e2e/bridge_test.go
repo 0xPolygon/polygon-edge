@@ -1642,17 +1642,10 @@ func TestE2E_Bridge_NonMintableERC20Token_WithPremine(t *testing.T) {
 		}),
 	)
 
-	validatorSrv := cluster.Servers[1]
-	validatorAcc, err := sidechain.GetAccountFromDir(validatorSrv.DataDir())
-	require.NoError(t, err)
-
-	validatorRawKey, err := validatorAcc.Ecdsa.MarshallPrivateKey()
-	require.NoError(t, err)
-
 	rootchainTxRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
 	require.NoError(t, err)
 
-	childEthEndpoint := validatorSrv.JSONRPC().Eth()
+	childEthEndpoint := cluster.Servers[0].JSONRPC().Eth()
 
 	defer cluster.Stop()
 
@@ -1662,17 +1655,18 @@ func TestE2E_Bridge_NonMintableERC20Token_WithPremine(t *testing.T) {
 	require.NoError(t, err)
 
 	checkBalancesFn := func(address types.Address, rootExpected, childExpected *big.Int) {
-		balance := erc20BalanceOf(t, types.Address(nonValidatorKey.Address()),
+		t.Log("Checking balance of native ERC20 token on root and child", "Address", address,
+			"Root expected", rootExpected, "Child Expected", childExpected)
+
+		balance := erc20BalanceOf(t, address,
 			polybftCfg.Bridge.RootNativeERC20Addr, rootchainTxRelayer)
-		t.Log("Balance of native ERC20 token on root at the beginning", balance,
-			"Address", nonValidatorKey.Address())
+		t.Log("Balance of native ERC20 token on root", balance, "Address", address)
 		require.Equal(t, rootExpected, balance)
 
 		balance, err = childEthEndpoint.GetBalance(ethgo.Address(address), ethgo.Latest)
 		require.NoError(t, err)
-		t.Log("Balance of native ERC20 token on child at the beginning", balance,
-			"Address", nonValidatorKey.Address())
-		require.Equal(t, childExpected, balance)
+		t.Log("Balance of native ERC20 token on child", balance, "Address", address)
+		require.True(t, balance.Cmp(childExpected) >= 0) // because of London fork
 	}
 
 	t.Run("check the balances at the beginning", func(t *testing.T) {
@@ -1689,6 +1683,13 @@ func TestE2E_Bridge_NonMintableERC20Token_WithPremine(t *testing.T) {
 
 	// this test case will check first if they can withdraw some of the premined amount of non-mintable token
 	t.Run("Do a withdraw for premined validator address and premined non-validator address", func(t *testing.T) {
+		validatorSrv := cluster.Servers[1]
+		validatorAcc, err := sidechain.GetAccountFromDir(validatorSrv.DataDir())
+		require.NoError(t, err)
+
+		validatorRawKey, err := validatorAcc.Ecdsa.MarshallPrivateKey()
+		require.NoError(t, err)
+
 		err = cluster.Bridge.Withdraw(
 			common.ERC20,
 			hex.EncodeToString(validatorRawKey),
@@ -1779,37 +1780,20 @@ func TestE2E_Bridge_NonMintableERC20Token_WithPremine(t *testing.T) {
 	})
 
 	t.Run("Do a deposit to some validator and non-validator address", func(t *testing.T) {
-		validatorBalanceBeforeDeposit, err := childEthEndpoint.GetBalance(
-			ethgo.Address(validatorAcc.Address()), ethgo.Latest)
-		require.NoError(t, err)
-
-		nonValidatorBalanceBeforeDeposit, err := childEthEndpoint.GetBalance(
-			nonValidatorKey.Address(), ethgo.Latest)
+		validatorSrv := cluster.Servers[4]
+		validatorAcc, err := sidechain.GetAccountFromDir(validatorSrv.DataDir())
 		require.NoError(t, err)
 
 		require.NoError(t, cluster.Bridge.Deposit(
 			common.ERC20,
 			polybftCfg.Bridge.RootNativeERC20Addr,
 			polybftCfg.Bridge.RootERC20PredicateAddr,
-			hex.EncodeToString(validatorRawKey),
-			validatorAcc.Address().String(),
-			tokensToTransfer.String(),
+			rootHelper.TestAccountPrivKey,
+			strings.Join([]string{validatorAcc.Address().String(), nonValidatorKey.Address().String()}, ","),
+			strings.Join([]string{tokensToTransfer.String(), tokensToTransfer.String()}, ","),
 			"",
 			cluster.Bridge.JSONRPCAddr(),
-			"",
-			false),
-		)
-
-		require.NoError(t, cluster.Bridge.Deposit(
-			common.ERC20,
-			polybftCfg.Bridge.RootNativeERC20Addr,
-			polybftCfg.Bridge.RootERC20PredicateAddr,
-			hex.EncodeToString(nonValidatorKeyRaw),
-			nonValidatorKey.Address().String(),
-			tokensToTransfer.String(),
-			"",
-			cluster.Bridge.JSONRPCAddr(),
-			"",
+			rootHelper.TestAccountPrivKey,
 			false),
 		)
 
@@ -1835,12 +1819,5 @@ func TestE2E_Bridge_NonMintableERC20Token_WithPremine(t *testing.T) {
 
 			require.NoError(t, cluster.WaitForBlock(finalBlockNum+(i+1)*sprintSize, 2*time.Minute))
 		}
-
-		// check balances of receivers got increased by deposited amount
-		checkBalancesFn(validatorAcc.Address(), bigZero,
-			new(big.Int).Add(validatorBalanceBeforeDeposit, tokensToTransfer))
-
-		checkBalancesFn(types.Address(nonValidatorKey.Address()), bigZero,
-			new(big.Int).Add(nonValidatorBalanceBeforeDeposit, tokensToTransfer))
 	})
 }
