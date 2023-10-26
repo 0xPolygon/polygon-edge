@@ -146,6 +146,10 @@ func NewServer(config *Config) (*Server, error) {
 		restoreProgression: progress.NewProgressionWrapper(progress.ChainSyncRestore),
 	}
 
+	if config.Chain.Params.GetEngine() == string(IBFTConsensus) {
+		m.logger.Info(common.IBFTImportantNotice)
+	}
+
 	m.logger.Info("Data dir", "path", config.DataDir)
 
 	var dirPaths = []string{
@@ -545,10 +549,6 @@ func (s *Server) setupConsensus() error {
 		blockTime = common.Duration{Duration: 0}
 		err       error
 	)
-
-	if engineName == string(IBFTConsensus) {
-		s.logger.Info(common.IBFTImportantNotice)
-	}
 
 	if engineName != string(DummyConsensus) && engineName != string(DevConsensus) {
 		blockTime, err = extractBlockTime(engineConfig)
