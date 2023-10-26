@@ -60,6 +60,9 @@ var (
 	errBaseFeeChangeDenomZero   = errors.New("base fee change denominator must be greater than 0")
 	errBaseFeeEMZero            = errors.New("base fee elasticity multiplier must be greater than 0")
 	errBaseFeeZero              = errors.New("base fee  must be greater than 0")
+	errRewardWalletNotDefined   = errors.New("reward wallet address must be defined")
+	errRewardTokenOnNonMintable = errors.New("a custom reward token must be defined when " +
+		"native ERC20 token is non-mintable")
 )
 
 type genesisParams struct {
@@ -164,7 +167,7 @@ func (p *genesisParams) validateFlags() error {
 			return err
 		}
 
-		if err := p.validateRewardWallet(); err != nil {
+		if err := p.validateRewardWalletAndToken(); err != nil {
 			return err
 		}
 
@@ -472,10 +475,14 @@ func (p *genesisParams) predeployStakingSC() (*chain.GenesisAccount, error) {
 	return stakingAccount, nil
 }
 
-// validateRewardWallet validates reward wallet flag
-func (p *genesisParams) validateRewardWallet() error {
+// validateRewardWalletAndToken validates reward wallet flag
+func (p *genesisParams) validateRewardWalletAndToken() error {
 	if p.rewardWallet == "" {
-		return errors.New("reward wallet address must be defined")
+		return errRewardWalletNotDefined
+	}
+
+	if !p.nativeTokenConfig.IsMintable && p.rewardTokenCode == "" {
+		return errRewardTokenOnNonMintable
 	}
 
 	premineInfo, err := helper.ParsePremineInfo(p.rewardWallet)

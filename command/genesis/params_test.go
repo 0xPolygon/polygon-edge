@@ -185,22 +185,32 @@ func Test_validateRewardWallet(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		name              string
-		rewardWallet      string
-		epochReward       uint64
-		expectValidateErr error
+		name                  string
+		rewardWallet          string
+		epochReward           uint64
+		isNativeERC20Mintable bool
+		expectValidateErr     error
 	}{
 		{
-			name:              "invalid reward wallet: no premine + reward",
-			rewardWallet:      types.StringToAddress("1").String() + ":0",
-			epochReward:       10,
-			expectValidateErr: errRewardWalletAmountZero,
+			name:                  "invalid reward wallet: no premine + reward",
+			rewardWallet:          types.StringToAddress("1").String() + ":0",
+			epochReward:           10,
+			isNativeERC20Mintable: true,
+			expectValidateErr:     errRewardWalletAmountZero,
 		},
 		{
-			name:              "valid reward wallet: no premine + no reward",
-			rewardWallet:      types.StringToAddress("1").String() + ":0",
-			epochReward:       0,
-			expectValidateErr: nil,
+			name:                  "valid reward wallet: no premine + no reward",
+			rewardWallet:          types.StringToAddress("1").String() + ":0",
+			epochReward:           0,
+			isNativeERC20Mintable: true,
+			expectValidateErr:     nil,
+		},
+		{
+			name:                  "valid reward wallet: native ERC20 mintable",
+			rewardWallet:          types.StringToAddress("1").String() + ":0",
+			epochReward:           0,
+			isNativeERC20Mintable: false,
+			expectValidateErr:     errRewardTokenOnNonMintable,
 		},
 	}
 	for _, c := range cases {
@@ -209,10 +219,11 @@ func Test_validateRewardWallet(t *testing.T) {
 			t.Parallel()
 
 			p := &genesisParams{
-				rewardWallet: c.rewardWallet,
-				epochReward:  c.epochReward,
+				rewardWallet:      c.rewardWallet,
+				epochReward:       c.epochReward,
+				nativeTokenConfig: &polybft.TokenConfig{IsMintable: c.isNativeERC20Mintable},
 			}
-			err := p.validateRewardWallet()
+			err := p.validateRewardWalletAndToken()
 			require.ErrorIs(t, err, c.expectValidateErr)
 		})
 	}
