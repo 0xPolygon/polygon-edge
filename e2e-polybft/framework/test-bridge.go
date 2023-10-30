@@ -561,7 +561,7 @@ func (t *TestBridge) deployStakeManager(genesisPath string) error {
 
 func (t *TestBridge) mintNativeRootToken(validatorAddresses []types.Address, tokenConfig *polybft.TokenConfig,
 	polybftConfig polybft.PolyBFTConfig) error {
-	if tokenConfig.IsMintable || t.clusterConfig.BurnContract == nil {
+	if tokenConfig.IsMintable {
 		// if token is mintable, it is premined in genesis command,
 		// so we just return here
 		return nil
@@ -598,7 +598,7 @@ func (t *TestBridge) mintNativeRootToken(validatorAddresses []types.Address, tok
 
 func (t *TestBridge) premineNativeRootToken(tokenConfig *polybft.TokenConfig,
 	polybftConfig polybft.PolyBFTConfig) error {
-	if tokenConfig.IsMintable || t.clusterConfig.BurnContract == nil {
+	if tokenConfig.IsMintable {
 		// if token is mintable, it is premined in genesis command,
 		// so we just return here
 		return nil

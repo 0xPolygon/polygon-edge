@@ -113,7 +113,9 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 	// check validator balance got increased by deposited amount
 	balance, err := childEthEndpoint.GetBalance(ethgo.Address(senderAccount.Address()), ethgo.Latest)
 	require.NoError(t, err)
-	require.Equal(t, tokensToDeposit, balance)
+	// because we premined validators
+	expectedBalance := new(big.Int).Add(tokensToDeposit, command.DefaultPremineBalance)
+	require.Equal(t, expectedBalance, balance)
 
 	t.Run("bridge ERC 20 tokens", func(t *testing.T) {
 		// DEPOSIT ERC20 TOKENS
@@ -1437,10 +1439,13 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 		checkStateSyncResultLogs(t, logs, totalTransfers)
 
 		// check receivers balances got increased by deposited amount
+		// because we premined validators
+		expectedBalance := new(big.Int).Add(command.DefaultPremineBalance, depositAmount)
+
 		for _, receiver := range receivers {
 			balance, err := childEthEndpoint.GetBalance(ethgo.Address(types.StringToAddress(receiver)), ethgo.Latest)
 			require.NoError(t, err)
-			require.Equal(t, depositAmount, balance)
+			require.Equal(t, expectedBalance, balance)
 		}
 
 		t.Log("Deposits were successfully processed")
@@ -1608,7 +1613,10 @@ func TestE2E_Bridge_Transfers_WithRootTrackerPollInterval(t *testing.T) {
 	// check validator balance got increased by deposited amount
 	balance, err := childEthEndpoint.GetBalance(ethgo.Address(senderAccount.Address()), ethgo.Latest)
 	require.NoError(t, err)
-	require.Equal(t, tokensToDeposit, balance)
+
+	// because we premined the validators
+	expectedBalance := new(big.Int).Add(command.DefaultPremineBalance, tokensToDeposit)
+	require.Equal(t, expectedBalance, balance)
 }
 
 func TestE2E_Bridge_NonMintableERC20Token_WithPremine(t *testing.T) {
