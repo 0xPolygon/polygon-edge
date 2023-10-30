@@ -66,7 +66,7 @@ func setFlags(cmd *cobra.Command) {
 
 	cmd.Flags().StringVar(
 		&params.nativeTokenRoot,
-		erc20NativeTokenFlag,
+		rootHelper.Erc20TokenFlag,
 		"",
 		"address of root erc20 native token",
 	)

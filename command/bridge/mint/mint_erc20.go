@@ -56,7 +56,7 @@ func setFlags(cmd *cobra.Command) {
 
 	cmd.Flags().StringVar(
 		&params.tokenAddr,
-		erc20TokenFlag,
+		rootHelper.Erc20TokenFlag,
 		"",
 		"address of the erc20 token to be minted",
 	)

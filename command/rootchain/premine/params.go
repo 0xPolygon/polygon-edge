@@ -2,17 +2,22 @@ package premine
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/command/helper"
+	rootHelper "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	sidechainHelper "github.com/0xPolygon/polygon-edge/command/sidechain"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
-const (
-	rootERC20PredicateFlag = "root-erc20-predicate"
-	erc20NativeTokenFlag   = "erc20-token" //nolint:gosec
+var (
+	errMandatorySupernetManagerAddr = errors.New("custom supernet manager address not defined")
+	errMandatoryRootPredicateAddr   = errors.New("root erc20 predicate address not defined")
 )
+
+const rootERC20PredicateFlag = "root-erc20-predicate"
 
 type premineParams struct {
 	accountDir            string
@@ -28,6 +33,30 @@ type premineParams struct {
 }
 
 func (p *premineParams) validateFlags() (err error) {
+	if p.nativeTokenRoot == "" {
+		return rootHelper.ErrMandatoryERC20Token
+	}
+
+	if err := types.IsValidAddress(p.nativeTokenRoot); err != nil {
+		return fmt.Errorf("invalid erc20 token address is provided: %w", err)
+	}
+
+	if p.customSupernetManager == "" {
+		return errMandatorySupernetManagerAddr
+	}
+
+	if err := types.IsValidAddress(p.customSupernetManager); err != nil {
+		return fmt.Errorf("invalid supernet manager address is provided: %w", err)
+	}
+
+	if p.rootERC20Predicate == "" {
+		return errMandatoryRootPredicateAddr
+	}
+
+	if err := types.IsValidAddress(p.rootERC20Predicate); err != nil {
+		return fmt.Errorf("invalid root erc20 predicate address is provided: %w", err)
+	}
+
 	if p.amountValue, err = helper.ParseAmount(p.amount); err != nil {
 		return err
 	}

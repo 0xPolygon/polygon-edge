@@ -2,7 +2,6 @@ package mint
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"math/big"
 
@@ -10,10 +9,6 @@ import (
 	rootHelper "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/types"
 )
-
-const erc20TokenFlag = "erc20-token" //nolint:gosec
-
-var errMandatoryERC20Token = errors.New("erc20 token address is mandatory")
 
 type mintParams struct {
 	addresses          []string
@@ -51,7 +46,7 @@ func (m *mintParams) validateFlags() error {
 	}
 
 	if m.tokenAddr == "" {
-		return errMandatoryERC20Token
+		return rootHelper.ErrMandatoryERC20Token
 	}
 
 	if err := types.IsValidAddress(m.tokenAddr); err != nil {
