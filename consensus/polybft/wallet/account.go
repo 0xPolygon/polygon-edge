@@ -106,7 +106,7 @@ func (a *Account) Save(secretsManager secrets.SecretsManager) (err error) {
 		return err
 	}
 
-	return secretsManager.SetSecret(secrets.ValidatorBLSKey, []byte(hex.EncodeToString(blsRaw)))
+	return secretsManager.SetSecret(secrets.ValidatorBLSKey, blsRaw)
 }
 
 func (a *Account) GetEcdsaPrivateKey() (*ecdsa.PrivateKey, error) {
