@@ -37,7 +37,7 @@ require (
 )
 
 require (
-	cloud.google.com/go/secretmanager v1.11.2
+	cloud.google.com/go/secretmanager v1.11.3
 	github.com/armon/go-metrics v0.4.1
 	github.com/aws/aws-sdk-go v1.46.1
 	github.com/benbjohnson/clock v1.3.0 // indirect
