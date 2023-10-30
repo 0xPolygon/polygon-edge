@@ -215,13 +215,6 @@ func setFlags(cmd *cobra.Command) {
 	)
 
 	cmd.Flags().Uint64Var(
-		&params.rawConfig.NumBlockConfirmations,
-		numBlockConfirmationsFlag,
-		defaultConfig.NumBlockConfirmations,
-		"minimal number of child blocks required for the parent block to be considered final",
-	)
-
-	cmd.Flags().Uint64Var(
 		&params.rawConfig.ConcurrentRequestsDebug,
 		concurrentRequestsDebugFlag,
 		defaultConfig.ConcurrentRequestsDebug,
@@ -240,6 +233,38 @@ func setFlags(cmd *cobra.Command) {
 		metricsIntervalFlag,
 		defaultConfig.MetricsInterval,
 		"the interval (in seconds) at which special metrics are generated. a value of zero means the metrics are disabled",
+	)
+
+	// event tracker config
+	cmd.Flags().Uint64Var(
+		&params.rawConfig.NumBlockConfirmations,
+		numBlockConfirmationsFlag,
+		defaultConfig.NumBlockConfirmations,
+		"minimal number of child blocks required for the parent block to be considered final",
+	)
+
+	cmd.Flags().Uint64Var(
+		&params.rawConfig.TrackerSyncBatchSize,
+		trackerSyncBatchSizeFlag,
+		defaultConfig.TrackerSyncBatchSize,
+		`defines a batch size of blocks that will be gotten from tracked chain,
+		when tracker is out of sync and needs to sync a number of blocks.
+		(e.g., SyncBatchSize = 10, trackers last processed block is 10, latest block on tracked chain is 100,
+		it will get blocks 11-20, get logs from confirmed blocks of given batch, remove processed confirm logs
+		from memory, and continue to the next batch)`,
+	)
+
+	cmd.Flags().Uint64Var(
+		&params.rawConfig.TrackerBlocksToReconcile,
+		trackerBlocksToReconcileFlag,
+		defaultConfig.TrackerBlocksToReconcile,
+		`defines how many blocks we will sync up from the latest block on tracked chain.
+		If a node that has tracker, was offline for days, months, a year, it will miss a lot of blocks.
+		In the meantime, we expect the rest of nodes to have collected the desired events and did their
+		logic with them, continuing consensus and relayer stuff.
+		In order to not waste too much unnecessary time in syncing all those blocks, with NumOfBlocksToReconcile,
+		we tell the tracker to sync only latestBlock.Number - NumOfBlocksToReconcile number of blocks.
+		If 0 is set to this flag, event tracker will sync all the blocks from tracked chain`,
 	)
 
 	setLegacyFlags(cmd)

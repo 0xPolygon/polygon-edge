@@ -84,8 +84,11 @@ type Params struct {
 	SecretsManager secrets.SecretsManager
 	BlockTime      uint64
 
-	NumBlockConfirmations uint64
-	MetricsInterval       time.Duration
+	MetricsInterval time.Duration
+	// event tracker
+	NumBlockConfirmations    uint64
+	TrackerSyncBatchSize     uint64
+	TrackerBlocksToReconcile uint64
 }
 
 // Factory is the factory function to create a discovery consensus
