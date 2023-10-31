@@ -172,7 +172,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 
 		genesisAccsMap := make(map[types.Address]*validator.GenesisValidator, len(genesisAccounts))
 		for _, genesisAcc := range genesisAccounts {
-			genesisBalanceInput, err := genesisBalancesABIFn.Encode(genesisAcc.Address)
+			genesisBalanceInput, err := genesisBalancesABIFn.Encode([]interface{}{genesisAcc.Address})
 			if err != nil {
 				return err
 			}
