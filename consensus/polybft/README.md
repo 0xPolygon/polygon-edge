@@ -130,7 +130,6 @@ It has a native support for running bridge, which enables running cross-chain tr
     $ polygon-edge polybft supernet --private-key <hex_encoded_rootchain_account_private_key_of_supernetManager_deployer> \
     --genesis <path_to_genesis_file> \
     --supernet-manager <address_of_SupernetManager_contract> \
-    --stake-manager <address_of_StakeManager_contract> \
     --finalize-genesis --enable-staking
     ```
 
