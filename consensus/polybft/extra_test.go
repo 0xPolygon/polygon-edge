@@ -8,9 +8,10 @@ import (
 	mrand "math/rand"
 	"testing"
 
+	"github.com/0xPolygon/polygon-edge/bls"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
-	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/crypto"
@@ -197,7 +198,7 @@ func TestExtra_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 		key, err := wallet.GenerateAccount()
 		require.NoError(t, err)
 
-		parentSignature := createSignature(t, []*wallet.Account{key}, types.BytesToHash([]byte("This is test hash")), bls.DomainCheckpointManager)
+		parentSignature := createSignature(t, []*wallet.Account{key}, types.BytesToHash([]byte("This is test hash")), signer.DomainCheckpointManager)
 		extraMarshalled.Set(parentSignature.MarshalRLPWith(ar))
 
 		// Committed
@@ -220,11 +221,11 @@ func TestExtra_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 		key, err := wallet.GenerateAccount()
 		require.NoError(t, err)
 
-		parentSignature := createSignature(t, []*wallet.Account{key}, types.BytesToHash(generateRandomBytes(t)), bls.DomainCheckpointManager)
+		parentSignature := createSignature(t, []*wallet.Account{key}, types.BytesToHash(generateRandomBytes(t)), signer.DomainCheckpointManager)
 		extraMarshalled.Set(parentSignature.MarshalRLPWith(ar))
 
 		// Committed
-		committedSignature := createSignature(t, []*wallet.Account{key}, types.BytesToHash(generateRandomBytes(t)), bls.DomainCheckpointManager)
+		committedSignature := createSignature(t, []*wallet.Account{key}, types.BytesToHash(generateRandomBytes(t)), signer.DomainCheckpointManager)
 		extraMarshalled.Set(committedSignature.MarshalRLPWith(ar))
 
 		// Checkpoint data
@@ -262,13 +263,13 @@ func TestExtra_ValidateFinalizedData_UnhappyPath(t *testing.T) {
 	// missing Committed field
 	extra := &Extra{}
 	err := extra.ValidateFinalizedData(
-		header, parent, nil, chainID, nil, bls.DomainCheckpointManager, hclog.NewNullLogger())
+		header, parent, nil, chainID, nil, signer.DomainCheckpointManager, hclog.NewNullLogger())
 	require.ErrorContains(t, err, fmt.Sprintf("failed to verify signatures for block %d, because signatures are not present", headerNum))
 
 	// missing Checkpoint field
 	extra = &Extra{Committed: &Signature{}}
 	err = extra.ValidateFinalizedData(
-		header, parent, nil, chainID, polyBackendMock, bls.DomainCheckpointManager, hclog.NewNullLogger())
+		header, parent, nil, chainID, polyBackendMock, signer.DomainCheckpointManager, hclog.NewNullLogger())
 	require.ErrorContains(t, err, fmt.Sprintf("failed to verify signatures for block %d, because checkpoint data are not present", headerNum))
 
 	// failed to retrieve validators from snapshot
@@ -279,7 +280,7 @@ func TestExtra_ValidateFinalizedData_UnhappyPath(t *testing.T) {
 	}
 	extra = &Extra{Committed: &Signature{}, Checkpoint: checkpoint}
 	err = extra.ValidateFinalizedData(
-		header, parent, nil, chainID, polyBackendMock, bls.DomainCheckpointManager, hclog.NewNullLogger())
+		header, parent, nil, chainID, polyBackendMock, signer.DomainCheckpointManager, hclog.NewNullLogger())
 	require.ErrorContains(t, err,
 		fmt.Sprintf("failed to validate header for block %d. could not retrieve block validators:validators not found", headerNum))
 
@@ -287,21 +288,21 @@ func TestExtra_ValidateFinalizedData_UnhappyPath(t *testing.T) {
 	polyBackendMock = new(polybftBackendMock)
 	polyBackendMock.On("GetValidators", mock.Anything, mock.Anything).Return(validators.GetPublicIdentities())
 
-	noQuorumSignature := createSignature(t, validators.GetPrivateIdentities("0", "1"), types.BytesToHash([]byte("FooBar")), bls.DomainCheckpointManager)
+	noQuorumSignature := createSignature(t, validators.GetPrivateIdentities("0", "1"), types.BytesToHash([]byte("FooBar")), signer.DomainCheckpointManager)
 	extra = &Extra{Committed: noQuorumSignature, Checkpoint: checkpoint}
 	checkpointHash, err := checkpoint.Hash(chainID, headerNum, header.Hash)
 	require.NoError(t, err)
 
 	err = extra.ValidateFinalizedData(
-		header, parent, nil, chainID, polyBackendMock, bls.DomainCheckpointManager, hclog.NewNullLogger())
+		header, parent, nil, chainID, polyBackendMock, signer.DomainCheckpointManager, hclog.NewNullLogger())
 	require.ErrorContains(t, err,
 		fmt.Sprintf("failed to verify signatures for block %d (proposal hash %s): quorum not reached", headerNum, checkpointHash))
 
 	// incorrect parent extra size
-	validSignature := createSignature(t, validators.GetPrivateIdentities(), checkpointHash, bls.DomainCheckpointManager)
+	validSignature := createSignature(t, validators.GetPrivateIdentities(), checkpointHash, signer.DomainCheckpointManager)
 	extra = &Extra{Committed: validSignature, Checkpoint: checkpoint}
 	err = extra.ValidateFinalizedData(
-		header, parent, nil, chainID, polyBackendMock, bls.DomainCheckpointManager, hclog.NewNullLogger())
+		header, parent, nil, chainID, polyBackendMock, signer.DomainCheckpointManager, hclog.NewNullLogger())
 	require.ErrorContains(t, err,
 		fmt.Sprintf("failed to verify signatures for block %d: wrong extra size: 0", headerNum))
 }
@@ -320,21 +321,21 @@ func TestExtra_ValidateParentSignatures(t *testing.T) {
 	// validation is skipped for blocks 0 and 1
 	extra := &Extra{}
 	err := extra.ValidateParentSignatures(
-		1, polyBackendMock, nil, nil, nil, chainID, bls.DomainCheckpointManager, hclog.NewNullLogger())
+		1, polyBackendMock, nil, nil, nil, chainID, signer.DomainCheckpointManager, hclog.NewNullLogger())
 	require.NoError(t, err)
 
 	// parent signatures not present
 	err = extra.ValidateParentSignatures(
-		headerNum, polyBackendMock, nil, nil, nil, chainID, bls.DomainCheckpointManager, hclog.NewNullLogger())
+		headerNum, polyBackendMock, nil, nil, nil, chainID, signer.DomainCheckpointManager, hclog.NewNullLogger())
 	require.ErrorContains(t, err, fmt.Sprintf("failed to verify signatures for parent of block %d because signatures are not present", headerNum))
 
 	// validators not found
 	validators := validator.NewTestValidators(t, 5)
 	incorrectHash := types.BytesToHash([]byte("Hello World"))
-	invalidSig := createSignature(t, validators.GetPrivateIdentities(), incorrectHash, bls.DomainCheckpointManager)
+	invalidSig := createSignature(t, validators.GetPrivateIdentities(), incorrectHash, signer.DomainCheckpointManager)
 	extra = &Extra{Parent: invalidSig}
 	err = extra.ValidateParentSignatures(
-		headerNum, polyBackendMock, nil, nil, nil, chainID, bls.DomainCheckpointManager, hclog.NewNullLogger())
+		headerNum, polyBackendMock, nil, nil, nil, chainID, signer.DomainCheckpointManager, hclog.NewNullLogger())
 	require.ErrorContains(t, err,
 		fmt.Sprintf("failed to validate header for block %d. could not retrieve parent validators: no validators", headerNum))
 
@@ -350,15 +351,15 @@ func TestExtra_ValidateParentSignatures(t *testing.T) {
 	require.NoError(t, err)
 
 	err = extra.ValidateParentSignatures(
-		headerNum, polyBackendMock, nil, parent, parentExtra, chainID, bls.DomainCheckpointManager, hclog.NewNullLogger())
+		headerNum, polyBackendMock, nil, parent, parentExtra, chainID, signer.DomainCheckpointManager, hclog.NewNullLogger())
 	require.ErrorContains(t, err,
 		fmt.Sprintf("failed to verify signatures for parent of block %d (proposal hash: %s): could not verify aggregated signature", headerNum, parentCheckpointHash))
 
 	// valid signature provided
-	validSig := createSignature(t, validators.GetPrivateIdentities(), parentCheckpointHash, bls.DomainCheckpointManager)
+	validSig := createSignature(t, validators.GetPrivateIdentities(), parentCheckpointHash, signer.DomainCheckpointManager)
 	extra = &Extra{Parent: validSig}
 	err = extra.ValidateParentSignatures(
-		headerNum, polyBackendMock, nil, parent, parentExtra, chainID, bls.DomainCheckpointManager, hclog.NewNullLogger())
+		headerNum, polyBackendMock, nil, parent, parentExtra, chainID, signer.DomainCheckpointManager, hclog.NewNullLogger())
 	require.NoError(t, err)
 }
 
@@ -382,7 +383,7 @@ func TestSignature_Verify(t *testing.T) {
 		for i, val := range vals.GetValidators() {
 			bitmap.Set(uint64(i))
 
-			tempSign, err := val.Account.Bls.Sign(msgHash[:], bls.DomainCheckpointManager)
+			tempSign, err := val.Account.Bls.Sign(msgHash[:], signer.DomainCheckpointManager)
 			require.NoError(t, err)
 
 			signatures = append(signatures, tempSign)
@@ -394,7 +395,7 @@ func TestSignature_Verify(t *testing.T) {
 				Bitmap:              bitmap,
 			}
 
-			err = s.Verify(10, validatorsMetadata, msgHash, bls.DomainCheckpointManager, hclog.NewNullLogger())
+			err = s.Verify(10, validatorsMetadata, msgHash, signer.DomainCheckpointManager, hclog.NewNullLogger())
 			signers[val.Address()] = struct{}{}
 
 			if !validatorSet.HasQuorum(10, signers) {
@@ -415,7 +416,7 @@ func TestSignature_Verify(t *testing.T) {
 		bmp.Set(uint64(validatorSet.Len() + 1))
 		s := &Signature{Bitmap: bmp}
 
-		err := s.Verify(0, validatorSet, types.Hash{0x1}, bls.DomainCheckpointManager, hclog.NewNullLogger())
+		err := s.Verify(0, validatorSet, types.Hash{0x1}, signer.DomainCheckpointManager, hclog.NewNullLogger())
 		require.Error(t, err)
 	})
 }
@@ -469,7 +470,7 @@ func TestSignature_VerifyRandom(t *testing.T) {
 	for _, index := range valIndxsRnd {
 		bitmap.Set(uint64(index))
 
-		tempSign, err := accounts[index].Account.Bls.Sign(msgHash[:], bls.DomainCheckpointManager)
+		tempSign, err := accounts[index].Account.Bls.Sign(msgHash[:], signer.DomainCheckpointManager)
 		require.NoError(t, err)
 
 		signature = append(signature, tempSign)
@@ -483,7 +484,7 @@ func TestSignature_VerifyRandom(t *testing.T) {
 		Bitmap:              bitmap,
 	}
 
-	err = s.Verify(1, vals.GetPublicIdentities(), msgHash, bls.DomainCheckpointManager, hclog.NewNullLogger())
+	err = s.Verify(1, vals.GetPublicIdentities(), msgHash, signer.DomainCheckpointManager, hclog.NewNullLogger())
 	assert.NoError(t, err)
 }
 

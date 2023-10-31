@@ -16,7 +16,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
@@ -723,7 +723,7 @@ func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, blockTimeDrift 
 
 	// validate extra data
 	return extra.ValidateFinalizedData(
-		header, parent, parents, p.blockchain.GetChainID(), p, bls.DomainCheckpointManager, p.logger)
+		header, parent, parents, p.blockchain.GetChainID(), p, signer.DomainCheckpointManager, p.logger)
 }
 
 func (p *Polybft) GetValidators(blockNumber uint64, parents []*types.Header) (validator.AccountSet, error) {

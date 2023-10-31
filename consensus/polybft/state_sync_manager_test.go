@@ -16,7 +16,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/common"
@@ -138,7 +138,7 @@ func TestStateSyncManager_MessagePool(t *testing.T) {
 		s.validatorSet = vals.ToValidatorSet()
 
 		badVal := validator.NewTestValidator(t, "a", 0)
-		msg, err := newMockMsg().sign(badVal, bls.DomainStateReceiver)
+		msg, err := newMockMsg().sign(badVal, signer.DomainStateReceiver)
 		require.NoError(t, err)
 
 		require.Error(t, s.saveVote(msg))
@@ -151,7 +151,7 @@ func TestStateSyncManager_MessagePool(t *testing.T) {
 		s.validatorSet = vals.ToValidatorSet()
 
 		val := newMockMsg()
-		msg, err := val.sign(vals.GetValidator("0"), bls.DomainStateReceiver)
+		msg, err := val.sign(vals.GetValidator("0"), signer.DomainStateReceiver)
 		require.NoError(t, err)
 
 		msg.EpochNumber = 1
@@ -176,7 +176,7 @@ func TestStateSyncManager_MessagePool(t *testing.T) {
 
 		// validator signs the msg in behalf of another validator
 		val := newMockMsg()
-		msg, err := val.sign(vals.GetValidator("0"), bls.DomainStateReceiver)
+		msg, err := val.sign(vals.GetValidator("0"), signer.DomainStateReceiver)
 		require.NoError(t, err)
 
 		msg.From = vals.GetValidator("1").Address().String()
@@ -184,7 +184,7 @@ func TestStateSyncManager_MessagePool(t *testing.T) {
 
 		// non validator signs the msg in behalf of a validator
 		badVal := validator.NewTestValidator(t, "a", 0)
-		msg, err = newMockMsg().sign(badVal, bls.DomainStateReceiver)
+		msg, err = newMockMsg().sign(badVal, signer.DomainStateReceiver)
 		require.NoError(t, err)
 
 		msg.From = vals.GetValidator("1").Address().String()
@@ -198,10 +198,10 @@ func TestStateSyncManager_MessagePool(t *testing.T) {
 		s.validatorSet = vals.ToValidatorSet()
 
 		msg := newMockMsg()
-		val1signed, err := msg.sign(vals.GetValidator("1"), bls.DomainStateReceiver)
+		val1signed, err := msg.sign(vals.GetValidator("1"), signer.DomainStateReceiver)
 		require.NoError(t, err)
 
-		val2signed, err := msg.sign(vals.GetValidator("2"), bls.DomainStateReceiver)
+		val2signed, err := msg.sign(vals.GetValidator("2"), signer.DomainStateReceiver)
 		require.NoError(t, err)
 
 		// vote with validator 1
@@ -255,10 +255,10 @@ func TestStateSyncManager_BuildCommitment(t *testing.T) {
 
 	// validators 0 and 1 vote for the proposal, there is not enough
 	// voting power for the proposal
-	signedMsg1, err := msg.sign(vals.GetValidator("0"), bls.DomainStateReceiver)
+	signedMsg1, err := msg.sign(vals.GetValidator("0"), signer.DomainStateReceiver)
 	require.NoError(t, err)
 
-	signedMsg2, err := msg.sign(vals.GetValidator("1"), bls.DomainStateReceiver)
+	signedMsg2, err := msg.sign(vals.GetValidator("1"), signer.DomainStateReceiver)
 	require.NoError(t, err)
 
 	require.NoError(t, s.saveVote(signedMsg1))
@@ -270,10 +270,10 @@ func TestStateSyncManager_BuildCommitment(t *testing.T) {
 
 	// validator 2 and 3 vote for the proposal, there is enough voting power now
 
-	signedMsg1, err = msg.sign(vals.GetValidator("2"), bls.DomainStateReceiver)
+	signedMsg1, err = msg.sign(vals.GetValidator("2"), signer.DomainStateReceiver)
 	require.NoError(t, err)
 
-	signedMsg2, err = msg.sign(vals.GetValidator("3"), bls.DomainStateReceiver)
+	signedMsg2, err = msg.sign(vals.GetValidator("3"), signer.DomainStateReceiver)
 	require.NoError(t, err)
 
 	require.NoError(t, s.saveVote(signedMsg1))

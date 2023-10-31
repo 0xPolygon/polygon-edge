@@ -3,8 +3,9 @@ package precompiled
 import (
 	"errors"
 
+	"github.com/0xPolygon/polygon-edge/bls"
 	"github.com/0xPolygon/polygon-edge/chain"
-	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo/abi"
@@ -99,7 +100,7 @@ func (c *blsAggSignsVerification) run(input []byte, caller types.Address, host r
 		blsPubKeys[i] = blsPubKey
 	}
 
-	if sig.VerifyAggregated(blsPubKeys, types.Hash(msg).Bytes(), bls.DomainStateReceiver) {
+	if sig.VerifyAggregated(blsPubKeys, types.Hash(msg).Bytes(), signer.DomainStateReceiver) {
 		return abiBoolTrue, nil
 	}
 

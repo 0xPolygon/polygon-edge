@@ -5,12 +5,13 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/0xPolygon/polygon-edge/bls"
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
 	rootHelper "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -89,9 +90,9 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	koskSignature, err := bls.MakeKOSKSignature(
+	koskSignature, err := signer.MakeKOSKSignature(
 		newValidatorAccount.Bls, newValidatorAccount.Address(),
-		rootChainID.Int64(), bls.DomainValidatorSet, types.StringToAddress(params.supernetManagerAddress))
+		rootChainID.Int64(), signer.DomainValidatorSet, types.StringToAddress(params.supernetManagerAddress))
 	if err != nil {
 		return err
 	}

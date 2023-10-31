@@ -9,8 +9,8 @@ import (
 	"math/big"
 	"reflect"
 
+	"github.com/0xPolygon/polygon-edge/bls"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/crypto"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"

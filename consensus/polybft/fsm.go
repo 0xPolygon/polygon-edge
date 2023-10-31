@@ -9,16 +9,18 @@ import (
 
 	"github.com/0xPolygon/go-ibft/messages"
 	"github.com/0xPolygon/go-ibft/messages/proto"
+	"github.com/armon/go-metrics"
+	hcf "github.com/hashicorp/go-hclog"
+
+	"github.com/0xPolygon/polygon-edge/bls"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/armon/go-metrics"
-	hcf "github.com/hashicorp/go-hclog"
 )
 
 type blockBuilder interface {
@@ -270,8 +272,8 @@ func (f *fsm) createDistributeRewardsTx() (*types.Transaction, error) {
 }
 
 // ValidateCommit is used to validate that a given commit is valid
-func (f *fsm) ValidateCommit(signer []byte, seal []byte, proposalHash []byte) error {
-	from := types.BytesToAddress(signer)
+func (f *fsm) ValidateCommit(signerAddr []byte, seal []byte, proposalHash []byte) error {
+	from := types.BytesToAddress(signerAddr)
 
 	validator := f.validators.Accounts().GetValidatorMetadata(from)
 	if validator == nil {
@@ -283,7 +285,7 @@ func (f *fsm) ValidateCommit(signer []byte, seal []byte, proposalHash []byte) er
 		return fmt.Errorf("failed to unmarshall signature: %w", err)
 	}
 
-	if !signature.Verify(validator.BlsKey, proposalHash, bls.DomainCheckpointManager) {
+	if !signature.Verify(validator.BlsKey, proposalHash, signer.DomainCheckpointManager) {
 		return fmt.Errorf("incorrect commit signature from %s", from)
 	}
 
@@ -326,7 +328,7 @@ func (f *fsm) Validate(proposal []byte) error {
 	}
 
 	if err := extra.ValidateParentSignatures(block.Number(), f.polybftBackend, nil, f.parent, parentExtra,
-		f.backend.GetChainID(), bls.DomainCheckpointManager, f.logger); err != nil {
+		f.backend.GetChainID(), signer.DomainCheckpointManager, f.logger); err != nil {
 		return err
 	}
 
@@ -645,7 +647,7 @@ func verifyBridgeCommitmentTx(blockNumber uint64, txHash types.Hash,
 		return fmt.Errorf("error for state tx (%s) while unmarshaling signature: %w", txHash, err)
 	}
 
-	verified := signature.VerifyAggregated(signers.GetBlsKeys(), commitmentHash.Bytes(), bls.DomainStateReceiver)
+	verified := signature.VerifyAggregated(signers.GetBlsKeys(), commitmentHash.Bytes(), signer.DomainStateReceiver)
 	if !verified {
 		return fmt.Errorf("invalid signature for state tx (%s)", txHash)
 	}

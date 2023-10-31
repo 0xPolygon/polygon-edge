@@ -11,7 +11,7 @@ import (
 	"github.com/0xPolygon/go-ibft/messages/proto"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
-	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
@@ -702,7 +702,7 @@ func TestConsensusRuntime_TamperMessageContent(t *testing.T) {
 	}
 	sender := validatorAccounts.GetValidator("A")
 	proposalHash := []byte{2, 4, 6, 8, 10}
-	proposalSignature, err := sender.Key().SignWithDomain(proposalHash, bls.DomainCheckpointManager)
+	proposalSignature, err := sender.Key().SignWithDomain(proposalHash, signer.DomainCheckpointManager)
 	require.NoError(t, err)
 
 	msg := &proto.Message{
@@ -924,7 +924,7 @@ func TestConsensusRuntime_BuildCommitMessage(t *testing.T) {
 		},
 	}
 
-	committedSeal, err := key.SignWithDomain(proposalHash, bls.DomainCheckpointManager)
+	committedSeal, err := key.SignWithDomain(proposalHash, signer.DomainCheckpointManager)
 	require.NoError(t, err)
 
 	expected := proto.Message{

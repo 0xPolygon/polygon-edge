@@ -1,11 +1,18 @@
 package bls
 
 import (
-	"errors"
 	"fmt"
 	"math/big"
 
 	bn256 "github.com/umbracle/go-eth-bn256"
+)
+
+const (
+	SignatureSize = 64
+)
+
+var (
+	ErrInvalidSignatureSize = fmt.Errorf("signature must be %d bytes long", SignatureSize)
 )
 
 // Signature represents bls signature which is point on the curve
@@ -48,8 +55,8 @@ func (s Signature) ToBigInt() ([2]*big.Int, error) {
 
 // UnmarshalSignature reads the signature from the given byte array
 func UnmarshalSignature(raw []byte) (*Signature, error) {
-	if len(raw) == 0 {
-		return nil, errors.New("cannot unmarshal signature from empty slice")
+	if len(raw) < SignatureSize {
+		return nil, ErrInvalidSignatureSize
 	}
 
 	g1 := new(bn256.G1)

@@ -1,12 +1,14 @@
-package bls
+package signer
 
 import (
 	"bytes"
-	"crypto/rand"
 	"math/big"
 
-	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo/abi"
+
+	"github.com/0xPolygon/polygon-edge/bls"
+	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 var (
@@ -14,51 +16,27 @@ var (
 	uint256ABIType = abi.MustNewType("uint256")
 )
 
-// GenerateBlsKey creates a random private and its corresponding public keys
-func GenerateBlsKey() (*PrivateKey, error) {
-	s, err := randomK(rand.Reader)
-	if err != nil {
-		return nil, err
-	}
+const (
+	DomainValidatorSetString      = "DOMAIN_CHILD_VALIDATOR_SET"
+	DomainCheckpointManagerString = "DOMAIN_CHECKPOINT_MANAGER"
+	DomainCommonSigningString     = "DOMAIN_COMMON_SIGNING"
+	DomainStateReceiverString     = "DOMAIN_STATE_RECEIVER"
+)
 
-	return &PrivateKey{s: s}, nil
-}
+var (
+	// domain used to map hash to G1 used by (child) validator set
+	DomainValidatorSet = crypto.Keccak256([]byte(DomainValidatorSetString))
 
-// CreateRandomBlsKeys creates an array of random private and their corresponding public keys
-func CreateRandomBlsKeys(total int) ([]*PrivateKey, error) {
-	blsKeys := make([]*PrivateKey, total)
+	// domain used to map hash to G1 used by child checkpoint manager
+	DomainCheckpointManager = crypto.Keccak256([]byte(DomainCheckpointManagerString))
 
-	for i := 0; i < total; i++ {
-		blsKey, err := GenerateBlsKey()
-		if err != nil {
-			return nil, err
-		}
-
-		blsKeys[i] = blsKey
-	}
-
-	return blsKeys, nil
-}
-
-// MarshalMessageToBigInt marshalls message into two big ints
-// first we must convert message bytes to point and than for each coordinate we create big int
-func MarshalMessageToBigInt(message, domain []byte) ([2]*big.Int, error) {
-	point, err := hashToPoint(message, domain)
-	if err != nil {
-		return [2]*big.Int{}, err
-	}
-
-	buf := point.Marshal()
-
-	return [2]*big.Int{
-		new(big.Int).SetBytes(buf[0:32]),
-		new(big.Int).SetBytes(buf[32:64]),
-	}, nil
-}
+	DomainCommonSigning = crypto.Keccak256([]byte(DomainCommonSigningString))
+	DomainStateReceiver = crypto.Keccak256([]byte(DomainStateReceiverString))
+)
 
 // MakeKOSKSignature creates KOSK signature which prevents rogue attack
-func MakeKOSKSignature(privateKey *PrivateKey, address types.Address,
-	chainID int64, domain []byte, supernetManagerAddr types.Address) (*Signature, error) {
+func MakeKOSKSignature(privateKey *bls.PrivateKey, address types.Address,
+	chainID int64, domain []byte, supernetManagerAddr types.Address) (*bls.Signature, error) {
 	spenderABI, err := addressABIType.Encode(address)
 	if err != nil {
 		return nil, err

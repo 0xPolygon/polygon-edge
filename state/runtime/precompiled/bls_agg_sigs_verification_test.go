@@ -3,7 +3,8 @@ package precompiled
 import (
 	"testing"
 
-	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/bls"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -67,7 +68,7 @@ func generatePubKeysAndSignature(t *testing.T, numKeys int, messageRaw []byte) (
 	signatures := make(bls.Signatures, len(validators))
 
 	for i, validator := range validators {
-		sign, err := validator.Sign(message[:], bls.DomainStateReceiver)
+		sign, err := validator.Sign(message[:], signer.DomainStateReceiver)
 		require.NoError(t, err)
 
 		pubKeys[i] = validator.PublicKey().Marshal()

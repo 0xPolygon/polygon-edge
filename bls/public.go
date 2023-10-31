@@ -2,11 +2,21 @@ package bls
 
 import (
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	bn256 "github.com/umbracle/go-eth-bn256"
+)
+
+const (
+	PublicKeySize = 128
+)
+
+var (
+	errInfinityPoint        = errors.New("infinity point")
+	ErrInvalidPublicKeySize = fmt.Errorf("public key must be %d bytes long", PublicKeySize)
 )
 
 // PublicKey represents bls public key
@@ -57,6 +67,10 @@ func (p *PublicKey) ToBigInt() [4]*big.Int {
 
 // UnmarshalPublicKey unmarshals bytes to public key
 func UnmarshalPublicKey(data []byte) (*PublicKey, error) {
+	if len(data) < PublicKeySize {
+		return nil, ErrInvalidPublicKeySize
+	}
+
 	g2 := new(bn256.G2)
 
 	if _, err := g2.Unmarshal(data); err != nil {
