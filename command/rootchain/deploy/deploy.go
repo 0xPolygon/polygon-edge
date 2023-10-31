@@ -153,7 +153,7 @@ var (
 				NewChildERC20Predicate: contracts.ChildERC20PredicateContract,
 				NewChildTokenTemplate:  contracts.ChildERC20Contract,
 				// map root native token address should be non-zero only if native token is non-mintable on a childchain
-				NativeTokenRootAddress: config.RootNativeERC20Address,
+				NewNativeTokenRoot: config.RootNativeERC20Address,
 			}
 
 			return initContract(fmt, relayer, inputParams,

@@ -352,7 +352,7 @@ func main() {
 				"whitelistValidators",
 				"register",
 				"getValidator",
-				"premine",
+				"addGenesisBalance",
 			},
 			[]string{
 				"ValidatorRegistered",

@@ -18,24 +18,16 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-type genesisAccount struct {
-	Address types.Address
-	Stake   *big.Int
-	Balance *big.Int
-}
-
-func (g *genesisAccount) String() string {
-	return fmt.Sprintf("%s %d %d", g.Address, g.Stake, g.Balance)
-}
-
 var (
-	params          supernetParams
-	genesisSetABIFn = contractsapi.CustomSupernetManager.Abi.Methods["genesisSet"]
+	params               supernetParams
+	genesisSetABIFn      = contractsapi.CustomSupernetManager.Abi.Methods["genesisSet"]
+	genesisBalancesABIFn = contractsapi.CustomSupernetManager.Abi.Methods["genesisBalances"]
 )
 
 func GetCommand() *cobra.Command {
@@ -178,14 +170,30 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 			return err
 		}
 
-		genesisAccsMap := make(map[types.Address]*genesisAccount, len(genesisAccounts))
+		genesisAccsMap := make(map[types.Address]*validator.GenesisValidator, len(genesisAccounts))
 		for _, genesisAcc := range genesisAccounts {
+			genesisBalanceInput, err := genesisBalancesABIFn.Encode(genesisAcc.Address)
+			if err != nil {
+				return err
+			}
+
+			genesisBalanceRaw, err := txRelayer.Call(ethgo.ZeroAddress, supernetAddr, genesisBalanceInput)
+			if err != nil {
+				return err
+			}
+
+			genesisBalance, err := common.ParseUint256orHex(&genesisBalanceRaw)
+			if err != nil {
+				return fmt.Errorf("failed to convert genesis balance '%s' to number: %w",
+					genesisBalanceRaw, err)
+			}
+
 			genesisAccsMap[genesisAcc.Address] = genesisAcc
 
-			if genesisAcc.Balance.Sign() > 0 {
+			if genesisBalance.Sign() > 0 {
 				// premine genesis accounts
 				chainConfig.Genesis.Alloc[genesisAcc.Address] =
-					&chain.GenesisAccount{Balance: genesisAcc.Balance}
+					&chain.GenesisAccount{Balance: genesisBalance}
 			}
 		}
 
@@ -258,8 +266,8 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 }
 
 // decodeGenesisAccounts decodes genesis set retrieved from CustomSupernetManager contract
-func decodeGenesisAccounts(genesisSetRaw string) ([]*genesisAccount, error) {
-	decodeAccount := func(rawAccount map[string]interface{}) (*genesisAccount, error) {
+func decodeGenesisAccounts(genesisSetRaw string) ([]*validator.GenesisValidator, error) {
+	decodeAccount := func(rawAccount map[string]interface{}) (*validator.GenesisValidator, error) {
 		addr, ok := rawAccount["validator"].(ethgo.Address)
 		if !ok {
 			return nil, errors.New("failed to retrieve genesis account address")
@@ -270,15 +278,9 @@ func decodeGenesisAccounts(genesisSetRaw string) ([]*genesisAccount, error) {
 			return nil, errors.New("failed to retrieve genesis account stake")
 		}
 
-		balance, ok := rawAccount["balance"].(*big.Int)
-		if !ok {
-			return nil, errors.New("failed to retrieve genesis account balance")
-		}
-
-		return &genesisAccount{
+		return &validator.GenesisValidator{
 			Address: types.Address(addr),
 			Stake:   stake,
-			Balance: balance,
 		}, nil
 	}
 
@@ -302,7 +304,7 @@ func decodeGenesisAccounts(genesisSetRaw string) ([]*genesisAccount, error) {
 		return nil, errors.New("failed to convert genesis set to slice")
 	}
 
-	genesisAccounts := make([]*genesisAccount, len(decodedGenesisSetSliceMap))
+	genesisAccounts := make([]*validator.GenesisValidator, len(decodedGenesisSetSliceMap))
 	for i, rawGenesisAccount := range decodedGenesisSetSliceMap {
 		genesisAccounts[i], err = decodeAccount(rawGenesisAccount)
 		if err != nil {

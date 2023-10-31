@@ -23,7 +23,7 @@ var (
 func GetCommand() *cobra.Command {
 	premineCmd := &cobra.Command{
 		Use: "premine",
-		Short: "Premine native root token to the caller. " +
+		Short: "Premine native root token to the caller, which determines genesis balances. " +
 			"This command is used in case Supernets native token is rootchain originated.",
 		PreRunE: runPreRun,
 		RunE:    runCommand,
@@ -128,7 +128,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("approve transaction failed on block %d", receipt.BlockNumber)
 	}
 
-	premineFn := &contractsapi.PremineCustomSupernetManagerFn{
+	premineFn := &contractsapi.AddGenesisBalanceCustomSupernetManagerFn{
 		Amount: params.amountValue,
 	}
 
