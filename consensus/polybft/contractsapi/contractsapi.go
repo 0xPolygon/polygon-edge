@@ -1309,22 +1309,6 @@ func (a *AddGenesisBalanceCustomSupernetManagerFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(CustomSupernetManager.Abi.Methods["addGenesisBalance"], buf, a)
 }
 
-type GenesisBalancesCustomSupernetManagerFn struct {
-	types.Address `abi:""`
-}
-
-func (g *GenesisBalancesCustomSupernetManagerFn) Sig() []byte {
-	return CustomSupernetManager.Abi.Methods["genesisBalances"].ID()
-}
-
-func (g *GenesisBalancesCustomSupernetManagerFn) EncodeAbi() ([]byte, error) {
-	return CustomSupernetManager.Abi.Methods["genesisBalances"].Encode(g)
-}
-
-func (g *GenesisBalancesCustomSupernetManagerFn) DecodeAbi(buf []byte) error {
-	return decodeMethod(CustomSupernetManager.Abi.Methods["genesisBalances"], buf, g)
-}
-
 type ValidatorRegisteredEvent struct {
 	Validator types.Address `abi:"validator"`
 	BlsKey    [4]*big.Int   `abi:"blsKey"`
