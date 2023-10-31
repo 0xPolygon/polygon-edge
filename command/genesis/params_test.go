@@ -199,6 +199,20 @@ func Test_validateRewardWallet(t *testing.T) {
 			expectValidateErr:     errRewardWalletAmountZero,
 		},
 		{
+			name:                  "invalid reward wallet: reward wallet not defined",
+			rewardWallet:          "",
+			epochReward:           10,
+			isNativeERC20Mintable: true,
+			expectValidateErr:     errRewardWalletNotDefined,
+		},
+		{
+			name:                  "invalid reward wallet: reward wallet is zero",
+			rewardWallet:          types.ZeroAddress.String() + ":0",
+			epochReward:           10,
+			isNativeERC20Mintable: true,
+			expectValidateErr:     errRewardWalletZero,
+		},
+		{
 			name:                  "valid reward wallet: no premine + no reward",
 			rewardWallet:          types.StringToAddress("1").String() + ":0",
 			epochReward:           0,

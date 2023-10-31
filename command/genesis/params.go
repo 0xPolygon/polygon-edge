@@ -63,6 +63,7 @@ var (
 	errRewardWalletNotDefined   = errors.New("reward wallet address must be defined")
 	errRewardTokenOnNonMintable = errors.New("a custom reward token must be defined when " +
 		"native ERC20 token is non-mintable")
+	errRewardWalletZero = errors.New("reward wallet address must not be zero address")
 )
 
 type genesisParams struct {
@@ -491,7 +492,7 @@ func (p *genesisParams) validateRewardWalletAndToken() error {
 	}
 
 	if premineInfo.Address == types.ZeroAddress {
-		return errors.New("reward wallet address must not be zero address")
+		return errRewardWalletZero
 	}
 
 	// If epoch rewards are enabled, reward wallet must have some amount of premine
