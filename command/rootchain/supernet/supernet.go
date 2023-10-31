@@ -268,7 +268,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 // decodeGenesisAccounts decodes genesis set retrieved from CustomSupernetManager contract
 func decodeGenesisAccounts(genesisSetRaw string) ([]*validator.GenesisValidator, error) {
 	decodeAccount := func(rawAccount map[string]interface{}) (*validator.GenesisValidator, error) {
-		addr, ok := rawAccount["validator"].(ethgo.Address)
+		addr, ok := rawAccount["addr"].(ethgo.Address)
 		if !ok {
 			return nil, errors.New("failed to retrieve genesis account address")
 		}
