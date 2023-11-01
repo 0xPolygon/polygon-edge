@@ -71,7 +71,8 @@ services:
       "--grpc-address", "0.0.0.0:9632",
       "--libp2p", "0.0.0.0:1478",
       "--jsonrpc", "0.0.0.0:8545",
-      "--prometheus", "0.0.0.0:5001"
+      "--prometheus", "0.0.0.0:5001",
+      "--seal"
     ]
     depends_on:
       init:
@@ -98,7 +99,8 @@ services:
       "--grpc-address", "0.0.0.0:9632",
       "--libp2p", "0.0.0.0:1478",
       "--jsonrpc", "0.0.0.0:8545",
-      "--prometheus", "0.0.0.0:5001"
+      "--prometheus", "0.0.0.0:5001",
+      "--seal"
     ]
     depends_on:
       init:
@@ -125,7 +127,8 @@ services:
       "--grpc-address", "0.0.0.0:9632",
       "--libp2p", "0.0.0.0:1478",
       "--jsonrpc", "0.0.0.0:8545",
-      "--prometheus", "0.0.0.0:5001"
+      "--prometheus", "0.0.0.0:5001",
+      "--seal"
     ]
     depends_on:
       init:

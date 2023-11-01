@@ -172,6 +172,10 @@ func (t *TestServer) Start() {
 		args = append(args, "--log-level", "DEBUG")
 	}
 
+	if config.Seal {
+		args = append(args, "--seal")
+	}
+
 	if config.Relayer {
 		args = append(args, "--relayer")
 	}
