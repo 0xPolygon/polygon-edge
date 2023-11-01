@@ -85,6 +85,13 @@ func setFlags(cmd *cobra.Command) {
 		rootHelper.SupernetManagerFlagDesc,
 	)
 
+	cmd.Flags().StringVar(
+		&params.stakeManagerAddress,
+		rootHelper.StakeManagerFlag,
+		"",
+		fmt.Sprintf("[DEPRECATED] %s", rootHelper.StakeManagerFlagDesc),
+	)
+
 	cmd.Flags().BoolVar(
 		&params.finalizeGenesisSet,
 		finalizeGenesisSetFlag,

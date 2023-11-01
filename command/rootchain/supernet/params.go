@@ -21,6 +21,7 @@ type supernetParams struct {
 	jsonRPC                string
 	supernetManagerAddress string
 	genesisPath            string
+	stakeManagerAddress    string
 	finalizeGenesisSet     bool
 	enableStaking          bool
 }
