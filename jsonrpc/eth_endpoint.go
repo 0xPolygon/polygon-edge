@@ -9,9 +9,11 @@ import (
 	"github.com/hashicorp/go-hclog"
 
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/gasprice"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
+	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -93,11 +95,12 @@ type ethStore interface {
 
 // Eth is the eth jsonrpc endpoint
 type Eth struct {
-	logger        hclog.Logger
-	store         ethStore
-	chainID       uint64
-	filterManager *FilterManager
-	priceLimit    uint64
+	logger         hclog.Logger
+	store          ethStore
+	chainID        uint64
+	filterManager  *FilterManager
+	priceLimit     uint64
+	secretsManager secrets.SecretsManager
 }
 
 var (
@@ -109,6 +112,16 @@ var (
 //nolint:stylecheck
 func (e *Eth) ChainId() (interface{}, error) {
 	return argUintPtr(e.chainID), nil
+}
+
+func (e *Eth) Accounts() (interface{}, error) {
+	// read account
+	account, err := wallet.NewAccountFromSecret(e.secretsManager)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read account data: %w", err)
+	}
+
+	return []types.Address{types.Address(wallet.NewKey(account).Address())}, nil
 }
 
 func (e *Eth) Syncing() (interface{}, error) {

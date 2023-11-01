@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/versioning"
 	"github.com/gorilla/websocket"
 	"github.com/hashicorp/go-hclog"
@@ -71,6 +72,8 @@ type Config struct {
 
 	ConcurrentRequestsDebug uint64
 	WebSocketReadLimit      uint64
+
+	SecretsManager secrets.SecretsManager
 }
 
 // NewJSONRPC returns the JSONRPC http server
@@ -85,6 +88,7 @@ func NewJSONRPC(logger hclog.Logger, config *Config) (*JSONRPC, error) {
 			jsonRPCBatchLengthLimit: config.BatchLengthLimit,
 			blockRangeLimit:         config.BlockRangeLimit,
 			concurrentRequestsDebug: config.ConcurrentRequestsDebug,
+			secretsManager:          config.SecretsManager,
 		},
 	)
 
