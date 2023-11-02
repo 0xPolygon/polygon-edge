@@ -41,11 +41,22 @@ jobs:
         id: run_tests_failure
         run: echo "test_output=false" >> $GITHUB_OUTPUT
 
-      # Triggering SonarQube analysis as results of it are required by Quality Gate check.
+  sonar-scan:
+    name: SonarQube Scan
+    needs: go_test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Branch
+        uses: actions/checkout@v3
+      - name: Download coverage report artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: code-coverage-report
+          path: ./coverage
       - name: SonarCloud Scan
         if: ${{ env.HAVE_SONAR_TOKEN == 'true' }}
         uses: SonarSource/sonarcloud-github-action@master
         env:
           HAVE_SONAR_TOKEN: ${{ secrets.SONAR_TOKEN != '' }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
