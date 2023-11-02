@@ -103,12 +103,16 @@ func (f *Forks) IsActive(name string, block uint64) bool {
 }
 
 // SetFork adds/updates fork defined by name
-func (f *Forks) SetFork(name string, value Fork) {
+func (f *Forks) SetFork(name string, value Fork) *Forks {
 	(*f)[name] = value
+
+	return f
 }
 
-func (f *Forks) RemoveFork(name string) {
+func (f *Forks) RemoveFork(name string) *Forks {
 	delete(*f, name)
+
+	return f
 }
 
 // At returns ForksInTime instance that shows which supported forks are enabled for the block

@@ -40,6 +40,9 @@ var (
 
 	// ErrTxTypeNotSupported denotes that transaction is not supported
 	ErrTxTypeNotSupported = errors.New("transaction type not supported")
+
+	// ErrInsufficientFunds denotes that account has insufficient funds for transaction execution
+	ErrInsufficientFunds = errors.New("insufficient funds for execution")
 )
 
 type Hash [HashLength]byte

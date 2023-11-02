@@ -3,12 +3,12 @@ package evm
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"math/bits"
 	"sync"
 
 	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/keccak"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -1232,11 +1232,10 @@ func (c *state) buildCallContract(op OpCode) (*runtime.Contract, uint64, uint64,
 		gasCost = 40
 	}
 
-	eip158 := c.config.EIP158
 	transfersValue := (op == CALL || op == CALLCODE) && value != nil && value.Sign() != 0
 
 	if op == CALL {
-		if eip158 {
+		if c.config.EIP158 {
 			if transfersValue && c.host.Empty(addr) {
 				gasCost += 25000
 			}
@@ -1271,7 +1270,14 @@ func (c *state) buildCallContract(op OpCode) (*runtime.Contract, uint64, uint64,
 		gas = initialGas.Uint64()
 	}
 
-	gasCost = gasCost + gas
+	gasCostTmp, isOverflow := common.SafeAddUint64(gasCost, gas)
+	if isOverflow {
+		c.exit(errGasUintOverflow)
+
+		return nil, 0, 0, nil
+	}
+
+	gasCost = gasCostTmp
 
 	// Consume gas cost
 	if !c.consumeGas(gasCost) {
@@ -1309,7 +1315,7 @@ func (c *state) buildCallContract(op OpCode) (*runtime.Contract, uint64, uint64,
 
 	if transfersValue {
 		if c.host.GetBalance(c.msg.Address).Cmp(value) < 0 {
-			return contract, 0, 0, fmt.Errorf("bad")
+			return contract, 0, 0, types.ErrInsufficientFunds
 		}
 	}
 
@@ -1352,7 +1358,7 @@ func (c *state) buildCreateContract(op OpCode) (*runtime.Contract, error) {
 
 	if hasTransfer {
 		if c.host.GetBalance(c.msg.Address).Cmp(value) < 0 {
-			return nil, fmt.Errorf("bad")
+			return nil, types.ErrInsufficientFunds
 		}
 	}
 
