@@ -103,10 +103,8 @@ func (f *Forks) IsActive(name string, block uint64) bool {
 }
 
 // SetFork adds/updates fork defined by name
-func (f *Forks) SetFork(name string, value Fork) *Forks {
+func (f *Forks) SetFork(name string, value Fork) {
 	(*f)[name] = value
-
-	return f
 }
 
 func (f *Forks) RemoveFork(name string) *Forks {
