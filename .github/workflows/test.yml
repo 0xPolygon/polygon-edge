@@ -48,11 +48,6 @@ jobs:
     steps:
       - name: Checkout Branch
         uses: actions/checkout@v3
-      - name: Download coverage report artifact
-        uses: actions/download-artifact@v3
-        with:
-          name: code-coverage-report
-          path: ./coverage
       - name: SonarCloud Scan
         if: ${{ env.HAVE_SONAR_TOKEN == 'true' }}
         uses: SonarSource/sonarcloud-github-action@master
