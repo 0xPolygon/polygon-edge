@@ -16,8 +16,6 @@ var (
 	two = big.NewInt(2)
 
 	allEnabledForks = chain.AllForksEnabled.At(0)
-
-	eip150DisabledForks = chain.AllForksEnabled.RemoveFork(chain.EIP150).At(0)
 )
 
 type cases2To1 []struct {
@@ -713,7 +711,7 @@ func Test_opCall(t *testing.T) {
 			contract: &runtime.Contract{
 				Static: false,
 			},
-			config: eip150DisabledForks,
+			config: chain.AllForksEnabled.RemoveFork(chain.EIP150).At(0),
 			initState: &state{
 				gas: 6640,
 				sp:  7,
