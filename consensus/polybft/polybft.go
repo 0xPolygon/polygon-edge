@@ -612,7 +612,7 @@ func (p *Polybft) startConsensusProtocol() {
 	// wait until he stops syncing
 	p.logger.Info("waiting to stop syncing so that we can try to join consensus if node is a validator")
 
-	for p.syncer.IsSyncingWithPeer() {
+	for p.syncer.IsSyncing() {
 	}
 
 	p.logger.Info("node synced up on start. Trying to join consensus if validator")

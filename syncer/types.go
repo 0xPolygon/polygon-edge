@@ -70,8 +70,8 @@ type Syncer interface {
 	HasSyncPeer() bool
 	// Sync starts routine to sync blocks
 	Sync(func(*types.FullBlock) bool) error
-
-	IsSyncingWithPeer() bool
+	// Indicates if syncer is syncing with the best peer
+	IsSyncing() bool
 }
 
 type Progression interface {

@@ -3,7 +3,6 @@ package syncer
 import (
 	"errors"
 	"fmt"
-	"sync/atomic"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/helper/progress"
@@ -39,8 +38,6 @@ type syncer struct {
 
 	// Channel to notify Sync that a new status arrived
 	newStatusCh chan struct{}
-
-	isSyncing atomic.Bool
 }
 
 func NewSyncer(
@@ -222,9 +219,6 @@ func (s *syncer) bulkSyncWithPeer(peerID peer.ID, peerLatestBlock uint64,
 		return 0, false, err
 	}
 
-	s.setIsSyncing(true)
-	defer s.setIsSyncing(false)
-
 	// Create a blockchain subscription for the sync progression and start tracking
 	subscription := s.blockchain.SubscribeEvents()
 	s.syncProgression.StartProgression(localLatest+1, subscription)
@@ -278,14 +272,9 @@ func (s *syncer) bulkSyncWithPeer(peerID peer.ID, peerLatestBlock uint64,
 	}
 }
 
-// setIsSyncing updates the isSyncing field
-func (s *syncer) setIsSyncing(isSyncing bool) {
-	s.isSyncing.Store(isSyncing)
-}
-
-// IsSyncingWithPeer indicates if node is syncing with peer
-func (s *syncer) IsSyncingWithPeer() bool {
-	return s.isSyncing.Load()
+// IsSyncing indicates if node is syncing with peer
+func (s *syncer) IsSyncing() bool {
+	return s.GetSyncProgression() != nil
 }
 
 func updateMetrics(fullBlock *types.FullBlock) {

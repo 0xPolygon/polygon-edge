@@ -395,7 +395,7 @@ func (tp *syncerMock) Sync(func(*types.FullBlock) bool) error {
 	return args.Error(0)
 }
 
-func (tp *syncerMock) IsSyncingWithPeer() bool {
+func (tp *syncerMock) IsSyncing() bool {
 	args := tp.Called()
 
 	return args.Bool(0)
