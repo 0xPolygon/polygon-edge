@@ -27,6 +27,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           submodules: recursive
+          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
 
       - name: Install Dependencies
         run: ./setup-ci.sh
@@ -39,15 +40,6 @@ jobs:
         id: run_tests_failure
         run: echo "test_output=false" >> $GITHUB_OUTPUT
 
-  sonar-scan:
-    name: SonarQube Scan
-    needs: go_test
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Branch
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
       - name: SonarCloud Scan
         if: ${{ env.HAVE_SONAR_TOKEN == 'true' }}
         uses: SonarSource/sonarcloud-github-action@master
