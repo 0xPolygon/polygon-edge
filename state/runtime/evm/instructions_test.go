@@ -1,6 +1,7 @@
 package evm
 
 import (
+	"math"
 	"math/big"
 	"testing"
 
@@ -666,7 +667,7 @@ func Test_opCall(t *testing.T) {
 		name        string
 		op          OpCode
 		contract    *runtime.Contract
-		config      *chain.ForksInTime
+		config      chain.ForksInTime
 		initState   *state
 		resultState *state
 		mockHost    *mockHostForInstructions
@@ -678,7 +679,7 @@ func Test_opCall(t *testing.T) {
 			contract: &runtime.Contract{
 				Static: true,
 			},
-			config: &allEnabledForks,
+			config: allEnabledForks,
 			initState: &state{
 				gas: 1000,
 				sp:  6,
@@ -696,6 +697,73 @@ func Test_opCall(t *testing.T) {
 				memory: []byte{0x01},
 				stop:   false,
 				err:    nil,
+				gas:    300,
+			},
+			mockHost: &mockHostForInstructions{
+				callxResult: &runtime.ExecutionResult{
+					ReturnValue: []byte{0x03},
+				},
+			},
+		},
+		{
+			name: "call cost overflow (EIP150 fork disabled)",
+			op:   CALLCODE,
+			contract: &runtime.Contract{
+				Static: false,
+			},
+			config: chain.AllForksEnabled.RemoveFork(chain.EIP150).At(0),
+			initState: &state{
+				gas: 6640,
+				sp:  7,
+				stack: []*big.Int{
+					big.NewInt(0x00),                        // outSize
+					big.NewInt(0x00),                        // outOffset
+					big.NewInt(0x00),                        // inSize
+					big.NewInt(0x00),                        // inOffset
+					big.NewInt(0x01),                        // value
+					big.NewInt(0x03),                        // address
+					big.NewInt(0).SetUint64(math.MaxUint64), // initialGas
+				},
+				memory: []byte{0x01},
+			},
+			resultState: &state{
+				memory: []byte{0x01},
+				stop:   true,
+				err:    errGasUintOverflow,
+				gas:    6640,
+			},
+			mockHost: &mockHostForInstructions{
+				callxResult: &runtime.ExecutionResult{
+					ReturnValue: []byte{0x03},
+				},
+			},
+		},
+		{
+			name: "available gas underflow",
+			op:   CALLCODE,
+			contract: &runtime.Contract{
+				Static: false,
+			},
+			config: allEnabledForks,
+			initState: &state{
+				gas: 6640,
+				sp:  7,
+				stack: []*big.Int{
+					big.NewInt(0x00),                        // outSize
+					big.NewInt(0x00),                        // outOffset
+					big.NewInt(0x00),                        // inSize
+					big.NewInt(0x00),                        // inOffset
+					big.NewInt(0x01),                        // value
+					big.NewInt(0x03),                        // address
+					big.NewInt(0).SetUint64(math.MaxUint64), // initialGas
+				},
+				memory: []byte{0x01},
+			},
+			resultState: &state{
+				memory: []byte{0x01},
+				stop:   true,
+				err:    errOutOfGas,
+				gas:    6640,
 			},
 			mockHost: &mockHostForInstructions{
 				callxResult: &runtime.ExecutionResult{
@@ -717,14 +785,15 @@ func Test_opCall(t *testing.T) {
 			state.sp = test.initState.sp
 			state.stack = test.initState.stack
 			state.memory = test.initState.memory
-			state.config = test.config
+			state.config = &test.config
 			state.host = test.mockHost
 
 			opCall(test.op)(state)
 
-			assert.Equal(t, test.resultState.memory, state.memory, "memory in state after execution is not correct")
-			assert.Equal(t, test.resultState.stop, state.stop, "stop in state after execution is not correct")
-			assert.Equal(t, test.resultState.err, state.err, "err in state after execution is not correct")
+			assert.Equal(t, test.resultState.memory, state.memory, "memory in state after execution is incorrect")
+			assert.Equal(t, test.resultState.stop, state.stop, "stop in state after execution is incorrect")
+			assert.Equal(t, test.resultState.err, state.err, "err in state after execution is incorrect")
+			assert.Equal(t, test.resultState.gas, state.gas, "gas in state after execution is incorrect")
 		})
 	}
 }

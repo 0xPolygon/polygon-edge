@@ -358,6 +358,17 @@ func BigIntDivCeil(a, b *big.Int) *big.Int {
 		Div(result, b)
 }
 
+// SafeAddUint64 sums two unsigned int64 numbers if there is no overflow.
+// In case there is an overflow, it would return 0 and true, otherwise sum and false.
+func SafeAddUint64(a, b uint64) (uint64, bool) {
+	sum := a + b
+	if sum < a || sum < b {
+		return 0, true
+	}
+
+	return sum, false
+}
+
 // EncodeUint64ToBytes encodes provided uint64 to big endian byte slice
 func EncodeUint64ToBytes(value uint64) []byte {
 	result := make([]byte, 8)

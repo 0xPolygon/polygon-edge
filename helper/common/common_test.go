@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"math"
 	"math/big"
 	"testing"
 	"time"
@@ -123,4 +125,44 @@ func TestRetryForever_CancelContext_ShouldEnd(t *testing.T) {
 		return errors.New("")
 	})
 	require.True(t, errors.Is(ctx.Err(), context.Canceled))
+}
+
+func Test_SafeAddUint64(t *testing.T) {
+	cases := []struct {
+		a        uint64
+		b        uint64
+		result   uint64
+		overflow bool
+	}{
+		{
+			a:      10,
+			b:      4,
+			result: 14,
+		},
+		{
+			a:      0,
+			b:      5,
+			result: 5,
+		},
+		{
+			a:        math.MaxUint64,
+			b:        3,
+			result:   0,
+			overflow: true,
+		},
+		{
+			a:        math.MaxUint64,
+			b:        math.MaxUint64,
+			result:   0,
+			overflow: true,
+		},
+	}
+
+	for i, c := range cases {
+		t.Run(fmt.Sprintf("%d case", i+1), func(t *testing.T) {
+			actualResult, actualOverflow := SafeAddUint64(c.a, c.b)
+			require.Equal(t, c.result, actualResult)
+			require.Equal(t, c.overflow, actualOverflow)
+		})
+	}
 }

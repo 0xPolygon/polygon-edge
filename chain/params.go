@@ -107,8 +107,10 @@ func (f *Forks) SetFork(name string, value Fork) {
 	(*f)[name] = value
 }
 
-func (f *Forks) RemoveFork(name string) {
+func (f *Forks) RemoveFork(name string) *Forks {
 	delete(*f, name)
+
+	return f
 }
 
 // At returns ForksInTime instance that shows which supported forks are enabled for the block
