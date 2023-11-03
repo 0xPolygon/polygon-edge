@@ -16,6 +16,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command"
 	bridgeCommon "github.com/0xPolygon/polygon-edge/command/bridge/common"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
+	cmdHelper "github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
 	rootHelper "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/server"
@@ -328,13 +329,14 @@ func (t *TestBridge) deployRootchainContracts(genesisPath string) error {
 	return nil
 }
 
-// fundRootchainValidators sends predefined amount of tokens to rootchain validators
-func (t *TestBridge) fundRootchainValidators(polybftConfig polybft.PolyBFTConfig) error {
+// fundAddressesOnRoot sends predefined amount of tokens to rootchain addresses
+func (t *TestBridge) fundAddressesOnRoot(tokenConfig *polybft.TokenConfig, polybftConfig polybft.PolyBFTConfig) error {
 	validatorSecrets, err := genesis.GetValidatorKeyFiles(t.clusterConfig.TmpDir, t.clusterConfig.ValidatorPrefix)
 	if err != nil {
 		return fmt.Errorf("could not get validator secrets on initial rootchain funding of genesis validators: %w", err)
 	}
 
+	// first fund validators
 	balances := make([]*big.Int, len(polybftConfig.InitialValidatorSet))
 	secrets := make([]string, len(validatorSecrets))
 
@@ -346,6 +348,33 @@ func (t *TestBridge) fundRootchainValidators(polybftConfig polybft.PolyBFTConfig
 	if err := t.FundValidators(polybftConfig.Bridge.StakeTokenAddr,
 		secrets, balances); err != nil {
 		return fmt.Errorf("failed to fund validators on the rootchain: %w", err)
+	}
+
+	// then fund all other addresses if token is non-mintable
+	// so that they can do premine on SupernetMAnager
+	if tokenConfig.IsMintable || len(t.clusterConfig.Premine) == 0 {
+		return nil
+	}
+
+	// non-validator addresses don't need to mint stake token,
+	// they only need to be funded with root token
+	args := []string{
+		"rootchain",
+		"fund",
+	}
+
+	for _, premineRaw := range t.clusterConfig.Premine {
+		premineInfo, err := cmdHelper.ParsePremineInfo(premineRaw)
+		if err != nil {
+			return err
+		}
+
+		args = append(args, "--addresses", premineInfo.Address.String())
+		args = append(args, "--amounts", command.DefaultPremineBalance.String()) // this is more than enough tokens
+	}
+
+	if err := t.cmdRun(args...); err != nil {
+		return fmt.Errorf("failed to fund non-validator addresses on root: %w", err)
 	}
 
 	return nil
@@ -467,7 +496,6 @@ func (t *TestBridge) finalizeGenesis(genesisPath string, polybftConfig polybft.P
 		"--private-key", rootHelper.TestAccountPrivKey,
 		"--genesis", genesisPath,
 		"--supernet-manager", polybftConfig.Bridge.CustomSupernetManagerAddr.String(),
-		"--stake-manager", polybftConfig.Bridge.StakeManagerAddr.String(),
 		"--finalize-genesis-set",
 		"--enable-staking",
 	}
@@ -529,4 +557,124 @@ func (t *TestBridge) deployStakeManager(genesisPath string) error {
 	}
 
 	return nil
+}
+
+func (t *TestBridge) mintNativeRootToken(validatorAddresses []types.Address, tokenConfig *polybft.TokenConfig,
+	polybftConfig polybft.PolyBFTConfig) error {
+	if tokenConfig.IsMintable {
+		// if token is mintable, it is premined in genesis command,
+		// so we just return here
+		return nil
+	}
+
+	// if token is non-mintable, then to do premine we first need to mint those tokens
+	// to validators and other provided addresses
+	args := []string{
+		"bridge",
+		"mint-erc20",
+		"--jsonrpc", t.JSONRPCAddr(),
+		"--erc20-token", polybftConfig.Bridge.RootNativeERC20Addr.String(),
+	}
+
+	// mint something for every validator
+	for _, addr := range validatorAddresses {
+		args = append(args, "--addresses", addr.String())
+		args = append(args, "--amounts", command.DefaultPremineBalance.String())
+	}
+
+	// mint something to others as well
+	for _, premineRaw := range t.clusterConfig.Premine {
+		premineInfo, err := cmdHelper.ParsePremineInfo(premineRaw)
+		if err != nil {
+			return err
+		}
+
+		args = append(args, "--addresses", premineInfo.Address.String())
+		args = append(args, "--amounts", premineInfo.Amount.String())
+	}
+
+	return t.cmdRun(args...)
+}
+
+func (t *TestBridge) premineNativeRootToken(tokenConfig *polybft.TokenConfig,
+	polybftConfig polybft.PolyBFTConfig) error {
+	if tokenConfig.IsMintable {
+		// if token is mintable, it is premined in genesis command,
+		// so we just return here
+		return nil
+	}
+
+	validatorSecrets, err := genesis.GetValidatorKeyFiles(t.clusterConfig.TmpDir, t.clusterConfig.ValidatorPrefix)
+	if err != nil {
+		return fmt.Errorf("could not get validator secrets on premining native root"+
+			" token for genesis validators: %w", err)
+	}
+
+	premineCmdArgs := func(secret, key string, amount *big.Int) error {
+		args := []string{
+			"rootchain",
+			"premine",
+			"--jsonrpc", t.JSONRPCAddr(),
+			"--supernet-manager", polybftConfig.Bridge.CustomSupernetManagerAddr.String(),
+			"--amount", amount.String(),
+			"--erc20-token", polybftConfig.Bridge.RootNativeERC20Addr.String(),
+			"--root-erc20-predicate", polybftConfig.Bridge.RootERC20PredicateAddr.String(),
+		}
+
+		if secret != "" {
+			args = append(args, "--"+polybftsecrets.AccountDirFlag, path.Join(t.clusterConfig.TmpDir, secret))
+		} else {
+			args = append(args, "--private-key", key)
+		}
+
+		return t.cmdRun(args...)
+	}
+
+	g, ctx := errgroup.WithContext(context.Background())
+
+	// premine validators
+	for _, secret := range validatorSecrets {
+		secret := secret
+
+		g.Go(func() error {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
+				if err := premineCmdArgs(secret, "", command.DefaultPremineBalance); err != nil {
+					return fmt.Errorf("failed to do premine of native root token for genesis validator: %w",
+						err)
+				}
+
+				return nil
+			}
+		})
+	}
+
+	// now premine for other addresses
+	for _, premineRaw := range t.clusterConfig.Premine {
+		premineRaw := premineRaw
+
+		g.Go(func() error {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
+				premineInfo, err := cmdHelper.ParsePremineInfo(premineRaw)
+				if err != nil {
+					return fmt.Errorf("failed to do premine of native root token for non-validator"+
+						" account: %w. premine raw: %s", err, premineRaw)
+				}
+
+				if err := premineCmdArgs("", premineInfo.Key, premineInfo.Amount); err != nil {
+					return fmt.Errorf("failed to do premine of native root token for "+
+						"non-validator account: %w. premine raw: %s", err, premineRaw)
+				}
+
+				return nil
+			}
+		})
+	}
+
+	return g.Wait()
 }

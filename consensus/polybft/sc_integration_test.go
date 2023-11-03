@@ -93,7 +93,7 @@ func TestIntegration_PerformExit(t *testing.T) {
 			NewExitHelper:          exitHelperContractAddress,
 			NewChildERC20Predicate: contracts.ChildERC20PredicateContract,
 			NewChildTokenTemplate:  contracts.ChildERC20Contract,
-			NativeTokenRootAddress: contracts.NativeERC20TokenContract,
+			NewNativeTokenRoot:     contracts.NativeERC20TokenContract,
 		}).EncodeAbi()
 	}
 	rootERC20PredicateAddr := deployAndInitContract(t, transition, contractsapi.RootERC20Predicate.Bytecode, deployerAddress, rootERC20PredicateInit)

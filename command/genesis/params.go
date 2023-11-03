@@ -3,10 +3,8 @@ package genesis
 import (
 	"errors"
 	"fmt"
-	"math"
 	"math/big"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -41,11 +39,6 @@ const (
 	rewardWalletFlag             = "reward-wallet"
 	blockTrackerPollIntervalFlag = "block-tracker-poll-interval"
 	proxyContractsAdminFlag      = "proxy-contracts-admin"
-
-	defaultNativeTokenName     = "Polygon"
-	defaultNativeTokenSymbol   = "MATIC"
-	defaultNativeTokenDecimals = uint8(18)
-	minNativeTokenParamsNumber = 4
 )
 
 // Legacy flags that need to be preserved for running clients
@@ -58,17 +51,19 @@ var (
 )
 
 var (
-	errValidatorsNotSpecified = errors.New("validator information not specified")
-	errUnsupportedConsensus   = errors.New("specified consensusRaw not supported")
-	errInvalidEpochSize       = errors.New("epoch size must be greater than 1")
-	errInvalidTokenParams     = errors.New("native token params were not submitted in proper format " +
-		"(<name:symbol:decimals count:mintable flag:[mintable token owner address]>)")
+	errValidatorsNotSpecified   = errors.New("validator information not specified")
+	errUnsupportedConsensus     = errors.New("specified consensusRaw not supported")
+	errInvalidEpochSize         = errors.New("epoch size must be greater than 1")
 	errRewardWalletAmountZero   = errors.New("reward wallet amount can not be zero or negative")
 	errReserveAccMustBePremined = errors.New("it is mandatory to premine reserve account (0x0 address)")
 	errBlockTrackerPollInterval = errors.New("block tracker poll interval must be greater than 0")
 	errBaseFeeChangeDenomZero   = errors.New("base fee change denominator must be greater than 0")
 	errBaseFeeEMZero            = errors.New("base fee elasticity multiplier must be greater than 0")
 	errBaseFeeZero              = errors.New("base fee  must be greater than 0")
+	errRewardWalletNotDefined   = errors.New("reward wallet address must be defined")
+	errRewardTokenOnNonMintable = errors.New("a custom reward token must be defined when " +
+		"native ERC20 token is non-mintable")
+	errRewardWalletZero = errors.New("reward wallet address must not be zero address")
 )
 
 type genesisParams struct {
@@ -132,7 +127,7 @@ type genesisParams struct {
 	nativeTokenConfigRaw string
 	nativeTokenConfig    *polybft.TokenConfig
 
-	premineInfos []*premineInfo
+	premineInfos []*helper.PremineInfo
 
 	// rewards
 	rewardTokenCode string
@@ -173,7 +168,7 @@ func (p *genesisParams) validateFlags() error {
 			return err
 		}
 
-		if err := p.validateRewardWallet(); err != nil {
+		if err := p.validateRewardWalletAndToken(); err != nil {
 			return err
 		}
 
@@ -451,8 +446,8 @@ func (p *genesisParams) initGenesisConfig() error {
 	}
 
 	for _, premineInfo := range p.premineInfos {
-		chainConfig.Genesis.Alloc[premineInfo.address] = &chain.GenesisAccount{
-			Balance: premineInfo.amount,
+		chainConfig.Genesis.Alloc[premineInfo.Address] = &chain.GenesisAccount{
+			Balance: premineInfo.Amount,
 		}
 	}
 
@@ -481,23 +476,27 @@ func (p *genesisParams) predeployStakingSC() (*chain.GenesisAccount, error) {
 	return stakingAccount, nil
 }
 
-// validateRewardWallet validates reward wallet flag
-func (p *genesisParams) validateRewardWallet() error {
+// validateRewardWalletAndToken validates reward wallet flag
+func (p *genesisParams) validateRewardWalletAndToken() error {
 	if p.rewardWallet == "" {
-		return errors.New("reward wallet address must be defined")
+		return errRewardWalletNotDefined
 	}
 
-	premineInfo, err := parsePremineInfo(p.rewardWallet)
+	if !p.nativeTokenConfig.IsMintable && p.rewardTokenCode == "" {
+		return errRewardTokenOnNonMintable
+	}
+
+	premineInfo, err := helper.ParsePremineInfo(p.rewardWallet)
 	if err != nil {
 		return err
 	}
 
-	if premineInfo.address == types.ZeroAddress {
-		return errors.New("reward wallet address must not be zero address")
+	if premineInfo.Address == types.ZeroAddress {
+		return errRewardWalletZero
 	}
 
 	// If epoch rewards are enabled, reward wallet must have some amount of premine
-	if p.epochReward > 0 && premineInfo.amount.Cmp(big.NewInt(0)) < 1 {
+	if p.epochReward > 0 && premineInfo.Amount.Cmp(big.NewInt(0)) < 1 {
 		return errRewardWalletAmountZero
 	}
 
@@ -506,10 +505,10 @@ func (p *genesisParams) validateRewardWallet() error {
 
 // parsePremineInfo parses premine flag
 func (p *genesisParams) parsePremineInfo() error {
-	p.premineInfos = make([]*premineInfo, 0, len(p.premine))
+	p.premineInfos = make([]*helper.PremineInfo, 0, len(p.premine))
 
 	for _, premine := range p.premine {
-		premineInfo, err := parsePremineInfo(premine)
+		premineInfo, err := helper.ParsePremineInfo(premine)
 		if err != nil {
 			return fmt.Errorf("invalid premine balance amount provided: %w", err)
 		}
@@ -523,7 +522,7 @@ func (p *genesisParams) parsePremineInfo() error {
 // validatePremineInfo validates whether reserve account (0x0 address) is premined
 func (p *genesisParams) validatePremineInfo() error {
 	for _, premineInfo := range p.premineInfos {
-		if premineInfo.address == types.ZeroAddress {
+		if premineInfo.Address == types.ZeroAddress {
 			// we have premine of zero address, just return
 			return nil
 		}
@@ -617,65 +616,12 @@ func (p *genesisParams) isBurnContractEnabled() bool {
 
 // extractNativeTokenMetadata parses provided native token metadata (such as name, symbol and decimals count)
 func (p *genesisParams) extractNativeTokenMetadata() error {
-	if p.nativeTokenConfigRaw == "" {
-		p.nativeTokenConfig = &polybft.TokenConfig{
-			Name:       defaultNativeTokenName,
-			Symbol:     defaultNativeTokenSymbol,
-			Decimals:   defaultNativeTokenDecimals,
-			IsMintable: false,
-			Owner:      types.ZeroAddress,
-		}
-
-		return nil
-	}
-
-	params := strings.Split(p.nativeTokenConfigRaw, ":")
-	if len(params) < minNativeTokenParamsNumber {
-		return errInvalidTokenParams
-	}
-
-	// name
-	name := strings.TrimSpace(params[0])
-	if name == "" {
-		return errInvalidTokenParams
-	}
-
-	// symbol
-	symbol := strings.TrimSpace(params[1])
-	if symbol == "" {
-		return errInvalidTokenParams
-	}
-
-	// decimals
-	decimals, err := strconv.ParseUint(strings.TrimSpace(params[2]), 10, 8)
-	if err != nil || decimals > math.MaxUint8 {
-		return errInvalidTokenParams
-	}
-
-	// is mintable native token used
-	isMintable, err := strconv.ParseBool(strings.TrimSpace(params[3]))
+	tokenConfig, err := polybft.ParseRawTokenConfig(p.nativeTokenConfigRaw)
 	if err != nil {
-		return errInvalidTokenParams
+		return err
 	}
 
-	// in case it is mintable native token, it is expected to have 5 parameters provided
-	if isMintable && len(params) != minNativeTokenParamsNumber+1 {
-		return errInvalidTokenParams
-	}
-
-	// owner address
-	owner := types.ZeroAddress
-	if isMintable {
-		owner = types.StringToAddress(strings.TrimSpace(params[4]))
-	}
-
-	p.nativeTokenConfig = &polybft.TokenConfig{
-		Name:       name,
-		Symbol:     symbol,
-		Decimals:   uint8(decimals),
-		IsMintable: isMintable,
-		Owner:      owner,
-	}
+	p.nativeTokenConfig = tokenConfig
 
 	return nil
 }

@@ -149,6 +149,7 @@ func TestE2E_Migration(t *testing.T) {
 	cluster := frameworkpolybft.NewTestCluster(t, 7,
 		frameworkpolybft.WithNonValidators(2),
 		frameworkpolybft.WithValidatorSnapshot(5),
+		frameworkpolybft.WithTestRewardToken(),
 		frameworkpolybft.WithGenesisState(tmpDir, types.Hash(stateRoot)),
 	)
 	defer cluster.Stop()

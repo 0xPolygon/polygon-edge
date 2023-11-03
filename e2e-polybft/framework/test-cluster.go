@@ -90,7 +90,6 @@ type TestClusterConfig struct {
 
 	Name                 string
 	Premine              []string // address[:amount]
-	PremineValidators    []string // address[:amount]
 	StakeAmounts         []*big.Int
 	BootnodeCount        int
 	NonValidatorCount    int
@@ -512,7 +511,11 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			args = append(args, "--native-token-config", cluster.Config.NativeTokenConfigRaw)
 		}
 
-		if len(cluster.Config.Premine) != 0 {
+		tokenConfig, err := polybft.ParseRawTokenConfig(cluster.Config.NativeTokenConfigRaw)
+		require.NoError(t, err)
+
+		if len(cluster.Config.Premine) != 0 && tokenConfig.IsMintable {
+			// only add premine flags in genesis if token is mintable
 			for _, premine := range cluster.Config.Premine {
 				args = append(args, "--premine", premine)
 			}
@@ -626,8 +629,11 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 	polybftConfig, err := polybft.LoadPolyBFTConfig(genesisPath)
 	require.NoError(t, err)
 
-	// fund validators on the rootchain
-	err = cluster.Bridge.fundRootchainValidators(polybftConfig)
+	tokenConfig, err := polybft.ParseRawTokenConfig(cluster.Config.NativeTokenConfigRaw)
+	require.NoError(t, err)
+
+	// fund addresses on the rootchain
+	err = cluster.Bridge.fundAddressesOnRoot(tokenConfig, polybftConfig)
 	require.NoError(t, err)
 
 	// whitelist genesis validators on the rootchain
@@ -640,6 +646,13 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 
 	// do initial staking for genesis validators on the rootchain
 	err = cluster.Bridge.initialStakingOfGenesisValidators(polybftConfig)
+	require.NoError(t, err)
+
+	// add premine if token is non-mintable
+	err = cluster.Bridge.mintNativeRootToken(addresses, tokenConfig, polybftConfig)
+	require.NoError(t, err)
+
+	err = cluster.Bridge.premineNativeRootToken(tokenConfig, polybftConfig)
 	require.NoError(t, err)
 
 	// finalize genesis validators on the rootchain

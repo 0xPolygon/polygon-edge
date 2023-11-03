@@ -20,6 +20,7 @@ func TestE2E_BurnContract_Deployed(t *testing.T) {
 	destinationAddr := types.Address(destinationKey.Address())
 
 	cluster := framework.NewTestCluster(t, 5,
+		framework.WithTestRewardToken(),
 		framework.WithBurnContract(&polybft.BurnContractInfo{
 			Address:            contractAddr,
 			DestinationAddress: destinationAddr,

@@ -539,7 +539,7 @@ type InitializeRootERC20PredicateFn struct {
 	NewExitHelper          types.Address `abi:"newExitHelper"`
 	NewChildERC20Predicate types.Address `abi:"newChildERC20Predicate"`
 	NewChildTokenTemplate  types.Address `abi:"newChildTokenTemplate"`
-	NativeTokenRootAddress types.Address `abi:"nativeTokenRootAddress"`
+	NewNativeTokenRoot     types.Address `abi:"newNativeTokenRoot"`
 }
 
 func (i *InitializeRootERC20PredicateFn) Sig() []byte {
@@ -1222,13 +1222,14 @@ func (o *OwnerOfChildERC721Fn) DecodeAbi(buf []byte) error {
 }
 
 type InitializeCustomSupernetManagerFn struct {
-	NewStakeManager      types.Address `abi:"newStakeManager"`
-	NewBls               types.Address `abi:"newBls"`
-	NewStateSender       types.Address `abi:"newStateSender"`
-	NewMatic             types.Address `abi:"newMatic"`
-	NewChildValidatorSet types.Address `abi:"newChildValidatorSet"`
-	NewExitHelper        types.Address `abi:"newExitHelper"`
-	NewDomain            string        `abi:"newDomain"`
+	NewStakeManager       types.Address `abi:"newStakeManager"`
+	NewBls                types.Address `abi:"newBls"`
+	NewStateSender        types.Address `abi:"newStateSender"`
+	NewMatic              types.Address `abi:"newMatic"`
+	NewChildValidatorSet  types.Address `abi:"newChildValidatorSet"`
+	NewExitHelper         types.Address `abi:"newExitHelper"`
+	NewRootERC20Predicate types.Address `abi:"newRootERC20Predicate"`
+	NewDomain             string        `abi:"newDomain"`
 }
 
 func (i *InitializeCustomSupernetManagerFn) Sig() []byte {
@@ -1290,6 +1291,22 @@ func (g *GetValidatorCustomSupernetManagerFn) EncodeAbi() ([]byte, error) {
 
 func (g *GetValidatorCustomSupernetManagerFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(CustomSupernetManager.Abi.Methods["getValidator"], buf, g)
+}
+
+type AddGenesisBalanceCustomSupernetManagerFn struct {
+	Amount *big.Int `abi:"amount"`
+}
+
+func (a *AddGenesisBalanceCustomSupernetManagerFn) Sig() []byte {
+	return CustomSupernetManager.Abi.Methods["addGenesisBalance"].ID()
+}
+
+func (a *AddGenesisBalanceCustomSupernetManagerFn) EncodeAbi() ([]byte, error) {
+	return CustomSupernetManager.Abi.Methods["addGenesisBalance"].Encode(a)
+}
+
+func (a *AddGenesisBalanceCustomSupernetManagerFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(CustomSupernetManager.Abi.Methods["addGenesisBalance"], buf, a)
 }
 
 type ValidatorRegisteredEvent struct {

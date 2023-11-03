@@ -122,7 +122,6 @@ case "$1" in
               "$POLYGON_EDGE_BIN" polybft supernet \
                 --private-key aa75e9a7d427efc732f8e4f1a5b7646adcc61fd5bae40f80d13c8419c9f43d6d \
                 --supernet-manager ${customSupernetManagerAddr} \
-                --stake-manager ${stakeManagerAddr} \
                 --finalize-genesis-set \
                 --enable-staking \
                 --genesis /data/genesis.json \

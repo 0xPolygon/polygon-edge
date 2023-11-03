@@ -105,17 +105,35 @@ It has a native support for running bridge, which enables running cross-chain tr
     --stake-manager <address_of_StakeManager_contract> --stake-token <address_of_erc20_token_used_for_staking>
     ```
 
-11. Finalize genesis validator set on rootchain (SupernetManager) contract. This is done after all validators from genesis do initial staking on rootchain, and it's a final step that is required before starting the child chain. This needs to be done by the deployer of SupernetManager contract (the user that run the deploy command). He can use either its hex encoded private key, or data-dir flag if he has secerets initialized. If enable-staking flag is provided, validators will be able to continue staking on rootchain. If not, genesis validators will not be able update its stake or unstake, nor will newly registered validators after genesis will be able to stake tokens on the rootchain. Enabling of staking can be done through this command, or later after the child chain starts.
+11. Do mint and premine for relayer node. **These commands should only be executed if non-mintable erc20 token is used**
+
+    ```bash
+    $ polygon-edge bridge mint-erc20 \ 
+    --erc20-token <address_of_native_root_erc20_token> \
+    --private-key <hex_encoded_private_key_of_token_deployer> \
+    --addresses <address_of_relayer_node> \
+    --amounts <ammount_of_tokens_to_mint_to_relayer>
+    ```
+
+     ```bash
+    $ polygon-edge rootchain premine \ 
+    --erc20-token <address_of_native_root_erc20_token> \
+       --root-erc20-predicate <address_of_root_erc20_predicate_on_root> \
+       --supernet-manager <address_of_CustomSupernetManager_contract_on_root> \
+       --private-key <hex_encoded_private_key_of_relayer_node> \
+       --amount <ammount_of_tokens_to_premine>
+    ```
+
+12. Finalize genesis validator set on rootchain (SupernetManager) contract. This is done after all validators from genesis do initial staking on rootchain, and it's a final step that is required before starting the child chain. This needs to be done by the deployer of SupernetManager contract (the user that run the deploy command). He can use either its hex encoded private key, or data-dir flag if he has secerets initialized. If enable-staking flag is provided, validators will be able to continue staking on rootchain. If not, genesis validators will not be able update its stake or unstake, nor will newly registered validators after genesis will be able to stake tokens on the rootchain. Enabling of staking can be done through this command, or later after the child chain starts.
 
     ```bash
     $ polygon-edge polybft supernet --private-key <hex_encoded_rootchain_account_private_key_of_supernetManager_deployer> \
     --genesis <path_to_genesis_file> \
     --supernet-manager <address_of_SupernetManager_contract> \
-    --stake-manager <address_of_StakeManager_contract> \
     --finalize-genesis --enable-staking
     ```
 
-12. Run (child chain) cluster, consisting of 4 Edge clients in this particular example
+13. Run (child chain) cluster, consisting of 4 Edge clients in this particular example
 
     ```bash
     $ polygon-edge server --data-dir ./test-chain-1 --chain genesis.json --grpc-address :5001 --libp2p :30301 --jsonrpc :9545 \

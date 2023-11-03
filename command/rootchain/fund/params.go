@@ -11,15 +11,13 @@ import (
 )
 
 const (
-	addressesFlag      = "addresses"
-	amountsFlag        = "amounts"
 	jsonRPCFlag        = "json-rpc"
 	mintStakeTokenFlag = "mint"
 )
 
 var (
 	errNoAddressesProvided = errors.New("no addresses provided")
-	errInconsistentLength  = errors.New("validator addresses and amounts must be equal length")
+	errInconsistentLength  = errors.New("addresses and amounts must be equal length")
 )
 
 type fundParams struct {
@@ -35,11 +33,11 @@ type fundParams struct {
 
 func (fp *fundParams) validateFlags() error {
 	if len(fp.addresses) == 0 {
-		return errNoAddressesProvided
+		return rootHelper.ErrNoAddressesProvided
 	}
 
 	if len(fp.amounts) != len(fp.addresses) {
-		return errInconsistentLength
+		return rootHelper.ErrInconsistentLength
 	}
 
 	for _, addr := range fp.addresses {

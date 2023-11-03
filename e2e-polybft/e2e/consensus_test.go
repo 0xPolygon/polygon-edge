@@ -29,10 +29,16 @@ import (
 var uint256ABIType = abi.MustNewType("tuple(uint256)")
 
 func TestE2E_Consensus_Basic_WithNonValidators(t *testing.T) {
-	const epochSize = 4
+	const (
+		epochSize     = 4
+		validatorsNum = 5
+	)
 
-	cluster := framework.NewTestCluster(t, 5,
-		framework.WithEpochSize(epochSize), framework.WithNonValidators(2))
+	cluster := framework.NewTestCluster(t, validatorsNum,
+		framework.WithEpochSize(epochSize),
+		framework.WithNonValidators(2),
+		framework.WithTestRewardToken(),
+	)
 	defer cluster.Stop()
 
 	cluster.WaitForReady(t)
@@ -41,8 +47,8 @@ func TestE2E_Consensus_Basic_WithNonValidators(t *testing.T) {
 	relayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(cluster.Servers[0].JSONRPC()))
 	require.NoError(t, err)
 
-	// because we are using native token as reward wallet, and it has default premine balance
-	initialTotalSupply := new(big.Int).Set(command.DefaultPremineBalance)
+	// because we are pre-mining native tokens to validators
+	initialTotalSupply := new(big.Int).Mul(big.NewInt(validatorsNum), command.DefaultPremineBalance)
 
 	// check if initial total supply of native ERC20 token is the same as expected
 	totalSupply := queryNativeERC20Metadata(t, "totalSupply", uint256ABIType, relayer)
@@ -100,7 +106,9 @@ func TestE2E_Consensus_BulkDrop(t *testing.T) {
 
 	cluster := framework.NewTestCluster(t, clusterSize,
 		framework.WithEpochSize(epochSize),
-		framework.WithBlockTime(time.Second))
+		framework.WithBlockTime(time.Second),
+		framework.WithTestRewardToken(),
+	)
 	defer cluster.Stop()
 
 	// wait for cluster to start
@@ -594,18 +602,6 @@ func TestE2E_Consensus_CustomRewardToken(t *testing.T) {
 	defer cluster.Stop()
 
 	cluster.WaitForReady(t)
-
-	// initialize tx relayer
-	relayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(cluster.Servers[0].JSONRPC()))
-	require.NoError(t, err)
-
-	// because we are not using native token as reward wallet, and have no premine
-	// initial token supply should be 0
-	initialTotalSupply := big.NewInt(0)
-
-	// check if initial total supply of native ERC20 token is the same as expected
-	totalSupply := queryNativeERC20Metadata(t, "totalSupply", uint256ABIType, relayer)
-	require.True(t, initialTotalSupply.Cmp(totalSupply.(*big.Int)) == 0) //nolint:forcetypeassert
 
 	// wait for couple of epochs to accumulate some rewards
 	require.NoError(t, cluster.WaitForBlock(epochSize*3, 3*time.Minute))
