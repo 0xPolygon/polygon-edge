@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/umbracle/ethgo/wallet"
 	"pgregory.net/rapid"
 
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
@@ -20,6 +21,9 @@ func TestProperty_DifferentVotingPower(t *testing.T) {
 		blockTime = time.Second * 6
 		maxStake  = 20
 	)
+
+	minter, err := wallet.GenerateKey()
+	require.NoError(t, err)
 
 	rapid.Check(t, func(tt *rapid.T) {
 		var (
@@ -40,6 +44,7 @@ func TestProperty_DifferentVotingPower(t *testing.T) {
 		cluster := framework.NewPropertyTestCluster(t, int(numNodes),
 			framework.WithEpochSize(epochSize),
 			framework.WithBlockTime(blockTime),
+			framework.WithNativeTokenConfig(fmt.Sprintf(framework.NativeTokenMintableTestCfg, minter.Address())),
 			framework.WithSecretsCallback(func(adresses []types.Address, config *framework.TestClusterConfig) {
 				for i := range adresses {
 					config.StakeAmounts = append(config.StakeAmounts, stakes[i])
@@ -60,6 +65,9 @@ func TestProperty_DropValidators(t *testing.T) {
 		blockTime = time.Second * 4
 	)
 
+	minter, err := wallet.GenerateKey()
+	require.NoError(t, err)
+
 	rapid.Check(t, func(tt *rapid.T) {
 		var (
 			numNodes  = rapid.Uint64Range(5, 8).Draw(tt, "number of cluster nodes")
@@ -69,6 +77,7 @@ func TestProperty_DropValidators(t *testing.T) {
 		cluster := framework.NewPropertyTestCluster(t, int(numNodes),
 			framework.WithEpochSize(epochSize),
 			framework.WithBlockTime(blockTime),
+			framework.WithNativeTokenConfig(fmt.Sprintf(framework.NativeTokenMintableTestCfg, minter.Address())),
 			framework.WithSecretsCallback(func(adresses []types.Address, config *framework.TestClusterConfig) {
 				for range adresses {
 					config.StakeAmounts = append(config.StakeAmounts, big.NewInt(20))

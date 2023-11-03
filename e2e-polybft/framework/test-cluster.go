@@ -48,6 +48,9 @@ const (
 
 	// prefix for non validators directory
 	nonValidatorPrefix = "test-non-validator-"
+
+	// NativeTokenMintableTestCfg is the test native token config for Supernets originated native tokens
+	NativeTokenMintableTestCfg = "Mintable Edge Coin:MEC:18:true:%s" //nolint:gosec
 )
 
 type NodeType int

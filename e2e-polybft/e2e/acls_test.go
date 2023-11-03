@@ -44,7 +44,7 @@ func TestE2E_AllowList_ContractDeployment(t *testing.T) {
 	otherAddr := types.Address{0x1}
 
 	cluster := framework.NewTestCluster(t, 5,
-		framework.WithNativeTokenConfig(fmt.Sprintf(nativeTokenMintableTestCfg, adminAddr)),
+		framework.WithNativeTokenConfig(fmt.Sprintf(framework.NativeTokenMintableTestCfg, adminAddr)),
 		framework.WithPremine(adminAddr, targetAddr),
 		framework.WithContractDeployerAllowListAdmin(adminAddr),
 		framework.WithContractDeployerAllowListEnabled(otherAddr),
@@ -143,7 +143,7 @@ func TestE2E_BlockList_ContractDeployment(t *testing.T) {
 	otherAddr := types.Address{0x1}
 
 	cluster := framework.NewTestCluster(t, 5,
-		framework.WithNativeTokenConfig(fmt.Sprintf(nativeTokenMintableTestCfg, adminAddr)),
+		framework.WithNativeTokenConfig(fmt.Sprintf(framework.NativeTokenMintableTestCfg, adminAddr)),
 		framework.WithPremine(adminAddr, targetAddr),
 		framework.WithContractDeployerBlockListAdmin(adminAddr),
 		framework.WithContractDeployerBlockListEnabled(otherAddr),
@@ -227,7 +227,7 @@ func TestE2E_AllowList_Transactions(t *testing.T) {
 	otherAddr := types.Address(other.Address())
 
 	cluster := framework.NewTestCluster(t, 5,
-		framework.WithNativeTokenConfig(fmt.Sprintf(nativeTokenMintableTestCfg, adminAddr)),
+		framework.WithNativeTokenConfig(fmt.Sprintf(framework.NativeTokenMintableTestCfg, adminAddr)),
 		framework.WithPremine(adminAddr, targetAddr, otherAddr),
 		framework.WithTransactionsAllowListAdmin(adminAddr),
 		framework.WithTransactionsAllowListEnabled(otherAddr),
@@ -321,7 +321,7 @@ func TestE2E_BlockList_Transactions(t *testing.T) {
 	otherAddr := types.Address(other.Address())
 
 	cluster := framework.NewTestCluster(t, 5,
-		framework.WithNativeTokenConfig(fmt.Sprintf(nativeTokenMintableTestCfg, adminAddr)),
+		framework.WithNativeTokenConfig(fmt.Sprintf(framework.NativeTokenMintableTestCfg, adminAddr)),
 		framework.WithPremine(adminAddr, targetAddr, otherAddr),
 		framework.WithTransactionsBlockListAdmin(adminAddr),
 		framework.WithTransactionsBlockListEnabled(otherAddr),
@@ -392,7 +392,7 @@ func TestE2E_AddressLists_Bridge(t *testing.T) {
 	otherAddr := types.Address(other.Address())
 
 	cluster := framework.NewTestCluster(t, 5,
-		framework.WithNativeTokenConfig(fmt.Sprintf(nativeTokenMintableTestCfg, adminAddr)),
+		framework.WithNativeTokenConfig(fmt.Sprintf(framework.NativeTokenMintableTestCfg, adminAddr)),
 		framework.WithPremine(adminAddr, targetAddr, otherAddr),
 		framework.WithBridgeAllowListAdmin(adminAddr),
 		framework.WithBridgeAllowListEnabled(otherAddr),
