@@ -24,6 +24,9 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
+//nolint:godox
+// TODO: @Stefan-Ethernal move this to params.go
+
 const (
 	sprintSizeFlag = "sprint-size"
 	blockTimeFlag  = "block-time"
@@ -69,7 +72,10 @@ type contractInfo struct {
 	address  types.Address
 }
 
+// TODO: @Stefan-Ethernal Rename to generateChainConfig
 // generatePolyBftChainConfig creates and persists polybft chain configuration to the provided file path
+//
+//nolint:godox
 func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) error {
 	// populate premine balance map
 	premineBalances := make(map[types.Address]*helper.PremineInfo, len(p.premine))

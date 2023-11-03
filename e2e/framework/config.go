@@ -1,21 +1,16 @@
 package framework
 
 import (
-	"crypto/ecdsa"
 	"math/big"
-	"path/filepath"
 
-	"github.com/0xPolygon/polygon-edge/consensus/ibft"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/0xPolygon/polygon-edge/validators"
 )
 
 type ConsensusType int
 
 const (
-	ConsensusIBFT ConsensusType = iota
-	ConsensusDev
+	ConsensusDev ConsensusType = iota
 	ConsensusDummy
 )
 
@@ -33,34 +28,32 @@ type PredeployParams struct {
 // TestServerConfig for the test server
 type TestServerConfig struct {
 	ReservedPorts           []ReservedPort
-	JSONRPCPort             int                      // The JSON RPC endpoint port
-	GRPCPort                int                      // The GRPC endpoint port
-	LibP2PPort              int                      // The Libp2p endpoint port
-	RootDir                 string                   // The root directory for test environment
-	IBFTDirPrefix           string                   // The prefix of data directory for IBFT
-	IBFTDir                 string                   // The name of data directory for IBFT
-	PremineAccts            []*SrvAccount            // Accounts with existing balances (genesis accounts)
-	GenesisValidatorBalance *big.Int                 // Genesis the balance for the validators
-	DevStakers              []types.Address          // List of initial staking addresses for the staking SC
-	Consensus               ConsensusType            // Consensus MechanismType
-	ValidatorType           validators.ValidatorType // Validator Type
-	Bootnodes               []string                 // Bootnode Addresses
-	PriceLimit              *uint64                  // Minimum gas price limit to enforce for acceptance into the pool
-	DevInterval             int                      // Dev consensus update interval [s]
-	EpochSize               uint64                   // The epoch size in blocks for the IBFT layer
-	BlockGasLimit           uint64                   // Block gas limit
-	BlockGasTarget          uint64                   // Gas target for new blocks
-	BaseFee                 uint64                   // Initial base fee
-	ShowsLog                bool                     // Flag specifying if logs are shown
-	Name                    string                   // Name of the server
-	SaveLogs                bool                     // Flag specifying if logs are saved
-	LogsDir                 string                   // Directory where logs are saved
-	IsPos                   bool                     // Specifies the mechanism used for IBFT (PoA / PoS)
-	Signer                  crypto.TxSigner          // Signer used for transactions
-	MinValidatorCount       uint64                   // Min validator count
-	MaxValidatorCount       uint64                   // Max validator count
-	BlockTime               uint64                   // Minimum block generation time (in s)
-	IBFTBaseTimeout         uint64                   // Base Timeout in seconds for IBFT
+	JSONRPCPort             int             // The JSON RPC endpoint port
+	GRPCPort                int             // The GRPC endpoint port
+	LibP2PPort              int             // The Libp2p endpoint port
+	RootDir                 string          // The root directory for test environment
+	IBFTDirPrefix           string          // The prefix of data directory for IBFT
+	IBFTDir                 string          // The name of data directory for IBFT
+	PremineAccts            []*SrvAccount   // Accounts with existing balances (genesis accounts)
+	GenesisValidatorBalance *big.Int        // Genesis the balance for the validators
+	DevStakers              []types.Address // List of initial staking addresses for the staking SC
+	Consensus               ConsensusType   // Consensus MechanismType
+	Bootnodes               []string        // Bootnode Addresses
+	PriceLimit              *uint64         // Minimum gas price limit to enforce for acceptance into the pool
+	DevInterval             int             // Dev consensus update interval [s]
+	EpochSize               uint64          // The epoch size in blocks for the IBFT layer
+	BlockGasLimit           uint64          // Block gas limit
+	BlockGasTarget          uint64          // Gas target for new blocks
+	BaseFee                 uint64          // Initial base fee
+	ShowsLog                bool            // Flag specifying if logs are shown
+	Name                    string          // Name of the server
+	SaveLogs                bool            // Flag specifying if logs are saved
+	LogsDir                 string          // Directory where logs are saved
+	IsPos                   bool            // Specifies the mechanism used for IBFT (PoA / PoS)
+	Signer                  crypto.TxSigner // Signer used for transactions
+	MinValidatorCount       uint64          // Min validator count
+	MaxValidatorCount       uint64          // Max validator count
+	BlockTime               uint64          // Minimum block generation time (in s)
 	PredeployParams         *PredeployParams
 	BurnContracts           map[uint64]types.Address
 }
@@ -71,12 +64,7 @@ func (t *TestServerConfig) SetPredeployParams(params *PredeployParams) {
 
 // DataDir returns path of data directory server uses
 func (t *TestServerConfig) DataDir() string {
-	switch t.Consensus {
-	case ConsensusIBFT:
-		return filepath.Join(t.RootDir, t.IBFTDir)
-	default:
-		return t.RootDir
-	}
+	return t.RootDir
 }
 
 func (t *TestServerConfig) SetSigner(signer crypto.TxSigner) {
@@ -85,15 +73,6 @@ func (t *TestServerConfig) SetSigner(signer crypto.TxSigner) {
 
 func (t *TestServerConfig) SetBlockTime(blockTime uint64) {
 	t.BlockTime = blockTime
-}
-
-func (t *TestServerConfig) SetIBFTBaseTimeout(baseTimeout uint64) {
-	t.IBFTBaseTimeout = baseTimeout
-}
-
-// PrivateKey returns a private key in data directory
-func (t *TestServerConfig) PrivateKey() (*ecdsa.PrivateKey, error) {
-	return crypto.GenerateOrReadPrivateKey(filepath.Join(t.DataDir(), "consensus", ibft.IbftKeyName))
 }
 
 // CALLBACKS //
@@ -132,11 +111,6 @@ func (t *TestServerConfig) SetBurnContract(block uint64, address types.Address) 
 // SetConsensus callback sets consensus
 func (t *TestServerConfig) SetConsensus(c ConsensusType) {
 	t.Consensus = c
-}
-
-// SetValidatorType callback sets validator type
-func (t *TestServerConfig) SetValidatorType(vt validators.ValidatorType) {
-	t.ValidatorType = vt
 }
 
 // SetDevInterval sets the update interval for the dev consensus

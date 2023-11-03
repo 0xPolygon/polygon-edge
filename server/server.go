@@ -146,10 +146,6 @@ func NewServer(config *Config) (*Server, error) {
 		restoreProgression: progress.NewProgressionWrapper(progress.ChainSyncRestore),
 	}
 
-	if config.Chain.Params.GetEngine() == string(IBFTConsensus) {
-		m.logger.Info(common.IBFTImportantNotice)
-	}
-
 	m.logger.Info("Data dir", "path", config.DataDir)
 
 	var dirPaths = []string{

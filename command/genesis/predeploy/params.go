@@ -8,7 +8,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
-	"github.com/0xPolygon/polygon-edge/contracts/staking"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/helper/predeployment"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -32,9 +31,7 @@ var (
 
 var (
 	predeployAddressMin = types.StringToAddress("01100")
-	reservedAddresses   = []types.Address{
-		staking.AddrStakingContract,
-	}
+	reservedAddresses   = []types.Address{}
 )
 
 var (

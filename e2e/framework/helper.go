@@ -2,22 +2,18 @@ package framework
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"errors"
 	"fmt"
 	"math/big"
 	"net"
 	"os"
+	"path"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/contracts/abis"
-	"github.com/0xPolygon/polygon-edge/contracts/staking"
-	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/common"
-	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/server/proto"
 	txpoolProto "github.com/0xPolygon/polygon-edge/txpool/proto"
@@ -80,136 +76,6 @@ func GetAccountBalance(t *testing.T, address types.Address, rpcClient *jsonrpc.C
 	assert.NoError(t, err)
 
 	return accountBalance
-}
-
-// GetValidatorSet returns the validator set from the SC
-func GetValidatorSet(from types.Address, rpcClient *jsonrpc.Client) ([]types.Address, error) {
-	validatorsMethod, ok := abis.StakingABI.Methods["validators"]
-	if !ok {
-		return nil, errors.New("validators method doesn't exist in Staking contract ABI")
-	}
-
-	toAddress := ethgo.Address(staking.AddrStakingContract)
-	selector := validatorsMethod.ID()
-	response, err := rpcClient.Eth().Call(
-		&ethgo.CallMsg{
-			From:     ethgo.Address(from),
-			To:       &toAddress,
-			Data:     selector,
-			GasPrice: 1000000000,
-			Value:    big.NewInt(0),
-		},
-		ethgo.Latest,
-	)
-
-	if err != nil {
-		return nil, fmt.Errorf("unable to call Staking contract method validators, %w", err)
-	}
-
-	byteResponse, decodeError := hex.DecodeHex(response)
-	if decodeError != nil {
-		return nil, fmt.Errorf("unable to decode hex response, %w", decodeError)
-	}
-
-	return staking.DecodeValidators(validatorsMethod, byteResponse)
-}
-
-// StakeAmount is a helper function for staking an amount on the Staking SC
-func StakeAmount(
-	from types.Address,
-	senderKey *ecdsa.PrivateKey,
-	amount *big.Int,
-	srv *TestServer,
-) error {
-	// Stake Balance
-	txn := &PreparedTransaction{
-		From:     from,
-		To:       &staking.AddrStakingContract,
-		GasPrice: ethgo.Gwei(1),
-		Gas:      1000000,
-		Value:    amount,
-		Input:    MethodSig("stake"),
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
-	defer cancel()
-
-	_, err := srv.SendRawTx(ctx, txn, senderKey)
-
-	if err != nil {
-		return fmt.Errorf("unable to call Staking contract method stake, %w", err)
-	}
-
-	return nil
-}
-
-// UnstakeAmount is a helper function for unstaking the entire amount on the Staking SC
-func UnstakeAmount(
-	from types.Address,
-	senderKey *ecdsa.PrivateKey,
-	srv *TestServer,
-) (*ethgo.Receipt, error) {
-	// Stake Balance
-	txn := &PreparedTransaction{
-		From:     from,
-		To:       &staking.AddrStakingContract,
-		GasPrice: ethgo.Gwei(1),
-		Gas:      DefaultGasLimit,
-		Value:    big.NewInt(0),
-		Input:    MethodSig("unstake"),
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
-	defer cancel()
-
-	receipt, err := srv.SendRawTx(ctx, txn, senderKey)
-
-	if err != nil {
-		return nil, fmt.Errorf("unable to call Staking contract method unstake, %w", err)
-	}
-
-	return receipt, nil
-}
-
-// GetStakedAmount is a helper function for getting the staked amount on the Staking SC
-func GetStakedAmount(from types.Address, rpcClient *jsonrpc.Client) (*big.Int, error) {
-	stakedAmountMethod, ok := abis.StakingABI.Methods["stakedAmount"]
-	if !ok {
-		return nil, errors.New("stakedAmount method doesn't exist in Staking contract ABI")
-	}
-
-	toAddress := ethgo.Address(staking.AddrStakingContract)
-	selector := stakedAmountMethod.ID()
-	response, err := rpcClient.Eth().Call(
-		&ethgo.CallMsg{
-			From:     ethgo.Address(from),
-			To:       &toAddress,
-			Data:     selector,
-			GasPrice: 1000000000,
-			Value:    big.NewInt(0),
-		},
-		ethgo.Latest,
-	)
-
-	if err != nil {
-		return nil, fmt.Errorf("unable to call Staking contract method stakedAmount, %w", err)
-	}
-
-	bigResponse, decodeErr := common.ParseUint256orHex(&response)
-	if decodeErr != nil {
-		return nil, fmt.Errorf("unable to decode hex response")
-	}
-
-	return bigResponse, nil
-}
-
-func EcrecoverFromBlockhash(hash types.Hash, signature []byte) (types.Address, error) {
-	pubKey, err := crypto.RecoverPubkey(signature, crypto.Keccak256(hash.Bytes()))
-	if err != nil {
-		return types.Address{}, err
-	}
-
-	return crypto.PubKeyToAddress(pubKey), nil
 }
 
 func MultiJoinSerial(t *testing.T, srvs []*TestServer) {
@@ -559,4 +425,15 @@ func WaitForServersToSeal(servers []*TestServer, desiredHeight uint64) []error {
 	wg.Wait()
 
 	return waitErrors
+}
+
+func initLogsDir(t *testing.T) (string, error) {
+	t.Helper()
+	logsDir := path.Join("..", fmt.Sprintf("e2e-logs-%d", time.Now().UTC().Unix()), t.Name())
+
+	if err := common.CreateDirSafe(logsDir, 0755); err != nil {
+		return "", err
+	}
+
+	return logsDir, nil
 }
