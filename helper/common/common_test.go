@@ -140,6 +140,11 @@ func Test_SafeAddUint64(t *testing.T) {
 			result: 14,
 		},
 		{
+			a:      0,
+			b:      5,
+			result: 5,
+		},
+		{
 			a:        math.MaxUint64,
 			b:        3,
 			result:   0,
