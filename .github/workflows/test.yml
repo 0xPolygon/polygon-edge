@@ -6,8 +6,6 @@ on:  # yamllint disable-line rule:truthy
     secrets:
       SONAR_TOKEN:
         required: false
-      SONAR_HOST_URL:
-        required: false
     outputs:
       workflow_output:
         description: "Unit tests output"
