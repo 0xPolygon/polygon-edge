@@ -150,6 +150,12 @@ func Test_SafeAddUint64(t *testing.T) {
 			result:   0,
 			overflow: true,
 		},
+		{
+			a:        math.MaxUint64,
+			b:        math.MaxUint64,
+			result:   0,
+			overflow: true,
+		},
 	}
 
 	for i, c := range cases {
