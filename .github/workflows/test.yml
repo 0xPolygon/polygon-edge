@@ -41,23 +41,19 @@ jobs:
         id: run_tests_failure
         run: echo "test_output=false" >> $GITHUB_OUTPUT
 
-      # Triggering SonarQube analysis as results of it are required by Quality Gate check.
-      - name: SonarQube Scan
+  sonar-scan:
+    name: SonarQube Scan
+    needs: go_test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Branch
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+      - name: SonarCloud Scan
         if: ${{ env.HAVE_SONAR_TOKEN == 'true' }}
-        uses: sonarsource/sonarqube-scan-action@master
+        uses: SonarSource/sonarcloud-github-action@master
         env:
           HAVE_SONAR_TOKEN: ${{ secrets.SONAR_TOKEN != '' }}
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-
-      # Check the Quality Gate status.
-      - name: SonarQube Quality Gate check
-        id: sonarqube-quality-gate-check
-        if: ${{ env.HAVE_SONAR_TOKEN == 'true' }}
-        uses: sonarsource/sonarqube-quality-gate-action@master
-        # Force to fail step after specific time.
-        timeout-minutes: 5
-        env:
-          HAVE_SONAR_TOKEN: ${{ secrets.SONAR_TOKEN != '' }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
