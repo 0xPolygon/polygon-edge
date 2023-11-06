@@ -8,7 +8,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/genesis/predeploy"
 	"github.com/0xPolygon/polygon-edge/helper/common"
-	"github.com/0xPolygon/polygon-edge/server"
 )
 
 func GetCommand() *cobra.Command {
@@ -20,7 +19,6 @@ func GetCommand() *cobra.Command {
 	}
 
 	setFlags(genesisCmd)
-	setLegacyFlags(genesisCmd)
 
 	genesisCmd.AddCommand(
 		// genesis predeploy
@@ -309,30 +307,8 @@ func setFlags(cmd *cobra.Command) {
 	}
 }
 
-// setLegacyFlags sets the legacy flags to preserve backwards compatibility
-// with running partners
-func setLegacyFlags(cmd *cobra.Command) {
-	// Legacy chainid flag
-	cmd.Flags().Uint64Var(
-		&params.chainID,
-		chainIDFlagLEGACY,
-		command.DefaultChainID,
-		"the ID of the chain",
-	)
-
-	_ = cmd.Flags().MarkHidden(chainIDFlagLEGACY)
-}
-
 func preRunCommand(cmd *cobra.Command, _ []string) error {
-	if err := params.validateFlags(); err != nil {
-		return err
-	}
-
-	//nolint:godox
-	// TODO: @Stefan-Ethernal Maybe it can be removed
-	params.consensus = server.ConsensusType(params.consensusRaw)
-
-	return nil
+	return params.validateFlags()
 }
 
 func runCommand(cmd *cobra.Command, _ []string) {
@@ -344,7 +320,6 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	if params.isPolyBFTConsensus() {
 		err = params.generatePolyBftChainConfig(outputter)
 	} else {
-		_, _ = outputter.Write([]byte(fmt.Sprintf("%s\n", common.IBFTImportantNotice)))
 		err = params.generateGenesis()
 	}
 

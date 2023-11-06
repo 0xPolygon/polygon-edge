@@ -7,7 +7,7 @@ This document outlines step necessary to perform a regenesis data migration.
 1. Create cluster
 
     ```bash
-    scripts/cluster ibft
+    scripts/cluster polybft
     ```
 
 2. Check balance

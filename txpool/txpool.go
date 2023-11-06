@@ -28,8 +28,7 @@ const (
 	txMaxSize   = 128 * 1024 // 128Kb
 	topicNameV1 = "txpool/0.1"
 
-	// maximum allowed number of times an account
-	// was excluded from block building (ibft.writeTransactions)
+	// maximum allowed number of times an account was excluded from block building
 	maxAccountDemotions uint64 = 10
 
 	// maximum allowed number of consecutive blocks that don't have the account's transaction

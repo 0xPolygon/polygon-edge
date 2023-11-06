@@ -80,8 +80,6 @@ type serverParams struct {
 	devInterval    uint64
 	isDevMode      bool
 
-	ibftBaseTimeoutLegacy uint64
-
 	genesisConfig *chain.Chain
 	secretsConfig *secrets.SecretsManagerConfig
 
