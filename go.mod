@@ -68,7 +68,7 @@ require (
 	github.com/quasilyte/go-ruleguard v0.4.0
 	github.com/quasilyte/go-ruleguard/dsl v0.3.22
 	github.com/sethvargo/go-retry v0.2.4
-	golang.org/x/sync v0.4.0
+	golang.org/x/sync v0.5.0
 	google.golang.org/genproto v0.0.0-20230822172742-b8732ec3820d
 	gopkg.in/DataDog/dd-trace-go.v1 v1.54.1
 	pgregory.net/rapid v1.1.0
