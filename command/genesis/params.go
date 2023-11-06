@@ -75,8 +75,6 @@ type genesisParams struct {
 
 	extraData []byte
 
-	consensusEngineConfig map[string]interface{}
-
 	genesisConfig *chain.Chain
 
 	// PolyBFT
@@ -202,7 +200,9 @@ func (p *genesisParams) initGenesisConfig() error {
 		Params: &chain.Params{
 			ChainID: int64(p.chainID),
 			Forks:   enabledForks,
-			Engine:  p.consensusEngineConfig,
+			Engine: map[string]interface{}{
+				p.consensusRaw: map[string]interface{}{},
+			},
 		},
 		Bootnodes: p.bootnodes,
 	}
