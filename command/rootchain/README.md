@@ -12,7 +12,7 @@ $ polygon-edge rootchain server
 
 ## Fund initialized accounts
 
-This command funds the initialized accounts via `polygon-edge polybft-secrets` command.
+This command funds the initialized accounts via `polygon-edge secrets init` command.
 
 ```bash
 $ polygon-edge rootchain fund --data-dir data-dir- --num 2
