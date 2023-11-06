@@ -160,7 +160,7 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	cluster := framework.NewTestCluster(t, validatorSetSize,
 		framework.WithEpochSize(epochSize),
 		framework.WithEpochReward(int(ethgo.Ether(1).Uint64())),
-		framework.WithNativeTokenConfig(fmt.Sprintf(nativeTokenMintableTestCfg, minter.Address())),
+		framework.WithNativeTokenConfig(fmt.Sprintf(framework.NativeTokenMintableTestCfg, minter.Address())),
 		framework.WithSecretsCallback(func(addresses []types.Address, config *framework.TestClusterConfig) {
 			config.Premine = append(config.Premine, fmt.Sprintf("%s:%s", minter.Address(), initMinterBalance))
 			for _, a := range addresses {
@@ -349,7 +349,7 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithEpochReward(int(ethgo.Ether(1).Uint64())),
 		framework.WithEpochSize(5),
-		framework.WithNativeTokenConfig(fmt.Sprintf(nativeTokenMintableTestCfg, minter.Address())),
+		framework.WithNativeTokenConfig(fmt.Sprintf(framework.NativeTokenMintableTestCfg, minter.Address())),
 		framework.WithSecretsCallback(func(addresses []types.Address, config *framework.TestClusterConfig) {
 			config.Premine = append(config.Premine, fmt.Sprintf("%s:%d", minter.Address(), minterBalance))
 			for _, a := range addresses {
@@ -646,7 +646,7 @@ func TestE2E_Consensus_EIP1559Check(t *testing.T) {
 
 	// first account should have some matics premined
 	cluster := framework.NewTestCluster(t, 5,
-		framework.WithNativeTokenConfig(fmt.Sprintf(nativeTokenMintableTestCfg, sender1.Address())),
+		framework.WithNativeTokenConfig(fmt.Sprintf(framework.NativeTokenMintableTestCfg, sender1.Address())),
 		framework.WithPremine(types.Address(sender1.Address()), types.Address(sender2.Address())),
 		framework.WithBurnContract(&polybft.BurnContractInfo{BlockNumber: 0, Address: types.ZeroAddress}),
 	)

@@ -26,7 +26,7 @@ func TestE2E_JsonRPC(t *testing.T) {
 	require.NoError(t, err)
 
 	cluster := framework.NewTestCluster(t, 4,
-		framework.WithNativeTokenConfig(fmt.Sprintf(nativeTokenMintableTestCfg, acct.Address())),
+		framework.WithNativeTokenConfig(fmt.Sprintf(framework.NativeTokenMintableTestCfg, acct.Address())),
 		framework.WithPremine(types.Address(acct.Address())),
 	)
 	defer cluster.Stop()

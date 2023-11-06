@@ -28,8 +28,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-const nativeTokenMintableTestCfg = "Mintable Edge Coin:MEC:18:true:%s"
-
 // getCheckpointManagerValidators queries rootchain validator set on CheckpointManager contract
 func getCheckpointManagerValidators(relayer txrelayer.TxRelayer, checkpointManagerAddr ethgo.Address) ([]*polybft.ValidatorInfo, error) {
 	validatorsCountRaw, err := ABICall(relayer, contractsapi.CheckpointManager,
