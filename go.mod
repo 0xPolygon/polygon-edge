@@ -65,6 +65,7 @@ require (
 )
 
 require (
+	github.com/json-iterator/go v1.1.12
 	github.com/quasilyte/go-ruleguard v0.4.0
 	github.com/quasilyte/go-ruleguard/dsl v0.3.22
 	github.com/sethvargo/go-retry v0.2.4
@@ -87,6 +88,8 @@ require (
 	github.com/hashicorp/golang-lru/v2 v2.0.3 // indirect
 	github.com/ipfs/boxo v0.8.1 // indirect
 	github.com/libp2p/go-yamux/v4 v4.0.0 // indirect
+	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
+	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/onsi/ginkgo/v2 v2.9.2 // indirect
 	github.com/outcaste-io/ristretto v0.2.3 // indirect
 	github.com/quic-go/qpack v0.4.0 // indirect
