@@ -12,4 +12,4 @@ updates:
     pull-request-branch-name:
       separator: "-"
     reviewers:
-      - "0xPolygon/core-edge"
+      - "Ethernal-Tech/blade-devs"
