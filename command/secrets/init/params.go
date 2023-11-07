@@ -160,36 +160,51 @@ func (ip *initParams) initKeys(secretsManager secrets.SecretsManager) ([]string,
 	var generated []string
 
 	if ip.generatesNetwork {
-		if !secretsManager.HasSecret(secrets.NetworkKey) {
-			if _, err := helper.InitNetworkingPrivateKey(secretsManager); err != nil {
-				return generated, fmt.Errorf("error initializing network-key: %w", err)
-			}
-
-			generated = append(generated, secrets.NetworkKey)
+		if err := ip.generateNetworkKey(secretsManager, &generated); err != nil {
+			return generated, err
 		}
 	}
 
 	if ip.generatesAccount {
-		var (
-			a   *wallet.Account
-			err error
-		)
-
-		if !secretsManager.HasSecret(secrets.ValidatorKey) && !secretsManager.HasSecret(secrets.ValidatorBLSKey) {
-			a, err = wallet.GenerateAccount()
-			if err != nil {
-				return generated, fmt.Errorf("error generating account: %w", err)
-			}
-
-			if err = a.Save(secretsManager); err != nil {
-				return generated, fmt.Errorf("error saving account: %w", err)
-			}
-
-			generated = append(generated, secrets.ValidatorKey, secrets.ValidatorBLSKey)
+		if err := ip.generateAccount(secretsManager, &generated); err != nil {
+			return generated, err
 		}
 	}
 
 	return generated, nil
+}
+
+func (ip *initParams) generateNetworkKey(secretsManager secrets.SecretsManager, generated *[]string) error {
+	if secretsManager.HasSecret(secrets.NetworkKey) {
+		return nil
+	}
+
+	if _, err := helper.InitNetworkingPrivateKey(secretsManager); err != nil {
+		return fmt.Errorf("error initializing network-key: %w", err)
+	}
+
+	*generated = append(*generated, secrets.NetworkKey)
+
+	return nil
+}
+
+func (ip *initParams) generateAccount(secretsManager secrets.SecretsManager, generated *[]string) error {
+	if secretsManager.HasSecret(secrets.ValidatorKey) && secretsManager.HasSecret(secrets.ValidatorBLSKey) {
+		return nil
+	}
+
+	a, err := wallet.GenerateAccount()
+	if err != nil {
+		return fmt.Errorf("error generating account: %w", err)
+	}
+
+	if err = a.Save(secretsManager); err != nil {
+		return fmt.Errorf("error saving account: %w", err)
+	}
+
+	*generated = append(*generated, secrets.ValidatorKey, secrets.ValidatorBLSKey)
+
+	return nil
 }
 
 // getResult gets keys from secret manager and return result to display
