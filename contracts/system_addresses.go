@@ -39,6 +39,8 @@ var (
 	L2StateSenderContract = types.StringToAddress("0x1002")
 	// L2StateSenderContractV1 is an address of bridge contract to the rootchain
 	L2StateSenderContractV1 = types.StringToAddress("0x10021")
+	// StakeManagerContract is an address of stake manager on child chain
+	StakeManagerContract = types.StringToAddress("0x10022")
 
 	// ChildERC20Contract is an address of bridgable ERC20 token contract on the child chain
 	ChildERC20Contract = types.StringToAddress("0x1003")

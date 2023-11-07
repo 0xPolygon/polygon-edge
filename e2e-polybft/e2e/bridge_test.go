@@ -1254,7 +1254,6 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 				validatorAddr,
 				polybftCfg.Bridge.CustomSupernetManagerAddr,
 				polybftCfg.Bridge.StakeManagerAddr,
-				polybftCfg.SupernetID,
 				rootRelayer,
 				childRelayer)
 			require.NoError(t, err)

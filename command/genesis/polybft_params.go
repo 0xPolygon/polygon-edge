@@ -365,6 +365,10 @@ func (p *genesisParams) deployContracts(
 			artifact: contractsapi.RewardPool,
 			address:  contracts.RewardPoolContractV1,
 		},
+		{
+			artifact: contractsapi.StakeManager,
+			address:  contracts.StakeManagerContract,
+		},
 	}
 
 	if !params.nativeTokenConfig.IsMintable {
@@ -528,7 +532,7 @@ func (p *genesisParams) getValidatorAccounts() ([]*validator.GenesisValidator, e
 				MultiAddr: parts[0],
 				Address:   addr,
 				BlsKey:    trimmedBLSKey,
-				Stake:     big.NewInt(0),
+				Stake:     p.stakeInfos[addr],
 			}
 		}
 
@@ -540,11 +544,10 @@ func (p *genesisParams) getValidatorAccounts() ([]*validator.GenesisValidator, e
 		validatorsPath = path.Dir(p.genesisPath)
 	}
 
-	validators, err := ReadValidatorsByPrefix(validatorsPath, p.validatorsPrefixPath)
+	validators, err := ReadValidatorsByPrefixStakeInfos(validatorsPath, p.validatorsPrefixPath, p.stakeInfos)
 	if err != nil {
 		return nil, err
 	}
-
 	return validators, nil
 }
 

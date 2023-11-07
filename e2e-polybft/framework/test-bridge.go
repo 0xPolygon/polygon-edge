@@ -463,7 +463,6 @@ func (t *TestBridge) initialStakingOfGenesisValidators(polybftConfig polybft.Pol
 					"--stake-manager", polybftConfig.Bridge.StakeManagerAddr.String(),
 					"--" + polybftsecrets.AccountDirFlag, path.Join(t.clusterConfig.TmpDir, secret),
 					"--amount", t.getStakeAmount(i).String(),
-					"--supernet-id", strconv.FormatInt(polybftConfig.SupernetID, 10),
 					"--stake-token", polybftConfig.Bridge.StakeTokenAddr.String(),
 				}
 

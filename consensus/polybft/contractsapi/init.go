@@ -259,11 +259,6 @@ func init() {
 		log.Fatal(err)
 	}
 
-	CustomSupernetManager, err = artifact.DecodeArtifact([]byte(CustomSupernetManagerArtifact))
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	StakeManager, err = artifact.DecodeArtifact([]byte(StakeManagerArtifact))
 	if err != nil {
 		log.Fatal(err)

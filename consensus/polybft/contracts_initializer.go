@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/0xPolygon/polygon-edge/bls"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo/abi"
@@ -26,11 +28,8 @@ func initValidatorSet(polyBFTConfig PolyBFTConfig, transition *state.Transition)
 	}
 
 	initFn := &contractsapi.InitializeValidatorSetFn{
-		NewStateSender:      contracts.L2StateSenderContract,
-		NewStateReceiver:    contracts.StateReceiverContract,
-		NewRootChainManager: polyBFTConfig.Bridge.CustomSupernetManagerAddr,
-		NewEpochSize:        new(big.Int).SetUint64(polyBFTConfig.EpochSize),
-		InitialValidators:   initialValidators,
+		NewEpochSize:      new(big.Int).SetUint64(polyBFTConfig.EpochSize),
+		InitialValidators: initialValidators,
 	}
 
 	input, err := initFn.EncodeAbi()
@@ -40,6 +39,37 @@ func initValidatorSet(polyBFTConfig PolyBFTConfig, transition *state.Transition)
 
 	return callContract(contracts.SystemCaller,
 		contracts.ValidatorSetContract, input, "ValidatorSet.initialize", transition)
+}
+func initStakeManager(polyBFTConfig PolyBFTConfig, transition *state.Transition) error {
+	startValidators := make([]*contractsapi.StartValidator, len(polyBFTConfig.InitialValidatorSet))
+	for i, validator := range polyBFTConfig.InitialValidatorSet {
+		blsRaw, err := hex.DecodeHex(validator.BlsKey)
+		if err != nil {
+			return err
+		}
+		key, err := bls.UnmarshalPublicKey(blsRaw)
+		if err != nil {
+			return err
+		}
+
+		startValidators[i] = &contractsapi.StartValidator{
+			Validator: validator.Address,
+			Stake:     validator.Stake,
+			BlsKey:    key.ToBigInt(),
+		}
+	}
+
+	initFn := &contractsapi.InitializeStakeManagerFn{
+		GenesisValidators: startValidators,
+	}
+
+	input, err := initFn.EncodeAbi()
+	if err != nil {
+		return fmt.Errorf("StakeManager.initialize params encoding failed: %w", err)
+	}
+
+	return callContract(contracts.SystemCaller,
+		contracts.StakeManagerContract, input, "StakeManager.initialize", transition)
 }
 
 // initRewardPool initializes RewardPool SC

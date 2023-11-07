@@ -95,7 +95,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	stakeManagerAddr := types.StringToAddress(params.stakeManagerAddress)
 
 	validatorInfo, err := rootHelper.GetValidatorInfo(validatorAddr,
-		supernetManagerAddr, stakeManagerAddr, params.chainID, txRelayer)
+		supernetManagerAddr, stakeManagerAddr, txRelayer)
 	if err != nil {
 		return fmt.Errorf("failed to get validator info for %s: %w", validatorAddr, err)
 	}

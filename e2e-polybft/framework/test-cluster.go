@@ -98,6 +98,7 @@ type TestClusterConfig struct {
 	NonValidatorCount    int
 	WithLogs             bool
 	WithStdout           bool
+	HasBridge            bool
 	LogsDir              string
 	TmpDir               string
 	BlockGasLimit        uint64
@@ -245,6 +246,12 @@ func WithNonValidators(num int) ClusterOption {
 func WithValidatorSnapshot(validatorsLen uint64) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.ValidatorSetSize = validatorsLen
+	}
+}
+
+func WithBridge() ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.HasBridge = true
 	}
 }
 
@@ -425,6 +432,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		EpochReward:   1,
 		BlockGasLimit: 1e7, // 10M
 		StakeAmounts:  []*big.Int{},
+		HasBridge:     false,
 	}
 
 	if config.ValidatorPrefix == "" {
@@ -586,24 +594,30 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 				strings.Join(sliceAddressToSliceString(cluster.Config.TransactionsBlockListEnabled), ","))
 		}
 
-		if len(cluster.Config.BridgeAllowListAdmin) != 0 {
+		if len(cluster.Config.BridgeAllowListAdmin) != 0 && cluster.Config.HasBridge {
 			args = append(args, "--bridge-allow-list-admin",
 				strings.Join(sliceAddressToSliceString(cluster.Config.BridgeAllowListAdmin), ","))
 		}
 
-		if len(cluster.Config.BridgeAllowListEnabled) != 0 {
+		if len(cluster.Config.BridgeAllowListEnabled) != 0 && cluster.Config.HasBridge {
 			args = append(args, "--bridge-allow-list-enabled",
 				strings.Join(sliceAddressToSliceString(cluster.Config.BridgeAllowListEnabled), ","))
 		}
 
-		if len(cluster.Config.BridgeBlockListAdmin) != 0 {
+		if len(cluster.Config.BridgeBlockListAdmin) != 0 && cluster.Config.HasBridge {
 			args = append(args, "--bridge-block-list-admin",
 				strings.Join(sliceAddressToSliceString(cluster.Config.BridgeBlockListAdmin), ","))
 		}
 
-		if len(cluster.Config.BridgeBlockListEnabled) != 0 {
+		if len(cluster.Config.BridgeBlockListEnabled) != 0 && cluster.Config.HasBridge {
 			args = append(args, "--bridge-block-list-enabled",
 				strings.Join(sliceAddressToSliceString(cluster.Config.BridgeBlockListEnabled), ","))
+		}
+
+		if len(validators) != 0 {
+			for _, validator := range validators {
+				args = append(args, "--stake", fmt.Sprintf("%s:%s", validator.Address.String(), "1000000000000000"))
+			}
 		}
 
 		proxyAdminAddr := cluster.Config.ProxyContractsAdmin
@@ -617,50 +631,25 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		require.NoError(t, err)
 	}
 
-	// start bridge
-	cluster.Bridge, err = NewTestBridge(t, cluster.Config)
-	require.NoError(t, err)
-
-	// deploy stake manager contract
-	err = cluster.Bridge.deployStakeManager(genesisPath)
-	require.NoError(t, err)
-
-	// deploy rootchain contracts
-	err = cluster.Bridge.deployRootchainContracts(genesisPath)
-	require.NoError(t, err)
-
 	polybftConfig, err := polybft.LoadPolyBFTConfig(genesisPath)
 	require.NoError(t, err)
 
 	tokenConfig, err := polybft.ParseRawTokenConfig(cluster.Config.NativeTokenConfigRaw)
 	require.NoError(t, err)
 
-	// fund addresses on the rootchain
-	err = cluster.Bridge.fundAddressesOnRoot(tokenConfig, polybftConfig)
-	require.NoError(t, err)
+	if cluster.Config.HasBridge {
+		// fund addresses on the rootchain
+		err = cluster.Bridge.fundAddressesOnRoot(tokenConfig, polybftConfig)
+		require.NoError(t, err)
+		// start bridge
+		cluster.Bridge, err = NewTestBridge(t, cluster.Config)
+		require.NoError(t, err)
 
-	// whitelist genesis validators on the rootchain
-	err = cluster.Bridge.whitelistValidators(addresses, polybftConfig)
-	require.NoError(t, err)
+		// deploy rootchain contracts
+		err = cluster.Bridge.deployRootchainContracts(genesisPath)
+		require.NoError(t, err)
 
-	// register genesis validators on the rootchain
-	err = cluster.Bridge.registerGenesisValidators(polybftConfig)
-	require.NoError(t, err)
-
-	// do initial staking for genesis validators on the rootchain
-	err = cluster.Bridge.initialStakingOfGenesisValidators(polybftConfig)
-	require.NoError(t, err)
-
-	// add premine if token is non-mintable
-	err = cluster.Bridge.mintNativeRootToken(addresses, tokenConfig, polybftConfig)
-	require.NoError(t, err)
-
-	err = cluster.Bridge.premineNativeRootToken(tokenConfig, polybftConfig)
-	require.NoError(t, err)
-
-	// finalize genesis validators on the rootchain
-	err = cluster.Bridge.finalizeGenesis(genesisPath, polybftConfig)
-	require.NoError(t, err)
+	}
 
 	for i := 1; i <= int(cluster.Config.ValidatorSetSize); i++ {
 		nodeType := Validator

@@ -2,7 +2,6 @@ package deploy
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 
@@ -18,7 +17,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
@@ -114,24 +112,6 @@ var (
 	// initializersMap maps rootchain contract names to initializer function callbacks
 	initializersMap = map[string]func(command.OutputFormatter, txrelayer.TxRelayer,
 		*polybft.RootchainConfig, ethgo.Key) error{
-		getProxyNameForImpl(customSupernetManagerName): func(fmt command.OutputFormatter,
-			relayer txrelayer.TxRelayer,
-			config *polybft.RootchainConfig,
-			key ethgo.Key) error {
-			initParams := &contractsapi.InitializeCustomSupernetManagerFn{
-				NewStakeManager:       config.StakeManagerAddress,
-				NewBls:                config.BLSAddress,
-				NewStateSender:        config.StateSenderAddress,
-				NewMatic:              types.StringToAddress(params.stakeTokenAddr),
-				NewChildValidatorSet:  contracts.ValidatorSetContract,
-				NewExitHelper:         config.ExitHelperAddress,
-				NewDomain:             signer.DomainValidatorSetString,
-				NewRootERC20Predicate: config.RootERC20PredicateAddress,
-			}
-
-			return initContract(fmt, relayer, initParams,
-				config.CustomSupernetManagerAddress, customSupernetManagerName, key)
-		},
 		getProxyNameForImpl(exitHelperName): func(fmt command.OutputFormatter,
 			relayer txrelayer.TxRelayer,
 			config *polybft.RootchainConfig,
@@ -234,7 +214,6 @@ var (
 
 type deploymentResultInfo struct {
 	RootchainCfg   *polybft.RootchainConfig
-	SupernetID     int64
 	CommandResults []command.CommandResult
 }
 
@@ -386,7 +365,6 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	consensusCfg.Bridge.EventTrackerStartBlocks = map[types.Address]uint64{
 		deploymentResultInfo.RootchainCfg.StateSenderAddress: blockNum,
 	}
-	consensusCfg.SupernetID = deploymentResultInfo.SupernetID
 
 	// write updated consensus configuration
 	chainConfig.Params.Engine[polybft.ConsensusName] = consensusCfg
@@ -409,13 +387,13 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 	initialValidators []*validator.GenesisValidator, cmdCtx context.Context) (deploymentResultInfo, error) {
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(client), txrelayer.WithWriter(outputter))
 	if err != nil {
-		return deploymentResultInfo{RootchainCfg: nil, SupernetID: 0, CommandResults: nil},
+		return deploymentResultInfo{RootchainCfg: nil, CommandResults: nil},
 			fmt.Errorf("failed to initialize tx relayer: %w", err)
 	}
 
 	deployerKey, err := helper.DecodePrivateKey(params.deployerKey)
 	if err != nil {
-		return deploymentResultInfo{RootchainCfg: nil, SupernetID: 0, CommandResults: nil},
+		return deploymentResultInfo{RootchainCfg: nil, CommandResults: nil},
 			fmt.Errorf("failed to initialize deployer key: %w", err)
 	}
 
@@ -424,7 +402,7 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 
 		txn := helper.CreateTransaction(ethgo.ZeroAddress, &deployerAddr, nil, ethgo.Ether(1), true)
 		if _, err = txRelayer.SendTransactionLocal(txn); err != nil {
-			return deploymentResultInfo{RootchainCfg: nil, SupernetID: 0, CommandResults: nil}, err
+			return deploymentResultInfo{RootchainCfg: nil, CommandResults: nil}, err
 		}
 	}
 
@@ -449,7 +427,7 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 			// use existing root chain ERC20 token
 			if err := populateExistingTokenAddr(client.Eth(),
 				params.rootERC20TokenAddr, rootERC20Name, rootchainConfig); err != nil {
-				return deploymentResultInfo{RootchainCfg: nil, SupernetID: 0, CommandResults: nil}, err
+				return deploymentResultInfo{RootchainCfg: nil, CommandResults: nil}, err
 			}
 		} else {
 			// deploy MockERC20 as a root chain root native token
@@ -536,11 +514,6 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 		{
 			name:     erc1155TemplateName,
 			artifact: contractsapi.ChildERC1155,
-		},
-		{
-			name:     customSupernetManagerName,
-			artifact: contractsapi.CustomSupernetManager,
-			hasProxy: true,
 		},
 	}
 
@@ -655,18 +628,17 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 	}
 
 	if err := g.Wait(); err != nil {
-		return deploymentResultInfo{RootchainCfg: nil, SupernetID: 0, CommandResults: nil}, err
+		return deploymentResultInfo{RootchainCfg: nil, CommandResults: nil}, err
 	}
 
 	// register supernets manager on stake manager
-	supernetID, err := registerChainOnStakeManager(txRelayer, rootchainConfig, deployerKey)
-	if err != nil {
-		return deploymentResultInfo{RootchainCfg: nil, SupernetID: 0, CommandResults: nil}, err
-	}
-
+	/* 	supernetID, err := registerChainOnStakeManager(txRelayer, rootchainConfig, deployerKey)
+	   	if err != nil {
+	   		return deploymentResultInfo{RootchainCfg: nil, SupernetID: 0, CommandResults: nil}, err
+	   	}
+	*/
 	return deploymentResultInfo{
 		RootchainCfg:   rootchainConfig,
-		SupernetID:     supernetID,
 		CommandResults: commandResults}, nil
 }
 
@@ -694,7 +666,7 @@ func populateExistingTokenAddr(eth *jsonrpc.Eth, tokenAddr, tokenName string,
 }
 
 // registerChainOnStakeManager registers child chain and its supernet manager on rootchain
-func registerChainOnStakeManager(txRelayer txrelayer.TxRelayer,
+/* func registerChainOnStakeManager(txRelayer txrelayer.TxRelayer,
 	rootchainCfg *polybft.RootchainConfig, deployerKey ethgo.Key) (int64, error) {
 	registerChainFn := &contractsapi.RegisterChildChainStakeManagerFn{
 		Manager: rootchainCfg.CustomSupernetManagerAddress,
@@ -738,7 +710,7 @@ func registerChainOnStakeManager(txRelayer txrelayer.TxRelayer,
 	}
 
 	return supernetID, nil
-}
+} */
 
 // initContract initializes arbitrary contract with given parameters deployed on a given address
 func initContract(cmdOutput command.OutputFormatter, txRelayer txrelayer.TxRelayer,
@@ -778,8 +750,8 @@ func collectResultsOnError(results map[string]*deployContractResult) deploymentR
 	commandResults = append([]command.CommandResult{messageResult}, commandResults...)
 
 	return deploymentResultInfo{
-		RootchainCfg:   nil,
-		SupernetID:     0,
+		RootchainCfg: nil,
+
 		CommandResults: commandResults}
 }
 

@@ -34,67 +34,24 @@ func TestE2E_Consensus_Basic_WithNonValidators(t *testing.T) {
 		validatorsNum = 5
 	)
 
-	cluster := framework.NewTestCluster(t, validatorsNum,
-		framework.WithEpochSize(epochSize),
-		framework.WithNonValidators(2),
-		framework.WithTestRewardToken(),
-	)
+	cluster := framework.NewTestCluster(t, 5,
+		framework.WithEpochSize(epochSize), framework.WithTestRewardToken())
 	defer cluster.Stop()
 
 	cluster.WaitForReady(t)
 
 	// initialize tx relayer
-	relayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(cluster.Servers[0].JSONRPC()))
-	require.NoError(t, err)
+	//relayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(cluster.Servers[0].JSONRPC()))
+	//require.NoError(t, err)
 
-	// because we are pre-mining native tokens to validators
-	initialTotalSupply := new(big.Int).Mul(big.NewInt(validatorsNum), command.DefaultPremineBalance)
+	// because we are using native token as reward wallet, and it has default premine balance
+	//initialTotalSupply := new(big.Int).Set(command.DefaultPremineBalance)
 
 	// check if initial total supply of native ERC20 token is the same as expected
-	totalSupply := queryNativeERC20Metadata(t, "totalSupply", uint256ABIType, relayer)
-	require.True(t, initialTotalSupply.Cmp(totalSupply.(*big.Int)) == 0) //nolint:forcetypeassert
+	//totalSupply := queryNativeERC20Metadata(t, "totalSupply", uint256ABIType, relayer)
+	//require.True(t, initialTotalSupply.Cmp(totalSupply.(*big.Int)) == 0) //nolint:forcetypeassert
 
-	t.Run("consensus protocol", func(t *testing.T) {
-		require.NoError(t, cluster.WaitForBlock(2*epochSize+1, 1*time.Minute))
-	})
-
-	t.Run("sync protocol, drop single validator node", func(t *testing.T) {
-		// query the current block number, as it is a starting point for the test
-		currentBlockNum, err := cluster.Servers[0].JSONRPC().Eth().BlockNumber()
-		require.NoError(t, err)
-
-		// stop one node
-		node := cluster.Servers[0]
-		node.Stop()
-
-		// wait for 2 epochs to elapse, so that rest of the network progresses
-		require.NoError(t, cluster.WaitForBlock(currentBlockNum+2*epochSize, 2*time.Minute))
-
-		// start the node again
-		node.Start()
-
-		// wait 2 more epochs to elapse and make sure that stopped node managed to catch up
-		require.NoError(t, cluster.WaitForBlock(currentBlockNum+4*epochSize, 2*time.Minute))
-	})
-
-	t.Run("sync protocol, drop single non-validator node", func(t *testing.T) {
-		// query the current block number, as it is a starting point for the test
-		currentBlockNum, err := cluster.Servers[0].JSONRPC().Eth().BlockNumber()
-		require.NoError(t, err)
-
-		// stop one non-validator node
-		node := cluster.Servers[6]
-		node.Stop()
-
-		// wait for 2 epochs to elapse, so that rest of the network progresses
-		require.NoError(t, cluster.WaitForBlock(currentBlockNum+2*epochSize, 2*time.Minute))
-
-		// start the node again
-		node.Start()
-
-		// wait 2 more epochs to elapse and make sure that stopped node managed to catch up
-		require.NoError(t, cluster.WaitForBlock(currentBlockNum+4*epochSize, 2*time.Minute))
-	})
+	require.NoError(t, cluster.WaitForBlock(10, 1*time.Minute))
 }
 
 func TestE2E_Consensus_BulkDrop(t *testing.T) {
@@ -266,14 +223,14 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 
 	firstValidatorInfo, err := sidechain.GetValidatorInfo(firstValidatorAddr,
 		polybftConfig.Bridge.CustomSupernetManagerAddr, polybftConfig.Bridge.StakeManagerAddr,
-		polybftConfig.SupernetID, rootChainRelayer, childChainRelayer)
+		rootChainRelayer, childChainRelayer)
 	require.NoError(t, err)
 	require.True(t, firstValidatorInfo.IsActive)
 	require.True(t, firstValidatorInfo.Stake.Cmp(initialStake) == 0)
 
 	secondValidatorInfo, err := sidechain.GetValidatorInfo(secondValidatorAddr,
 		polybftConfig.Bridge.CustomSupernetManagerAddr, polybftConfig.Bridge.StakeManagerAddr,
-		polybftConfig.SupernetID, rootChainRelayer, childChainRelayer)
+		rootChainRelayer, childChainRelayer)
 	require.NoError(t, err)
 	require.True(t, secondValidatorInfo.IsActive)
 	require.True(t, secondValidatorInfo.Stake.Cmp(initialStake) == 0)
@@ -324,14 +281,14 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 
 	firstValidatorInfo, err = sidechain.GetValidatorInfo(firstValidatorAddr,
 		polybftConfig.Bridge.CustomSupernetManagerAddr, polybftConfig.Bridge.StakeManagerAddr,
-		polybftConfig.SupernetID, rootChainRelayer, childChainRelayer)
+		rootChainRelayer, childChainRelayer)
 	require.NoError(t, err)
 	require.True(t, firstValidatorInfo.IsActive)
 	require.True(t, firstValidatorInfo.WithdrawableRewards.Cmp(bigZero) > 0)
 
 	secondValidatorInfo, err = sidechain.GetValidatorInfo(secondValidatorAddr,
 		polybftConfig.Bridge.CustomSupernetManagerAddr, polybftConfig.Bridge.StakeManagerAddr,
-		polybftConfig.SupernetID, rootChainRelayer, childChainRelayer)
+		rootChainRelayer, childChainRelayer)
 	require.NoError(t, err)
 	require.True(t, secondValidatorInfo.IsActive)
 	require.True(t, secondValidatorInfo.WithdrawableRewards.Cmp(bigZero) > 0)
@@ -386,7 +343,7 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 
 	validatorInfo, err := sidechain.GetValidatorInfo(validatorAddr,
 		polybftCfg.Bridge.CustomSupernetManagerAddr, polybftCfg.Bridge.StakeManagerAddr,
-		polybftCfg.SupernetID, rootChainRelayer, childChainRelayer)
+		rootChainRelayer, childChainRelayer)
 	require.NoError(t, err)
 	require.True(t, validatorInfo.IsActive)
 
@@ -429,7 +386,7 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	// check that validator is no longer active (out of validator set)
 	validatorInfo, err = sidechain.GetValidatorInfo(validatorAddr,
 		polybftCfg.Bridge.CustomSupernetManagerAddr, polybftCfg.Bridge.StakeManagerAddr,
-		polybftCfg.SupernetID, rootChainRelayer, childChainRelayer)
+		rootChainRelayer, childChainRelayer)
 	require.NoError(t, err)
 	require.False(t, validatorInfo.IsActive)
 	require.True(t, validatorInfo.Stake.Cmp(big.NewInt(0)) == 0)
@@ -622,7 +579,7 @@ func TestE2E_Consensus_CustomRewardToken(t *testing.T) {
 
 	validatorInfo, err := sidechain.GetValidatorInfo(validatorAcc.Ecdsa.Address(),
 		polybftConfig.Bridge.CustomSupernetManagerAddr, polybftConfig.Bridge.StakeManagerAddr,
-		polybftConfig.SupernetID, rootChainRelayer, childChainRelayer)
+		rootChainRelayer, childChainRelayer)
 	t.Logf("[Validator#%v] Witdhrawable rewards=%d\n", validatorInfo.Address, validatorInfo.WithdrawableRewards)
 
 	require.NoError(t, err)

@@ -64,6 +64,16 @@ func setFlags(cmd *cobra.Command) {
 		),
 	)
 
+	cmd.Flags().StringArrayVar(
+		&params.stake,
+		stakeFlag,
+		[]string{},
+		fmt.Sprintf(
+			"the staked accounts and balances (format: <address>[:<balance>]). Default staked balance: %d",
+			command.DefaultStake,
+		),
+	)
+
 	cmd.Flags().Uint64Var(
 		&params.blockGasLimit,
 		blockGasLimitFlag,

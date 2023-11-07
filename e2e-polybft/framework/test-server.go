@@ -240,7 +240,6 @@ func (t *TestServer) Stake(polybftConfig polybft.PolyBFTConfig, amount *big.Int)
 		"--stake-manager", polybftConfig.Bridge.StakeManagerAddr.String(),
 		"--" + polybftsecrets.AccountDirFlag, t.config.DataDir,
 		"--amount", amount.String(),
-		"--supernet-id", strconv.FormatInt(polybftConfig.SupernetID, 10),
 		"--stake-token", polybftConfig.Bridge.StakeTokenAddr.String(),
 	}
 

@@ -169,11 +169,7 @@ func main() {
 			"ChildMintableERC1155Predicate",
 		},
 		{
-			"root/staking/CustomSupernetManager.sol",
-			"CustomSupernetManager",
-		},
-		{
-			"root/staking/StakeManager.sol",
+			"child/staking/StakeManager.sol",
 			"StakeManager",
 		},
 		{

@@ -60,9 +60,8 @@ func GetAccountFromDir(accountDir string) (*wallet.Account, error) {
 // GetValidatorInfo queries CustomSupernetManager, StakeManager and RewardPool smart contracts
 // to retrieve validator info for given address
 func GetValidatorInfo(validatorAddr ethgo.Address, supernetManager, stakeManager types.Address,
-	chainID int64, rootRelayer, childRelayer txrelayer.TxRelayer) (*polybft.ValidatorInfo, error) {
-	validatorInfo, err := rootHelper.GetValidatorInfo(validatorAddr, supernetManager, stakeManager,
-		chainID, rootRelayer)
+	rootRelayer, childRelayer txrelayer.TxRelayer) (*polybft.ValidatorInfo, error) {
+	validatorInfo, err := rootHelper.GetValidatorInfo(validatorAddr, supernetManager, stakeManager, rootRelayer)
 	if err != nil {
 		return nil, err
 	}

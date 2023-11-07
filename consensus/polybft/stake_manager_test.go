@@ -51,12 +51,12 @@ func TestStakeManager_PostBlock(t *testing.T) {
 		stakeManager, err := newStakeManager(
 			hclog.NewNullLogger(),
 			state,
-			nil,
 			wallet.NewEcdsaSigner(validators.GetValidator("A").Key()),
 			validatorSetAddr, types.StringToAddress("0x0002"),
 			bcMock,
 			nil,
 			5,
+			nil,
 			nil,
 		)
 		require.NoError(t, err)
@@ -110,12 +110,12 @@ func TestStakeManager_PostBlock(t *testing.T) {
 		stakeManager, err := newStakeManager(
 			hclog.NewNullLogger(),
 			state,
-			nil,
 			wallet.NewEcdsaSigner(validators.GetValidator("A").Key()),
 			types.StringToAddress("0x0001"), types.StringToAddress("0x0002"),
 			bcMock,
 			nil,
 			5,
+			nil,
 			nil,
 		)
 		require.NoError(t, err)
@@ -177,12 +177,12 @@ func TestStakeManager_PostBlock(t *testing.T) {
 		stakeManager, err := newStakeManager(
 			hclog.NewNullLogger(),
 			state,
-			txRelayerMock,
 			wallet.NewEcdsaSigner(validators.GetValidator("A").Key()),
 			types.StringToAddress("0x0001"), types.StringToAddress("0x0002"),
 			bcMock,
 			nil,
 			5,
+			nil,
 			nil,
 		)
 		require.NoError(t, err)
@@ -237,12 +237,12 @@ func TestStakeManager_UpdateValidatorSet(t *testing.T) {
 	stakeManager, err := newStakeManager(
 		hclog.NewNullLogger(),
 		state,
-		nil,
 		wallet.NewEcdsaSigner(validators.GetValidator("A").Key()),
 		types.StringToAddress("0x0001"), types.StringToAddress("0x0002"),
 		bcMock,
 		nil,
 		10,
+		nil,
 		nil,
 	)
 	require.NoError(t, err)
@@ -475,12 +475,12 @@ func TestStakeManager_UpdateOnInit(t *testing.T) {
 	_, err := newStakeManager(
 		hclog.NewNullLogger(),
 		state,
-		nil,
 		wallet.NewEcdsaSigner(validators.GetValidator("A").Key()),
 		validatorSetAddr, types.StringToAddress("0x0002"),
 		bcMock,
 		polyBackendMock,
 		5,
+		nil,
 		nil,
 	)
 	require.NoError(t, err)

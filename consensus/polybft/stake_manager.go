@@ -14,11 +14,11 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
-	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
+	"github.com/umbracle/ethgo/contract"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -60,37 +60,37 @@ var _ StakeManager = (*stakeManager)(nil)
 // stakeManager saves transfer events that happened in each block
 // and calculates updated validator set based on changed stake
 type stakeManager struct {
-	logger                  hclog.Logger
-	state                   *State
-	rootChainRelayer        txrelayer.TxRelayer
-	key                     ethgo.Key
-	supernetManagerContract types.Address
-	validatorSetContract    types.Address
-	maxValidatorSetSize     int
-	polybftBackend          polybftBackend
+	logger                       hclog.Logger
+	state                        *State
+	key                          ethgo.Key
+	stakeManagerContractAddr     types.Address
+	validatorSetContract         types.Address
+	maxValidatorSetSize          int
+	polybftBackend               polybftBackend
+	stakeManagerContractContract *contract.Contract
+	blockchain                   blockchainBackend
 }
 
 // newStakeManager returns a new instance of stake manager
 func newStakeManager(
 	logger hclog.Logger,
 	state *State,
-	rootchainRelayer txrelayer.TxRelayer,
 	key ethgo.Key,
-	validatorSetAddr, supernetManagerAddr types.Address,
+	validatorSetAddr, stakeManagerAddr types.Address,
 	blockchain blockchainBackend,
 	polybftBackend polybftBackend,
 	maxValidatorSetSize int,
-	dbTx *bolt.Tx,
+	dbTx *bolt.Tx, blockchainB blockchainBackend,
 ) (*stakeManager, error) {
 	sm := &stakeManager{
-		logger:                  logger,
-		state:                   state,
-		rootChainRelayer:        rootchainRelayer,
-		key:                     key,
-		supernetManagerContract: supernetManagerAddr,
-		validatorSetContract:    validatorSetAddr,
-		maxValidatorSetSize:     maxValidatorSetSize,
-		polybftBackend:          polybftBackend,
+		logger:                   logger,
+		state:                    state,
+		key:                      key,
+		stakeManagerContractAddr: stakeManagerAddr,
+		validatorSetContract:     validatorSetAddr,
+		maxValidatorSetSize:      maxValidatorSetSize,
+		polybftBackend:           polybftBackend,
+		blockchain:               blockchainB,
 	}
 
 	if err := sm.init(blockchain, dbTx); err != nil {
@@ -334,39 +334,22 @@ func (s *stakeManager) UpdateValidatorSet(
 
 // getBlsKey returns bls key for validator from the supernet contract
 func (s *stakeManager) getBlsKey(address types.Address) (*bls.PublicKey, error) {
-	getValidatorFn := &contractsapi.GetValidatorCustomSupernetManagerFn{
-		Validator_: address,
-	}
-
-	encoded, err := getValidatorFn.EncodeAbi()
+	provider, err := s.blockchain.GetStateProviderForBlock(s.blockchain.CurrentHeader())
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := s.rootChainRelayer.Call(
-		s.key.Address(),
-		ethgo.Address(s.supernetManagerContract),
-		encoded)
-	if err != nil {
-		return nil, fmt.Errorf("failed to invoke validators function on the supernet manager: %w", err)
-	}
+	stakeManagerContractContract := contract.NewContract(
+		ethgo.Address(s.stakeManagerContractAddr),
+		contractsapi.ValidatorSet.Abi, contract.WithProvider(provider),
+	)
 
-	byteResponse, err := hex.DecodeHex(response)
-	if err != nil {
-		return nil, fmt.Errorf("unable to decode hex response, %w", err)
-	}
-
-	decoded, err := validatorTypeABI.Decode(byteResponse)
+	rawResult, err := stakeManagerContractContract.Call("currentEpochId", ethgo.Latest)
 	if err != nil {
 		return nil, err
 	}
 
-	output, ok := decoded.(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("could not convert decoded outputs to map")
-	}
-
-	blsKey, ok := output["blsKey"].([4]*big.Int)
+	blsKey, ok := rawResult["blsKey"].([4]*big.Int)
 	if !ok {
 		return nil, fmt.Errorf("failed to decode blskey")
 	}

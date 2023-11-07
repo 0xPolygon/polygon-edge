@@ -27,6 +27,7 @@ const (
 	dirFlag                      = "dir"
 	nameFlag                     = "name"
 	premineFlag                  = "premine"
+	stakeFlag                    = "stake"
 	chainIDFlag                  = "chain-id"
 	epochSizeFlag                = "epoch-size"
 	epochRewardFlag              = "epoch-reward"
@@ -71,6 +72,7 @@ type genesisParams struct {
 	name         string
 	consensusRaw string
 	premine      []string
+	stake        []string
 	bootnodes    []string
 
 	chainID   uint64
@@ -128,6 +130,7 @@ type genesisParams struct {
 	nativeTokenConfig    *polybft.TokenConfig
 
 	premineInfos []*helper.PremineInfo
+	stakeInfos   map[types.Address]*big.Int
 
 	// rewards
 	rewardTokenCode string
@@ -156,6 +159,10 @@ func (p *genesisParams) validateFlags() error {
 	}
 
 	if err := p.parsePremineInfo(); err != nil {
+		return err
+	}
+
+	if err := p.parseStakeInfo(); err != nil {
 		return err
 	}
 
@@ -514,6 +521,21 @@ func (p *genesisParams) parsePremineInfo() error {
 		}
 
 		p.premineInfos = append(p.premineInfos, premineInfo)
+	}
+
+	return nil
+}
+
+func (p *genesisParams) parseStakeInfo() error {
+	p.stakeInfos = make(map[types.Address]*big.Int, len(p.stake))
+
+	for _, stake := range p.stake {
+		stakeInfo, err := helper.ParsePremineInfo(stake)
+		if err != nil {
+			return fmt.Errorf("invalid stake balance amount provided: %w", err)
+		}
+
+		p.stakeInfos[stakeInfo.Address] = stakeInfo.Amount
 	}
 
 	return nil

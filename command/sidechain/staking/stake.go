@@ -2,7 +2,6 @@ package staking
 
 import (
 	"fmt"
-	"math/big"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/command"
@@ -117,8 +116,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("approve transaction failed on block %d", receipt.BlockNumber)
 	}
 
-	stakeFn := contractsapi.StakeForStakeManagerFn{
-		ID:     new(big.Int).SetInt64(params.supernetID),
+	stakeFn := contractsapi.StakeStakeManagerFn{
 		Amount: params.amountValue,
 	}
 

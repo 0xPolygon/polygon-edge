@@ -1221,145 +1221,27 @@ func (o *OwnerOfChildERC721Fn) DecodeAbi(buf []byte) error {
 	return decodeMethod(ChildERC721.Abi.Methods["ownerOf"], buf, o)
 }
 
-type InitializeCustomSupernetManagerFn struct {
-	NewStakeManager       types.Address `abi:"newStakeManager"`
-	NewBls                types.Address `abi:"newBls"`
-	NewStateSender        types.Address `abi:"newStateSender"`
-	NewMatic              types.Address `abi:"newMatic"`
-	NewChildValidatorSet  types.Address `abi:"newChildValidatorSet"`
-	NewExitHelper         types.Address `abi:"newExitHelper"`
-	NewRootERC20Predicate types.Address `abi:"newRootERC20Predicate"`
-	NewDomain             string        `abi:"newDomain"`
-}
-
-func (i *InitializeCustomSupernetManagerFn) Sig() []byte {
-	return CustomSupernetManager.Abi.Methods["initialize"].ID()
-}
-
-func (i *InitializeCustomSupernetManagerFn) EncodeAbi() ([]byte, error) {
-	return CustomSupernetManager.Abi.Methods["initialize"].Encode(i)
-}
-
-func (i *InitializeCustomSupernetManagerFn) DecodeAbi(buf []byte) error {
-	return decodeMethod(CustomSupernetManager.Abi.Methods["initialize"], buf, i)
-}
-
-type WhitelistValidatorsCustomSupernetManagerFn struct {
-	Validators_ []ethgo.Address `abi:"validators_"`
-}
-
-func (w *WhitelistValidatorsCustomSupernetManagerFn) Sig() []byte {
-	return CustomSupernetManager.Abi.Methods["whitelistValidators"].ID()
-}
-
-func (w *WhitelistValidatorsCustomSupernetManagerFn) EncodeAbi() ([]byte, error) {
-	return CustomSupernetManager.Abi.Methods["whitelistValidators"].Encode(w)
-}
-
-func (w *WhitelistValidatorsCustomSupernetManagerFn) DecodeAbi(buf []byte) error {
-	return decodeMethod(CustomSupernetManager.Abi.Methods["whitelistValidators"], buf, w)
-}
-
-type RegisterCustomSupernetManagerFn struct {
-	Signature [2]*big.Int `abi:"signature"`
-	Pubkey    [4]*big.Int `abi:"pubkey"`
-}
-
-func (r *RegisterCustomSupernetManagerFn) Sig() []byte {
-	return CustomSupernetManager.Abi.Methods["register"].ID()
-}
-
-func (r *RegisterCustomSupernetManagerFn) EncodeAbi() ([]byte, error) {
-	return CustomSupernetManager.Abi.Methods["register"].Encode(r)
-}
-
-func (r *RegisterCustomSupernetManagerFn) DecodeAbi(buf []byte) error {
-	return decodeMethod(CustomSupernetManager.Abi.Methods["register"], buf, r)
-}
-
-type GetValidatorCustomSupernetManagerFn struct {
-	Validator_ types.Address `abi:"validator_"`
-}
-
-func (g *GetValidatorCustomSupernetManagerFn) Sig() []byte {
-	return CustomSupernetManager.Abi.Methods["getValidator"].ID()
-}
-
-func (g *GetValidatorCustomSupernetManagerFn) EncodeAbi() ([]byte, error) {
-	return CustomSupernetManager.Abi.Methods["getValidator"].Encode(g)
-}
-
-func (g *GetValidatorCustomSupernetManagerFn) DecodeAbi(buf []byte) error {
-	return decodeMethod(CustomSupernetManager.Abi.Methods["getValidator"], buf, g)
-}
-
-type AddGenesisBalanceCustomSupernetManagerFn struct {
-	Amount *big.Int `abi:"amount"`
-}
-
-func (a *AddGenesisBalanceCustomSupernetManagerFn) Sig() []byte {
-	return CustomSupernetManager.Abi.Methods["addGenesisBalance"].ID()
-}
-
-func (a *AddGenesisBalanceCustomSupernetManagerFn) EncodeAbi() ([]byte, error) {
-	return CustomSupernetManager.Abi.Methods["addGenesisBalance"].Encode(a)
-}
-
-func (a *AddGenesisBalanceCustomSupernetManagerFn) DecodeAbi(buf []byte) error {
-	return decodeMethod(CustomSupernetManager.Abi.Methods["addGenesisBalance"], buf, a)
-}
-
-type ValidatorRegisteredEvent struct {
+type StartValidator struct {
 	Validator types.Address `abi:"validator"`
+	Stake     *big.Int      `abi:"stake"`
 	BlsKey    [4]*big.Int   `abi:"blsKey"`
 }
 
-func (*ValidatorRegisteredEvent) Sig() ethgo.Hash {
-	return CustomSupernetManager.Abi.Events["ValidatorRegistered"].ID()
+var StartValidatorABIType = abi.MustNewType("tuple(address validator,uint256 stake,uint256[4] blsKey)")
+
+func (s *StartValidator) EncodeAbi() ([]byte, error) {
+	return StartValidatorABIType.Encode(s)
 }
 
-func (v *ValidatorRegisteredEvent) Encode() ([]byte, error) {
-	return CustomSupernetManager.Abi.Events["ValidatorRegistered"].Inputs.Encode(v)
-}
-
-func (v *ValidatorRegisteredEvent) ParseLog(log *ethgo.Log) (bool, error) {
-	if !CustomSupernetManager.Abi.Events["ValidatorRegistered"].Match(log) {
-		return false, nil
-	}
-
-	return true, decodeEvent(CustomSupernetManager.Abi.Events["ValidatorRegistered"], log, v)
-}
-
-func (v *ValidatorRegisteredEvent) Decode(input []byte) error {
-	return CustomSupernetManager.Abi.Events["ValidatorRegistered"].Inputs.DecodeStruct(input, &v)
-}
-
-type AddedToWhitelistEvent struct {
-	Validator types.Address `abi:"validator"`
-}
-
-func (*AddedToWhitelistEvent) Sig() ethgo.Hash {
-	return CustomSupernetManager.Abi.Events["AddedToWhitelist"].ID()
-}
-
-func (a *AddedToWhitelistEvent) Encode() ([]byte, error) {
-	return CustomSupernetManager.Abi.Events["AddedToWhitelist"].Inputs.Encode(a)
-}
-
-func (a *AddedToWhitelistEvent) ParseLog(log *ethgo.Log) (bool, error) {
-	if !CustomSupernetManager.Abi.Events["AddedToWhitelist"].Match(log) {
-		return false, nil
-	}
-
-	return true, decodeEvent(CustomSupernetManager.Abi.Events["AddedToWhitelist"], log, a)
-}
-
-func (a *AddedToWhitelistEvent) Decode(input []byte) error {
-	return CustomSupernetManager.Abi.Events["AddedToWhitelist"].Inputs.DecodeStruct(input, &a)
+func (s *StartValidator) DecodeAbi(buf []byte) error {
+	return decodeStruct(StartValidatorABIType, buf, &s)
 }
 
 type InitializeStakeManagerFn struct {
-	NewStakingToken types.Address `abi:"newStakingToken"`
+	NewStakingToken   types.Address     `abi:"newStakingToken"`
+	NewBls            types.Address     `abi:"newBls"`
+	NewDomain         string            `abi:"newDomain"`
+	GenesisValidators []*StartValidator `abi:"genesisValidators"`
 }
 
 func (i *InitializeStakeManagerFn) Sig() []byte {
@@ -1374,54 +1256,36 @@ func (i *InitializeStakeManagerFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(StakeManager.Abi.Methods["initialize"], buf, i)
 }
 
-type RegisterChildChainStakeManagerFn struct {
-	Manager types.Address `abi:"manager"`
-}
-
-func (r *RegisterChildChainStakeManagerFn) Sig() []byte {
-	return StakeManager.Abi.Methods["registerChildChain"].ID()
-}
-
-func (r *RegisterChildChainStakeManagerFn) EncodeAbi() ([]byte, error) {
-	return StakeManager.Abi.Methods["registerChildChain"].Encode(r)
-}
-
-func (r *RegisterChildChainStakeManagerFn) DecodeAbi(buf []byte) error {
-	return decodeMethod(StakeManager.Abi.Methods["registerChildChain"], buf, r)
-}
-
-type StakeForStakeManagerFn struct {
-	ID     *big.Int `abi:"id"`
+type StakeStakeManagerFn struct {
 	Amount *big.Int `abi:"amount"`
 }
 
-func (s *StakeForStakeManagerFn) Sig() []byte {
-	return StakeManager.Abi.Methods["stakeFor"].ID()
+func (s *StakeStakeManagerFn) Sig() []byte {
+	return StakeManager.Abi.Methods["stake"].ID()
 }
 
-func (s *StakeForStakeManagerFn) EncodeAbi() ([]byte, error) {
-	return StakeManager.Abi.Methods["stakeFor"].Encode(s)
+func (s *StakeStakeManagerFn) EncodeAbi() ([]byte, error) {
+	return StakeManager.Abi.Methods["stake"].Encode(s)
 }
 
-func (s *StakeForStakeManagerFn) DecodeAbi(buf []byte) error {
-	return decodeMethod(StakeManager.Abi.Methods["stakeFor"], buf, s)
+func (s *StakeStakeManagerFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(StakeManager.Abi.Methods["stake"], buf, s)
 }
 
-type ReleaseStakeOfStakeManagerFn struct {
+type StakeOfStakeManagerFn struct {
 	Validator types.Address `abi:"validator"`
-	Amount    *big.Int      `abi:"amount"`
 }
 
-func (r *ReleaseStakeOfStakeManagerFn) Sig() []byte {
-	return StakeManager.Abi.Methods["releaseStakeOf"].ID()
+func (s *StakeOfStakeManagerFn) Sig() []byte {
+	return StakeManager.Abi.Methods["stakeOf"].ID()
 }
 
-func (r *ReleaseStakeOfStakeManagerFn) EncodeAbi() ([]byte, error) {
-	return StakeManager.Abi.Methods["releaseStakeOf"].Encode(r)
+func (s *StakeOfStakeManagerFn) EncodeAbi() ([]byte, error) {
+	return StakeManager.Abi.Methods["stakeOf"].Encode(s)
 }
 
-func (r *ReleaseStakeOfStakeManagerFn) DecodeAbi(buf []byte) error {
-	return decodeMethod(StakeManager.Abi.Methods["releaseStakeOf"], buf, r)
+func (s *StakeOfStakeManagerFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(StakeManager.Abi.Methods["stakeOf"], buf, s)
 }
 
 type WithdrawStakeStakeManagerFn struct {
@@ -1441,21 +1305,53 @@ func (w *WithdrawStakeStakeManagerFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(StakeManager.Abi.Methods["withdrawStake"], buf, w)
 }
 
-type StakeOfStakeManagerFn struct {
-	Validator types.Address `abi:"validator"`
-	ID        *big.Int      `abi:"id"`
+type GetValidatorStakeManagerFn struct {
+	Validator_ types.Address `abi:"validator_"`
 }
 
-func (s *StakeOfStakeManagerFn) Sig() []byte {
-	return StakeManager.Abi.Methods["stakeOf"].ID()
+func (g *GetValidatorStakeManagerFn) Sig() []byte {
+	return StakeManager.Abi.Methods["getValidator"].ID()
 }
 
-func (s *StakeOfStakeManagerFn) EncodeAbi() ([]byte, error) {
-	return StakeManager.Abi.Methods["stakeOf"].Encode(s)
+func (g *GetValidatorStakeManagerFn) EncodeAbi() ([]byte, error) {
+	return StakeManager.Abi.Methods["getValidator"].Encode(g)
 }
 
-func (s *StakeOfStakeManagerFn) DecodeAbi(buf []byte) error {
-	return decodeMethod(StakeManager.Abi.Methods["stakeOf"], buf, s)
+func (g *GetValidatorStakeManagerFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(StakeManager.Abi.Methods["getValidator"], buf, g)
+}
+
+type WhitelistValidatorsStakeManagerFn struct {
+	Validators_ []ethgo.Address `abi:"validators_"`
+}
+
+func (w *WhitelistValidatorsStakeManagerFn) Sig() []byte {
+	return StakeManager.Abi.Methods["whitelistValidators"].ID()
+}
+
+func (w *WhitelistValidatorsStakeManagerFn) EncodeAbi() ([]byte, error) {
+	return StakeManager.Abi.Methods["whitelistValidators"].Encode(w)
+}
+
+func (w *WhitelistValidatorsStakeManagerFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(StakeManager.Abi.Methods["whitelistValidators"], buf, w)
+}
+
+type RegisterStakeManagerFn struct {
+	Signature [2]*big.Int `abi:"signature"`
+	Pubkey    [4]*big.Int `abi:"pubkey"`
+}
+
+func (r *RegisterStakeManagerFn) Sig() []byte {
+	return StakeManager.Abi.Methods["register"].ID()
+}
+
+func (r *RegisterStakeManagerFn) EncodeAbi() ([]byte, error) {
+	return StakeManager.Abi.Methods["register"].Encode(r)
+}
+
+func (r *RegisterStakeManagerFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(StakeManager.Abi.Methods["register"], buf, r)
 }
 
 type ChildManagerRegisteredEvent struct {
@@ -1484,7 +1380,6 @@ func (c *ChildManagerRegisteredEvent) Decode(input []byte) error {
 }
 
 type StakeAddedEvent struct {
-	ID        *big.Int      `abi:"id"`
 	Validator types.Address `abi:"validator"`
 	Amount    *big.Int      `abi:"amount"`
 }
@@ -1533,6 +1428,55 @@ func (s *StakeWithdrawnEvent) ParseLog(log *ethgo.Log) (bool, error) {
 
 func (s *StakeWithdrawnEvent) Decode(input []byte) error {
 	return StakeManager.Abi.Events["StakeWithdrawn"].Inputs.DecodeStruct(input, &s)
+}
+
+type ValidatorRegisteredEvent struct {
+	Validator types.Address `abi:"validator"`
+	BlsKey    [4]*big.Int   `abi:"blsKey"`
+}
+
+func (*ValidatorRegisteredEvent) Sig() ethgo.Hash {
+	return StakeManager.Abi.Events["ValidatorRegistered"].ID()
+}
+
+func (v *ValidatorRegisteredEvent) Encode() ([]byte, error) {
+	return StakeManager.Abi.Events["ValidatorRegistered"].Inputs.Encode(v)
+}
+
+func (v *ValidatorRegisteredEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !StakeManager.Abi.Events["ValidatorRegistered"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(StakeManager.Abi.Events["ValidatorRegistered"], log, v)
+}
+
+func (v *ValidatorRegisteredEvent) Decode(input []byte) error {
+	return StakeManager.Abi.Events["ValidatorRegistered"].Inputs.DecodeStruct(input, &v)
+}
+
+type AddedToWhitelistEvent struct {
+	Validator types.Address `abi:"validator"`
+}
+
+func (*AddedToWhitelistEvent) Sig() ethgo.Hash {
+	return StakeManager.Abi.Events["AddedToWhitelist"].ID()
+}
+
+func (a *AddedToWhitelistEvent) Encode() ([]byte, error) {
+	return StakeManager.Abi.Events["AddedToWhitelist"].Inputs.Encode(a)
+}
+
+func (a *AddedToWhitelistEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !StakeManager.Abi.Events["AddedToWhitelist"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(StakeManager.Abi.Events["AddedToWhitelist"], log, a)
+}
+
+func (a *AddedToWhitelistEvent) Decode(input []byte) error {
+	return StakeManager.Abi.Events["AddedToWhitelist"].Inputs.DecodeStruct(input, &a)
 }
 
 type Epoch struct {
@@ -1600,11 +1544,8 @@ func (v *ValidatorInit) DecodeAbi(buf []byte) error {
 }
 
 type InitializeValidatorSetFn struct {
-	NewStateSender      types.Address    `abi:"newStateSender"`
-	NewStateReceiver    types.Address    `abi:"newStateReceiver"`
-	NewRootChainManager types.Address    `abi:"newRootChainManager"`
-	NewEpochSize        *big.Int         `abi:"newEpochSize"`
-	InitialValidators   []*ValidatorInit `abi:"initialValidators"`
+	NewEpochSize      *big.Int         `abi:"newEpochSize"`
+	InitialValidators []*ValidatorInit `abi:"initialValidators"`
 }
 
 func (i *InitializeValidatorSetFn) Sig() []byte {

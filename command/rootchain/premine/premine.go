@@ -9,11 +9,9 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
 	rootHelper "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	sidechainHelper "github.com/0xPolygon/polygon-edge/command/sidechain"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/spf13/cobra"
-	"github.com/umbracle/ethgo"
 )
 
 var (
@@ -126,27 +124,6 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 
 	if receipt == nil || receipt.Status == uint64(types.ReceiptFailed) {
 		return fmt.Errorf("approve transaction failed on block %d", receipt.BlockNumber)
-	}
-
-	premineFn := &contractsapi.AddGenesisBalanceCustomSupernetManagerFn{
-		Amount: params.amountValue,
-	}
-
-	premineInput, err := premineFn.EncodeAbi()
-	if err != nil {
-		return err
-	}
-
-	supernetManagerAddr := ethgo.Address(types.StringToAddress(params.customSupernetManager))
-	txn := rootHelper.CreateTransaction(ownerKey.Address(), &supernetManagerAddr, premineInput, nil, true)
-
-	receipt, err = txRelayer.SendTransaction(txn, ownerKey)
-	if err != nil {
-		return err
-	}
-
-	if receipt == nil || receipt.Status == uint64(types.ReceiptFailed) {
-		return fmt.Errorf("premine transaction failed on block %d", receipt.BlockNumber)
 	}
 
 	outputter.WriteCommandResult(&premineResult{

@@ -149,7 +149,7 @@ func registerValidator(sender txrelayer.TxRelayer, account *wallet.Account,
 		return nil, fmt.Errorf("register validator failed: %w", err)
 	}
 
-	registerFn := &contractsapi.RegisterCustomSupernetManagerFn{
+	registerFn := &contractsapi.RegisterStakeManagerFn{
 		Signature: sigMarshal,
 		Pubkey:    account.Bls.PublicKey().ToBigInt(),
 	}
