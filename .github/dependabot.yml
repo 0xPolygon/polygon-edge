@@ -4,11 +4,11 @@ updates:
     directory: /
     target-branch: "develop"
     schedule:
-      interval: weekly
+      interval: monthly
     ignore:
       - dependency-name: "github.com/aws/aws-sdk-go"
         update-types: [ "version-update:semver-patch" ]
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 20
     pull-request-branch-name:
       separator: "-"
     reviewers:

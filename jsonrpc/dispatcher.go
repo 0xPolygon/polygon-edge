@@ -2,7 +2,6 @@ package jsonrpc
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -14,6 +13,12 @@ import (
 
 	"github.com/armon/go-metrics"
 	"github.com/hashicorp/go-hclog"
+	jsonIter "github.com/json-iterator/go"
+)
+
+var (
+	jsonIt     = jsonIter.ConfigCompatibleWithStandardLibrary
+	fastJSONIt = jsonIter.ConfigFastest
 )
 
 type serviceData struct {
@@ -186,7 +191,7 @@ func formatID(id interface{}) (interface{}, Error) {
 
 func (d *Dispatcher) handleSubscribe(req Request, conn wsConn) (string, Error) {
 	var params []interface{}
-	if err := json.Unmarshal(req.Params, &params); err != nil {
+	if err := jsonIt.Unmarshal(req.Params, &params); err != nil {
 		return "", NewInvalidRequestError("Invalid json request")
 	}
 
@@ -219,7 +224,7 @@ func (d *Dispatcher) handleSubscribe(req Request, conn wsConn) (string, Error) {
 
 func (d *Dispatcher) handleUnsubscribe(req Request) (bool, Error) {
 	var params []interface{}
-	if err := json.Unmarshal(req.Params, &params); err != nil {
+	if err := jsonIt.Unmarshal(req.Params, &params); err != nil {
 		return false, NewInvalidRequestError("Invalid json request")
 	}
 
@@ -252,7 +257,7 @@ func (d *Dispatcher) HandleWs(reqBody []byte, conn wsConn) ([]byte, error) {
 	if len(reqBody) > 0 && reqBody[0] == openSquareBracket {
 		var batchReq BatchRequest
 
-		err := json.Unmarshal(reqBody, &batchReq)
+		err := jsonIt.Unmarshal(reqBody, &batchReq)
 		if err != nil {
 			return NewRPCResponse(nil, "2.0", nil,
 				NewInvalidRequestError("Invalid json batch request")).Bytes()
@@ -289,7 +294,7 @@ func (d *Dispatcher) HandleWs(reqBody []byte, conn wsConn) ([]byte, error) {
 	}
 
 	var req Request
-	if err := json.Unmarshal(reqBody, &req); err != nil {
+	if err := jsonIt.Unmarshal(reqBody, &req); err != nil {
 		return NewRPCResponse(req.ID, "2.0", nil, NewInvalidRequestError("Invalid json request")).Bytes()
 	}
 
@@ -334,7 +339,7 @@ func (d *Dispatcher) Handle(reqBody []byte) ([]byte, error) {
 
 	if x[0] == '{' {
 		var req Request
-		if err := json.Unmarshal(reqBody, &req); err != nil {
+		if err := jsonIt.Unmarshal(reqBody, &req); err != nil {
 			return NewRPCResponse(nil, "2.0", nil, NewInvalidRequestError("Invalid json request")).Bytes()
 		}
 
@@ -349,7 +354,7 @@ func (d *Dispatcher) Handle(reqBody []byte) ([]byte, error) {
 
 	// handle batch requests
 	var requests BatchRequest
-	if err := json.Unmarshal(reqBody, &requests); err != nil {
+	if err := jsonIt.Unmarshal(reqBody, &requests); err != nil {
 		return NewRPCResponse(
 			nil,
 			"2.0",
@@ -383,7 +388,7 @@ func (d *Dispatcher) Handle(reqBody []byte) ([]byte, error) {
 		responses = append(responses, resp)
 	}
 
-	respBytes, err := json.Marshal(responses)
+	respBytes, err := jsonIt.Marshal(responses)
 	if err != nil {
 		return NewRPCResponse(nil, "2.0", nil, NewInternalError("Internal error")).Bytes()
 	}
@@ -411,7 +416,7 @@ func (d *Dispatcher) handleReq(req Request) ([]byte, Error) {
 	}
 
 	if fd.numParams() > 0 {
-		if err := json.Unmarshal(req.Params, &inputs); err != nil {
+		if err := jsonIt.Unmarshal(req.Params, &inputs); err != nil {
 			return nil, NewInvalidParamsError("Invalid Params")
 		}
 	}
@@ -444,7 +449,7 @@ func (d *Dispatcher) handleReq(req Request) ([]byte, Error) {
 	}
 
 	if res := output[0].Interface(); res != nil {
-		data, err = json.Marshal(res)
+		data, err = fastJSONIt.Marshal(res)
 		if err != nil {
 			d.logInternalError(req.Method, err)
 
