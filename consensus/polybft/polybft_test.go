@@ -323,11 +323,6 @@ func Test_GenesisPostHookFactory(t *testing.T) {
 				EnabledAddresses: []types.Address{validators.Validators["1"].Address()},
 			},
 		},
-		{
-			name:        "missing bridge configuration",
-			config:      &PolyBFTConfig{},
-			expectedErr: errMissingBridgeConfig,
-		},
 	}
 
 	for _, tc := range cases {

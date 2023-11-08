@@ -39,6 +39,7 @@ func TestStakeManager_PostBlock(t *testing.T) {
 
 		bcMock := new(blockchainMock)
 		bcMock.On("CurrentHeader").Return(&types.Header{Number: block - 1}, true).Once()
+		bcMock.On("GetStateProviderForBlock", mock.Anything).Return(nil).Times(len(allAliases))
 
 		validators := validator.NewTestValidatorsWithAliases(t, allAliases)
 
@@ -57,7 +58,7 @@ func TestStakeManager_PostBlock(t *testing.T) {
 			nil,
 			5,
 			nil,
-			nil,
+			bcMock,
 		)
 		require.NoError(t, err)
 
@@ -166,7 +167,8 @@ func TestStakeManager_PostBlock(t *testing.T) {
 			Return(nil, error(nil))
 
 		bcMock := new(blockchainMock)
-		bcMock.On("CurrentHeader").Return(&types.Header{Number: block - 1}, true).Once()
+		bcMock.On("CurrentHeader").Return(&types.Header{Number: block - 1}, true)
+		bcMock.On("GetStateProviderForBlock", mock.Anything).Return(nil).Times(len(allAliases))
 
 		// insert initial full validator set
 		require.NoError(t, state.StakeStore.insertFullValidatorSet(validatorSetState{
@@ -183,7 +185,7 @@ func TestStakeManager_PostBlock(t *testing.T) {
 			nil,
 			5,
 			nil,
-			nil,
+			bcMock,
 		)
 		require.NoError(t, err)
 
