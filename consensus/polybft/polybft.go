@@ -188,7 +188,6 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 		}
 
 		bridgeCfg := polyBFTConfig.Bridge
-
 		if bridgeCfg != nil {
 
 			// check if there are Bridge Allow List Admins and Bridge Block List Admins
@@ -621,6 +620,7 @@ func (p *Polybft) startConsensusProtocol() {
 
 		currentValidators, err := p.GetValidators(latestHeader.Number, nil)
 		p.logger.Error(fmt.Sprintf("Current Validators %+v", currentValidators))
+
 		if err != nil {
 			p.logger.Error("failed to query current validator set", "block number", latestHeader.Number, "error", err)
 		}

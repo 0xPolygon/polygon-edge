@@ -548,6 +548,7 @@ func (p *genesisParams) getValidatorAccounts() ([]*validator.GenesisValidator, e
 	if err != nil {
 		return nil, err
 	}
+
 	return validators, nil
 }
 

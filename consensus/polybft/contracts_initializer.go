@@ -42,11 +42,13 @@ func initValidatorSet(polyBFTConfig PolyBFTConfig, transition *state.Transition)
 }
 func initStakeManager(polyBFTConfig PolyBFTConfig, transition *state.Transition) error {
 	startValidators := make([]*contractsapi.StartValidator, len(polyBFTConfig.InitialValidatorSet))
+
 	for i, validator := range polyBFTConfig.InitialValidatorSet {
 		blsRaw, err := hex.DecodeHex(validator.BlsKey)
 		if err != nil {
 			return err
 		}
+
 		key, err := bls.UnmarshalPublicKey(blsRaw)
 		if err != nil {
 			return err

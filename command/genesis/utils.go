@@ -247,7 +247,8 @@ func ReadValidatorsByPrefix(dir, prefix string) ([]*validator.GenesisValidator, 
 }
 
 // ReadValidatorsByPrefix reads validators secrets on a given root directory and with given folder prefix
-func ReadValidatorsByPrefixStakeInfos(dir, prefix string, stakeInfos map[types.Address]*big.Int) ([]*validator.GenesisValidator, error) {
+func ReadValidatorsByPrefixStakeInfos(dir, prefix string,
+	stakeInfos map[types.Address]*big.Int) ([]*validator.GenesisValidator, error) {
 	validatorKeyFiles, err := GetValidatorKeyFiles(dir, prefix)
 	if err != nil {
 		return nil, err

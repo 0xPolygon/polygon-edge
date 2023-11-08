@@ -648,7 +648,6 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		// deploy rootchain contracts
 		err = cluster.Bridge.deployRootchainContracts(genesisPath)
 		require.NoError(t, err)
-
 	}
 
 	for i := 1; i <= int(cluster.Config.ValidatorSetSize); i++ {
