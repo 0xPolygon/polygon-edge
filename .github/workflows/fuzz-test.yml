@@ -15,7 +15,7 @@ on:  # yamllint disable-line rule:truthy
 
 jobs:
   fuzz_test:
-    name: Polygon Edge
+    name: Blade
     runs-on: ubuntu-latest
     outputs:
       fuzz_output_failure: ${{ steps.run_fuzz_failure.outputs.test_output }}

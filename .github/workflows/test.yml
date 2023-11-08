@@ -13,7 +13,7 @@ on:  # yamllint disable-line rule:truthy
 
 jobs:
   go_test:
-    name: Polygon Edge
+    name: Blade
     runs-on: ubuntu-latest
     outputs:
       test_output_failure: ${{ steps.run_tests_failure.outputs.test_output }}

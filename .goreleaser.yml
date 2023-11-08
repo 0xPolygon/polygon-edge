@@ -72,28 +72,6 @@ archives:
       - LICENSE
       - README.md
 
-#nfpms:
-#  - vendor: 0xPolygon
-#    homepage: https://polygon.technology
-#    maintainer: Polygon Edge Team <edge@polygon.technology>
-#    description:  A Framework for Building Ethereum-compatible Blockchain Networks
-#    license: GPLv3 LGPLv3
-#
-#    formats:
-#      - apk
-#      - deb
-#      - rpm
-#
-#    contents:
-#      - src: polygon-edge.service
-#        dst: /lib/systemd/system/polygon-edge.service
-#        type: config
-#
-#    overrides:
-#      rpm:
-#        replacements:
-#          amd64: x86_64
-
 snapshot:
   name_template: "{{ .Tag }}.next"
 
