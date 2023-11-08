@@ -1,6 +1,6 @@
 ---
 -
-  name: Update Polygon Edge binary
+  name: Update Blade binary
   hosts:
     - all
   become: yes
@@ -11,58 +11,58 @@
         upgrade: yes
         update_cache: yes
 
-    ## stop polygon-edge service
-    - name: Stop polygon edge service
+    ## stop blade service
+    - name: Stop Blade service
       systemd:
         state: stopped
-        name: polygon-edge
+        name: blade
 
     ## get the latest release
     - name: Get latest release link
       uri:
-        url: https://api.github.com/repos/0xPolygon/polygon-edge/releases/latest
+        url: https://api.github.com/repos/Ethernal-Tech/blade/releases/latest
         return_content: true
       register: edge_release
 
     ## download the latest release
-    - name: Download latest Polygon Edge release
+    - name: Download latest Blade release
       get_url:
         url: "{{ edge_release.json.assets[3].browser_download_url }}"
-        dest: /tmp/polygon-edge.tar.gz
+        dest: /tmp/blade.tar.gz
         force: yes
 
     ## create temp dir for release
-    - name: Create temp dir for Polygon Edge release
+    - name: Create temp dir for Blade release
       file:
-        path: /tmp/polygon-edge
+        path: /tmp/blade
         state: directory
 
     ## unpack release tar
-    - name: Unpack Polygon Edge release
+    - name: Unpack Blade release
       unarchive:
         remote_src: yes
-        src: /tmp/polygon-edge.tar.gz
-        dest: /tmp/polygon-edge
+        src: /tmp/blade.tar.gz
+        dest: /tmp/blade
 
-    ## set polygon-edge to PATH
-    - name: Place Polygon Edge binary to PATH
+    ## set blade to PATH
+    - name: Place Blade binary to PATH
       copy:
         remote_src: yes
-        src: /tmp/polygon-edge/polygon-edge
+        src: /tmp/blade/blade
         dest: /usr/local/bin/
         mode: a+x
         force: yes
 
     ## remove release temp dir
-    - name: Remove temp Polygon Edge release dir
+    - name: Remove temp Blade release dir
       file:
         state: absent
-        path: /tmp/polygon-edge
+        path: /tmp/blade
 
-    ## start polygon edge service
-    - name: Start polygon-edge service
+    ## start Blade service
+    - name: Start blade service
       systemd:
         state: restarted
-        name: polygon-edge
+        name: blade
         daemon_reload: yes
         enabled: yes

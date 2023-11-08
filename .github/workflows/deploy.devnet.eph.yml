@@ -33,10 +33,10 @@ jobs:
       url: https://rpc.us-east-1.deph.testing.psdk.io/
     runs-on: ubuntu-latest
     steps:
-      - name: Download Polygon Edge Artifact
+      - name: Download Blade Artifact
         uses: actions/download-artifact@v3
         with:
-          name: polygon-edge
+          name: blade
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1-node16
@@ -74,7 +74,7 @@ jobs:
 
       - name: Publish Binary package to S3
         run: |
-          aws s3 cp ./polygon-edge.tar.gz s3://${{ secrets.POLYGON_EDGE_ARTIFACT_BUCKET }} --metadata "{\"commit_sha\":\"${GITHUB_SHA}\"}"
+          aws s3 cp ./blade.tar.gz s3://${{ secrets.POLYGON_EDGE_ARTIFACT_BUCKET }} --metadata "{\"commit_sha\":\"${GITHUB_SHA}\"}"
 
       - name: Deploy Ephemeral DevNet
         continue-on-error: true
@@ -86,8 +86,8 @@ jobs:
           echo "--------------------"
 
           # Should finish relatively fast. Can add a check to guard against pre-mature cycle
-          echo "Cleaning up the data directories and stopping Polygon-Edge service..."
-          aws ssm send-command --document-name polygon-edge-validators-maintenance-clean-data --targets Key=tag:aws:autoscaling:groupName,Values=$VALIDATOR_ASGS >> /dev/null
+          echo "Cleaning up the data directories and stopping blade service..."
+          aws ssm send-command --document-name blade-validators-maintenance-clean-data --targets Key=tag:aws:autoscaling:groupName,Values=$VALIDATOR_ASGS >> /dev/null
 
           for vasg in ${VALIDATOR_ASGS//,/ }
           do

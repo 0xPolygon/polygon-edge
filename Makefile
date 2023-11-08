@@ -42,11 +42,11 @@ build: check-go check-git
 	$(eval VERSION = $(shell git tag --points-at ${COMMIT_HASH}))
 	$(eval BRANCH = $(shell git rev-parse --abbrev-ref HEAD | tr -d '\040\011\012\015\n'))
 	$(eval TIME = $(shell date))
-	go build -o polygon-edge -ldflags="\
-    	-X 'github.com/0xPolygon/polygon-edge/versioning.Version=$(VERSION)' \
-		-X 'github.com/0xPolygon/polygon-edge/versioning.Commit=$(COMMIT_HASH)'\
-		-X 'github.com/0xPolygon/polygon-edge/versioning.Branch=$(BRANCH)'\
-		-X 'github.com/0xPolygon/polygon-edge/versioning.BuildTime=$(TIME)'" \
+	go build -o blade -ldflags="\
+    	-X 'github.com/Ethernal-Tech/blade/versioning.Version=$(VERSION)' \
+		-X 'github.com/Ethernal-Tech/blade/versioning.Commit=$(COMMIT_HASH)'\
+		-X 'github.com/Ethernal-Tech/blade/versioning.Branch=$(BRANCH)'\
+		-X 'github.com/Ethernal-Tech/blade/versioning.BuildTime=$(TIME)'" \
 	main.go
 
 .PHONY: lint
@@ -67,19 +67,19 @@ fuzz-test: check-go
 
 .PHONY: test-e2e
 test-e2e: check-go
-	go build -race -o artifacts/polygon-edge .
-	env EDGE_BINARY=${PWD}/artifacts/polygon-edge go test -v -timeout=30m ./e2e/...
+	go build -race -o artifacts/blade .
+	env EDGE_BINARY=${PWD}/artifacts/blade go test -v -timeout=30m ./e2e/...
 
 .PHONY: test-e2e-polybft
 test-e2e-polybft: check-go
-	go build -o artifacts/polygon-edge .
-	env EDGE_BINARY=${PWD}/artifacts/polygon-edge E2E_TESTS=true E2E_LOGS=true \
+	go build -o artifacts/blade .
+	env EDGE_BINARY=${PWD}/artifacts/blade E2E_TESTS=true E2E_LOGS=true \
 	go test -v -timeout=1h30m ./e2e-polybft/e2e/...
 
 .PHONY: test-property-polybft
 test-property-polybft: check-go
-	go build -o artifacts/polygon-edge .
-	env EDGE_BINARY=${PWD}/artifacts/polygon-edge E2E_TESTS=true E2E_LOGS=true go test -v -timeout=30m ./e2e-polybft/property/... \
+	go build -o artifacts/blade .
+	env EDGE_BINARY=${PWD}/artifacts/blade E2E_TESTS=true E2E_LOGS=true go test -v -timeout=30m ./e2e-polybft/property/... \
 	-rapid.checks=10
 
 .PHONY: compile-core-contracts

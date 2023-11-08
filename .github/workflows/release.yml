@@ -55,7 +55,7 @@ jobs:
           		ghcr.io/goreleaser/goreleaser-cross:${GOLANG_CROSS_VERSION} \
           		--rm-dist --skip-validate
         env:
-          PACKAGE_NAME: github.com/0xPolygon/polygon-edge
+          PACKAGE_NAME: github.com/Ethernal-Tech/blade
           GOLANG_CROSS_VERSION: v1.20.5
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.prepare.outputs.tag_name }}

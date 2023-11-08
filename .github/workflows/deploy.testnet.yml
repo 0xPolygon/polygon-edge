@@ -32,10 +32,10 @@ jobs:
       url: https://rpc.us-east-1.tn.testing.psdk.io/
     runs-on: ubuntu-latest
     steps:
-      - name: Download Polygon Edge Artifact
+      - name: Download Blade Artifact
         uses: actions/download-artifact@v3
         with:
-          name: polygon-edge
+          name: blade
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1-node16

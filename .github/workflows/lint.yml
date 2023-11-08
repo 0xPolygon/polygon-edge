@@ -1,13 +1,13 @@
 ---
 name: Lint
-on:  # yamllint disable-line rule:truthy
+on: # yamllint disable-line rule:truthy
   push:
     branches:
-      - '*'
+      - "*"
     tags-ignore:
-      - 'v*'
+      - "v*"
     paths:
-      - '**.go'
+      - "**.go"
   pull_request:
     types:
       - opened
@@ -19,6 +19,7 @@ on:  # yamllint disable-line rule:truthy
 
 jobs:
   golangci_lint:
+    name: Linter
     runs-on: ubuntu-latest
     steps:
       - name: Install Go
