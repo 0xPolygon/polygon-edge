@@ -605,52 +605,6 @@ func (p *genesisParams) validateRewardWalletAndToken() error {
 	return nil
 }
 
-// validatePremineInfo validates whether reserve account (0x0 address) is premined
-func (p *genesisParams) validatePremineInfo() error {
-	for _, premineInfo := range p.premineInfos {
-		if premineInfo.Address == types.ZeroAddress {
-			// we have premine of zero address, just return
-			return nil
-		}
-	}
-
-	return errReserveAccMustBePremined
-}
-
-// validateBlockTrackerPollInterval validates block tracker block interval
-// which can not be 0
-func (p *genesisParams) validateBlockTrackerPollInterval() error {
-	if p.blockTrackerPollInterval == 0 {
-		return helper.ErrBlockTrackerPollInterval
-	}
-
-	return nil
-}
-
-// validateBurnContract validates burn contract. If native token is mintable,
-// burn contract flag must not be set. If native token is non mintable only one burn contract
-// can be set and the specified address will be used to predeploy default EIP1559 burn contract.
-func (p *genesisParams) validateBurnContract() error {
-	if p.isBurnContractEnabled() {
-		burnContractInfo, err := parseBurnContractInfo(p.burnContract)
-		if err != nil {
-			return fmt.Errorf("invalid burn contract info provided: %w", err)
-		}
-
-		if p.nativeTokenConfig.IsMintable {
-			if burnContractInfo.Address != types.ZeroAddress {
-				return errors.New("only zero address is allowed as burn destination for mintable native token")
-			}
-		} else {
-			if burnContractInfo.Address == types.ZeroAddress {
-				return errors.New("it is not allowed to deploy burn contract to 0x0 address")
-			}
-		}
-	}
-
-	return nil
-}
-
 func (p *genesisParams) validateProxyContractsAdmin() error {
 	if strings.TrimSpace(p.proxyContractsAdmin) == "" {
 		return errors.New("proxy contracts admin address must be set")
