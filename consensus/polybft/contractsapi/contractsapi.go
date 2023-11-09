@@ -539,7 +539,7 @@ type InitializeRootERC20PredicateFn struct {
 	NewExitHelper          types.Address `abi:"newExitHelper"`
 	NewChildERC20Predicate types.Address `abi:"newChildERC20Predicate"`
 	NewChildTokenTemplate  types.Address `abi:"newChildTokenTemplate"`
-	NewNativeTokenRoot     types.Address `abi:"newNativeTokenRoot"`
+	NativeTokenRootAddress types.Address `abi:"nativeTokenRootAddress"`
 }
 
 func (i *InitializeRootERC20PredicateFn) Sig() []byte {

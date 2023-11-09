@@ -83,7 +83,7 @@ test-property-polybft: check-go
 	-rapid.checks=10
 
 .PHONY: compile-blade-contracts
-compile-core-contracts: check-npm
+compile-blade-contracts: check-npm
 	cd blade-contracts && npm install && npm run compile
 	$(MAKE) generate-smart-contract-bindings
 
