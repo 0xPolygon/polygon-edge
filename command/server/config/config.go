@@ -71,10 +71,6 @@ type Headers struct {
 }
 
 const (
-	// BlockTimeMultiplierForTimeout Multiplier to get IBFT timeout from block time
-	// timeout is calculated when IBFT timeout is not specified
-	BlockTimeMultiplierForTimeout uint64 = 5
-
 	// DefaultJSONRPCBatchRequestLimit maximum length allowed for json_rpc batch requests
 	DefaultJSONRPCBatchRequestLimit uint64 = 20
 

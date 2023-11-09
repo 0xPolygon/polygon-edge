@@ -29,12 +29,6 @@ var (
 	MaxSafeJSInt = uint64(math.Pow(2, 53) - 2)
 
 	errInvalidDuration = errors.New("invalid duration")
-
-	IBFTImportantNotice = "***** IMPORTANT NOTICE: IBFT consensus protocol is about to be" +
-		" removed from the Edge in the following release. *****\n" +
-		"Please migrate to the PolyBFT protocol and plan your activities accordingly.\n" +
-		"More information on how to execute the migration process can be found here" +
-		"(https://wiki.polygon.technology/docs/edge/operate/ibft-to-polybft/)."
 )
 
 // RetryForever will execute a function until it completes without error or

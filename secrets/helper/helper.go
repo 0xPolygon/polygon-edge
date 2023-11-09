@@ -8,6 +8,7 @@ import (
 	libp2pCrypto "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 
+	"github.com/0xPolygon/polygon-edge/bls"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/network"
@@ -92,32 +93,6 @@ func InitECDSAValidatorKey(secretsManager secrets.SecretsManager) (types.Address
 	return address, nil
 }
 
-func InitBLSValidatorKey(secretsManager secrets.SecretsManager) ([]byte, error) {
-	if secretsManager.HasSecret(secrets.ValidatorBLSKey) {
-		return nil, fmt.Errorf(`secrets "%s" has been already initialized`, secrets.ValidatorBLSKey)
-	}
-
-	blsSecretKey, blsSecretKeyEncoded, err := crypto.GenerateAndEncodeBLSSecretKey()
-	if err != nil {
-		return nil, err
-	}
-
-	// Write the validator private key to the secrets manager storage
-	if setErr := secretsManager.SetSecret(
-		secrets.ValidatorBLSKey,
-		blsSecretKeyEncoded,
-	); setErr != nil {
-		return nil, setErr
-	}
-
-	pubkeyBytes, err := crypto.BLSSecretKeyToPubkeyBytes(blsSecretKey)
-	if err != nil {
-		return nil, err
-	}
-
-	return pubkeyBytes, nil
-}
-
 func InitNetworkingPrivateKey(secretsManager secrets.SecretsManager) (libp2pCrypto.PrivKey, error) {
 	if secretsManager.HasSecret(secrets.NetworkKey) {
 		return nil, fmt.Errorf(`secrets "%s" has been already initialized`, secrets.NetworkKey)
@@ -170,17 +145,12 @@ func LoadBLSPublicKey(secretsManager secrets.SecretsManager) (string, error) {
 		return "", err
 	}
 
-	secretKey, err := crypto.BytesToBLSSecretKey(encodedKey)
+	secretKey, err := bls.UnmarshalPrivateKey(encodedKey)
 	if err != nil {
 		return "", err
 	}
 
-	pubkeyBytes, err := crypto.BLSSecretKeyToPubkeyBytes(secretKey)
-	if err != nil {
-		return "", err
-	}
-
-	return hex.EncodeToHex(pubkeyBytes), nil
+	return hex.EncodeToString(secretKey.PublicKey().Marshal()), nil
 }
 
 // LoadNodeID loads Libp2p key by SecretsManager and returns Node ID

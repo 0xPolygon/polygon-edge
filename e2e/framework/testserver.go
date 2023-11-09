@@ -15,14 +15,11 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/hashicorp/go-hclog"
-	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/jsonrpc"
 	"github.com/umbracle/ethgo/wallet"
@@ -33,23 +30,13 @@ import (
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
-	"github.com/0xPolygon/polygon-edge/command/genesis/predeploy"
-	ibftSwitch "github.com/0xPolygon/polygon-edge/command/ibft/switch"
-	initCmd "github.com/0xPolygon/polygon-edge/command/secrets/init"
 	"github.com/0xPolygon/polygon-edge/command/server"
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/fork"
-	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/common"
-	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
 	"github.com/0xPolygon/polygon-edge/helper/tests"
-	"github.com/0xPolygon/polygon-edge/network"
-	"github.com/0xPolygon/polygon-edge/secrets"
-	"github.com/0xPolygon/polygon-edge/secrets/local"
 	"github.com/0xPolygon/polygon-edge/server/proto"
 	txpoolProto "github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/0xPolygon/polygon-edge/validators"
 )
 
 type TestServerConfigCallback func(*TestServerConfig)
@@ -85,7 +72,6 @@ func NewTestServer(t *testing.T, rootDir string, callback TestServerConfigCallba
 		JSONRPCPort:   ports[2].Port(),
 		RootDir:       rootDir,
 		Signer:        crypto.NewSigner(chain.AllForksEnabled.At(0), 100),
-		ValidatorType: validators.ECDSAValidatorType,
 	}
 
 	if callback != nil {
@@ -149,17 +135,6 @@ func (t *TestServer) TxnPoolOperator() txpoolProto.TxnPoolOperatorClient {
 	return txpoolProto.NewTxnPoolOperatorClient(conn)
 }
 
-func (t *TestServer) IBFTOperator() ibftOp.IbftOperatorClient {
-	conn, err := grpc.Dial(
-		t.GrpcAddr(),
-		grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		t.t.Fatal(err)
-	}
-
-	return ibftOp.NewIbftOperatorClient(conn)
-}
-
 func (t *TestServer) ReleaseReservedPorts() {
 	for _, p := range t.Config.ReservedPorts {
 		if err := p.Close(); err != nil {
@@ -189,84 +164,6 @@ type InitIBFTResult struct {
 	NodeID  string
 }
 
-func (t *TestServer) SecretsInit() (*InitIBFTResult, error) {
-	secretsInitCmd := initCmd.GetCommand()
-
-	var args []string
-
-	commandSlice := strings.Split(fmt.Sprintf("secrets %s", secretsInitCmd.Use), " ")
-	args = append(args, commandSlice...)
-	args = append(args, "--data-dir", filepath.Join(t.Config.IBFTDir, "tmp"))
-	args = append(args, "--insecure")
-
-	cmd := exec.Command(resolveBinary(), args...) //nolint:gosec
-	cmd.Dir = t.Config.RootDir
-
-	if _, err := cmd.Output(); err != nil {
-		return nil, err
-	}
-
-	res := &InitIBFTResult{}
-
-	localSecretsManager, factoryErr := local.SecretsManagerFactory(
-		nil,
-		&secrets.SecretsManagerParams{
-			Logger: hclog.NewNullLogger(),
-			Extra: map[string]interface{}{
-				secrets.Path: filepath.Join(cmd.Dir, t.Config.IBFTDir),
-			},
-		})
-	if factoryErr != nil {
-		return nil, factoryErr
-	}
-
-	// Generate the IBFT validator private key
-	validatorKey, validatorKeyEncoded, keyErr := crypto.GenerateAndEncodeECDSAPrivateKey()
-	if keyErr != nil {
-		return nil, keyErr
-	}
-
-	// Write the validator private key to the secrets manager storage
-	if setErr := localSecretsManager.SetSecret(secrets.ValidatorKey, validatorKeyEncoded); setErr != nil {
-		return nil, setErr
-	}
-
-	// Generate the libp2p private key
-	libp2pKey, libp2pKeyEncoded, keyErr := network.GenerateAndEncodeLibp2pKey()
-	if keyErr != nil {
-		return nil, keyErr
-	}
-
-	// Write the networking private key to the secrets manager storage
-	if setErr := localSecretsManager.SetSecret(secrets.NetworkKey, libp2pKeyEncoded); setErr != nil {
-		return nil, setErr
-	}
-
-	if t.Config.ValidatorType == validators.BLSValidatorType {
-		// Generate the BLS Key
-		_, blsKeyEncoded, keyErr := crypto.GenerateAndEncodeBLSSecretKey()
-		if keyErr != nil {
-			return nil, keyErr
-		}
-
-		// Write the networking private key to the secrets manager storage
-		if setErr := localSecretsManager.SetSecret(secrets.ValidatorBLSKey, blsKeyEncoded); setErr != nil {
-			return nil, setErr
-		}
-	}
-
-	// Get the node ID from the private key
-	nodeID, err := peer.IDFromPrivateKey(libp2pKey)
-	if err != nil {
-		return nil, err
-	}
-
-	res.Address = crypto.PubKeyToAddress(&validatorKey.PublicKey).String()
-	res.NodeID = nodeID.String()
-
-	return res, nil
-}
-
 func (t *TestServer) GenerateGenesis() error {
 	genesisCmd := genesis.GetCommand()
 	args := []string{
@@ -278,65 +175,16 @@ func (t *TestServer) GenerateGenesis() error {
 		args = append(args, "--premine", acct.Addr.String()+":0x"+acct.Balance.Text(16))
 	}
 
-	// provide block time flag
-	// (e2e framework expects BlockTime parameter to be provided in seconds)
-	if t.Config.BlockTime != 0 {
-		args = append(args, "--block-time",
-			(time.Duration(t.Config.BlockTime) * time.Second).String())
-	}
-
 	// add consensus flags
 	switch t.Config.Consensus {
-	case ConsensusIBFT:
-		args = append(
-			args,
-			"--consensus", "ibft",
-			"--ibft-validator-type", string(t.Config.ValidatorType),
-		)
-
-		if t.Config.IBFTDirPrefix == "" {
-			return errors.New("prefix of IBFT directory is not set")
-		}
-
-		args = append(args, "--validators-prefix", t.Config.IBFTDirPrefix)
-
-		if t.Config.EpochSize != 0 {
-			args = append(args, "--epoch-size", strconv.FormatUint(t.Config.EpochSize, 10))
-		}
-
 	case ConsensusDev:
-		args = append(
-			args,
-			"--consensus", "dev",
-			"--ibft-validator-type", string(t.Config.ValidatorType),
-		)
-
-		// Set up any initial staker addresses for the predeployed Staking SC
-		for _, stakerAddress := range t.Config.DevStakers {
-			args = append(args, "--validators", stakerAddress.String())
-		}
+		args = append(args, "--consensus", "dev")
 	case ConsensusDummy:
 		args = append(args, "--consensus", "dummy")
 	}
 
 	for _, bootnode := range t.Config.Bootnodes {
 		args = append(args, "--bootnode", bootnode)
-	}
-
-	// Make sure the correct mechanism is selected
-	if t.Config.IsPos {
-		args = append(args, "--pos")
-
-		if t.Config.MinValidatorCount == 0 {
-			t.Config.MinValidatorCount = stakingHelper.MinValidatorCount
-		}
-
-		if t.Config.MaxValidatorCount == 0 {
-			t.Config.MaxValidatorCount = stakingHelper.MaxValidatorCount
-		}
-
-		args = append(args, "--min-validator-count", strconv.FormatUint(t.Config.MinValidatorCount, 10))
-		args = append(args, "--max-validator-count", strconv.FormatUint(t.Config.MaxValidatorCount, 10))
 	}
 
 	// add block gas limit
@@ -352,54 +200,8 @@ func (t *TestServer) GenerateGenesis() error {
 		args = append(args, "--base-fee-config", *common.EncodeUint64(t.Config.BaseFee))
 	}
 
-	// add burn contracts
-	if len(t.Config.BurnContracts) != 0 {
-		for block, addr := range t.Config.BurnContracts {
-			args = append(args, "--burn-contract", fmt.Sprintf("%d:%s", block, addr))
-		}
-	} else {
-		// london hardfork is enabled by default so there must be a default burn contract
-		args = append(args, "--burn-contract", "0:0x0000000000000000000000000000000000000000")
-	}
-
-	cmd := exec.Command(resolveBinary(), args...) //nolint:gosec
-	cmd.Dir = t.Config.RootDir
-
-	stdout := t.GetStdout()
-	cmd.Stdout = stdout
-	cmd.Stderr = stdout
-
-	return cmd.Run()
-}
-
-func (t *TestServer) GenesisPredeploy() error {
-	if t.Config.PredeployParams == nil {
-		// No need to predeploy anything
-		return nil
-	}
-
-	genesisPredeployCmd := predeploy.GetCommand()
-	args := make([]string, 0)
-
-	commandSlice := strings.Split(fmt.Sprintf("genesis %s", genesisPredeployCmd.Use), " ")
-
-	args = append(args, commandSlice...)
-
-	// Add the path to the genesis file
-	args = append(args, "--chain", filepath.Join(t.Config.RootDir, "genesis.json"))
-
-	// Add predeploy address
-	if t.Config.PredeployParams.PredeployAddress != "" {
-		args = append(args, "--predeploy-address", t.Config.PredeployParams.PredeployAddress)
-	}
-
-	// Add constructor arguments, if any
-	for _, constructorArg := range t.Config.PredeployParams.ConstructorArgs {
-		args = append(args, "--constructor-args", constructorArg)
-	}
-
-	// Add the path to the artifacts file
-	args = append(args, "--artifacts-path", t.Config.PredeployParams.ArtifactsPath)
+	// london hardfork is enabled by default so there must be a default burn contract
+	args = append(args, "--burn-contract", "0:0x0000000000000000000000000000000000000000")
 
 	cmd := exec.Command(resolveBinary(), args...) //nolint:gosec
 	cmd.Dir = t.Config.RootDir
@@ -426,8 +228,6 @@ func (t *TestServer) Start(ctx context.Context) error {
 	}
 
 	switch t.Config.Consensus {
-	case ConsensusIBFT:
-		args = append(args, "--data-dir", filepath.Join(t.Config.RootDir, t.Config.IBFTDir))
 	case ConsensusDev:
 		args = append(args, "--data-dir", t.Config.RootDir)
 		args = append(args, "--dev")
@@ -450,10 +250,6 @@ func (t *TestServer) Start(ctx context.Context) error {
 	// add block gas target
 	if t.Config.BlockGasTarget != 0 {
 		args = append(args, "--block-gas-target", *common.EncodeUint64(t.Config.BlockGasTarget))
-	}
-
-	if t.Config.IBFTBaseTimeout != 0 {
-		args = append(args, "--ibft-base-timeout", strconv.FormatUint(t.Config.IBFTBaseTimeout, 10))
 	}
 
 	t.ReleaseReservedPorts()
@@ -493,44 +289,6 @@ func (t *TestServer) Start(ctx context.Context) error {
 	t.chainID = chainID
 
 	return nil
-}
-
-func (t *TestServer) SwitchIBFTType(typ fork.IBFTType, from uint64, to, deployment *uint64) error {
-	t.t.Helper()
-
-	ibftSwitchCmd := ibftSwitch.GetCommand()
-	args := make([]string, 0)
-
-	commandSlice := strings.Split(fmt.Sprintf("ibft %s", ibftSwitchCmd.Use), " ")
-
-	args = append(args, commandSlice...)
-	args = append(args,
-		// add custom chain
-		"--chain", filepath.Join(t.Config.RootDir, "genesis.json"),
-		"--type", string(typ),
-		"--from", strconv.FormatUint(from, 10),
-	)
-
-	// Default ibft validator type for e2e tests is ECDSA
-	args = append(args, "--ibft-validator-type", string(validators.ECDSAValidatorType))
-
-	if to != nil {
-		args = append(args, "--to", strconv.FormatUint(*to, 10))
-	}
-
-	if deployment != nil {
-		args = append(args, "--deployment", strconv.FormatUint(*deployment, 10))
-	}
-
-	// Start the server
-	t.cmd = exec.Command(resolveBinary(), args...) //nolint:gosec
-	t.cmd.Dir = t.Config.RootDir
-
-	stdout := t.GetStdout()
-	t.cmd.Stdout = stdout
-	t.cmd.Stderr = stdout
-
-	return t.cmd.Run()
 }
 
 // SignTx is a helper method for signing transactions

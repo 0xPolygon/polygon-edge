@@ -8,7 +8,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
-	"github.com/0xPolygon/polygon-edge/contracts/staking"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/helper/predeployment"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -22,23 +21,14 @@ const (
 )
 
 var (
-	errInvalidPredeployAddress  = errors.New("invalid predeploy address provided")
-	errAddressTaken             = errors.New("the provided predeploy address is taken")
-	errReservedPredeployAddress = errors.New("the provided predeploy address is reserved")
-	errInvalidAddress           = fmt.Errorf(
+	errInvalidPredeployAddress = errors.New("invalid predeploy address provided")
+	errAddressTaken            = errors.New("the provided predeploy address is taken")
+	errInvalidAddress          = fmt.Errorf(
 		"the provided predeploy address must be >= %s", predeployAddressMin.String(),
 	)
-)
 
-var (
 	predeployAddressMin = types.StringToAddress("01100")
-	reservedAddresses   = []types.Address{
-		staking.AddrStakingContract,
-	}
-)
-
-var (
-	params = &predeployParams{}
+	params              = &predeployParams{}
 )
 
 type predeployParams struct {
@@ -80,24 +70,9 @@ func (p *predeployParams) initPredeployAddress() error {
 		return errInvalidPredeployAddress
 	}
 
-	address := types.StringToAddress(p.addressRaw)
-	if isReservedAddress(address) {
-		return errReservedPredeployAddress
-	}
-
-	p.address = address
+	p.address = types.StringToAddress(p.addressRaw)
 
 	return nil
-}
-
-func isReservedAddress(address types.Address) bool {
-	for _, reservedAddress := range reservedAddresses {
-		if address == reservedAddress {
-			return true
-		}
-	}
-
-	return false
 }
 
 func (p *predeployParams) verifyMinAddress() error {

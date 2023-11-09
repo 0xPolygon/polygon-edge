@@ -33,7 +33,6 @@ protoc: check-protoc
 	 ./server/proto/*.proto \
 	 ./network/proto/*.proto \
 	 ./txpool/proto/*.proto	\
-	 ./consensus/ibft/**/*.proto \
 	 ./consensus/polybft/**/*.proto
 
 .PHONY: build

@@ -1,4 +1,4 @@
-package polybftsecrets
+package init
 
 import (
 	"errors"

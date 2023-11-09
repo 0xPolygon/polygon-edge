@@ -5,7 +5,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus"
 	consensusDev "github.com/0xPolygon/polygon-edge/consensus/dev"
 	consensusDummy "github.com/0xPolygon/polygon-edge/consensus/dummy"
-	consensusIBFT "github.com/0xPolygon/polygon-edge/consensus/ibft"
 	consensusPolyBFT "github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/forkmanager"
 	"github.com/0xPolygon/polygon-edge/secrets"
@@ -26,14 +25,12 @@ type ForkManagerInitialParamsFactory func(config *chain.Chain) (*forkmanager.For
 
 const (
 	DevConsensus     ConsensusType = "dev"
-	IBFTConsensus    ConsensusType = "ibft"
 	PolyBFTConsensus ConsensusType = consensusPolyBFT.ConsensusName
 	DummyConsensus   ConsensusType = "dummy"
 )
 
 var consensusBackends = map[ConsensusType]consensus.Factory{
 	DevConsensus:     consensusDev.Factory,
-	IBFTConsensus:    consensusIBFT.Factory,
 	PolyBFTConsensus: consensusPolyBFT.Factory,
 	DummyConsensus:   consensusDummy.Factory,
 }
