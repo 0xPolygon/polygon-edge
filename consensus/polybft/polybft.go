@@ -81,7 +81,7 @@ type Polybft struct {
 	// closeCh is used to signal that consensus protocol is stopped
 	closeCh chan struct{}
 
-	// ibft is the ibft engine
+	// ibft is the wrapper around ibft consensus engine
 	ibft *IBFTConsensusWrapper
 
 	// state is reference to the struct which encapsulates consensus data persistence logic

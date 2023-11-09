@@ -12,7 +12,6 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
-	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/server"
 	"github.com/0xPolygon/polygon-edge/server/proto"
@@ -126,19 +125,6 @@ func GetSystemClientConnection(address string) (
 	}
 
 	return proto.NewSystemClient(conn), nil
-}
-
-// GetIBFTOperatorClientConnection returns the IBFT operator client connection
-func GetIBFTOperatorClientConnection(address string) (
-	ibftOp.IbftOperatorClient,
-	error,
-) {
-	conn, err := GetGRPCConnection(address)
-	if err != nil {
-		return nil, err
-	}
-
-	return ibftOp.NewIbftOperatorClient(conn), nil
 }
 
 // GetGRPCConnection returns a grpc client connection

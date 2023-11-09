@@ -864,12 +864,12 @@ func (c *TestCluster) InitSecrets(prefix string, count int) ([]types.Address, er
 	var b bytes.Buffer
 
 	args := []string{
-		"polybft-secrets",
+		"secrets", "init",
 		"--data-dir", path.Join(c.Config.TmpDir, prefix),
 		"--num", strconv.Itoa(count),
 		"--insecure",
 	}
-	stdOut := c.Config.GetStdout("polybft-secrets", &b)
+	stdOut := c.Config.GetStdout("secrets-init", &b)
 
 	if err := runCommand(c.Config.Binary, args, stdOut); err != nil {
 		return nil, err
