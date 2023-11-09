@@ -5,7 +5,7 @@ import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.2/index.js';
 
 let duration = __ENV.LOADTEST_DURATION;
 if (duration == undefined) {
-    duration = "2m";
+  duration = "2m";
 }
 
 export const options = {
@@ -13,7 +13,7 @@ export const options = {
   scenarios: {
     constant_request_rate: {
       executor: 'constant-arrival-rate',
-      rate: 3000,
+      rate: 1500,
       timeUnit: '1s',
       duration: duration,
       preAllocatedVUs: 60,
