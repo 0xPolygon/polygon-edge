@@ -22,7 +22,7 @@ const (
 func main() {
 	_, filename, _, _ := runtime.Caller(0) //nolint: dogsled
 	currentPath := path.Dir(filename)
-	scpath := path.Join(currentPath, "../../../../core-contracts/artifacts/contracts/")
+	scpath := path.Join(currentPath, "../../../../blade-contracts/artifacts/contracts/")
 
 	readContracts := []struct {
 		Path string
