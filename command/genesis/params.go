@@ -280,7 +280,7 @@ func (p *genesisParams) parseStakeInfo() error {
 	for _, stake := range p.stake {
 		stakeInfo, err := helper.ParsePremineInfo(stake)
 		if err != nil {
-			return fmt.Errorf("invalid stake balance amount provided: %w", err)
+			return fmt.Errorf("invalid stake amount provided: %w", err)
 		}
 
 		p.stakeInfos[stakeInfo.Address] = stakeInfo.Amount
