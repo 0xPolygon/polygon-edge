@@ -219,7 +219,7 @@ func GetValidatorKeyFiles(rootDir, filePrefix string) ([]string, error) {
 }
 
 // ReadValidatorsByPrefix reads validators secrets on a given root directory and with given folder prefix
-func ReadValidatorsByPrefix(dir, prefix string) ([]*validator.GenesisValidator, error) {
+func ReadValidatorsByPrefix(dir, prefix string, stakeInfos map[types.Address]*big.Int) ([]*validator.GenesisValidator, error) {
 	validatorKeyFiles, err := GetValidatorKeyFiles(dir, prefix)
 	if err != nil {
 		return nil, err
@@ -234,41 +234,16 @@ func ReadValidatorsByPrefix(dir, prefix string) ([]*validator.GenesisValidator, 
 		if err != nil {
 			return nil, err
 		}
-
-		validators[i] = &validator.GenesisValidator{
-			Address:   types.Address(account.Ecdsa.Address()),
-			BlsKey:    hex.EncodeToString(account.Bls.PublicKey().Marshal()),
-			MultiAddr: fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", "127.0.0.1", bootnodePortStart+int64(i), nodeID),
-			Stake:     big.NewInt(0),
-		}
-	}
-
-	return validators, nil
-}
-
-// ReadValidatorsByPrefix reads validators secrets on a given root directory and with given folder prefix
-func ReadValidatorsByPrefixStakeInfos(dir, prefix string,
-	stakeInfos map[types.Address]*big.Int) ([]*validator.GenesisValidator, error) {
-	validatorKeyFiles, err := GetValidatorKeyFiles(dir, prefix)
-	if err != nil {
-		return nil, err
-	}
-
-	validators := make([]*validator.GenesisValidator, len(validatorKeyFiles))
-
-	for i, file := range validatorKeyFiles {
-		path := filepath.Join(dir, file)
-
-		account, nodeID, err := getSecrets(path)
-		if err != nil {
-			return nil, err
+		stake, exists := stakeInfos[types.Address(account.Ecdsa.Address())]
+		if !exists {
+			stake = big.NewInt(0)
 		}
 
 		validators[i] = &validator.GenesisValidator{
 			Address:   types.Address(account.Ecdsa.Address()),
 			BlsKey:    hex.EncodeToString(account.Bls.PublicKey().Marshal()),
 			MultiAddr: fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", "127.0.0.1", bootnodePortStart+int64(i), nodeID),
-			Stake:     stakeInfos[types.Address(account.Ecdsa.Address())],
+			Stake:     stake,
 		}
 	}
 

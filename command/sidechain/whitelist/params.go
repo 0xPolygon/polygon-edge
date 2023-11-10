@@ -18,12 +18,11 @@ var (
 )
 
 type whitelistParams struct {
-	accountDir             string
-	accountConfig          string
-	privateKey             string
-	jsonRPC                string
-	newValidatorAddresses  []string
-	supernetManagerAddress string
+	accountDir            string
+	accountConfig         string
+	privateKey            string
+	jsonRPC               string
+	newValidatorAddresses []string
 }
 
 func (ep *whitelistParams) validateFlags() error {

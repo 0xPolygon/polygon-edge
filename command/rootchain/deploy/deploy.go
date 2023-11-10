@@ -631,12 +631,6 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 		return deploymentResultInfo{RootchainCfg: nil, CommandResults: nil}, err
 	}
 
-	// register supernets manager on stake manager
-	/* 	supernetID, err := registerChainOnStakeManager(txRelayer, rootchainConfig, deployerKey)
-	   	if err != nil {
-	   		return deploymentResultInfo{RootchainCfg: nil, SupernetID: 0, CommandResults: nil}, err
-	   	}
-	*/
 	return deploymentResultInfo{
 		RootchainCfg:   rootchainConfig,
 		CommandResults: commandResults}, nil
@@ -664,53 +658,6 @@ func populateExistingTokenAddr(eth *jsonrpc.Eth, tokenAddr, tokenName string,
 
 	return nil
 }
-
-// registerChainOnStakeManager registers child chain and its supernet manager on rootchain
-/* func registerChainOnStakeManager(txRelayer txrelayer.TxRelayer,
-	rootchainCfg *polybft.RootchainConfig, deployerKey ethgo.Key) (int64, error) {
-	registerChainFn := &contractsapi.RegisterChildChainStakeManagerFn{
-		Manager: rootchainCfg.CustomSupernetManagerAddress,
-	}
-
-	encoded, err := registerChainFn.EncodeAbi()
-	if err != nil {
-		return 0, fmt.Errorf("failed to encode parameters for registering child chain on supernets. error: %w", err)
-	}
-
-	receipt, err := helper.SendTransaction(txRelayer, ethgo.Address(rootchainCfg.StakeManagerAddress),
-		encoded, stakeManagerName, deployerKey)
-	if err != nil {
-		return 0, err
-	}
-
-	var (
-		childChainRegisteredEvent contractsapi.ChildManagerRegisteredEvent
-		found                     bool
-		supernetID                int64
-	)
-
-	for _, log := range receipt.Logs {
-		doesMatch, err := childChainRegisteredEvent.ParseLog(log)
-		if err != nil {
-			return 0, err
-		}
-
-		if !doesMatch {
-			continue
-		}
-
-		supernetID = childChainRegisteredEvent.ID.Int64()
-		found = true
-
-		break
-	}
-
-	if !found {
-		return 0, errors.New("could not find a log that child chain was registered on stake manager")
-	}
-
-	return supernetID, nil
-} */
 
 // initContract initializes arbitrary contract with given parameters deployed on a given address
 func initContract(cmdOutput command.OutputFormatter, txRelayer txrelayer.TxRelayer,

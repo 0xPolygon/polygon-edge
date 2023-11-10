@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"os"
 
-	rootHelper "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	polybftsecrets "github.com/0xPolygon/polygon-edge/command/secrets/init"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/common"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo"
@@ -59,21 +59,76 @@ func GetAccountFromDir(accountDir string) (*wallet.Account, error) {
 
 // GetValidatorInfo queries CustomSupernetManager, StakeManager and RewardPool smart contracts
 // to retrieve validator info for given address
-func GetValidatorInfo(validatorAddr ethgo.Address, supernetManager, stakeManager types.Address,
-	rootRelayer, childRelayer txrelayer.TxRelayer) (*polybft.ValidatorInfo, error) {
-	validatorInfo, err := rootHelper.GetValidatorInfo(validatorAddr, supernetManager, stakeManager, rootRelayer)
+func GetValidatorInfo(validatorAddr ethgo.Address, childRelayer txrelayer.TxRelayer) (*polybft.ValidatorInfo, error) {
+
+	getValidatorMethod := contractsapi.StakeManager.Abi.GetMethod("getValidator")
+
+	encode, err := getValidatorMethod.Encode([]interface{}{validatorAddr})
 	if err != nil {
 		return nil, err
 	}
+
+	response, err := childRelayer.Call(ethgo.Address(contracts.SystemCaller), ethgo.Address(contracts.StakeManagerContract), encode)
+	if err != nil {
+		return nil, err
+	}
+
+	byteResponse, err := hex.DecodeHex(response)
+	if err != nil {
+		return nil, fmt.Errorf("unable to decode hex response, %w", err)
+	}
+
+	decoded, err := getValidatorMethod.Outputs.Decode(byteResponse)
+	if err != nil {
+		return nil, err
+	}
+
+	decodedOutputsMap, ok := decoded.(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("could not convert decoded outputs to map")
+	}
+
+	innerMap, ok := decodedOutputsMap["0"].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("could not convert decoded outputs map to inner map")
+	}
+
+	//nolint:forcetypeassert
+	validatorInfo := &polybft.ValidatorInfo{
+		Address:       validatorAddr,
+		IsActive:      innerMap["isActive"].(bool),
+		IsWhitelisted: innerMap["isWhitelisted"].(bool),
+	}
+
+	stakeOfFn := &contractsapi.StakeOfStakeManagerFn{
+		Validator: types.Address(validatorAddr),
+	}
+
+	encode, err = stakeOfFn.EncodeAbi()
+	if err != nil {
+		return nil, err
+	}
+
+	response, err = childRelayer.Call(ethgo.Address(contracts.SystemCaller), ethgo.Address(contracts.StakeManagerContract), encode)
+	if err != nil {
+		return nil, err
+	}
+
+	stake, err := common.ParseUint256orHex(&response)
+	if err != nil {
+		return nil, err
+	}
+
+	validatorInfo.Stake = stake
 
 	withdrawableFn := contractsapi.RewardPool.Abi.GetMethod("pendingRewards")
 
-	encode, err := withdrawableFn.Encode([]interface{}{validatorAddr})
+	encode, err = withdrawableFn.Encode([]interface{}{validatorAddr})
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := childRelayer.Call(ethgo.ZeroAddress, ethgo.Address(contracts.RewardPoolContract), encode)
+	response, err = childRelayer.Call(ethgo.ZeroAddress, ethgo.Address(contracts.RewardPoolContract), encode)
 	if err != nil {
 		return nil, err
 	}

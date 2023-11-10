@@ -46,20 +46,6 @@ func setFlags(cmd *cobra.Command) {
 		polybftsecrets.AccountConfigFlagDesc,
 	)
 
-	cmd.Flags().StringVar(
-		&params.supernetManagerAddress,
-		rootHelper.SupernetManagerFlag,
-		"",
-		rootHelper.SupernetManagerFlagDesc,
-	)
-
-	cmd.Flags().StringVar(
-		&params.stakeManagerAddress,
-		rootHelper.StakeManagerFlag,
-		"",
-		rootHelper.StakeManagerFlagDesc,
-	)
-
 	cmd.Flags().Int64Var(
 		&params.chainID,
 		polybftsecrets.ChainIDFlag,

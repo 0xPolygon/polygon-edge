@@ -9,6 +9,7 @@ import (
 	rootHelper "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	polybftsecrets "github.com/0xPolygon/polygon-edge/command/secrets/init"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/spf13/cobra"
@@ -59,13 +60,6 @@ func setFlags(cmd *cobra.Command) {
 		"account addresses of a possible validators",
 	)
 
-	cmd.Flags().StringVar(
-		&params.supernetManagerAddress,
-		rootHelper.SupernetManagerFlag,
-		"",
-		rootHelper.SupernetManagerFlagDesc,
-	)
-
 	cmd.MarkFlagsMutuallyExclusive(polybftsecrets.AccountDirFlag, polybftsecrets.AccountConfigFlag)
 	cmd.MarkFlagsMutuallyExclusive(polybftsecrets.PrivateKeyFlag, polybftsecrets.AccountConfigFlag)
 	cmd.MarkFlagsMutuallyExclusive(polybftsecrets.PrivateKeyFlag, polybftsecrets.AccountDirFlag)
@@ -103,8 +97,8 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("whitelist validator failed. Could not abi encode whitelist function: %w", err)
 	}
 
-	supernetAddr := ethgo.Address(types.StringToAddress(params.supernetManagerAddress))
-	txn := rootHelper.CreateTransaction(ecdsaKey.Address(), &supernetAddr, encoded, nil, true)
+	stakeManagerAddr := ethgo.Address(contracts.StakeManagerContract)
+	txn := rootHelper.CreateTransaction(ecdsaKey.Address(), &stakeManagerAddr, encoded, nil, true)
 
 	receipt, err := txRelayer.SendTransaction(txn, ecdsaKey)
 	if err != nil {

@@ -221,16 +221,12 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	// stake manually for the second validator
 	require.NoError(t, secondValidator.Stake(polybftConfig, initialStake))
 
-	firstValidatorInfo, err := sidechain.GetValidatorInfo(firstValidatorAddr,
-		polybftConfig.Bridge.CustomSupernetManagerAddr, polybftConfig.Bridge.StakeManagerAddr,
-		rootChainRelayer, childChainRelayer)
+	firstValidatorInfo, err := sidechain.GetValidatorInfo(firstValidatorAddr, childChainRelayer)
 	require.NoError(t, err)
 	require.True(t, firstValidatorInfo.IsActive)
 	require.True(t, firstValidatorInfo.Stake.Cmp(initialStake) == 0)
 
-	secondValidatorInfo, err := sidechain.GetValidatorInfo(secondValidatorAddr,
-		polybftConfig.Bridge.CustomSupernetManagerAddr, polybftConfig.Bridge.StakeManagerAddr,
-		rootChainRelayer, childChainRelayer)
+	secondValidatorInfo, err := sidechain.GetValidatorInfo(secondValidatorAddr, childChainRelayer)
 	require.NoError(t, err)
 	require.True(t, secondValidatorInfo.IsActive)
 	require.True(t, secondValidatorInfo.Stake.Cmp(initialStake) == 0)
@@ -279,16 +275,12 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 
 	bigZero := big.NewInt(0)
 
-	firstValidatorInfo, err = sidechain.GetValidatorInfo(firstValidatorAddr,
-		polybftConfig.Bridge.CustomSupernetManagerAddr, polybftConfig.Bridge.StakeManagerAddr,
-		rootChainRelayer, childChainRelayer)
+	firstValidatorInfo, err = sidechain.GetValidatorInfo(firstValidatorAddr, childChainRelayer)
 	require.NoError(t, err)
 	require.True(t, firstValidatorInfo.IsActive)
 	require.True(t, firstValidatorInfo.WithdrawableRewards.Cmp(bigZero) > 0)
 
-	secondValidatorInfo, err = sidechain.GetValidatorInfo(secondValidatorAddr,
-		polybftConfig.Bridge.CustomSupernetManagerAddr, polybftConfig.Bridge.StakeManagerAddr,
-		rootChainRelayer, childChainRelayer)
+	secondValidatorInfo, err = sidechain.GetValidatorInfo(secondValidatorAddr, childChainRelayer)
 	require.NoError(t, err)
 	require.True(t, secondValidatorInfo.IsActive)
 	require.True(t, secondValidatorInfo.WithdrawableRewards.Cmp(bigZero) > 0)
@@ -341,9 +333,7 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	// wait for some rewards to get accumulated
 	require.NoError(t, cluster.WaitForBlock(polybftCfg.EpochSize*3, time.Minute))
 
-	validatorInfo, err := sidechain.GetValidatorInfo(validatorAddr,
-		polybftCfg.Bridge.CustomSupernetManagerAddr, polybftCfg.Bridge.StakeManagerAddr,
-		rootChainRelayer, childChainRelayer)
+	validatorInfo, err := sidechain.GetValidatorInfo(validatorAddr, childChainRelayer)
 	require.NoError(t, err)
 	require.True(t, validatorInfo.IsActive)
 
@@ -384,9 +374,7 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	require.NoError(t, err)
 
 	// check that validator is no longer active (out of validator set)
-	validatorInfo, err = sidechain.GetValidatorInfo(validatorAddr,
-		polybftCfg.Bridge.CustomSupernetManagerAddr, polybftCfg.Bridge.StakeManagerAddr,
-		rootChainRelayer, childChainRelayer)
+	validatorInfo, err = sidechain.GetValidatorInfo(validatorAddr, childChainRelayer)
 	require.NoError(t, err)
 	require.False(t, validatorInfo.IsActive)
 	require.True(t, validatorInfo.Stake.Cmp(big.NewInt(0)) == 0)
@@ -568,18 +556,10 @@ func TestE2E_Consensus_CustomRewardToken(t *testing.T) {
 	childChainRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(owner.JSONRPCAddr()))
 	require.NoError(t, err)
 
-	rootChainRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
-	require.NoError(t, err)
-
-	polybftConfig, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
-	require.NoError(t, err)
-
 	validatorAcc, err := sidechain.GetAccountFromDir(owner.DataDir())
 	require.NoError(t, err)
 
-	validatorInfo, err := sidechain.GetValidatorInfo(validatorAcc.Ecdsa.Address(),
-		polybftConfig.Bridge.CustomSupernetManagerAddr, polybftConfig.Bridge.StakeManagerAddr,
-		rootChainRelayer, childChainRelayer)
+	validatorInfo, err := sidechain.GetValidatorInfo(validatorAcc.Ecdsa.Address(), childChainRelayer)
 	t.Logf("[Validator#%v] Witdhrawable rewards=%d\n", validatorInfo.Address, validatorInfo.WithdrawableRewards)
 
 	require.NoError(t, err)

@@ -540,7 +540,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		}
 
 		validators, err := genesis.ReadValidatorsByPrefix(
-			cluster.Config.TmpDir, cluster.Config.ValidatorPrefix)
+			cluster.Config.TmpDir, cluster.Config.ValidatorPrefix, nil)
 		require.NoError(t, err)
 
 		if cluster.Config.BootnodeCount > 0 {

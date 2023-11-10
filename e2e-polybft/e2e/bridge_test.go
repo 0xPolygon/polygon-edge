@@ -1252,9 +1252,6 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 			// query validator info
 			validatorInfo, err := sidechain.GetValidatorInfo(
 				validatorAddr,
-				polybftCfg.Bridge.CustomSupernetManagerAddr,
-				polybftCfg.Bridge.StakeManagerAddr,
-				rootRelayer,
 				childRelayer)
 			require.NoError(t, err)
 

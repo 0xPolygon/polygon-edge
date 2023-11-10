@@ -542,7 +542,7 @@ func (p *genesisParams) getValidatorAccounts() ([]*validator.GenesisValidator, e
 		validatorsPath = path.Dir(p.genesisPath)
 	}
 
-	validators, err := ReadValidatorsByPrefixStakeInfos(validatorsPath, p.validatorsPrefixPath, p.stakeInfos)
+	validators, err := ReadValidatorsByPrefix(validatorsPath, p.validatorsPrefixPath, p.stakeInfos)
 	if err != nil {
 		return nil, err
 	}
