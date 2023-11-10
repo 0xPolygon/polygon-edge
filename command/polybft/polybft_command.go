@@ -2,13 +2,13 @@ package polybft
 
 import (
 	"github.com/0xPolygon/polygon-edge/command/rootchain/supernet/stakemanager"
-	"github.com/0xPolygon/polygon-edge/command/rootchain/validators"
-	"github.com/0xPolygon/polygon-edge/command/rootchain/whitelist"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/withdraw"
 	"github.com/0xPolygon/polygon-edge/command/sidechain/registration"
 	"github.com/0xPolygon/polygon-edge/command/sidechain/rewards"
 	"github.com/0xPolygon/polygon-edge/command/sidechain/staking"
 	"github.com/0xPolygon/polygon-edge/command/sidechain/unstaking"
+	"github.com/0xPolygon/polygon-edge/command/sidechain/validators"
+	"github.com/0xPolygon/polygon-edge/command/sidechain/whitelist"
 	sidechainWithdraw "github.com/0xPolygon/polygon-edge/command/sidechain/withdraw"
 	"github.com/spf13/cobra"
 )
