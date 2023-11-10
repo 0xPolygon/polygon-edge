@@ -188,9 +188,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 		}
 
 		bridgeCfg := polyBFTConfig.Bridge
-
 		if bridgeCfg != nil {
-
 			// check if there are Bridge Allow List Admins and Bridge Block List Admins
 			// and if there are, get the first address as the Admin
 			bridgeAllowListAdmin := types.ZeroAddress
