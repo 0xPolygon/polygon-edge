@@ -65,7 +65,7 @@ func setFlags(cmd *cobra.Command) {
 		stakeFlag,
 		[]string{},
 		fmt.Sprintf(
-			"the staked accounts and balances (format: <address>[:<balance>]). Default staked balance: %d",
+			"the staked accounts and balances (format: <address>[:<stake>]). Default staked balance: %d",
 			command.DefaultStake,
 		),
 	)
