@@ -355,6 +355,7 @@ func main() {
 				"getValidator",
 				"whitelistValidators",
 				"register",
+				"unstake",
 			},
 			[]string{
 				"ChildManagerRegistered",

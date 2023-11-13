@@ -1221,27 +1221,27 @@ func (o *OwnerOfChildERC721Fn) DecodeAbi(buf []byte) error {
 	return decodeMethod(ChildERC721.Abi.Methods["ownerOf"], buf, o)
 }
 
-type StartValidator struct {
+type GenesisValidator struct {
 	Validator types.Address `abi:"validator"`
 	Stake     *big.Int      `abi:"stake"`
 	BlsKey    [4]*big.Int   `abi:"blsKey"`
 }
 
-var StartValidatorABIType = abi.MustNewType("tuple(address validator,uint256 stake,uint256[4] blsKey)")
+var GenesisValidatorABIType = abi.MustNewType("tuple(address validator,uint256 stake,uint256[4] blsKey)")
 
-func (s *StartValidator) EncodeAbi() ([]byte, error) {
-	return StartValidatorABIType.Encode(s)
+func (g *GenesisValidator) EncodeAbi() ([]byte, error) {
+	return GenesisValidatorABIType.Encode(g)
 }
 
-func (s *StartValidator) DecodeAbi(buf []byte) error {
-	return decodeStruct(StartValidatorABIType, buf, &s)
+func (g *GenesisValidator) DecodeAbi(buf []byte) error {
+	return decodeStruct(GenesisValidatorABIType, buf, &g)
 }
 
 type InitializeStakeManagerFn struct {
-	NewStakingToken   types.Address     `abi:"newStakingToken"`
-	NewBls            types.Address     `abi:"newBls"`
-	NewDomain         string            `abi:"newDomain"`
-	GenesisValidators []*StartValidator `abi:"genesisValidators"`
+	NewStakingToken   types.Address       `abi:"newStakingToken"`
+	NewBls            types.Address       `abi:"newBls"`
+	NewDomain         string              `abi:"newDomain"`
+	GenesisValidators []*GenesisValidator `abi:"genesisValidators"`
 }
 
 func (i *InitializeStakeManagerFn) Sig() []byte {
@@ -1352,6 +1352,22 @@ func (r *RegisterStakeManagerFn) EncodeAbi() ([]byte, error) {
 
 func (r *RegisterStakeManagerFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(StakeManager.Abi.Methods["register"], buf, r)
+}
+
+type UnstakeStakeManagerFn struct {
+	Amount *big.Int `abi:"amount"`
+}
+
+func (u *UnstakeStakeManagerFn) Sig() []byte {
+	return StakeManager.Abi.Methods["unstake"].ID()
+}
+
+func (u *UnstakeStakeManagerFn) EncodeAbi() ([]byte, error) {
+	return StakeManager.Abi.Methods["unstake"].Encode(u)
+}
+
+func (u *UnstakeStakeManagerFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(StakeManager.Abi.Methods["unstake"], buf, u)
 }
 
 type ChildManagerRegisteredEvent struct {

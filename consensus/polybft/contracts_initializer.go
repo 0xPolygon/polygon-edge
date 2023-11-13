@@ -41,7 +41,7 @@ func initValidatorSet(polyBFTConfig PolyBFTConfig, transition *state.Transition)
 		contracts.ValidatorSetContract, input, "ValidatorSet.initialize", transition)
 }
 func initStakeManager(polyBFTConfig PolyBFTConfig, transition *state.Transition) error {
-	startValidators := make([]*contractsapi.StartValidator, len(polyBFTConfig.InitialValidatorSet))
+	startValidators := make([]*contractsapi.GenesisValidator, len(polyBFTConfig.InitialValidatorSet))
 
 	for i, validator := range polyBFTConfig.InitialValidatorSet {
 		blsRaw, err := hex.DecodeHex(validator.BlsKey)
@@ -54,7 +54,7 @@ func initStakeManager(polyBFTConfig PolyBFTConfig, transition *state.Transition)
 			return err
 		}
 
-		startValidators[i] = &contractsapi.StartValidator{
+		startValidators[i] = &contractsapi.GenesisValidator{
 			Validator: validator.Address,
 			Stake:     validator.Stake,
 			BlsKey:    key.ToBigInt(),
