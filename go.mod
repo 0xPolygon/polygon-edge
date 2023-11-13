@@ -14,7 +14,7 @@ require (
 	github.com/hashicorp/go-immutable-radix v1.3.1
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/golang-lru v1.0.2
-	github.com/hashicorp/hcl v1.0.1-vault
+	github.com/hashicorp/hcl v1.0.1-vault-5
 	github.com/hashicorp/vault/api v1.10.0
 	github.com/libp2p/go-libp2p v0.27.8
 	github.com/libp2p/go-libp2p-kbucket v0.6.3
@@ -70,14 +70,14 @@ require (
 	github.com/sethvargo/go-retry v0.2.4
 	golang.org/x/sync v0.4.0
 	google.golang.org/genproto v0.0.0-20230822172742-b8732ec3820d
-	gopkg.in/DataDog/dd-trace-go.v1 v1.54.1
+	gopkg.in/DataDog/dd-trace-go.v1 v1.57.0
 	pgregory.net/rapid v1.1.0
 )
 
 require (
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
 	github.com/DataDog/appsec-internal-go v1.0.0 // indirect
-	github.com/DataDog/datadog-agent/pkg/remoteconfig/state v0.48.0-devel.0.20230725154044-2549ba9058df // indirect
+	github.com/DataDog/datadog-agent/pkg/remoteconfig/state v0.48.1 // indirect
 	github.com/DataDog/go-libddwaf v1.5.0 // indirect
 	github.com/DataDog/go-tuf v1.0.2-0.5.2 // indirect
 	github.com/ebitengine/purego v0.5.0-alpha.1 // indirect
