@@ -289,7 +289,6 @@ func (c *consensusRuntime) initStakeManager(logger hcf.Logger, dbTx *bolt.Tx) er
 		c.config.polybftBackend,
 		int(c.config.PolyBFTConfig.MaxValidatorSetSize),
 		dbTx,
-		c.config.blockchain,
 	)
 
 	c.eventProvider.Subscribe(c.stakeManager)

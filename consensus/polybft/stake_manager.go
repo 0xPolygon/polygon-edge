@@ -61,15 +61,15 @@ var _ StakeManager = (*stakeManager)(nil)
 // stakeManager saves transfer events that happened in each block
 // and calculates updated validator set based on changed stake
 type stakeManager struct {
-	logger                       hclog.Logger
-	state                        *State
-	key                          ethgo.Key
-	stakeManagerContractAddr     types.Address
-	validatorSetContract         types.Address
-	maxValidatorSetSize          int
-	polybftBackend               polybftBackend
-	stakeManagerContractContract *contract.Contract
-	blockchain                   blockchainBackend
+	logger                   hclog.Logger
+	state                    *State
+	key                      ethgo.Key
+	stakeManagerContractAddr types.Address
+	validatorSetContract     types.Address
+	maxValidatorSetSize      int
+	polybftBackend           polybftBackend
+	stakeManagerContract     *contract.Contract
+	blockchain               blockchainBackend
 }
 
 // newStakeManager returns a new instance of stake manager
@@ -81,7 +81,7 @@ func newStakeManager(
 	blockchain blockchainBackend,
 	polybftBackend polybftBackend,
 	maxValidatorSetSize int,
-	dbTx *bolt.Tx, blockchainB blockchainBackend,
+	dbTx *bolt.Tx,
 ) (*stakeManager, error) {
 	sm := &stakeManager{
 		logger:                   logger,
@@ -91,7 +91,7 @@ func newStakeManager(
 		validatorSetContract:     validatorSetAddr,
 		maxValidatorSetSize:      maxValidatorSetSize,
 		polybftBackend:           polybftBackend,
-		blockchain:               blockchainB,
+		blockchain:               blockchain,
 	}
 
 	if err := sm.init(blockchain, dbTx); err != nil {

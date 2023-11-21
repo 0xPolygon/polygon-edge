@@ -141,10 +141,6 @@ func (p *genesisParams) validateFlags() error {
 		return err
 	}
 
-	if err := p.parseStakeInfo(); err != nil {
-		return err
-	}
-
 	if p.isPolyBFTConsensus() {
 		if err := p.extractNativeTokenMetadata(); err != nil {
 			return err
@@ -165,6 +161,10 @@ func (p *genesisParams) validateFlags() error {
 		if err := p.validateProxyContractsAdmin(); err != nil {
 			return err
 		}
+		if err := p.parseStakeInfo(); err != nil {
+			return err
+		}
+
 	}
 
 	// Validate validatorsPath only if validators information were not provided via CLI flag

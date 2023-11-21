@@ -594,24 +594,26 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 				strings.Join(sliceAddressToSliceString(cluster.Config.TransactionsBlockListEnabled), ","))
 		}
 
-		if len(cluster.Config.BridgeAllowListAdmin) != 0 && cluster.Config.HasBridge {
-			args = append(args, "--bridge-allow-list-admin",
-				strings.Join(sliceAddressToSliceString(cluster.Config.BridgeAllowListAdmin), ","))
-		}
+		if cluster.Config.HasBridge {
+			if len(cluster.Config.BridgeAllowListAdmin) != 0 {
+				args = append(args, "--bridge-allow-list-admin",
+					strings.Join(sliceAddressToSliceString(cluster.Config.BridgeAllowListAdmin), ","))
+			}
 
-		if len(cluster.Config.BridgeAllowListEnabled) != 0 && cluster.Config.HasBridge {
-			args = append(args, "--bridge-allow-list-enabled",
-				strings.Join(sliceAddressToSliceString(cluster.Config.BridgeAllowListEnabled), ","))
-		}
+			if len(cluster.Config.BridgeAllowListEnabled) != 0 {
+				args = append(args, "--bridge-allow-list-enabled",
+					strings.Join(sliceAddressToSliceString(cluster.Config.BridgeAllowListEnabled), ","))
+			}
 
-		if len(cluster.Config.BridgeBlockListAdmin) != 0 && cluster.Config.HasBridge {
-			args = append(args, "--bridge-block-list-admin",
-				strings.Join(sliceAddressToSliceString(cluster.Config.BridgeBlockListAdmin), ","))
-		}
+			if len(cluster.Config.BridgeBlockListAdmin) != 0 {
+				args = append(args, "--bridge-block-list-admin",
+					strings.Join(sliceAddressToSliceString(cluster.Config.BridgeBlockListAdmin), ","))
+			}
 
-		if len(cluster.Config.BridgeBlockListEnabled) != 0 && cluster.Config.HasBridge {
-			args = append(args, "--bridge-block-list-enabled",
-				strings.Join(sliceAddressToSliceString(cluster.Config.BridgeBlockListEnabled), ","))
+			if len(cluster.Config.BridgeBlockListEnabled) != 0 {
+				args = append(args, "--bridge-block-list-enabled",
+					strings.Join(sliceAddressToSliceString(cluster.Config.BridgeBlockListEnabled), ","))
+			}
 		}
 
 		if len(validators) != 0 {

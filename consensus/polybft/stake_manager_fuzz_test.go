@@ -118,7 +118,6 @@ func FuzzTestStakeManagerPostBlock(f *testing.F) {
 			nil,
 			5,
 			nil,
-			nil,
 		)
 		require.NoError(t, err)
 
@@ -162,7 +161,6 @@ func FuzzTestStakeManagerUpdateValidatorSet(f *testing.F) {
 		bcMock,
 		nil,
 		10,
-		nil,
 		nil,
 	)
 	require.NoError(f, err)

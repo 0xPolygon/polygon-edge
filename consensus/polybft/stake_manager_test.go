@@ -58,7 +58,6 @@ func TestStakeManager_PostBlock(t *testing.T) {
 			nil,
 			5,
 			nil,
-			bcMock,
 		)
 		require.NoError(t, err)
 
@@ -116,7 +115,6 @@ func TestStakeManager_PostBlock(t *testing.T) {
 			bcMock,
 			nil,
 			5,
-			nil,
 			nil,
 		)
 		require.NoError(t, err)
@@ -185,7 +183,6 @@ func TestStakeManager_PostBlock(t *testing.T) {
 			nil,
 			5,
 			nil,
-			bcMock,
 		)
 		require.NoError(t, err)
 
@@ -244,7 +241,6 @@ func TestStakeManager_UpdateValidatorSet(t *testing.T) {
 		bcMock,
 		nil,
 		10,
-		nil,
 		nil,
 	)
 	require.NoError(t, err)
@@ -482,7 +478,6 @@ func TestStakeManager_UpdateOnInit(t *testing.T) {
 		bcMock,
 		polyBackendMock,
 		5,
-		nil,
 		nil,
 	)
 	require.NoError(t, err)
