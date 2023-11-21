@@ -60,7 +60,6 @@ func GetAccountFromDir(accountDir string) (*wallet.Account, error) {
 // GetValidatorInfo queries CustomSupernetManager, StakeManager and RewardPool smart contracts
 // to retrieve validator info for given address
 func GetValidatorInfo(validatorAddr ethgo.Address, childRelayer txrelayer.TxRelayer) (*polybft.ValidatorInfo, error) {
-
 	getValidatorMethod := contractsapi.StakeManager.Abi.GetMethod("getValidator")
 
 	encode, err := getValidatorMethod.Encode([]interface{}{validatorAddr})
@@ -68,7 +67,8 @@ func GetValidatorInfo(validatorAddr ethgo.Address, childRelayer txrelayer.TxRela
 		return nil, err
 	}
 
-	response, err := childRelayer.Call(ethgo.Address(contracts.SystemCaller), ethgo.Address(contracts.StakeManagerContract), encode)
+	response, err := childRelayer.Call(ethgo.Address(contracts.SystemCaller),
+		ethgo.Address(contracts.StakeManagerContract), encode)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +109,8 @@ func GetValidatorInfo(validatorAddr ethgo.Address, childRelayer txrelayer.TxRela
 		return nil, err
 	}
 
-	response, err = childRelayer.Call(ethgo.Address(contracts.SystemCaller), ethgo.Address(contracts.StakeManagerContract), encode)
+	response, err = childRelayer.Call(ethgo.Address(contracts.SystemCaller),
+		ethgo.Address(contracts.StakeManagerContract), encode)
 	if err != nil {
 		return nil, err
 	}
