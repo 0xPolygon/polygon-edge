@@ -76,7 +76,7 @@ func TestE2E_Consensus_Basic(t *testing.T) {
 	childChainRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(srv.JSONRPCAddr()))
 	require.NoError(t, err)
 
-	srv.Stake(polybftConfig, big.NewInt(500))
+	require.NoError(t, srv.Stake(polybftConfig, big.NewInt(500)))
 
 	require.NoError(t, cluster.WaitForBlock(26, 1*time.Minute))
 

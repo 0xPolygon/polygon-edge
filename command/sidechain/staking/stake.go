@@ -82,7 +82,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	}
 
 	approveTxn, err := rootHelper.CreateApproveERC20Txn(params.amountValue,
-		contracts.StakeManagerContract, contracts.ERC20Contract, true)
+		contracts.StakeManagerContract, contracts.NativeERC20TokenContract, true)
 	if err != nil {
 		return err
 	}
