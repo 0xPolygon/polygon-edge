@@ -360,6 +360,7 @@ func main() {
 			[]string{
 				"ChildManagerRegistered",
 				"StakeAdded",
+				"StakeRemoved",
 				"StakeWithdrawn",
 				"ValidatorRegistered",
 				"AddedToWhitelist",

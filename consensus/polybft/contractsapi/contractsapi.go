@@ -1420,6 +1420,31 @@ func (s *StakeAddedEvent) Decode(input []byte) error {
 	return StakeManager.Abi.Events["StakeAdded"].Inputs.DecodeStruct(input, &s)
 }
 
+type StakeRemovedEvent struct {
+	Validator types.Address `abi:"validator"`
+	Amount    *big.Int      `abi:"amount"`
+}
+
+func (*StakeRemovedEvent) Sig() ethgo.Hash {
+	return StakeManager.Abi.Events["StakeRemoved"].ID()
+}
+
+func (s *StakeRemovedEvent) Encode() ([]byte, error) {
+	return StakeManager.Abi.Events["StakeRemoved"].Inputs.Encode(s)
+}
+
+func (s *StakeRemovedEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !StakeManager.Abi.Events["StakeRemoved"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(StakeManager.Abi.Events["StakeRemoved"], log, s)
+}
+
+func (s *StakeRemovedEvent) Decode(input []byte) error {
+	return StakeManager.Abi.Events["StakeRemoved"].Inputs.DecodeStruct(input, &s)
+}
+
 type StakeWithdrawnEvent struct {
 	Validator types.Address `abi:"validator"`
 	Recipient types.Address `abi:"recipient"`
