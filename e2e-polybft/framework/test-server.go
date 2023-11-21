@@ -236,11 +236,9 @@ func (t *TestServer) Stake(polybftConfig polybft.PolyBFTConfig, amount *big.Int)
 	args := []string{
 		"polybft",
 		"stake",
-		"--jsonrpc", t.BridgeJSONRPCAddr(),
-		"--stake-manager", polybftConfig.Bridge.StakeManagerAddr.String(),
+		"--jsonrpc", t.JSONRPCAddr(),
 		"--" + polybftsecrets.AccountDirFlag, t.config.DataDir,
 		"--amount", amount.String(),
-		"--stake-token", polybftConfig.Bridge.StakeTokenAddr.String(),
 	}
 
 	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("stake"))

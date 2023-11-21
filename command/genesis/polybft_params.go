@@ -365,7 +365,11 @@ func (p *genesisParams) deployContracts(
 		},
 		{
 			artifact: contractsapi.StakeManager,
-			address:  contracts.StakeManagerContract,
+			address:  contracts.StakeManagerContractV1,
+		},
+		{
+			artifact: contractsapi.RootERC20,
+			address:  contracts.ERC20Contract,
 		},
 	}
 

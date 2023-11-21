@@ -1,7 +1,6 @@
 package polybft
 
 import (
-	"github.com/0xPolygon/polygon-edge/command/rootchain/supernet/stakemanager"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/withdraw"
 	"github.com/0xPolygon/polygon-edge/command/sidechain/registration"
 	"github.com/0xPolygon/polygon-edge/command/sidechain/rewards"
@@ -36,8 +35,6 @@ func GetCommand() *cobra.Command {
 		registration.GetCommand(),
 		// rootchain (stake manager) stake command
 		staking.GetCommand(),
-		// rootchain command for deploying stake manager
-		stakemanager.GetCommand(),
 	)
 
 	return polybftCmd

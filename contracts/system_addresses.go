@@ -39,8 +39,10 @@ var (
 	L2StateSenderContract = types.StringToAddress("0x1002")
 	// L2StateSenderContractV1 is an address of bridge contract to the rootchain
 	L2StateSenderContractV1 = types.StringToAddress("0x10021")
-	// StakeManagerContract is an address of stake manager on child chain
+	// StakeManagerContract is an address of stake manager proxy contract on child chain
 	StakeManagerContract = types.StringToAddress("0x10022")
+	// StakeManagerContract is an address of stake manager contract on child chain
+	StakeManagerContractV1 = types.StringToAddress("0x100221")
 
 	// ChildERC20Contract is an address of bridgable ERC20 token contract on the child chain
 	ChildERC20Contract = types.StringToAddress("0x1003")
@@ -94,6 +96,8 @@ var (
 	AllowListBridgeAddr = types.StringToAddress("0x0200000000000000000000000000000000000004")
 	// BlockListBridgeAddr is the address of the bridge block list
 	BlockListBridgeAddr = types.StringToAddress("0x0300000000000000000000000000000000000004")
+
+	ERC20Contract = types.StringToAddress("0x2040")
 )
 
 // GetProxyImplementationMapping retrieves the addresses of proxy contracts that should be deployed unconditionally
@@ -104,6 +108,7 @@ func GetProxyImplementationMapping() map[types.Address]types.Address {
 		MerkleContract:                       MerkleContractV1,
 		L2StateSenderContract:                L2StateSenderContractV1,
 		ValidatorSetContract:                 ValidatorSetContractV1,
+		StakeManagerContract:                 StakeManagerContractV1,
 		RewardPoolContract:                   RewardPoolContractV1,
 		NativeERC20TokenContract:             NativeERC20TokenContractV1,
 		ChildERC20PredicateContract:          ChildERC20PredicateContractV1,

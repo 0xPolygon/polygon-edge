@@ -10,6 +10,7 @@ import (
 	polybftsecrets "github.com/0xPolygon/polygon-edge/command/secrets/init"
 	sidechainHelper "github.com/0xPolygon/polygon-edge/command/sidechain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/spf13/cobra"
@@ -23,7 +24,7 @@ var (
 func GetCommand() *cobra.Command {
 	stakeCmd := &cobra.Command{
 		Use:     "stake",
-		Short:   "Stakes the amount sent for validator on rootchain",
+		Short:   "Stakes the amount sent for validator",
 		PreRunE: runPreRun,
 		RunE:    runCommand,
 	}
@@ -50,31 +51,10 @@ func setFlags(cmd *cobra.Command) {
 	)
 
 	cmd.Flags().StringVar(
-		&params.stakeManagerAddr,
-		rootHelper.StakeManagerFlag,
-		"",
-		rootHelper.StakeManagerFlagDesc,
-	)
-
-	cmd.Flags().StringVar(
 		&params.amount,
 		sidechainHelper.AmountFlag,
 		"",
 		"amount to stake",
-	)
-
-	cmd.Flags().Int64Var(
-		&params.supernetID,
-		supernetIDFlag,
-		0,
-		"ID of supernet provided by stake manager on supernet registration",
-	)
-
-	cmd.Flags().StringVar(
-		&params.stakeTokenAddr,
-		rootHelper.StakeTokenFlag,
-		"",
-		rootHelper.StakeTokenFlagDesc,
 	)
 
 	cmd.MarkFlagsMutuallyExclusive(polybftsecrets.AccountDirFlag, polybftsecrets.AccountConfigFlag)
@@ -102,7 +82,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	}
 
 	approveTxn, err := rootHelper.CreateApproveERC20Txn(params.amountValue,
-		types.StringToAddress(params.stakeManagerAddr), types.StringToAddress(params.stakeTokenAddr), true)
+		contracts.StakeManagerContract, contracts.ERC20Contract, true)
 	if err != nil {
 		return err
 	}
@@ -125,7 +105,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	stakeManagerAddr := ethgo.Address(types.StringToAddress(params.stakeManagerAddr))
+	stakeManagerAddr := ethgo.Address(contracts.StakeManagerContract)
 
 	txn := rootHelper.CreateTransaction(validatorAccount.Ecdsa.Address(), &stakeManagerAddr, encoded, nil, true)
 

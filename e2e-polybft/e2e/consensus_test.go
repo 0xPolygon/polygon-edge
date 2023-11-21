@@ -28,14 +28,29 @@ import (
 
 var uint256ABIType = abi.MustNewType("tuple(uint256)")
 
-func TestE2E_Consensus_Basic_WithNonValidators(t *testing.T) {
+func TestE2E_Consensus_Basic(t *testing.T) {
 	const (
 		epochSize     = 4
 		validatorsNum = 5
 	)
 
+	var (
+		initMinterBalance = ethgo.Ether(4e15)
+		premineBalance    = ethgo.Ether(2e15)
+	)
+
+	minter, err := wallet.GenerateKey()
+	require.NoError(t, err)
+
 	cluster := framework.NewTestCluster(t, 5,
-		framework.WithEpochSize(epochSize), framework.WithTestRewardToken())
+		framework.WithEpochSize(epochSize), framework.WithTestRewardToken(),
+		framework.WithNativeTokenConfig(fmt.Sprintf(framework.NativeTokenMintableTestCfg, minter.Address())),
+		framework.WithSecretsCallback(func(addresses []types.Address, config *framework.TestClusterConfig) {
+			config.Premine = append(config.Premine, fmt.Sprintf("%s:%s", minter.Address(), initMinterBalance))
+			for _, a := range addresses {
+				config.Premine = append(config.Premine, fmt.Sprintf("%s:%s", a, premineBalance))
+			}
+		}))
 	defer cluster.Stop()
 
 	cluster.WaitForReady(t)
@@ -52,6 +67,28 @@ func TestE2E_Consensus_Basic_WithNonValidators(t *testing.T) {
 	//require.True(t, initialTotalSupply.Cmp(totalSupply.(*big.Int)) == 0) //nolint:forcetypeassert
 
 	require.NoError(t, cluster.WaitForBlock(10, 1*time.Minute))
+
+	polybftConfig, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
+	require.NoError(t, err)
+
+	srv := cluster.Servers[0]
+
+	childChainRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(srv.JSONRPCAddr()))
+	require.NoError(t, err)
+
+	srv.Stake(polybftConfig, big.NewInt(500))
+
+	require.NoError(t, cluster.WaitForBlock(26, 1*time.Minute))
+
+	validatorAcc, err := sidechain.GetAccountFromDir(srv.DataDir())
+	require.NoError(t, err)
+	// check that validator is no longer active (out of validator set)
+	validatorInfo, err := sidechain.GetValidatorInfo(validatorAcc.Ecdsa.Address(), childChainRelayer)
+
+	t.Log(validatorInfo.Stake)
+
+	require.NoError(t, cluster.WaitForBlock(35, 1*time.Minute))
+
 }
 
 func TestE2E_Consensus_BulkDrop(t *testing.T) {
