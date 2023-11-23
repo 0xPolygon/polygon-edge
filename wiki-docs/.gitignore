@@ -1,0 +1,10 @@
+.code
+.idea
+site/
+venv/
+env/
+*.out
+node_modules/
+.DS_Store
+**/.DS_Store
+*.iml

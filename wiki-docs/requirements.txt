@@ -1,0 +1,4 @@
+mkdocs-material==9.4.8
+markdown-include==0.8.1
+mkdocs-git-revision-date-localized-plugin==1.2.1
+mkdocs-open-in-new-tab==1.0.3
