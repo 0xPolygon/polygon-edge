@@ -2,7 +2,7 @@
 
     We recommend using the pre-built releases and verifying the provided checksums for security.
 
-    The Docker image is also a convenient option for containerized deployment. Building from source provides greater flexibility, but requires a [<ins>suitable development environment</iedgens>](/operate/system).
+    The Docker image is also a convenient option for containerized deployment. Building from source provides greater flexibility, but requires a [<ins>suitable development environment</iedgens>](system.md).
 
 ## Pre-built releases
 

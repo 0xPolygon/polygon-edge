@@ -5,7 +5,7 @@ The consensus mechanism comprises two key components, a **consensus engine** and
 PolyBFT utilizes the IBFT consensus engine and a Proof-of-Stake architecture to seal blocks, provide specific network capabilities, and govern the network.
 The core smart contracts work in tandem with the consensus engine to define all the network's Proof-of-Stake rules.
 
-![bridge](/img/edge/polybft.excalidraw.png)
+![bridge](../../..//img/edge/polybft.excalidraw.png)
 
 The consensus engine of PolyBFT is based on the Istanbul Byzantine Fault Tolerance [<ins>(IBFT 2.0) protocol</ins>](https://github.com/0xPolygon/go-ibft), which is responsible for sealing blocks on the blockchain.
 The IBFT 2.0 protocol ensures that network integrity is maintained even in the presence of malicious or dishonest nodes.
@@ -15,7 +15,7 @@ Each PolyBFT node maintains a local copy of the blockchain, represented as a lis
 
 PolyBFT's consensus protocol is implemented through a set of core smart contracts. These contracts serve multiple purposes, including enabling staking functionality and defining an incentivization scheme for validators on the network, managing the validator set, and facilitating cross-chain communication through a native bridge.
 
-![bridge](/img/edge/contracts.excalidraw.png)
+![bridge](../../../img/edge/contracts.excalidraw.png)
 
 ## Bridge
 

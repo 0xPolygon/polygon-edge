@@ -3,7 +3,7 @@ The guides explain the end-to-end process for setting up and deploying a local E
 
 ## Prerequisites
 
-Before diving into any of the tutorials, make sure your environment meets the necessary prerequisites. They can be found **[<ins>here</ins>](/operate/system)**.
+Before diving into any of the tutorials, make sure your environment meets the necessary prerequisites. They can be found **[<ins>here</ins>](../system.md)**.
 
 ### Before starting
 
@@ -11,7 +11,7 @@ Before diving into any of the tutorials, make sure your environment meets the ne
 
       Please ensure that you are not running on the `develop` branch, which is the active development branch and include changes that are still being tested and not compatible with the current process.
 
-      Instead, use the [<ins>latest release</ins>](/operate/install) for deployments.
+      Instead, use the [<ins>latest release</ins>](../install.md) for deployments.
 
 !!! caution "Key management and secure values"
       When passing values, it is important to keep sensitive values like private keys and API keys secure.
@@ -49,11 +49,11 @@ By the end of this tutorial, you will have a fully functional Edge test network 
 
 The deployment guides will cover the steps outlined below. If you are deploying an Edge-powered chain for the first time, please navigate each section in order. 
 
-1. [<ins>Spawn a New Edge-powered chain</ins>](/operate/deploy/local-chain)
-2. [<ins>Configure Your New Edge-powered chain</ins>](/operate/deploy/genesis)
-3. [<ins>Configure the Rootchain</ins>](/operate/deploy/rootchain-config)
-4. [<ins>Configure the Initial Validator Set</ins>](/operate/deploy/genesis-validators)
-5. [<ins>Start Your New Edge-powered chain</ins>](/operate/deploy/start-chain)
+1. [<ins>Spawn a New Edge-powered chain</ins>](local-chain.md)
+2. [<ins>Configure Your New Edge-powered chain</ins>](genesis.md)
+3. [<ins>Configure the Rootchain</ins>](rootchain-config.md)
+4. [<ins>Configure the Initial Validator Set</ins>](genesis-validators.md)
+5. [<ins>Start Your New Edge-powered chain</ins>](start-chain.md)
 
 <details>
 <summary>Fast-track guide ↓</summary>

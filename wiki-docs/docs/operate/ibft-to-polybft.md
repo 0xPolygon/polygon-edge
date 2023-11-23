@@ -4,7 +4,7 @@ In this guide, you'll discover how to migrate from an existing IBFT consensus ch
 
 !!! caution "This is not an upgrade"
 
-    The regenesis process is not intended as an upgrade to another version of the consensus client but rather as a transformation to a distinct product suite designed for next-generation, application-specific chains (appchains) with cross-chain compatibility and staking requirements. If you are unfamiliar or uncertain about this, please refer to the [<ins>system design documentation</ins>](/design/overview). For further assistance, please reach out to the Polygon team.
+    The regenesis process is not intended as an upgrade to another version of the consensus client but rather as a transformation to a distinct product suite designed for next-generation, application-specific chains (appchains) with cross-chain compatibility and staking requirements. If you are unfamiliar or uncertain about this, please refer to the [<ins>system design documentation</ins>](../design/overview.md). For further assistance, please reach out to the Polygon team.
 
 !!! info "Compatibility"
 
@@ -61,7 +61,7 @@ Before beginning the regenesis process, there are some prerequisites that must b
 !!! caution "Don't use the develop branch for deployments"
     Please ensure that you are not running on the `develop` branch, which is the active development branch and include changes that are still being tested and not compatible with the current process.
 
-    Instead, use the [<ins>latest release</ins>](/operate/install) for deployments.
+    Instead, use the [<ins>latest release</ins>](install.md) for deployments.
 
 ## Regenesis
 
@@ -69,7 +69,7 @@ The regenesis process involves several steps, which are outlined below.
 
 !!! note "Configuration Parameters"
 
-    For a list of configurable parameters, please refer to the reference guide available [<ins>here</ins>](/operate/param-reference).
+    For a list of configurable parameters, please refer to the reference guide available [<ins>here</ins>](param-reference.md).
 
 ### 1. Get trie root
 

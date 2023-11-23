@@ -1,6 +1,6 @@
 ## Prerequisites
 
-You'll need to have a successful bridge deployment to make any cross-chain transactions. If you haven't done so already, check out the local deployment guide [<ins>here</ins>](/operate/deploy/local-chain).
+You'll need to have a successful bridge deployment to make any cross-chain transactions. If you haven't done so already, check out the local deployment guide [<ins>here</ins>](../local-chain.md).
 
 :::caution Key management and secure values
 When passing values to run transactions, it is important to keep sensitive values like private keys and API keys secure.

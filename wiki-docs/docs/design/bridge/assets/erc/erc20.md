@@ -2,13 +2,13 @@ Edge provides developers with two standards for creating ERC-20 fungible tokens 
 
 ## ChildERC20
 
-The [`ChildERC20`](../../../../../interfaces/erc20/childerc20) token standard is used for tokens mapping and enables developers to create tokens on both the Edge-powered chain and the associated rootchain. To create a new `ChildERC20` token, developers can use the `ChildERC20` contract as a template and deploy it on their Edge-powered chain. The contract requires a name, symbol, and number of decimals to determine the minimum unit of the token.
+The [`ChildERC20`](../../../../interfaces/erc20/childerc20.md) token standard is used for tokens mapping and enables developers to create tokens on both the Edge-powered chain and the associated rootchain. To create a new `ChildERC20` token, developers can use the `ChildERC20` contract as a template and deploy it on their Edge-powered chain. The contract requires a name, symbol, and number of decimals to determine the minimum unit of the token.
 
-`ChildERC20` tokens are minted and burned on the Edge-powered chain through the corresponding [`ERC20Predicate`](../../../../../interfaces/erc20/childerc20-predicate/) contract. This ensures that the supply of tokens on the rootchain and the Edge-powered chain remains in sync. The `ERC20Predicate` contract also allows for the transfer of tokens between the two networks using the native bridge.
+`ChildERC20` tokens are minted and burned on the Edge-powered chain through the corresponding [`ERC20Predicate`](../../../../interfaces/erc20/childerc20-predicate.md) contract. This ensures that the supply of tokens on the rootchain and the Edge-powered chain remains in sync. The `ERC20Predicate` contract also allows for the transfer of tokens between the two networks using the native bridge.
 
 ## NativeERC20
 
-The [`NativeERC20`](../../../../../interfaces/erc20/native-erc20/) token standard represents native tokens on Edge and offers fast and inexpensive transactions. It is deployed only on the Edge-powered chain and relies on the native transfer precompile to make transfers. The `NativeERC20` tokens can be minted and burned by the associated predicate contract.
+The [`NativeERC20`](../../../../interfaces/erc20/native-erc20.md) token standard represents native tokens on Edge and offers fast and inexpensive transactions. It is deployed only on the Edge-powered chain and relies on the native transfer precompile to make transfers. The `NativeERC20` tokens can be minted and burned by the associated predicate contract.
 
 In addition, developers can use the `NativeERC20Mintable` contract to create and manage `NativeMintable` tokens, which are fungible tokens that represent assets on the Edge-powered chain. These tokens can be managed through the native bridge contract and transferred between an Edge-powered chain and rootchain networks.
 

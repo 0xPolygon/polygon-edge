@@ -34,7 +34,7 @@ function readAddressList(address) returns (uint256)
 - `EnabledRole`: The address has some permissions.
 - `AdminRole`: The address has all permissions and can change the roles of other addresses.
 
-**For more information about how ACLs work in Edge, check out the overview guide [<ins>here</ins>](/design/runtime/allowlist).**
+**For more information about how ACLs work in Edge, check out the overview guide [<ins>here</ins>](../../../design/runtime/allowlist.md).**
 
 ```go
 NoRole      Role = Role(types.StringToHash("..."))

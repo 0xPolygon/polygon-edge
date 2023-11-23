@@ -48,7 +48,7 @@ Yes, the bridge can connect to any EVM-compatible rootchain (e.g. Polygon PoS). 
 
 ## What assets are supported on the bridge?
 
-The bridge currently supports ERC-20, ERC-721, and ERC-1155 tokens for transfer. However, support for other asset types will soon be available. It is important to keep in mind that not all tokens have the same functionality and capabilities. Users should review the [bridge document](/design/bridge/overview/) to understand how to use tokens with the bridge.
+The bridge currently supports ERC-20, ERC-721, and ERC-1155 tokens for transfer. However, support for other asset types will soon be available. It is important to keep in mind that not all tokens have the same functionality and capabilities. Users should review the [bridge document](design/bridge/overview.md) to understand how to use tokens with the bridge.
 
 As the Edge ecosystem evolves, the bridge will support additional assets, enhancing interoperability between various blockchain networks and applications.
 
@@ -73,7 +73,7 @@ To upgrade to a new blockchain with PolyBFT consensus using IBFT 2.0, you'll nee
 - Create a new genesis block for the new blockchain with PolyBFT consensus using IBFT 2.0.
 - Migrate the data and state from the old blockchain to the new blockchain. **Currently, the product suite only support state migration.**
 
-For more information on the migration process, please refer to the migration guide available [<ins>here</ins>](/operate/ibft-to-polybft/).
+For more information on the migration process, please refer to the migration guide available [<ins>here</ins>](operate/ibft-to-polybft.md).
 
 ## Does the current implementation support configuration of an RPC node and full node?
 

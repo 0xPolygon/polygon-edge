@@ -15,11 +15,11 @@ This is the minimum hardware configuration required to set up a Edge-powered cha
 | Storage | 200 GB SSD | 1 TB SSD |
 | Network | High-speed internet connection | Dedicated server with gigabit connection |
 
-> Note that these minimum requirements are based on the x2iezn.2xlarge instance type used in the [<ins>performance tests</ins>](/operate/benchmarks/), which demonstrated satisfactory performance. However, for better performance and higher transaction throughput, consider using more powerful hardware configurations, such as those equivalent to x2iezn.4xlarge or x2iezn.8xlarge instance types.
+> Note that these minimum requirements are based on the x2iezn.2xlarge instance type used in the [<ins>performance tests</ins>](benchmarks.md), which demonstrated satisfactory performance. However, for better performance and higher transaction throughput, consider using more powerful hardware configurations, such as those equivalent to x2iezn.4xlarge or x2iezn.8xlarge instance types.
 
 ## Prerequisites
 
-Before starting any of the tutorials, you should understand the basics of blockchain technology and be familiar with command-line interfaces. It would help if you also had the `polygon-edge` binary installed on your machine. Check out the [<ins>installation guide</ins>](/operate/install/) for more information if you haven't already.
+Before starting any of the tutorials, you should understand the basics of blockchain technology and be familiar with command-line interfaces. It would help if you also had the `polygon-edge` binary installed on your machine. Check out the [<ins>installation guide</ins>](install.md) for more information if you haven't already.
 
 Ensure you have the following system prerequisites:
 

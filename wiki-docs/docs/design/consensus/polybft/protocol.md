@@ -114,10 +114,10 @@ the integrity of the blockchain.
 ## Native bridge integration
 
 With the help of PolyBFT, Edge supports an
-[in-built bridging mechanism (a two-way bridge)](/design/bridge/overview/),
+[in-built bridging mechanism (a two-way bridge)](../../bridge/overview.md),
 which enables arbitrary message passing between an Edge-powered chain and another Proof-of-Stake
 blockchain (`rootchain`). Transfers can occur without mapping.
 
-![bridge](/img/edge/contracts-bridge.excalidraw.png)
+![bridge](../../../img/edge/contracts-bridge.excalidraw.png)
 
-Learn more [here](/design/bridge/overview/)).
+Learn more [here](../../bridge/overview.md)).

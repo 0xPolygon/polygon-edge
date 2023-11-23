@@ -1,4 +1,4 @@
-Before proceeding, ensure that your system meets the necessary [system requirements](/operate/system/).
+Before proceeding, ensure that your system meets the necessary [system requirements](operate/system.md).
 
 To access the pre-built releases, visit the [GitHub releases page](https://github.com/0xPolygon/polygon-edge/releases). The client provides cross-compiled AMD64/ARM64 binaries for Darwin and Linux.
 

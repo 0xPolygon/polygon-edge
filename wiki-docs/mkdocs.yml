@@ -117,3 +117,7 @@ markdown_extensions:
   - pymdownx.details
   - pymdownx.superfences
   - pymdownx.tabbed
+
+
+validation:
+  absolute_links: warn

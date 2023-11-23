@@ -176,7 +176,7 @@ The introduction of a hard fork necessitates an upgrade process across the netwo
 3. **Distribute Genesis File**: Share the updated genesis.json file with all network nodes.
 
     For a step-by-step guide on generating a new genesis file, please consult the chain configuration deployment guide 
-    [<ins>here</ins>](/operate/deploy/genesis).
+    [<ins>here</ins>](../genesis.md).
 
 4. **Stop Client**: Pause the Edge client on all network nodes before block 100.
 5. **Replace Files**: Replace the existing genesis.json and Edge files with the updated versions.

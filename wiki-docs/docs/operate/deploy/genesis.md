@@ -347,7 +347,7 @@ Genesis written to ./genesis.json
 
 When setting up the initial chain state for a multiple-host validator setup, you'll need to specify the validator information using the `--validators` flag in the following format: `<multi_address>:<public_ECDSA_address>:<public_BLS_key>:<BLS_signature>`.
 
-This follows the [libp2p multiaddr format](/design/libp2p): `<ip4><ip_address><transport><port><p2p><node_id>`.
+This follows the [libp2p multiaddr format](../../design/libp2p.md): `<ip4><ip_address><transport><port><p2p><node_id>`.
 
 In this example, we will designate the first and second nodes as bootnodes for all other nodes. Nodes connecting to node 1 or 2 will receive information on how to connect to each other through the mutually contacted bootnode. For the ports, we will use `30301` for the first node and `30302` for the second node. Since we are running on localhost, it is safe to assume that the `ip_address` is `127.0.0.1`. If you are not running on your localhost, please update accordingly.
 
@@ -554,4 +554,4 @@ Genesis written to ./genesis.json
 
 With a **genesis.json** file containing the initial chain state, validator nodes, and chain admins for your new childchain instance, you are ready to proceed.
 
-To configure the associated rootchain of the Edge-powered chain and deploy the essential rootchain core contracts, navigate to the [<ins>Rootchain Deployment guide</ins>](/operate/deploy/rootchain-config).
+To configure the associated rootchain of the Edge-powered chain and deploy the essential rootchain core contracts, navigate to the [<ins>Rootchain Deployment guide</ins>](rootchain-config.md).

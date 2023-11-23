@@ -196,7 +196,7 @@ If you already have an ERC-20 token deployed on the rootchain that you want to u
 
 Replace `<ERC20_TOKEN_ADDRESS>` with the address of your existing ERC-20 token on the rootchain.
 
-To deposit a desired amount and mint it on the childchain, please refer to the guidelines outlined in the deposit guide [<ins>here</ins>](/operate/deploy/transfers/deposit).
+To deposit a desired amount and mint it on the childchain, please refer to the guidelines outlined in the deposit guide [<ins>here</ins>](transfers/deposit.md).
 
 ### iii. Proxy Contract Admin
 
@@ -455,7 +455,7 @@ If you already have an ERC-20 token deployed on the rootchain that you want to u
 
 Replace `<ERC20_TOKEN_ADDRESS>` with the address of your existing ERC-20 token on the rootchain.
 
-To deposit a desired amount and mint it on the childchain, please refer to the guidelines outlined in the deposit guide [<ins>here</ins>](/operate/deploy/transfers/deposit).
+To deposit a desired amount and mint it on the childchain, please refer to the guidelines outlined in the deposit guide [<ins>here</ins>](transfers/deposit.md).
 
 ## 3. Deploy Rootchain Contracts
 
@@ -649,4 +649,4 @@ Here's an example of how to fund a validator account (replace address value with
 
 Now that we have successfully configured the initial setup of your Edge-powered chain, including both the childchain and rootchain, we can proceed to the next crucial step: rootchain staking and allowlisting through the configuration of the initial validator set.
 
-To accomplish this, navigate to the [<ins>Configure the Initial Validator Set</ins>](/operate/deploy/genesis-validators) deployment guide.
+To accomplish this, navigate to the [<ins>Configure the Initial Validator Set</ins>](genesis-validators.md) deployment guide.
