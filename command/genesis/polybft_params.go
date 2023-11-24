@@ -356,12 +356,8 @@ func (p *genesisParams) deployContracts(
 			address:  contracts.L2StateSenderContractV1,
 		},
 		{
-			artifact: contractsapi.ValidatorSet,
+			artifact: contractsapi.EpochManager,
 			address:  contracts.ValidatorSetContractV1,
-		},
-		{
-			artifact: contractsapi.RewardPool,
-			address:  contracts.RewardPoolContractV1,
 		},
 		{
 			artifact: contractsapi.StakeManager,
@@ -380,21 +376,10 @@ func (p *genesisParams) deployContracts(
 				address:  contracts.NativeERC20TokenContractV1,
 			})
 
-		// burn contract can be set only for non-mintable native token. If burn contract is set,
-		// default EIP1559 contract will be deployed.
-		if p.isBurnContractEnabled() {
-			genesisContracts = append(genesisContracts,
-				&contractInfo{
-					artifact: contractsapi.EIP1559Burn,
-					address:  burnContractAddr,
-				})
-
-			proxyAddresses = append(proxyAddresses, contracts.DefaultBurnContract)
-		}
 	} else {
 		genesisContracts = append(genesisContracts,
 			&contractInfo{
-				artifact: contractsapi.NativeERC20Mintable,
+				artifact: contractsapi.NativeERC20,
 				address:  contracts.NativeERC20TokenContractV1,
 			})
 	}

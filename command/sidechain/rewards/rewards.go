@@ -77,7 +77,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	encoded, err := contractsapi.RewardPool.Abi.Methods["pendingRewards"].Encode([]interface{}{validatorAddr})
+	encoded, err := contractsapi.EpochManager.Abi.Methods["pendingRewards"].Encode([]interface{}{validatorAddr})
 	if err != nil {
 		return err
 	}
@@ -92,7 +92,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	encoded, err = contractsapi.RewardPool.Abi.Methods["withdrawReward"].Encode([]interface{}{})
+	encoded, err = contractsapi.EpochManager.Abi.Methods["withdrawReward"].Encode([]interface{}{})
 	if err != nil {
 		return err
 	}

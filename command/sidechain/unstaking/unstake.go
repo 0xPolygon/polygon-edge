@@ -78,7 +78,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	unstakeFn := &contractsapi.UnstakeValidatorSetFn{
+	unstakeFn := &contractsapi.UnstakeStakeManagerFn{
 		Amount: params.amountValue,
 	}
 
@@ -103,7 +103,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	}
 
 	var (
-		withdrawalRegisteredEvent contractsapi.WithdrawalRegisteredEvent
+		withdrawalRegisteredEvent contractsapi.StakeRemovedEvent
 		foundLog                  bool
 	)
 

@@ -360,7 +360,7 @@ func (s *stakeManager) getBlsKey(address types.Address) (*bls.PublicKey, error) 
 
 	stakeManagerContractContract := contract.NewContract(
 		ethgo.Address(s.stakeManagerContractAddr),
-		contractsapi.ValidatorSet.Abi, contract.WithProvider(provider),
+		contractsapi.EpochManager.Abi, contract.WithProvider(provider),
 	)
 
 	rawResult, err := stakeManagerContractContract.Call("currentEpochId", ethgo.Latest)

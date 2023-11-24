@@ -610,8 +610,8 @@ func (c *consensusRuntime) restartEpoch(header *types.Header, dbTx *bolt.Tx) (*e
 func (c *consensusRuntime) calculateCommitEpochInput(
 	currentBlock *types.Header,
 	epoch *epochMetadata,
-) (*contractsapi.CommitEpochValidatorSetFn,
-	*contractsapi.DistributeRewardForRewardPoolFn, error) {
+) (*contractsapi.CommitEpochEpochManagerFn,
+	*contractsapi.DistributeRewardForEpochManagerFn, error) {
 	uptimeCounter := map[types.Address]int64{}
 	blockHeader := currentBlock
 	epochID := epoch.Number
@@ -689,7 +689,7 @@ func (c *consensusRuntime) calculateCommitEpochInput(
 		}
 	}
 
-	commitEpoch := &contractsapi.CommitEpochValidatorSetFn{
+	commitEpoch := &contractsapi.CommitEpochEpochManagerFn{
 		ID: new(big.Int).SetUint64(epochID),
 		Epoch: &contractsapi.Epoch{
 			StartBlock: new(big.Int).SetUint64(epoch.FirstBlockInEpoch),
@@ -698,7 +698,7 @@ func (c *consensusRuntime) calculateCommitEpochInput(
 		},
 	}
 
-	distributeRewards := &contractsapi.DistributeRewardForRewardPoolFn{
+	distributeRewards := &contractsapi.DistributeRewardForEpochManagerFn{
 		EpochID: new(big.Int).SetUint64(epochID),
 		Uptime:  uptime,
 	}

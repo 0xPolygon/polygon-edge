@@ -144,15 +144,6 @@ func main() {
 			[]string{},
 		},
 		{
-			"NativeERC20Mintable",
-			gensc.NativeERC20Mintable,
-			false,
-			[]string{
-				"initialize",
-			},
-			[]string{},
-		},
-		{
 			"RootERC20Predicate",
 			gensc.RootERC20Predicate,
 			false,
@@ -351,52 +342,29 @@ func main() {
 				"initialize",
 				"stake",
 				"stakeOf",
-				"withdrawStake",
+				"withdraw",
 				"getValidator",
 				"whitelistValidators",
 				"register",
 				"unstake",
 			},
 			[]string{
-				"ChildManagerRegistered",
 				"StakeAdded",
 				"StakeRemoved",
 				"StakeWithdrawn",
 				"ValidatorRegistered",
 				"AddedToWhitelist",
+				"Transfer",
 			},
 		},
 		{
-			"ValidatorSet",
-			gensc.ValidatorSet,
+			"EpochManager",
+			gensc.EpochManager,
 			false,
 			[]string{
 				"commitEpoch",
-				"unstake",
-				"initialize",
-			},
-			[]string{
-				"Transfer",
-				"WithdrawalRegistered",
-				"Withdrawal",
-			},
-		},
-		{
-			"RewardPool",
-			gensc.RewardPool,
-			false,
-			[]string{
 				"initialize",
 				"distributeRewardFor",
-			},
-			[]string{},
-		},
-		{
-			"EIP1559Burn",
-			gensc.EIP1559Burn,
-			false,
-			[]string{
-				"initialize",
 			},
 			[]string{},
 		},
@@ -422,6 +390,7 @@ func main() {
 	generatedData := &generatedData{}
 
 	for _, c := range cases {
+		fmt.Println("Contract", c.contractName)
 		if c.generateConstructor {
 			if err := generateConstructor(generatedData, c.contractName, c.artifact.Abi.Constructor); err != nil {
 				log.Fatal(err)
@@ -441,6 +410,7 @@ func main() {
 				method = c.artifact.Abi.GetMethodBySignature(methodRaw)
 				resolvedBySignature = true
 			} else {
+				fmt.Println("Function", methodRaw)
 				method = c.artifact.Abi.GetMethod(methodRaw)
 			}
 
@@ -450,6 +420,7 @@ func main() {
 		}
 
 		for _, event := range c.events {
+			fmt.Println("Event", event)
 			if err := generateEvent(generatedData, c.contractName, c.artifact.Abi.Events[event]); err != nil {
 				log.Fatal(err)
 			}

@@ -33,7 +33,7 @@ func TestEncoding_Method(t *testing.T) {
 			Bitmap:    []byte{},
 		},
 		// empty commit epoch
-		&CommitEpochValidatorSetFn{
+		&CommitEpochEpochManagerFn{
 			ID: big.NewInt(1),
 			Epoch: &Epoch{
 				StartBlock: big.NewInt(1),

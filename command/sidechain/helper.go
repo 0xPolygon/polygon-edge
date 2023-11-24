@@ -122,7 +122,7 @@ func GetValidatorInfo(validatorAddr ethgo.Address, childRelayer txrelayer.TxRela
 
 	validatorInfo.Stake = stake
 
-	withdrawableFn := contractsapi.RewardPool.Abi.GetMethod("pendingRewards")
+	withdrawableFn := contractsapi.EpochManager.Abi.GetMethod("pendingRewards")
 
 	encode, err = withdrawableFn.Encode([]interface{}{validatorAddr})
 	if err != nil {

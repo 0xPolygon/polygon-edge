@@ -92,9 +92,9 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	withdrawFn := &contractsapi.WithdrawStakeStakeManagerFn{
-		To:     types.StringToAddress(params.addressTo),
-		Amount: params.amountValue,
+	withdrawFn := &contractsapi.WithdrawStakeManagerFn{
+		// To:     types.StringToAddress(params.addressTo),
+		// Amount: params.amountValue,
 	}
 
 	encoded, err := withdrawFn.EncodeAbi()
@@ -134,7 +134,6 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		}
 
 		result.Amount = withdrawalEvent.Amount.Uint64()
-		result.WithdrawnTo = withdrawalEvent.Recipient.String()
 		foundLog = true
 
 		break

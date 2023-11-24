@@ -41,7 +41,7 @@ func NewSystemState(valSetAddr types.Address, stateRcvAddr types.Address, provid
 	s := &SystemStateImpl{}
 	s.validatorContract = contract.NewContract(
 		ethgo.Address(valSetAddr),
-		contractsapi.ValidatorSet.Abi, contract.WithProvider(provider),
+		contractsapi.EpochManager.Abi, contract.WithProvider(provider),
 	)
 	s.sidechainBridgeContract = contract.NewContract(
 		ethgo.Address(stateRcvAddr),

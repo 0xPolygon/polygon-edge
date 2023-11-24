@@ -520,7 +520,7 @@ func TestE2E_Consensus_MintableERC20NativeToken(t *testing.T) {
 	require.Equal(t, decimals, decimalsCount)
 
 	// send mint transactions
-	mintFn, exists := contractsapi.NativeERC20Mintable.Abi.Methods["mint"]
+	mintFn, exists := contractsapi.NativeERC20.Abi.Methods["mint"]
 	require.True(t, exists)
 
 	mintAmount := ethgo.Ether(10)

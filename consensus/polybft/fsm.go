@@ -77,12 +77,12 @@ type fsm struct {
 
 	// commitEpochInput holds info about a single epoch
 	// It is populated only for epoch-ending blocks.
-	commitEpochInput *contractsapi.CommitEpochValidatorSetFn
+	commitEpochInput *contractsapi.CommitEpochEpochManagerFn
 
 	// distributeRewardsInput holds info about validators work in a single epoch
 	// mainly, how many blocks they signed during given epoch
 	// It is populated only for epoch-ending blocks.
-	distributeRewardsInput *contractsapi.DistributeRewardForRewardPoolFn
+	distributeRewardsInput *contractsapi.DistributeRewardForEpochManagerFn
 
 	// isEndOfEpoch indicates if epoch reached its end
 	isEndOfEpoch bool
@@ -448,7 +448,7 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 			if err = verifyBridgeCommitmentTx(f.Height(), tx.Hash, stateTxData, f.validators); err != nil {
 				return err
 			}
-		case *contractsapi.CommitEpochValidatorSetFn:
+		case *contractsapi.CommitEpochEpochManagerFn:
 			if commitEpochTxExists {
 				// if we already validated commit epoch tx,
 				// that means someone added more than one commit epoch tx to block,
@@ -461,7 +461,7 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 			if err := f.verifyCommitEpochTx(tx); err != nil {
 				return fmt.Errorf("error while verifying commit epoch transaction. error: %w", err)
 			}
-		case *contractsapi.DistributeRewardForRewardPoolFn:
+		case *contractsapi.DistributeRewardForEpochManagerFn:
 			if distributeRewardsTxExists {
 				// if we already validated distribute rewards tx,
 				// that means someone added more than one distribute rewards tx to block,

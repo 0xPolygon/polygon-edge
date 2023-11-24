@@ -29,83 +29,79 @@ func main() {
 		Name string
 	}{
 		{
-			"child/L2StateSender.sol",
+			"blade/L2StateSender.sol",
 			"L2StateSender",
 		},
 		{
-			"child/StateReceiver.sol",
+			"blade/StateReceiver.sol",
 			"StateReceiver",
 		},
 		{
-			"child/NativeERC20.sol",
+			"blade/NativeERC20.sol",
 			"NativeERC20",
 		},
 		{
-			"child/NativeERC20Mintable.sol",
-			"NativeERC20Mintable",
-		},
-		{
-			"child/ChildERC20.sol",
+			"blade/ChildERC20.sol",
 			"ChildERC20",
 		},
 		{
-			"child/ChildERC20Predicate.sol",
+			"blade/ChildERC20Predicate.sol",
 			"ChildERC20Predicate",
 		},
 		{
-			"child/ChildERC20PredicateAccessList.sol",
+			"blade/ChildERC20PredicateAccessList.sol",
 			"ChildERC20PredicateACL",
 		},
 		{
-			"child/RootMintableERC20Predicate.sol",
+			"blade/RootMintableERC20Predicate.sol",
 			"RootMintableERC20Predicate",
 		},
 		{
-			"child/RootMintableERC20PredicateAccessList.sol",
+			"blade/RootMintableERC20PredicateAccessList.sol",
 			"RootMintableERC20PredicateACL",
 		},
 		{
-			"child/ChildERC721.sol",
+			"blade/ChildERC721.sol",
 			"ChildERC721",
 		},
 		{
-			"child/ChildERC721Predicate.sol",
+			"blade/ChildERC721Predicate.sol",
 			"ChildERC721Predicate",
 		},
 		{
-			"child/ChildERC721PredicateAccessList.sol",
+			"blade/ChildERC721PredicateAccessList.sol",
 			"ChildERC721PredicateACL",
 		},
 		{
-			"child/RootMintableERC721Predicate.sol",
+			"blade/RootMintableERC721Predicate.sol",
 			"RootMintableERC721Predicate",
 		},
 		{
-			"child/RootMintableERC721PredicateAccessList.sol",
+			"blade/RootMintableERC721PredicateAccessList.sol",
 			"RootMintableERC721PredicateACL",
 		},
 		{
-			"child/ChildERC1155.sol",
+			"blade/ChildERC1155.sol",
 			"ChildERC1155",
 		},
 		{
-			"child/ChildERC1155Predicate.sol",
+			"blade/ChildERC1155Predicate.sol",
 			"ChildERC1155Predicate",
 		},
 		{
-			"child/ChildERC1155PredicateAccessList.sol",
+			"blade/ChildERC1155PredicateAccessList.sol",
 			"ChildERC1155PredicateACL",
 		},
 		{
-			"child/RootMintableERC1155Predicate.sol",
+			"blade/RootMintableERC1155Predicate.sol",
 			"RootMintableERC1155Predicate",
 		},
 		{
-			"child/RootMintableERC1155PredicateAccessList.sol",
+			"blade/RootMintableERC1155PredicateAccessList.sol",
 			"RootMintableERC1155PredicateACL",
 		},
 		{
-			"child/System.sol",
+			"blade/System.sol",
 			"System",
 		},
 		{
@@ -121,15 +117,15 @@ func main() {
 			"Merkle",
 		},
 		{
-			"root/CheckpointManager.sol",
+			"bridge/CheckpointManager.sol",
 			"CheckpointManager",
 		},
 		{
-			"root/ExitHelper.sol",
+			"bridge/ExitHelper.sol",
 			"ExitHelper",
 		},
 		{
-			"root/StateSender.sol",
+			"bridge/StateSender.sol",
 			"StateSender",
 		},
 		{
@@ -137,11 +133,11 @@ func main() {
 			"MockERC20",
 		},
 		{
-			"root/RootERC20Predicate.sol",
+			"bridge/RootERC20Predicate.sol",
 			"RootERC20Predicate",
 		},
 		{
-			"root/ChildMintableERC20Predicate.sol",
+			"bridge/ChildMintableERC20Predicate.sol",
 			"ChildMintableERC20Predicate",
 		},
 		{
@@ -149,11 +145,11 @@ func main() {
 			"MockERC721",
 		},
 		{
-			"root/RootERC721Predicate.sol",
+			"bridge/RootERC721Predicate.sol",
 			"RootERC721Predicate",
 		},
 		{
-			"root/ChildMintableERC721Predicate.sol",
+			"bridge/ChildMintableERC721Predicate.sol",
 			"ChildMintableERC721Predicate",
 		},
 		{
@@ -161,28 +157,20 @@ func main() {
 			"MockERC1155",
 		},
 		{
-			"root/RootERC1155Predicate.sol",
+			"bridge/RootERC1155Predicate.sol",
 			"RootERC1155Predicate",
 		},
 		{
-			"root/ChildMintableERC1155Predicate.sol",
+			"bridge/ChildMintableERC1155Predicate.sol",
 			"ChildMintableERC1155Predicate",
 		},
 		{
-			"child/staking/StakeManager.sol",
+			"blade/staking/StakeManager.sol",
 			"StakeManager",
 		},
 		{
-			"child/validator/RewardPool.sol",
-			"RewardPool",
-		},
-		{
-			"child/validator/ValidatorSet.sol",
-			"ValidatorSet",
-		},
-		{
-			"child/EIP1559Burn.sol",
-			"EIP1559Burn",
+			"blade/validator/EpochManager.sol",
+			"EpochManager",
 		},
 		{
 			"lib/GenesisProxy.sol",

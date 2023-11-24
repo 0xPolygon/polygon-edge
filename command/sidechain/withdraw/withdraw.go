@@ -74,12 +74,12 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	encoded, err := contractsapi.ValidatorSet.Abi.Methods["withdraw"].Encode([]interface{}{})
+	encoded, err := contractsapi.StakeManager.Abi.Methods["withdraw"].Encode([]interface{}{})
 	if err != nil {
 		return err
 	}
 
-	receiver := (*ethgo.Address)(&contracts.ValidatorSetContract)
+	receiver := (*ethgo.Address)(&contracts.StakeManagerContract)
 	txn := rootHelper.CreateTransaction(validatorAccount.Ecdsa.Address(), receiver, encoded, nil, false)
 
 	receipt, err := txRelayer.SendTransaction(txn, validatorAccount.Ecdsa)
@@ -92,7 +92,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	}
 
 	var (
-		withdrawalEvent contractsapi.WithdrawalEvent
+		withdrawalEvent contractsapi.StakeWithdrawnEvent
 		foundLog        bool
 	)
 

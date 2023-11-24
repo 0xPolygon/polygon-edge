@@ -162,11 +162,6 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			return err
 		}
 
-		// initialize ValidatorSet SC
-		if err = initValidatorSet(polyBFTConfig, transition); err != nil {
-			return err
-		}
-
 		// initialize StakeManager SC
 		if err = initStakeManager(polyBFTConfig, transition); err != nil {
 			return err
@@ -183,7 +178,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 		}
 
 		// initialize RewardPool SC
-		if err = initRewardPool(polyBFTConfig, transition); err != nil {
+		if err = initEpochManager(polyBFTConfig, transition); err != nil {
 			return err
 		}
 
@@ -355,7 +350,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 
 			if polyBFTConfig.NativeTokenConfig.IsMintable {
 				// initialize NativeERC20Mintable SC
-				params := &contractsapi.InitializeNativeERC20MintableFn{
+				params := &contractsapi.InitializeNativeERC20Fn{
 					Predicate_:   contracts.ChildERC20PredicateContract,
 					Owner_:       polyBFTConfig.NativeTokenConfig.Owner,
 					RootToken_:   types.ZeroAddress, // in case native mintable token is used, it is always root token
@@ -393,25 +388,6 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 				if err = callContract(contracts.SystemCaller,
 					contracts.NativeERC20TokenContract, input, "NativeERC20", transition); err != nil {
 					return err
-				}
-
-				// initialize EIP1559Burn SC
-				if isBurnContractSet {
-					burnParams := &contractsapi.InitializeEIP1559BurnFn{
-						NewChildERC20Predicate: contracts.ChildERC20PredicateContract,
-						NewBurnDestination:     config.Params.BurnContractDestinationAddress,
-					}
-
-					input, err = burnParams.EncodeAbi()
-					if err != nil {
-						return err
-					}
-
-					if err = callContract(contracts.SystemCaller,
-						burnContractAddress,
-						input, "EIP1559Burn", transition); err != nil {
-						return err
-					}
 				}
 			}
 		}
