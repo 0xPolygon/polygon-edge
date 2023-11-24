@@ -103,7 +103,6 @@ type TestClusterConfig struct {
 	TmpDir               string
 	BlockGasLimit        uint64
 	BlockTime            time.Duration
-	BurnContract         *polybft.BurnContractInfo
 	ValidatorPrefix      string
 	Binary               string
 	ValidatorSetSize     uint64
@@ -289,12 +288,6 @@ func WithBlockTime(blockTime time.Duration) ClusterOption {
 func WithBlockGasLimit(blockGasLimit uint64) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.BlockGasLimit = blockGasLimit
-	}
-}
-
-func WithBurnContract(burnContract *polybft.BurnContractInfo) ClusterOption {
-	return func(h *TestClusterConfig) {
-		h.BurnContract = burnContract
 	}
 }
 
@@ -530,13 +523,6 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			for _, premine := range cluster.Config.Premine {
 				args = append(args, "--premine", premine)
 			}
-		}
-
-		burnContract := cluster.Config.BurnContract
-		if burnContract != nil {
-			args = append(args, "--burn-contract",
-				fmt.Sprintf("%d:%s:%s",
-					burnContract.BlockNumber, burnContract.Address, burnContract.DestinationAddress))
 		}
 
 		validators, err := genesis.ReadValidatorsByPrefix(

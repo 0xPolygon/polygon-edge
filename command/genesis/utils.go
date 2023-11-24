@@ -92,46 +92,6 @@ func parseTrackerStartBlocks(trackerStartBlocksRaw []string) (map[types.Address]
 	return trackerStartBlocksConfig, nil
 }
 
-// parseBurnContractInfo parses provided burn contract information and returns burn contract block and address
-func parseBurnContractInfo(burnContractInfoRaw string) (*polybft.BurnContractInfo, error) {
-	// <block>:<address>[:<burn destination address>]
-	burnContractParts := strings.Split(burnContractInfoRaw, ":")
-	if len(burnContractParts) < 2 || len(burnContractParts) > 3 {
-		return nil, fmt.Errorf("expected format: <block>:<address>[:<burn destination>]")
-	}
-
-	blockRaw := burnContractParts[0]
-
-	blockNum, err := common.ParseUint64orHex(&blockRaw)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse block number %s: %w", blockRaw, err)
-	}
-
-	contractAddress := burnContractParts[1]
-	if err = types.IsValidAddress(contractAddress); err != nil {
-		return nil, fmt.Errorf("failed to parse contract address %s: %w", contractAddress, err)
-	}
-
-	if len(burnContractParts) == 2 {
-		return &polybft.BurnContractInfo{
-			BlockNumber:        blockNum,
-			Address:            types.StringToAddress(contractAddress),
-			DestinationAddress: types.ZeroAddress,
-		}, nil
-	}
-
-	destinationAddress := burnContractParts[2]
-	if err = types.IsValidAddress(destinationAddress); err != nil {
-		return nil, fmt.Errorf("failed to parse burn destination address %s: %w", destinationAddress, err)
-	}
-
-	return &polybft.BurnContractInfo{
-		BlockNumber:        blockNum,
-		Address:            types.StringToAddress(contractAddress),
-		DestinationAddress: types.StringToAddress(destinationAddress),
-	}, nil
-}
-
 type baseFeeInfo struct {
 	baseFee            uint64
 	baseFeeEM          uint64

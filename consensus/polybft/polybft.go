@@ -149,11 +149,6 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 
 		proxyAddrMapping := contracts.GetProxyImplementationMapping()
 
-		burnContractAddress, isBurnContractSet := getBurnContractAddress(config, polyBFTConfig)
-		if isBurnContractSet {
-			proxyAddrMapping[contracts.DefaultBurnContract] = burnContractAddress
-		}
-
 		if _, ok := config.Genesis.Alloc[contracts.RewardTokenContract]; ok {
 			proxyAddrMapping[contracts.RewardTokenContract] = contracts.RewardTokenContractV1
 		}
@@ -816,18 +811,4 @@ func initProxies(transition *state.Transition, admin types.Address,
 	}
 
 	return nil
-}
-
-func getBurnContractAddress(config *chain.Chain, polyBFTConfig PolyBFTConfig) (types.Address, bool) {
-	if config.Params.BurnContract != nil &&
-		len(config.Params.BurnContract) == 1 &&
-		!polyBFTConfig.NativeTokenConfig.IsMintable {
-		for _, address := range config.Params.BurnContract {
-			if _, ok := config.Genesis.Alloc[address]; ok {
-				return address, true
-			}
-		}
-	}
-
-	return types.ZeroAddress, false
 }

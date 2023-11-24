@@ -153,11 +153,7 @@ func (p *genesisParams) generateChainConfig(o command.OutputFormatter) error {
 		ProxyContractsAdmin:      types.StringToAddress(p.proxyContractsAdmin),
 	}
 
-	// Disable london hardfork if burn contract address is not provided
 	enabledForks := chain.AllForksEnabled
-	if !p.isBurnContractEnabled() {
-		enabledForks.RemoveFork(chain.London)
-	}
 
 	chainConfig := &chain.Chain{
 		Name: p.name,
@@ -171,29 +167,14 @@ func (p *genesisParams) generateChainConfig(o command.OutputFormatter) error {
 		Bootnodes: p.bootnodes,
 	}
 
-	burnContractAddr := types.ZeroAddress
-
-	if p.isBurnContractEnabled() {
-		chainConfig.Params.BurnContract = make(map[uint64]types.Address, 1)
-
-		burnContractInfo, err := parseBurnContractInfo(p.burnContract)
-		if err != nil {
-			return err
-		}
-
-		if !p.nativeTokenConfig.IsMintable {
-			// burn contract can be specified on arbitrary address for non-mintable native tokens
-			burnContractAddr = burnContractInfo.Address
-			chainConfig.Params.BurnContract[burnContractInfo.BlockNumber] = burnContractAddr
-			chainConfig.Params.BurnContractDestinationAddress = burnContractInfo.DestinationAddress
-		} else {
-			// burnt funds are sent to zero address when dealing with mintable native tokens
-			chainConfig.Params.BurnContract[burnContractInfo.BlockNumber] = types.ZeroAddress
-		}
-	}
+	chainConfig.Params.BurnContract = make(map[uint64]types.Address, 1)
+	chainConfig.Params.BurnContract[0] = types.ZeroAddress
+	chainConfig.Genesis.BaseFee = p.parsedBaseFeeConfig.baseFee
+	chainConfig.Genesis.BaseFeeEM = p.parsedBaseFeeConfig.baseFeeEM
+	chainConfig.Genesis.BaseFeeChangeDenom = p.parsedBaseFeeConfig.baseFeeChangeDenom
 
 	// deploy genesis contracts
-	allocs, err := p.deployContracts(rewardTokenByteCode, polyBftConfig, chainConfig, burnContractAddr)
+	allocs, err := p.deployContracts(rewardTokenByteCode, polyBftConfig, chainConfig)
 	if err != nil {
 		return err
 	}
@@ -296,22 +277,13 @@ func (p *genesisParams) generateChainConfig(o command.OutputFormatter) error {
 		}
 	}
 
-	if p.isBurnContractEnabled() {
-		// only populate base fee and base fee multiplier values if burn contract(s)
-		// is provided
-		chainConfig.Genesis.BaseFee = p.parsedBaseFeeConfig.baseFee
-		chainConfig.Genesis.BaseFeeEM = p.parsedBaseFeeConfig.baseFeeEM
-		chainConfig.Genesis.BaseFeeChangeDenom = p.parsedBaseFeeConfig.baseFeeChangeDenom
-	}
-
 	return helper.WriteGenesisConfigToDisk(chainConfig, params.genesisPath)
 }
 
 func (p *genesisParams) deployContracts(
 	rewardTokenByteCode []byte,
 	polybftConfig *polybft.PolyBFTConfig,
-	chainConfig *chain.Chain,
-	burnContractAddr types.Address) (map[types.Address]*chain.GenesisAccount, error) {
+	chainConfig *chain.Chain) (map[types.Address]*chain.GenesisAccount, error) {
 	proxyToImplAddrMap := contracts.GetProxyImplementationMapping()
 	proxyAddresses := make([]types.Address, 0, len(proxyToImplAddrMap))
 
@@ -542,10 +514,6 @@ func (p *genesisParams) getValidatorAccounts() ([]*validator.GenesisValidator, e
 // validatePolyBFTParams validates params for polybft consensus
 func (p *genesisParams) validatePolyBFTParams() error {
 	if err := p.extractNativeTokenMetadata(); err != nil {
-		return err
-	}
-
-	if err := p.validateBurnContract(); err != nil {
 		return err
 	}
 

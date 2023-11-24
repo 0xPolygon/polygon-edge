@@ -622,7 +622,6 @@ func TestE2E_Consensus_EIP1559Check(t *testing.T) {
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithNativeTokenConfig(fmt.Sprintf(framework.NativeTokenMintableTestCfg, sender1.Address())),
 		framework.WithPremine(types.Address(sender1.Address()), types.Address(sender2.Address())),
-		framework.WithBurnContract(&polybft.BurnContractInfo{BlockNumber: 0, Address: types.ZeroAddress}),
 	)
 	defer cluster.Stop()
 

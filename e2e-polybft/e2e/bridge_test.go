@@ -1638,10 +1638,6 @@ func TestE2E_Bridge_NonMintableERC20Token_WithPremine(t *testing.T) {
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithEpochSize(epochSize),
 		framework.WithNumBlockConfirmations(numBlockConfirmations),
-		// this enables London (EIP-1559) fork
-		framework.WithBurnContract(&polybft.BurnContractInfo{
-			BlockNumber: 0,
-			Address:     types.StringToAddress("0xBurnContractAddress")}),
 		framework.WithTestRewardToken(),
 		framework.WithSecretsCallback(func(_ []types.Address, tcc *framework.TestClusterConfig) {
 			nonValidatorKeyString := hex.EncodeToString(nonValidatorKeyRaw)

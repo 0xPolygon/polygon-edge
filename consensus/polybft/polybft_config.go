@@ -304,10 +304,3 @@ type rewardsConfigRaw struct {
 	WalletAddress types.Address `json:"rewardWalletAddress"`
 	WalletAmount  *string       `json:"rewardWalletAmount"`
 }
-
-// BurnContractInfo contains metadata for burn contract, which is part of EIP-1559 specification
-type BurnContractInfo struct {
-	BlockNumber        uint64
-	Address            types.Address
-	DestinationAddress types.Address
-}

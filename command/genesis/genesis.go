@@ -78,13 +78,6 @@ func setFlags(cmd *cobra.Command) {
 	)
 
 	cmd.Flags().StringVar(
-		&params.burnContract,
-		burnContractFlag,
-		"",
-		"the burn contract block and address (format: <block>:<address>[:<burn destination>])",
-	)
-
-	cmd.Flags().StringVar(
 		&params.baseFeeConfig,
 		genesisBaseFeeConfigFlag,
 		command.DefaultGenesisBaseFeeConfig,
