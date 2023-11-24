@@ -257,7 +257,7 @@ func (f *fsm) createCommitEpochTx() (*types.Transaction, error) {
 		return nil, err
 	}
 
-	return createStateTransactionWithData(f.Height(), contracts.ValidatorSetContract, input), nil
+	return createStateTransactionWithData(f.Height(), contracts.EpochManagerContract, input), nil
 }
 
 // createDistributeRewardsTx create a StateTransaction, which invokes RewardPool smart contract
@@ -268,7 +268,7 @@ func (f *fsm) createDistributeRewardsTx() (*types.Transaction, error) {
 		return nil, err
 	}
 
-	return createStateTransactionWithData(f.Height(), contracts.RewardPoolContract, input), nil
+	return createStateTransactionWithData(f.Height(), contracts.EpochManagerContract, input), nil
 }
 
 // ValidateCommit is used to validate that a given commit is valid

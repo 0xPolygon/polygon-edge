@@ -129,7 +129,7 @@ func GetValidatorInfo(validatorAddr ethgo.Address, childRelayer txrelayer.TxRela
 		return nil, err
 	}
 
-	response, err = childRelayer.Call(ethgo.ZeroAddress, ethgo.Address(contracts.RewardPoolContract), encode)
+	response, err = childRelayer.Call(ethgo.ZeroAddress, ethgo.Address(contracts.EpochManagerContract), encode)
 	if err != nil {
 		return nil, err
 	}

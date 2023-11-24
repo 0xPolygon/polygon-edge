@@ -295,7 +295,7 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 		initValidators := make([]*validator.GenesisValidator, accSet.Len())
 		// add contracts to genesis data
 		alloc := map[types.Address]*chain.GenesisAccount{
-			contracts.ValidatorSetContract: {
+			contracts.EpochManagerContract: {
 				Code: contractsapi.EpochManager.DeployedBytecode,
 			},
 			contracts.NativeERC20TokenContract: {
@@ -353,7 +353,7 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 		require.NoError(t, err)
 
 		// call commit epoch
-		result := transition.Call2(contracts.SystemCaller, contracts.ValidatorSetContract, input, big.NewInt(0), 10000000000)
+		result := transition.Call2(contracts.SystemCaller, contracts.EpochManagerContract, input, big.NewInt(0), 10000000000)
 		require.NoError(t, result.Err)
 		t.Logf("Number of validators %d on commit epoch, Gas used %+v\n", accSet.Len(), result.GasUsed)
 
@@ -363,7 +363,7 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 		require.NoError(t, err)
 
 		// call reward distributor
-		result = transition.Call2(contracts.SystemCaller, contracts.RewardPoolContract, input, big.NewInt(0), 10000000000)
+		result = transition.Call2(contracts.SystemCaller, contracts.EpochManagerContract, input, big.NewInt(0), 10000000000)
 		require.NoError(t, result.Err)
 		t.Logf("Number of validators %d on reward distribution, Gas used %+v\n", accSet.Len(), result.GasUsed)
 
@@ -372,7 +372,7 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 		require.NoError(t, err)
 
 		// call commit epoch
-		result = transition.Call2(contracts.SystemCaller, contracts.ValidatorSetContract, input, big.NewInt(0), 10000000000)
+		result = transition.Call2(contracts.SystemCaller, contracts.EpochManagerContract, input, big.NewInt(0), 10000000000)
 		require.NoError(t, result.Err)
 		t.Logf("Number of validators %d on commit epoch, Gas used %+v\n", accSet.Len(), result.GasUsed)
 
@@ -381,7 +381,7 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 		require.NoError(t, err)
 
 		// call reward distributor
-		result = transition.Call2(contracts.SystemCaller, contracts.RewardPoolContract, input, big.NewInt(0), 10000000000)
+		result = transition.Call2(contracts.SystemCaller, contracts.EpochManagerContract, input, big.NewInt(0), 10000000000)
 		require.NoError(t, result.Err)
 		t.Logf("Number of validators %d on reward distribution, Gas used %+v\n", accSet.Len(), result.GasUsed)
 	}

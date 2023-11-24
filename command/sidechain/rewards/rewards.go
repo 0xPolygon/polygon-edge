@@ -69,7 +69,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	}
 
 	validatorAddr := validatorAccount.Ecdsa.Address()
-	rewardPoolAddr := ethgo.Address(contracts.RewardPoolContract)
+	epochManagerContract := ethgo.Address(contracts.EpochManagerContract)
 
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(params.jsonRPC),
 		txrelayer.WithReceiptTimeout(150*time.Millisecond))
@@ -82,7 +82,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	response, err := txRelayer.Call(validatorAddr, rewardPoolAddr, encoded)
+	response, err := txRelayer.Call(validatorAddr, epochManagerContract, encoded)
 	if err != nil {
 		return err
 	}
@@ -97,7 +97,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	txn := rootHelper.CreateTransaction(validatorAddr, &rewardPoolAddr, encoded, nil, false)
+	txn := rootHelper.CreateTransaction(validatorAddr, &epochManagerContract, encoded, nil, false)
 
 	receipt, err := txRelayer.SendTransaction(txn, validatorAccount.Ecdsa)
 	if err != nil {

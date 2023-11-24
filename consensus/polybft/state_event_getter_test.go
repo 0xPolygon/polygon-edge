@@ -14,7 +14,7 @@ import (
 func TestEventDBInsertRetry_GetEvents(t *testing.T) {
 	receipt := &types.Receipt{
 		Logs: []*types.Log{
-			createTestLogForTransferEvent(t, contracts.ValidatorSetContract, types.ZeroAddress, types.ZeroAddress, 10),
+			createTestLogForTransferEvent(t, contracts.EpochManagerContract, types.ZeroAddress, types.ZeroAddress, 10),
 		},
 	}
 	receipt.SetStatus(types.ReceiptSuccess)
@@ -30,7 +30,7 @@ func TestEventDBInsertRetry_GetEvents(t *testing.T) {
 			blockchain: backend,
 		},
 		isValidLogFn: func(l *types.Log) bool {
-			return l.Address == contracts.ValidatorSetContract
+			return l.Address == contracts.EpochManagerContract
 		},
 		parseEventFn: func(h *types.Header, l *ethgo.Log) (*contractsapi.TransferEvent, bool, error) {
 			var e contractsapi.TransferEvent

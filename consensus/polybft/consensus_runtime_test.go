@@ -496,7 +496,7 @@ func Test_NewConsensusRuntime(t *testing.T) {
 	assert.Equal(t, runtime.config.DataDir, tmpDir)
 	assert.Equal(t, uint64(10), runtime.config.PolyBFTConfig.SprintSize)
 	assert.Equal(t, uint64(10), runtime.config.PolyBFTConfig.EpochSize)
-	assert.Equal(t, "0x0000000000000000000000000000000000000101", contracts.ValidatorSetContract.String())
+	assert.Equal(t, "0x0000000000000000000000000000000000000101", contracts.EpochManagerContract.String())
 	assert.Equal(t, "0x1300000000000000000000000000000000000000", runtime.config.PolyBFTConfig.Bridge.StateSenderAddr.String())
 	assert.Equal(t, "0x1000000000000000000000000000000000000000", runtime.config.PolyBFTConfig.Bridge.CheckpointManagerAddr.String())
 	assert.True(t, runtime.IsBridgeEnabled())

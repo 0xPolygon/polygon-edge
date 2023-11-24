@@ -357,7 +357,7 @@ func (p *genesisParams) deployContracts(
 		},
 		{
 			artifact: contractsapi.EpochManager,
-			address:  contracts.ValidatorSetContractV1,
+			address:  contracts.EpochManagerContractV1,
 		},
 		{
 			artifact: contractsapi.StakeManager,

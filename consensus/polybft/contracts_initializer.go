@@ -43,7 +43,7 @@ func initStakeManager(polyBFTConfig PolyBFTConfig, transition *state.Transition)
 		GenesisValidators: startValidators,
 		NewStakingToken:   contracts.NativeERC20TokenContract,
 		NewBls:            polyBFTConfig.Bridge.BLSAddress,
-		EpochManager:      contracts.ValidatorSetContract,
+		EpochManager:      contracts.EpochManagerContract,
 		NewDomain:         signer.DomainValidatorSetString,
 	}
 
@@ -72,7 +72,7 @@ func initEpochManager(polybftConfig PolyBFTConfig, transition *state.Transition)
 	}
 
 	return callContract(contracts.SystemCaller,
-		contracts.RewardPoolContract, input, "EpochManager.initialize", transition)
+		contracts.EpochManagerContract, input, "EpochManager.initialize", transition)
 }
 
 // getInitERC20PredicateInput builds initialization input parameters for child chain ERC20Predicate SC
@@ -258,7 +258,7 @@ func mintRewardTokensToWallet(polyBFTConfig PolyBFTConfig, transition *state.Tra
 // since reward pool distributes rewards.
 func approveRewardPoolAsSpender(polyBFTConfig PolyBFTConfig, transition *state.Transition) error {
 	approveFn := &contractsapi.ApproveRootERC20Fn{
-		Spender: contracts.RewardPoolContract,
+		Spender: contracts.EpochManagerContract,
 		Amount:  polyBFTConfig.RewardConfig.WalletAmount,
 	}
 
