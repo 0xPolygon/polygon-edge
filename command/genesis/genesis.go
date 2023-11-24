@@ -190,7 +190,7 @@ func setFlags(cmd *cobra.Command) {
 			nativeTokenConfigFlag,
 			"",
 			"native token configuration, provided in the following format: "+
-				"<name:symbol:decimals count:mintable flag:[mintable token owner address]>",
+				"<name:symbol:decimals count:mintable token owner address>",
 		)
 
 		cmd.Flags().StringVar(

@@ -28,8 +28,8 @@ var (
 		Name:       defaultNativeTokenName,
 		Symbol:     defaultNativeTokenSymbol,
 		Decimals:   defaultNativeTokenDecimals,
-		IsMintable: false,
 		Owner:      types.ZeroAddress,
+		IsMintable: true,
 	}
 
 	errInvalidTokenParams = errors.New("native token params were not submitted in proper format " +
@@ -231,28 +231,14 @@ func ParseRawTokenConfig(rawConfig string) (*TokenConfig, error) {
 		return nil, errInvalidTokenParams
 	}
 
-	// is mintable native token used
-	isMintable, err := strconv.ParseBool(strings.TrimSpace(params[3]))
-	if err != nil {
-		return nil, errInvalidTokenParams
-	}
-
-	// in case it is mintable native token, it is expected to have 5 parameters provided
-	if isMintable && len(params) != minNativeTokenParamsNumber+1 {
-		return nil, errInvalidTokenParams
-	}
-
 	// owner address
-	owner := types.ZeroAddress
-	if isMintable {
-		owner = types.StringToAddress(strings.TrimSpace(params[4]))
-	}
+	owner := types.StringToAddress(strings.TrimSpace(params[3]))
 
 	return &TokenConfig{
 		Name:       name,
 		Symbol:     symbol,
 		Decimals:   uint8(decimals),
-		IsMintable: isMintable,
+		IsMintable: true, // native token on blade is always mintable
 		Owner:      owner,
 	}, nil
 }
