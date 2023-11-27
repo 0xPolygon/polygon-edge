@@ -17,13 +17,13 @@ func decodeStateTransaction(txData []byte) (contractsapi.StateTransactionInput, 
 	sig := txData[:abiMethodIDLength]
 
 	var (
-		commitFn            contractsapi.CommitStateReceiverFn
+		commitBridgeTxFn    contractsapi.CommitStateReceiverFn
 		commitEpochFn       contractsapi.CommitEpochEpochManagerFn
 		distributeRewardsFn contractsapi.DistributeRewardForEpochManagerFn
 		obj                 contractsapi.StateTransactionInput
 	)
 
-	if bytes.Equal(sig, commitFn.Sig()) {
+	if bytes.Equal(sig, commitBridgeTxFn.Sig()) {
 		// bridge commitment
 		obj = &CommitmentMessageSigned{}
 	} else if bytes.Equal(sig, commitEpochFn.Sig()) {
