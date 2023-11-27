@@ -347,7 +347,6 @@ func (p *genesisParams) deployContracts(
 				artifact: contractsapi.NativeERC20,
 				address:  contracts.NativeERC20TokenContractV1,
 			})
-
 	} else {
 		genesisContracts = append(genesisContracts,
 			&contractInfo{

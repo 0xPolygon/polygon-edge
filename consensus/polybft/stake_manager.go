@@ -23,8 +23,9 @@ import (
 )
 
 var (
-	bigZero                     = big.NewInt(0)
-	validatorTypeABI            = abi.MustNewType("tuple(uint256[4] blsKey, uint256 stake, bool isWhitelisted, bool isActive)")
+	bigZero          = big.NewInt(0)
+	validatorTypeABI = abi.MustNewType("tuple(uint256[4] blsKey," +
+		"uint256 stake, bool isWhitelisted, bool isActive)")
 	errUnknownStakeManagerEvent = errors.New("unknown event from stake manager contract")
 )
 
@@ -43,6 +44,7 @@ var _ StakeManager = (*dummyStakeManager)(nil)
 type dummyStakeManager struct{}
 
 func (d *dummyStakeManager) PostBlock(req *PostBlockRequest) error { return nil }
+
 func (d *dummyStakeManager) UpdateValidatorSet(epoch uint64,
 	currentValidatorSet validator.AccountSet) (*validator.ValidatorSetDelta, error) {
 	return &validator.ValidatorSetDelta{}, nil
@@ -52,6 +54,7 @@ func (d *dummyStakeManager) UpdateValidatorSet(epoch uint64,
 func (d *dummyStakeManager) GetLogFilters() map[types.Address][]types.Hash {
 	return make(map[types.Address][]types.Hash)
 }
+
 func (d *dummyStakeManager) ProcessLog(header *types.Header, log *ethgo.Log, dbTx *bolt.Tx) error {
 	return nil
 }

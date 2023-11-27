@@ -34,7 +34,7 @@ type generatedData struct {
 }
 
 func main() {
-	cases := []struct {
+	contractsMetadata := []struct {
 		contractName        string
 		artifact            *artifact.Artifact
 		generateConstructor bool
@@ -389,8 +389,7 @@ func main() {
 
 	generatedData := &generatedData{}
 
-	for _, c := range cases {
-		fmt.Println("Contract", c.contractName)
+	for _, c := range contractsMetadata {
 		if c.generateConstructor {
 			if err := generateConstructor(generatedData, c.contractName, c.artifact.Abi.Constructor); err != nil {
 				log.Fatal(err)
@@ -410,18 +409,18 @@ func main() {
 				method = c.artifact.Abi.GetMethodBySignature(methodRaw)
 				resolvedBySignature = true
 			} else {
-				fmt.Println("Function", methodRaw)
 				method = c.artifact.Abi.GetMethod(methodRaw)
 			}
 
 			if err := generateFunction(generatedData, c.contractName, method, resolvedBySignature); err != nil {
+				fmt.Println("Contract name", c.contractName, "Function name", methodRaw)
 				log.Fatal(err)
 			}
 		}
 
 		for _, event := range c.events {
-			fmt.Println("Event", event)
 			if err := generateEvent(generatedData, c.contractName, c.artifact.Abi.Events[event]); err != nil {
+				fmt.Println("Contract name", c.contractName, "Event name", event)
 				log.Fatal(err)
 			}
 		}

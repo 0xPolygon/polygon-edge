@@ -84,11 +84,11 @@ func TestE2E_Consensus_Basic(t *testing.T) {
 	require.NoError(t, err)
 	// check that validator is no longer active (out of validator set)
 	validatorInfo, err := sidechain.GetValidatorInfo(validatorAcc.Ecdsa.Address(), childChainRelayer)
+	require.NoError(t, err)
 
 	t.Log(validatorInfo.Stake)
 
 	require.NoError(t, cluster.WaitForBlock(35, 1*time.Minute))
-
 }
 
 func TestE2E_Consensus_BulkDrop(t *testing.T) {
