@@ -112,7 +112,6 @@ func FuzzTestStakeManagerPostBlock(f *testing.F) {
 			hclog.NewNullLogger(),
 			state,
 			wallet.NewEcdsaSigner(validators.GetValidator("A").Key()),
-			validatorSetAddr,
 			types.StringToAddress("0x0002"),
 			bcMock,
 			nil,
@@ -122,11 +121,10 @@ func FuzzTestStakeManagerPostBlock(f *testing.F) {
 		require.NoError(t, err)
 
 		header := &types.Header{Number: data.BlockID}
-		require.NoError(t, stakeManager.ProcessLog(header, convertLog(createTestLogForTransferEvent(
+		require.NoError(t, stakeManager.ProcessLog(header, convertLog(createTestLogForStakeAddedEvent(
 			t,
 			validatorSetAddr,
 			validators.GetValidator(initialSetAliases[data.ValidatorID]).Address(),
-			types.ZeroAddress,
 			data.StakeValue,
 		)), nil))
 
@@ -157,7 +155,7 @@ func FuzzTestStakeManagerUpdateValidatorSet(f *testing.F) {
 		hclog.NewNullLogger(),
 		state,
 		wallet.NewEcdsaSigner(validators.GetValidator("A").Key()),
-		types.StringToAddress("0x0001"), types.StringToAddress("0x0002"),
+		types.StringToAddress("0x0001"),
 		bcMock,
 		nil,
 		10,

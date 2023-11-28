@@ -29,7 +29,7 @@ func TestStakeManager_PostBlock(t *testing.T) {
 		newStake          = uint64(100)
 		firstValidator    = uint64(0)
 		secondValidator   = uint64(1)
-		validatorSetAddr  = types.StringToAddress("0x0001")
+		stakeManagerAddr  = types.StringToAddress("0x0001")
 	)
 
 	t.Run("PostBlock - unstake to zero", func(t *testing.T) {
@@ -53,7 +53,7 @@ func TestStakeManager_PostBlock(t *testing.T) {
 			hclog.NewNullLogger(),
 			state,
 			wallet.NewEcdsaSigner(validators.GetValidator("A").Key()),
-			validatorSetAddr, types.StringToAddress("0x0002"),
+			stakeManagerAddr,
 			bcMock,
 			nil,
 			5,
@@ -63,11 +63,10 @@ func TestStakeManager_PostBlock(t *testing.T) {
 
 		header := &types.Header{Number: block}
 
-		require.NoError(t, stakeManager.ProcessLog(header, convertLog(createTestLogForTransferEvent(
+		require.NoError(t, stakeManager.ProcessLog(header, convertLog(createTestLogForStakeRemovedEvent(
 			t,
-			validatorSetAddr,
+			stakeManagerAddr,
 			validators.GetValidator(initialSetAliases[firstValidator]).Address(),
-			types.ZeroAddress,
 			1, // initial validator stake was 1
 		)), nil))
 
@@ -111,7 +110,7 @@ func TestStakeManager_PostBlock(t *testing.T) {
 			hclog.NewNullLogger(),
 			state,
 			wallet.NewEcdsaSigner(validators.GetValidator("A").Key()),
-			types.StringToAddress("0x0001"), types.StringToAddress("0x0002"),
+			types.StringToAddress("0x0001"),
 			bcMock,
 			nil,
 			5,
@@ -120,10 +119,9 @@ func TestStakeManager_PostBlock(t *testing.T) {
 		require.NoError(t, err)
 
 		header := &types.Header{Number: block}
-		require.NoError(t, stakeManager.ProcessLog(header, convertLog(createTestLogForTransferEvent(
+		require.NoError(t, stakeManager.ProcessLog(header, convertLog(createTestLogForStakeAddedEvent(
 			t,
-			validatorSetAddr,
-			types.ZeroAddress,
+			stakeManagerAddr,
 			validators.GetValidator(initialSetAliases[secondValidator]).Address(),
 			250,
 		)), nil))
@@ -178,7 +176,7 @@ func TestStakeManager_PostBlock(t *testing.T) {
 			hclog.NewNullLogger(),
 			state,
 			wallet.NewEcdsaSigner(validators.GetValidator("A").Key()),
-			types.StringToAddress("0x0001"), types.StringToAddress("0x0002"),
+			types.StringToAddress("0x0001"),
 			bcMock,
 			nil,
 			5,
@@ -189,10 +187,9 @@ func TestStakeManager_PostBlock(t *testing.T) {
 		header := &types.Header{Number: block}
 
 		for i := 0; i < len(allAliases); i++ {
-			require.NoError(t, stakeManager.ProcessLog(header, convertLog(createTestLogForTransferEvent(
+			require.NoError(t, stakeManager.ProcessLog(header, convertLog(createTestLogForStakeAddedEvent(
 				t,
-				validatorSetAddr,
-				types.ZeroAddress,
+				stakeManagerAddr,
 				validators.GetValidator(allAliases[i]).Address(),
 				newStake,
 			)), nil))
@@ -237,7 +234,7 @@ func TestStakeManager_UpdateValidatorSet(t *testing.T) {
 		hclog.NewNullLogger(),
 		state,
 		wallet.NewEcdsaSigner(validators.GetValidator("A").Key()),
-		types.StringToAddress("0x0001"), types.StringToAddress("0x0002"),
+		types.StringToAddress("0x0001"),
 		bcMock,
 		nil,
 		10,
@@ -409,7 +406,7 @@ func TestStakeManager_UpdateOnInit(t *testing.T) {
 
 	var (
 		allAliases       = []string{"A", "B", "C", "D", "E", "F"}
-		validatorSetAddr = types.StringToAddress("0xf001")
+		stakeManagerAddr = types.StringToAddress("0xf001")
 		epochID          = uint64(120)
 	)
 
@@ -444,10 +441,9 @@ func TestStakeManager_UpdateOnInit(t *testing.T) {
 		{
 			Status: &success,
 			Logs: []*types.Log{
-				createTestLogForTransferEvent(
+				createTestLogForStakeAddedEvent(
 					t,
-					validatorSetAddr,
-					types.ZeroAddress,
+					stakeManagerAddr,
 					addresses[len(addresses)-2],
 					4,
 				),
@@ -458,10 +454,9 @@ func TestStakeManager_UpdateOnInit(t *testing.T) {
 		{
 			Status: &success,
 			Logs: []*types.Log{
-				createTestLogForTransferEvent(
+				createTestLogForStakeAddedEvent(
 					t,
-					validatorSetAddr,
-					types.ZeroAddress,
+					stakeManagerAddr,
 					addresses[len(addresses)-1],
 					6,
 				),
@@ -474,7 +469,7 @@ func TestStakeManager_UpdateOnInit(t *testing.T) {
 		hclog.NewNullLogger(),
 		state,
 		wallet.NewEcdsaSigner(validators.GetValidator("A").Key()),
-		validatorSetAddr, types.StringToAddress("0x0002"),
+		stakeManagerAddr,
 		bcMock,
 		polyBackendMock,
 		5,
@@ -503,16 +498,33 @@ func TestStakeManager_UpdateOnInit(t *testing.T) {
 	}
 }
 
-func createTestLogForTransferEvent(t *testing.T, validatorSet, from, to types.Address, stake uint64) *types.Log {
+func createTestLogForStakeAddedEvent(t *testing.T, validatorSet, to types.Address, stake uint64) *types.Log {
 	t.Helper()
 
-	var transferEvent contractsapi.TransferEvent
+	var transferEvent contractsapi.StakeAddedEvent
 
-	topics := make([]types.Hash, 3)
+	topics := make([]types.Hash, 2)
 	topics[0] = types.Hash(transferEvent.Sig())
-	topics[1] = types.BytesToHash(from.Bytes())
-	topics[2] = types.BytesToHash(to.Bytes())
+	topics[1] = types.BytesToHash(to.Bytes())
 	encodedData, err := abi.MustNewType("uint256").Encode(new(big.Int).SetUint64(stake))
+	require.NoError(t, err)
+
+	return &types.Log{
+		Address: validatorSet,
+		Topics:  topics,
+		Data:    encodedData,
+	}
+}
+
+func createTestLogForStakeRemovedEvent(t *testing.T, validatorSet, to types.Address, unstake uint64) *types.Log {
+	t.Helper()
+
+	var transferEvent contractsapi.StakeRemovedEvent
+
+	topics := make([]types.Hash, 2)
+	topics[0] = types.Hash(transferEvent.Sig())
+	topics[1] = types.BytesToHash(to.Bytes())
+	encodedData, err := abi.MustNewType("uint256").Encode(new(big.Int).SetUint64(unstake))
 	require.NoError(t, err)
 
 	return &types.Log{

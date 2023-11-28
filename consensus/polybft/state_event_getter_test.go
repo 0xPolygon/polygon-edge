@@ -14,7 +14,7 @@ import (
 func TestEventDBInsertRetry_GetEvents(t *testing.T) {
 	receipt := &types.Receipt{
 		Logs: []*types.Log{
-			createTestLogForTransferEvent(t, contracts.EpochManagerContract, types.ZeroAddress, types.ZeroAddress, 10),
+			createTestLogForStakeAddedEvent(t, contracts.EpochManagerContract, types.ZeroAddress, 10),
 		},
 	}
 	receipt.SetStatus(types.ReceiptSuccess)
@@ -25,15 +25,15 @@ func TestEventDBInsertRetry_GetEvents(t *testing.T) {
 	}, true)
 	backend.On("GetReceiptsByHash", mock.Anything).Return([]*types.Receipt{receipt}, nil)
 
-	retryManager := &eventsGetter[*contractsapi.TransferEvent]{
+	retryManager := &eventsGetter[*contractsapi.StakeAddedEvent]{
 		receiptsGetter: receiptsGetter{
 			blockchain: backend,
 		},
 		isValidLogFn: func(l *types.Log) bool {
 			return l.Address == contracts.EpochManagerContract
 		},
-		parseEventFn: func(h *types.Header, l *ethgo.Log) (*contractsapi.TransferEvent, bool, error) {
-			var e contractsapi.TransferEvent
+		parseEventFn: func(h *types.Header, l *ethgo.Log) (*contractsapi.StakeAddedEvent, bool, error) {
+			var e contractsapi.StakeAddedEvent
 			doesMatch, err := e.ParseLog(l)
 
 			return &e, doesMatch, err
