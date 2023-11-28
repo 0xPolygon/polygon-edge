@@ -35,8 +35,8 @@ func TestE2E_Consensus_Basic(t *testing.T) {
 	)
 
 	var (
-		initMinterBalance = ethgo.Ether(4e15)
-		premineBalance    = ethgo.Ether(2e15)
+		initMinterBalance = ethgo.Ether(4)
+		premineBalance    = ethgo.Ether(2)
 	)
 
 	minter, err := wallet.GenerateKey()
