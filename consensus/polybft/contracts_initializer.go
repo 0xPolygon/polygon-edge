@@ -37,12 +37,27 @@ func initStakeManager(polyBFTConfig PolyBFTConfig, transition *state.Transition)
 			Stake:  validator.Stake,
 			BlsKey: key.ToBigInt(),
 		}
+
+		approveFn := &contractsapi.ApproveNativeERC20Fn{
+			Spender: contracts.StakeManagerContract,
+			Amount:  validator.Stake,
+		}
+
+		input, err := approveFn.EncodeAbi()
+		if err != nil {
+			return fmt.Errorf("NativeERC20.approve params encoding failed: %w", err)
+		}
+
+		err = callContract(validator.Address, contracts.NativeERC20TokenContract, input, "NativeERC20.approve", transition)
+		if err != nil {
+			return fmt.Errorf("Error while calling contract %w", err)
+		}
 	}
 
 	initFn := &contractsapi.InitializeStakeManagerFn{
 		GenesisValidators: startValidators,
 		NewStakingToken:   contracts.NativeERC20TokenContract,
-		NewBls:            polyBFTConfig.Bridge.BLSAddress,
+		NewBls:            contracts.BLSContract,
 		EpochManager:      contracts.EpochManagerContract,
 		NewDomain:         signer.DomainValidatorSetString,
 	}

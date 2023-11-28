@@ -513,6 +513,23 @@ func (i *InitializeNativeERC20Fn) DecodeAbi(buf []byte) error {
 	return decodeMethod(NativeERC20.Abi.Methods["initialize"], buf, i)
 }
 
+type ApproveNativeERC20Fn struct {
+	Spender types.Address `abi:"spender"`
+	Amount  *big.Int      `abi:"amount"`
+}
+
+func (a *ApproveNativeERC20Fn) Sig() []byte {
+	return NativeERC20.Abi.Methods["approve"].ID()
+}
+
+func (a *ApproveNativeERC20Fn) EncodeAbi() ([]byte, error) {
+	return NativeERC20.Abi.Methods["approve"].Encode(a)
+}
+
+func (a *ApproveNativeERC20Fn) DecodeAbi(buf []byte) error {
+	return decodeMethod(NativeERC20.Abi.Methods["approve"], buf, a)
+}
+
 type InitializeRootERC20PredicateFn struct {
 	NewStateSender         types.Address `abi:"newStateSender"`
 	NewExitHelper          types.Address `abi:"newExitHelper"`

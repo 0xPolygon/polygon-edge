@@ -140,6 +140,7 @@ func main() {
 			false,
 			[]string{
 				"initialize",
+				"approve",
 			},
 			[]string{},
 		},

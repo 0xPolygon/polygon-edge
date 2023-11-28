@@ -169,9 +169,6 @@ func (p *genesisParams) generateChainConfig(o command.OutputFormatter) error {
 
 	chainConfig.Params.BurnContract = make(map[uint64]types.Address, 1)
 	chainConfig.Params.BurnContract[0] = types.ZeroAddress
-	chainConfig.Genesis.BaseFee = p.parsedBaseFeeConfig.baseFee
-	chainConfig.Genesis.BaseFeeEM = p.parsedBaseFeeConfig.baseFeeEM
-	chainConfig.Genesis.BaseFeeChangeDenom = p.parsedBaseFeeConfig.baseFeeChangeDenom
 
 	// deploy genesis contracts
 	allocs, err := p.deployContracts(rewardTokenByteCode, polyBftConfig, chainConfig)
@@ -215,12 +212,15 @@ func (p *genesisParams) generateChainConfig(o command.OutputFormatter) error {
 
 	// populate genesis parameters
 	chainConfig.Genesis = &chain.Genesis{
-		GasLimit:   p.blockGasLimit,
-		Difficulty: 0,
-		Alloc:      allocs,
-		ExtraData:  genesisExtraData,
-		GasUsed:    command.DefaultGenesisGasUsed,
-		Mixhash:    polybft.PolyBFTMixDigest,
+		GasLimit:           p.blockGasLimit,
+		Difficulty:         0,
+		Alloc:              allocs,
+		ExtraData:          genesisExtraData,
+		GasUsed:            command.DefaultGenesisGasUsed,
+		Mixhash:            polybft.PolyBFTMixDigest,
+		BaseFee:            p.parsedBaseFeeConfig.baseFee,
+		BaseFeeEM:          p.parsedBaseFeeConfig.baseFeeEM,
+		BaseFeeChangeDenom: p.parsedBaseFeeConfig.baseFeeChangeDenom,
 	}
 
 	if len(p.contractDeployerAllowListAdmin) != 0 {

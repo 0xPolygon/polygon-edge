@@ -15,10 +15,10 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/command"
 	bridgeCommon "github.com/0xPolygon/polygon-edge/command/bridge/common"
+	bridgeHelper "github.com/0xPolygon/polygon-edge/command/bridge/helper"
+	"github.com/0xPolygon/polygon-edge/command/bridge/server"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	cmdHelper "github.com/0xPolygon/polygon-edge/command/helper"
-	rootHelper "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
-	"github.com/0xPolygon/polygon-edge/command/rootchain/server"
 	polybftsecrets "github.com/0xPolygon/polygon-edge/command/secrets/init"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
@@ -50,7 +50,7 @@ func NewTestBridge(t *testing.T, clusterConfig *TestClusterConfig) (*TestBridge,
 func (t *TestBridge) Start() error {
 	// Build arguments
 	args := []string{
-		"rootchain",
+		"bridge",
 		"server",
 		"--data-dir", t.clusterConfig.Dir("test-rootchain"),
 	}
@@ -313,7 +313,7 @@ func (t *TestBridge) deployRootchainContracts(genesisPath string) error {
 	}
 
 	args := []string{
-		"rootchain",
+		"bridge",
 		"deploy",
 		"--stake-manager", polybftConfig.Bridge.StakeManagerAddr.String(),
 		"--stake-token", polybftConfig.Bridge.StakeTokenAddr.String(),
@@ -359,7 +359,7 @@ func (t *TestBridge) fundAddressesOnRoot(tokenConfig *polybft.TokenConfig, polyb
 	// non-validator addresses don't need to mint stake token,
 	// they only need to be funded with root token
 	args := []string{
-		"rootchain",
+		"bridge",
 		"fund",
 	}
 
@@ -388,12 +388,12 @@ func (t *TestBridge) whitelistValidators(validatorAddresses []types.Address,
 	}
 
 	args := []string{
-		"polybft",
+		"validator",
 		"whitelist-validators",
 		"--addresses", strings.Join(addressesAsString, ","),
 		"--jsonrpc", t.JSONRPCAddr(),
 		"--supernet-manager", polybftConfig.Bridge.CustomSupernetManagerAddr.String(),
-		"--private-key", rootHelper.TestAccountPrivKey,
+		"--private-key", bridgeHelper.TestAccountPrivKey,
 	}
 
 	if err := t.cmdRun(args...); err != nil {
@@ -420,7 +420,7 @@ func (t *TestBridge) registerGenesisValidators(polybftConfig polybft.PolyBFTConf
 				return ctx.Err()
 			default:
 				args := []string{
-					"polybft",
+					"validator",
 					"register-validator",
 					"--jsonrpc", t.JSONRPCAddr(),
 					"--supernet-manager", polybftConfig.Bridge.CustomSupernetManagerAddr.String(),
@@ -457,7 +457,7 @@ func (t *TestBridge) initialStakingOfGenesisValidators(polybftConfig polybft.Pol
 				return ctx.Err()
 			default:
 				args := []string{
-					"polybft",
+					"validator",
 					"stake",
 					"--jsonrpc", t.JSONRPCAddr(),
 					"--stake-manager", polybftConfig.Bridge.StakeManagerAddr.String(),
@@ -487,25 +487,6 @@ func (t *TestBridge) getStakeAmount(validatorIndex int) *big.Int {
 	return t.clusterConfig.StakeAmounts[validatorIndex]
 }
 
-func (t *TestBridge) finalizeGenesis(genesisPath string, polybftConfig polybft.PolyBFTConfig) error {
-	args := []string{
-		"polybft",
-		"supernet",
-		"--jsonrpc", t.JSONRPCAddr(),
-		"--private-key", rootHelper.TestAccountPrivKey,
-		"--genesis", genesisPath,
-		"--supernet-manager", polybftConfig.Bridge.CustomSupernetManagerAddr.String(),
-		"--finalize-genesis-set",
-		"--enable-staking",
-	}
-
-	if err := t.cmdRun(args...); err != nil {
-		return fmt.Errorf("failed to finalize genesis validators on supernet manager: %w", err)
-	}
-
-	return nil
-}
-
 // FundValidators sends tokens to a rootchain validators
 func (t *TestBridge) FundValidators(tokenAddress types.Address, secretsPaths []string, amounts []*big.Int) error {
 	if len(secretsPaths) != len(amounts) {
@@ -513,7 +494,7 @@ func (t *TestBridge) FundValidators(tokenAddress types.Address, secretsPaths []s
 	}
 
 	args := []string{
-		"rootchain",
+		"bridge",
 		"fund",
 		"--stake-token", tokenAddress.String(),
 		"--mint",
@@ -536,23 +517,6 @@ func (t *TestBridge) FundValidators(tokenAddress types.Address, secretsPaths []s
 
 	if err := t.cmdRun(args...); err != nil {
 		return err
-	}
-
-	return nil
-}
-
-func (t *TestBridge) deployStakeManager(genesisPath string) error {
-	args := []string{
-		"polybft",
-		"stake-manager-deploy",
-		"--jsonrpc", t.JSONRPCAddr(),
-		"--genesis", genesisPath,
-		"--proxy-contracts-admin", t.clusterConfig.GetProxyContractsAdmin(),
-		"--test",
-	}
-
-	if err := t.cmdRun(args...); err != nil {
-		return fmt.Errorf("failed to deploy stake manager contract: %w", err)
 	}
 
 	return nil
@@ -611,7 +575,7 @@ func (t *TestBridge) premineNativeRootToken(tokenConfig *polybft.TokenConfig,
 
 	premineCmdArgs := func(secret, key string, amount *big.Int) error {
 		args := []string{
-			"rootchain",
+			"bridge",
 			"premine",
 			"--jsonrpc", t.JSONRPCAddr(),
 			"--supernet-manager", polybftConfig.Bridge.CustomSupernetManagerAddr.String(),

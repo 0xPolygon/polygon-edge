@@ -17,7 +17,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
-	"github.com/0xPolygon/polygon-edge/command/sidechain"
+	validatorHelper "github.com/0xPolygon/polygon-edge/command/validator/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
@@ -80,10 +80,10 @@ func TestE2E_Consensus_Basic(t *testing.T) {
 
 	require.NoError(t, cluster.WaitForBlock(26, 1*time.Minute))
 
-	validatorAcc, err := sidechain.GetAccountFromDir(srv.DataDir())
+	validatorAcc, err := validatorHelper.GetAccountFromDir(srv.DataDir())
 	require.NoError(t, err)
 	// check that validator is no longer active (out of validator set)
-	validatorInfo, err := sidechain.GetValidatorInfo(validatorAcc.Ecdsa.Address(), childChainRelayer)
+	validatorInfo, err := validatorHelper.GetValidatorInfo(validatorAcc.Ecdsa.Address(), childChainRelayer)
 	require.NoError(t, err)
 
 	t.Log(validatorInfo.Stake)
@@ -258,12 +258,12 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	// stake manually for the second validator
 	require.NoError(t, secondValidator.Stake(polybftConfig, initialStake))
 
-	firstValidatorInfo, err := sidechain.GetValidatorInfo(firstValidatorAddr, childChainRelayer)
+	firstValidatorInfo, err := validatorHelper.GetValidatorInfo(firstValidatorAddr, childChainRelayer)
 	require.NoError(t, err)
 	require.True(t, firstValidatorInfo.IsActive)
 	require.True(t, firstValidatorInfo.Stake.Cmp(initialStake) == 0)
 
-	secondValidatorInfo, err := sidechain.GetValidatorInfo(secondValidatorAddr, childChainRelayer)
+	secondValidatorInfo, err := validatorHelper.GetValidatorInfo(secondValidatorAddr, childChainRelayer)
 	require.NoError(t, err)
 	require.True(t, secondValidatorInfo.IsActive)
 	require.True(t, secondValidatorInfo.Stake.Cmp(initialStake) == 0)
@@ -312,12 +312,12 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 
 	bigZero := big.NewInt(0)
 
-	firstValidatorInfo, err = sidechain.GetValidatorInfo(firstValidatorAddr, childChainRelayer)
+	firstValidatorInfo, err = validatorHelper.GetValidatorInfo(firstValidatorAddr, childChainRelayer)
 	require.NoError(t, err)
 	require.True(t, firstValidatorInfo.IsActive)
 	require.True(t, firstValidatorInfo.WithdrawableRewards.Cmp(bigZero) > 0)
 
-	secondValidatorInfo, err = sidechain.GetValidatorInfo(secondValidatorAddr, childChainRelayer)
+	secondValidatorInfo, err = validatorHelper.GetValidatorInfo(secondValidatorAddr, childChainRelayer)
 	require.NoError(t, err)
 	require.True(t, secondValidatorInfo.IsActive)
 	require.True(t, secondValidatorInfo.WithdrawableRewards.Cmp(bigZero) > 0)
@@ -356,7 +356,7 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	rootChainRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
 	require.NoError(t, err)
 
-	validatorAcc, err := sidechain.GetAccountFromDir(srv.DataDir())
+	validatorAcc, err := validatorHelper.GetAccountFromDir(srv.DataDir())
 	require.NoError(t, err)
 
 	cluster.WaitForReady(t)
@@ -370,7 +370,7 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	// wait for some rewards to get accumulated
 	require.NoError(t, cluster.WaitForBlock(polybftCfg.EpochSize*3, time.Minute))
 
-	validatorInfo, err := sidechain.GetValidatorInfo(validatorAddr, childChainRelayer)
+	validatorInfo, err := validatorHelper.GetValidatorInfo(validatorAddr, childChainRelayer)
 	require.NoError(t, err)
 	require.True(t, validatorInfo.IsActive)
 
@@ -411,7 +411,7 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	require.NoError(t, err)
 
 	// check that validator is no longer active (out of validator set)
-	validatorInfo, err = sidechain.GetValidatorInfo(validatorAddr, childChainRelayer)
+	validatorInfo, err = validatorHelper.GetValidatorInfo(validatorAddr, childChainRelayer)
 	require.NoError(t, err)
 	require.False(t, validatorInfo.IsActive)
 	require.True(t, validatorInfo.Stake.Cmp(big.NewInt(0)) == 0)
@@ -557,7 +557,7 @@ func TestE2E_Consensus_MintableERC20NativeToken(t *testing.T) {
 	require.Equal(t, initMinterBalance, minterBalance)
 
 	// try sending mint transaction from non minter account and make sure it would fail
-	nonMinterAcc, err := sidechain.GetAccountFromDir(cluster.Servers[1].DataDir())
+	nonMinterAcc, err := validatorHelper.GetAccountFromDir(cluster.Servers[1].DataDir())
 	require.NoError(t, err)
 
 	mintInput, err := mintFn.Encode([]interface{}{validatorsAddrs[0], ethgo.Ether(1)})
@@ -593,10 +593,10 @@ func TestE2E_Consensus_CustomRewardToken(t *testing.T) {
 	childChainRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(owner.JSONRPCAddr()))
 	require.NoError(t, err)
 
-	validatorAcc, err := sidechain.GetAccountFromDir(owner.DataDir())
+	validatorAcc, err := validatorHelper.GetAccountFromDir(owner.DataDir())
 	require.NoError(t, err)
 
-	validatorInfo, err := sidechain.GetValidatorInfo(validatorAcc.Ecdsa.Address(), childChainRelayer)
+	validatorInfo, err := validatorHelper.GetValidatorInfo(validatorAcc.Ecdsa.Address(), childChainRelayer)
 	t.Logf("[Validator#%v] Witdhrawable rewards=%d\n", validatorInfo.Address, validatorInfo.WithdrawableRewards)
 
 	require.NoError(t, err)

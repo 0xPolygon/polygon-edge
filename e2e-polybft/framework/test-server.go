@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	rootHelper "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
+	bridgeHelper "github.com/0xPolygon/polygon-edge/command/bridge/helper"
 	polybftsecrets "github.com/0xPolygon/polygon-edge/command/secrets/init"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
@@ -207,7 +207,7 @@ func (t *TestServer) RootchainFundFor(accounts []types.Address, amounts []*big.I
 	}
 
 	args := []string{
-		"rootchain",
+		"bridge",
 		"fund",
 		"--json-rpc", t.BridgeJSONRPCAddr(),
 		"--stake-token", stakeToken.String(),
@@ -234,7 +234,7 @@ func (t *TestServer) RootchainFundFor(accounts []types.Address, amounts []*big.I
 // Stake stakes given amount to validator account encapsulated by given server instance
 func (t *TestServer) Stake(polybftConfig polybft.PolyBFTConfig, amount *big.Int) error {
 	args := []string{
-		"polybft",
+		"validator",
 		"stake",
 		"--jsonrpc", t.JSONRPCAddr(),
 		"--" + polybftsecrets.AccountDirFlag, t.config.DataDir,
@@ -247,7 +247,7 @@ func (t *TestServer) Stake(polybftConfig polybft.PolyBFTConfig, amount *big.Int)
 // Unstake unstakes given amount from validator account encapsulated by given server instance
 func (t *TestServer) Unstake(amount *big.Int) error {
 	args := []string{
-		"polybft",
+		"validator",
 		"unstake",
 		"--" + polybftsecrets.AccountDirFlag, t.config.DataDir,
 		"--jsonrpc", t.JSONRPCAddr(),
@@ -260,7 +260,7 @@ func (t *TestServer) Unstake(amount *big.Int) error {
 // RegisterValidator is a wrapper function which registers new validator on a root chain
 func (t *TestServer) RegisterValidator(supernetManagerAddr types.Address) error {
 	args := []string{
-		"polybft",
+		"validator",
 		"register-validator",
 		"--jsonrpc", t.BridgeJSONRPCAddr(),
 		"--supernet-manager", supernetManagerAddr.String(),
@@ -274,9 +274,9 @@ func (t *TestServer) RegisterValidator(supernetManagerAddr types.Address) error 
 // that whitelists validators on the root chain
 func (t *TestServer) WhitelistValidators(addresses []string, supernetManager types.Address) error {
 	args := []string{
-		"polybft",
+		"validator",
 		"whitelist-validators",
-		"--private-key", rootHelper.TestAccountPrivKey,
+		"--private-key", bridgeHelper.TestAccountPrivKey,
 		"--jsonrpc", t.BridgeJSONRPCAddr(),
 		"--supernet-manager", supernetManager.String(),
 	}
@@ -290,7 +290,7 @@ func (t *TestServer) WhitelistValidators(addresses []string, supernetManager typ
 // WithdrawChildChain withdraws available balance from child chain
 func (t *TestServer) WithdrawChildChain() error {
 	args := []string{
-		"polybft",
+		"validator",
 		"withdraw-child",
 		"--" + polybftsecrets.AccountDirFlag, t.config.DataDir,
 		"--jsonrpc", t.JSONRPCAddr(),
@@ -303,7 +303,7 @@ func (t *TestServer) WithdrawChildChain() error {
 func (t *TestServer) WithdrawRootChain(recipient string, amount *big.Int,
 	stakeManager ethgo.Address, bridgeJSONRPC string) error {
 	args := []string{
-		"polybft",
+		"validator",
 		"withdraw-root",
 		"--" + polybftsecrets.AccountDirFlag, t.config.DataDir,
 		"--to", recipient,
@@ -318,7 +318,7 @@ func (t *TestServer) WithdrawRootChain(recipient string, amount *big.Int,
 // WithdrawRewards withdraws pending rewards for given validator on RewardPool contract
 func (t *TestServer) WithdrawRewards() error {
 	args := []string{
-		"polybft",
+		"validator",
 		"withdraw-rewards",
 		"--" + polybftsecrets.AccountDirFlag, t.config.DataDir,
 		"--jsonrpc", t.JSONRPCAddr(),

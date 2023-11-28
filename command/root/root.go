@@ -10,17 +10,16 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/bridge"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	"github.com/0xPolygon/polygon-edge/command/helper"
-	"github.com/0xPolygon/polygon-edge/command/license"
+	"github.com/0xPolygon/polygon-edge/command/mint"
 	"github.com/0xPolygon/polygon-edge/command/monitor"
 	"github.com/0xPolygon/polygon-edge/command/peers"
-	"github.com/0xPolygon/polygon-edge/command/polybft"
 	"github.com/0xPolygon/polygon-edge/command/regenesis"
-	"github.com/0xPolygon/polygon-edge/command/rootchain"
 	"github.com/0xPolygon/polygon-edge/command/secrets"
 	polybftsecrets "github.com/0xPolygon/polygon-edge/command/secrets/init"
 	"github.com/0xPolygon/polygon-edge/command/server"
 	"github.com/0xPolygon/polygon-edge/command/status"
 	"github.com/0xPolygon/polygon-edge/command/txpool"
+	"github.com/0xPolygon/polygon-edge/command/validator"
 	"github.com/0xPolygon/polygon-edge/command/version"
 )
 
@@ -49,16 +48,15 @@ func (rc *RootCommand) registerSubCommands() {
 		status.GetCommand(),
 		secrets.GetCommand(),
 		peers.GetCommand(),
-		rootchain.GetCommand(),
 		monitor.GetCommand(),
 		backup.GetCommand(),
 		genesis.GetCommand(),
 		server.GetCommand(),
-		license.GetCommand(),
 		polybftsecrets.GetCommand(),
-		polybft.GetCommand(),
 		bridge.GetCommand(),
 		regenesis.GetCommand(),
+		mint.GetCommand(),
+		validator.GetCommand(),
 	)
 }
 
