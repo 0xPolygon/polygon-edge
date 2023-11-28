@@ -172,18 +172,6 @@ func (p *genesisParams) generateChainConfig(o command.OutputFormatter) error {
 		return err
 	}
 
-	// premine other accounts
-	for _, premine := range premineBalances {
-		// validators have already been premined, so no need to premine them again
-		if _, ok := allocs[premine.Address]; ok {
-			continue
-		}
-
-		allocs[premine.Address] = &chain.GenesisAccount{
-			Balance: premine.Amount,
-		}
-	}
-
 	validatorMetadata := make([]*validator.ValidatorMetadata, len(initialValidators))
 
 	for i, validator := range initialValidators {
@@ -198,6 +186,26 @@ func (p *genesisParams) generateChainConfig(o command.OutputFormatter) error {
 		// set genesis validators as boot nodes if boot nodes not provided via CLI
 		if len(p.bootnodes) == 0 {
 			chainConfig.Bootnodes = append(chainConfig.Bootnodes, validator.MultiAddr)
+		}
+
+		// add default premine for a validator if it is not specified in genesis command
+		if _, exists := premineBalances[validator.Address]; !exists {
+			premineBalances[validator.Address] = &helper.PremineInfo{
+				Address: validator.Address,
+				Amount:  command.DefaultPremineBalance,
+			}
+		}
+	}
+
+	// premine other accounts
+	for _, premine := range premineBalances {
+		// validators have already been premined, so no need to premine them again
+		if _, ok := allocs[premine.Address]; ok {
+			continue
+		}
+
+		allocs[premine.Address] = &chain.GenesisAccount{
+			Balance: premine.Amount,
 		}
 	}
 

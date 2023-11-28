@@ -501,10 +501,10 @@ func TestStakeManager_UpdateOnInit(t *testing.T) {
 func createTestLogForStakeAddedEvent(t *testing.T, validatorSet, to types.Address, stake uint64) *types.Log {
 	t.Helper()
 
-	var transferEvent contractsapi.StakeAddedEvent
+	var stakeAddedEvent contractsapi.StakeAddedEvent
 
 	topics := make([]types.Hash, 2)
-	topics[0] = types.Hash(transferEvent.Sig())
+	topics[0] = types.Hash(stakeAddedEvent.Sig())
 	topics[1] = types.BytesToHash(to.Bytes())
 	encodedData, err := abi.MustNewType("uint256").Encode(new(big.Int).SetUint64(stake))
 	require.NoError(t, err)
@@ -519,10 +519,10 @@ func createTestLogForStakeAddedEvent(t *testing.T, validatorSet, to types.Addres
 func createTestLogForStakeRemovedEvent(t *testing.T, validatorSet, to types.Address, unstake uint64) *types.Log {
 	t.Helper()
 
-	var transferEvent contractsapi.StakeRemovedEvent
+	var stakeRemovedEvent contractsapi.StakeRemovedEvent
 
 	topics := make([]types.Hash, 2)
-	topics[0] = types.Hash(transferEvent.Sig())
+	topics[0] = types.Hash(stakeRemovedEvent.Sig())
 	topics[1] = types.BytesToHash(to.Bytes())
 	encodedData, err := abi.MustNewType("uint256").Encode(new(big.Int).SetUint64(unstake))
 	require.NoError(t, err)
