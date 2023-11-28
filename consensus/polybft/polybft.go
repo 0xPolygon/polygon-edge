@@ -343,47 +343,25 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 				}
 			}
 
-			if polyBFTConfig.NativeTokenConfig.IsMintable {
-				// initialize NativeERC20Mintable SC
-				params := &contractsapi.InitializeNativeERC20Fn{
-					Predicate_:   contracts.ChildERC20PredicateContract,
-					Owner_:       polyBFTConfig.NativeTokenConfig.Owner,
-					RootToken_:   types.ZeroAddress, // in case native mintable token is used, it is always root token
-					Name_:        polyBFTConfig.NativeTokenConfig.Name,
-					Symbol_:      polyBFTConfig.NativeTokenConfig.Symbol,
-					Decimals_:    polyBFTConfig.NativeTokenConfig.Decimals,
-					TokenSupply_: initialTotalSupply,
-				}
+			// initialize NativeERC20 SC
+			params := &contractsapi.InitializeNativeERC20Fn{
+				Predicate_:   contracts.ChildERC20PredicateContract,
+				Owner_:       polyBFTConfig.BladeAdmin,
+				RootToken_:   types.ZeroAddress, // in case native mintable token is used, it is always root token
+				Name_:        polyBFTConfig.NativeTokenConfig.Name,
+				Symbol_:      polyBFTConfig.NativeTokenConfig.Symbol,
+				Decimals_:    polyBFTConfig.NativeTokenConfig.Decimals,
+				TokenSupply_: initialTotalSupply,
+			}
 
-				input, err := params.EncodeAbi()
-				if err != nil {
-					return err
-				}
+			input, err := params.EncodeAbi()
+			if err != nil {
+				return err
+			}
 
-				if err = callContract(contracts.SystemCaller,
-					contracts.NativeERC20TokenContract, input, "NativeERC20Mintable", transition); err != nil {
-					return err
-				}
-			} else {
-				// initialize NativeERC20 SC
-				params := &contractsapi.InitializeNativeERC20Fn{
-					Name_:        polyBFTConfig.NativeTokenConfig.Name,
-					Symbol_:      polyBFTConfig.NativeTokenConfig.Symbol,
-					Decimals_:    polyBFTConfig.NativeTokenConfig.Decimals,
-					RootToken_:   polyBFTConfig.Bridge.RootNativeERC20Addr,
-					Predicate_:   contracts.ChildERC20PredicateContract,
-					TokenSupply_: initialTotalSupply,
-				}
-
-				input, err := params.EncodeAbi()
-				if err != nil {
-					return err
-				}
-
-				if err = callContract(contracts.SystemCaller,
-					contracts.NativeERC20TokenContract, input, "NativeERC20", transition); err != nil {
-					return err
-				}
+			if err = callContract(contracts.SystemCaller,
+				contracts.NativeERC20TokenContract, input, "NativeERC20", transition); err != nil {
+				return err
 			}
 		}
 

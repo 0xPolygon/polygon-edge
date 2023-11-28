@@ -184,7 +184,6 @@ func createTestBridgeConfig() *BridgeConfig {
 		ExitHelperAddr:                    types.StringToAddress("3"),
 		RootERC20PredicateAddr:            types.StringToAddress("4"),
 		ChildMintableERC20PredicateAddr:   types.StringToAddress("5"),
-		RootNativeERC20Addr:               types.StringToAddress("6"),
 		RootERC721PredicateAddr:           types.StringToAddress("8"),
 		ChildMintableERC721PredicateAddr:  types.StringToAddress("9"),
 		RootERC1155PredicateAddr:          types.StringToAddress("11"),

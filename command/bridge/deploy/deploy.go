@@ -34,7 +34,6 @@ const (
 	exitHelperName                    = "ExitHelper"
 	rootERC20PredicateName            = "RootERC20Predicate"
 	childERC20MintablePredicateName   = "ChildERC20MintablePredicate"
-	rootERC20Name                     = "RootERC20"
 	erc20TemplateName                 = "ERC20Template"
 	rootERC721PredicateName           = "RootERC721Predicate"
 	childERC721MintablePredicateName  = "ChildERC721MintablePredicate"
@@ -77,9 +76,6 @@ var (
 		getProxyNameForImpl(childERC20MintablePredicateName): func(
 			rootchainConfig *polybft.RootchainConfig, addr types.Address) {
 			rootchainConfig.ChildMintableERC20PredicateAddress = addr
-		},
-		rootERC20Name: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
-			rootchainConfig.RootNativeERC20Address = addr
 		},
 		erc20TemplateName: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
 			rootchainConfig.ChildERC20Address = addr
@@ -133,7 +129,7 @@ var (
 				NewChildERC20Predicate: contracts.ChildERC20PredicateContract,
 				NewChildTokenTemplate:  contracts.ChildERC20Contract,
 				// map root native token address should be non-zero only if native token is non-mintable on a childchain
-				NewNativeTokenRoot: config.RootNativeERC20Address,
+				NewNativeTokenRoot: types.ZeroAddress,
 			}
 
 			return initContract(fmt, relayer, inputParams,
@@ -245,13 +241,6 @@ func GetCommand() *cobra.Command {
 		jsonRPCFlag,
 		txrelayer.DefaultRPCAddress,
 		"the JSON RPC rootchain IP address",
-	)
-
-	cmd.Flags().StringVar(
-		&params.rootERC20TokenAddr,
-		erc20AddrFlag,
-		"",
-		"existing root chain root native token address",
 	)
 
 	cmd.Flags().BoolVar(
@@ -419,21 +408,6 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 		StakeManagerAddress: types.StringToAddress(params.stakeManagerAddr),
 	}
 
-	tokenContracts := []*contractInfo{}
-
-	// deploy root ERC20 token only if non-mintable native token flavor is used on a child chain
-	if params.rootERC20TokenAddr != "" {
-		// use existing root chain ERC20 token
-		if err := populateExistingTokenAddr(client.Eth(),
-			params.rootERC20TokenAddr, rootERC20Name, rootchainConfig); err != nil {
-			return deploymentResultInfo{RootchainCfg: nil, CommandResults: nil}, err
-		}
-	} else {
-		// deploy MockERC20 as a root chain root native token
-		tokenContracts = append(tokenContracts,
-			&contractInfo{name: rootERC20Name, artifact: contractsapi.RootERC20})
-	}
-
 	allContracts := []*contractInfo{
 		{
 			name:     stateSenderName,
@@ -514,8 +488,6 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 			artifact: contractsapi.ChildERC1155,
 		},
 	}
-
-	allContracts = append(tokenContracts, allContracts...)
 
 	g, ctx := errgroup.WithContext(cmdCtx)
 	results := make(map[string]*deployContractResult, len(allContracts))

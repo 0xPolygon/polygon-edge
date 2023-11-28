@@ -1237,6 +1237,7 @@ type InitializeStakeManagerFn struct {
 	NewStakingToken   types.Address       `abi:"newStakingToken"`
 	NewBls            types.Address       `abi:"newBls"`
 	EpochManager      types.Address       `abi:"epochManager"`
+	Owner             types.Address       `abi:"owner"`
 	NewDomain         string              `abi:"newDomain"`
 	GenesisValidators []*GenesisValidator `abi:"genesisValidators"`
 }

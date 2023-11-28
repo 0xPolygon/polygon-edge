@@ -30,33 +30,31 @@ func Test_extractNativeTokenMetadata(t *testing.T) {
 		},
 		{
 			name:      "not enough params provided",
-			rawConfig: "Test:TST:18",
+			rawConfig: "Test:TST",
 			expectErr: true,
 		},
 		{
 			name:      "empty name provided",
-			rawConfig: ":TST:18:0x123456789",
+			rawConfig: ":TST:18",
 			expectErr: true,
 		},
 		{
 			name:      "empty symbol provided",
-			rawConfig: "Test::18:0x123456789",
+			rawConfig: "Test::18",
 			expectErr: true,
 		},
 		{
 			name:      "invalid decimals number provided",
-			rawConfig: "Test:TST:9999999999999999999999999999999999999999999999999999999999:false:0x123456789",
+			rawConfig: "Test:TST:9999999999999999999999999999999999999999999999999999999999:false",
 			expectErr: true,
 		},
 		{
 			name:      "valid config",
-			rawConfig: "MyToken:MTK:9:0x123456789",
+			rawConfig: "MyToken:MTK:9",
 			expectedCfg: &polybft.TokenConfig{
-				Name:       "MyToken",
-				Symbol:     "MTK",
-				Decimals:   9,
-				IsMintable: true,
-				Owner:      types.StringToAddress("0x123456789"),
+				Name:     "MyToken",
+				Symbol:   "MTK",
+				Decimals: 9,
 			},
 			expectErr: false,
 		},
@@ -185,13 +183,6 @@ func Test_validateRewardWallet(t *testing.T) {
 			isNativeERC20Mintable: true,
 			expectValidateErr:     nil,
 		},
-		{
-			name:                  "valid reward wallet: native ERC20 mintable",
-			rewardWallet:          types.StringToAddress("1").String() + ":0",
-			epochReward:           0,
-			isNativeERC20Mintable: false,
-			expectValidateErr:     errRewardTokenOnNonMintable,
-		},
 	}
 	for _, c := range cases {
 		c := c
@@ -201,7 +192,7 @@ func Test_validateRewardWallet(t *testing.T) {
 			p := &genesisParams{
 				rewardWallet:      c.rewardWallet,
 				epochReward:       c.epochReward,
-				nativeTokenConfig: &polybft.TokenConfig{IsMintable: c.isNativeERC20Mintable},
+				nativeTokenConfig: &polybft.TokenConfig{},
 			}
 			err := p.validateRewardWalletAndToken()
 			require.ErrorIs(t, err, c.expectValidateErr)

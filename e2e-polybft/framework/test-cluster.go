@@ -50,7 +50,7 @@ const (
 	nonValidatorPrefix = "test-non-validator-"
 
 	// NativeTokenMintableTestCfg is the test native token config for Supernets originated native tokens
-	NativeTokenMintableTestCfg = "Mintable Edge Coin:MEC:18:true:%s" //nolint:gosec
+	NativeTokenMintableTestCfg = "Mintable Edge Coin:MEC:18" //nolint:gosec
 )
 
 type NodeType int
@@ -494,6 +494,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			"--premine", "0x0000000000000000000000000000000000000000",
 			"--reward-wallet", testRewardWalletAddr.String(),
 			"--trieroot", cluster.Config.InitialStateRoot.String(),
+			"--blade-admin", addresses[0].String(), // we put first validator as owner by default
 		}
 
 		if cluster.Config.BlockTime != 0 {
@@ -515,10 +516,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			args = append(args, "--native-token-config", cluster.Config.NativeTokenConfigRaw)
 		}
 
-		tokenConfig, err := polybft.ParseRawTokenConfig(cluster.Config.NativeTokenConfigRaw)
-		require.NoError(t, err)
-
-		if len(cluster.Config.Premine) != 0 && tokenConfig.IsMintable {
+		if len(cluster.Config.Premine) != 0 {
 			// only add premine flags in genesis if token is mintable
 			for _, premine := range cluster.Config.Premine {
 				args = append(args, "--premine", premine)

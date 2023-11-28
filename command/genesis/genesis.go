@@ -190,7 +190,7 @@ func setFlags(cmd *cobra.Command) {
 			nativeTokenConfigFlag,
 			"",
 			"native token configuration, provided in the following format: "+
-				"<name:symbol:decimals count:mintable token owner address>",
+				"<name:symbol:decimals count>",
 		)
 
 		cmd.Flags().StringVar(
@@ -219,6 +219,13 @@ func setFlags(cmd *cobra.Command) {
 			blockTrackerPollIntervalFlag,
 			defaultBlockTrackerPollInterval,
 			"interval (number of seconds) at which block tracker polls for latest block at rootchain",
+		)
+
+		cmd.Flags().StringVar(
+			&params.bladeAdmin,
+			bladeAdminFlag,
+			"",
+			"address of owner/admin of NativeERC20 token and StakeManager",
 		)
 	}
 

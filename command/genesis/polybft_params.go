@@ -49,6 +49,7 @@ const (
 	bridgeAllowListEnabledFlag           = "bridge-allow-list-enabled"
 	bridgeBlockListAdminFlag             = "bridge-block-list-admin"
 	bridgeBlockListEnabledFlag           = "bridge-block-list-enabled"
+	bladeAdminFlag                       = "blade-admin"
 
 	bootnodePortStart = 30301
 
@@ -57,9 +58,13 @@ const (
 )
 
 var (
-	errNoGenesisValidators = errors.New("genesis validators aren't provided")
-	errNoPremineAllowed    = errors.New("native token is not mintable, so no premine is allowed " +
-		"except for zero address and reward wallet if native token is used as reward token")
+	errNoGenesisValidators      = errors.New("genesis validators aren't provided")
+	errProxyAdminNotProvided    = errors.New("proxy contracts admin address must be set")
+	errProxyAdminIsZeroAddress  = errors.New("proxy contracts admin address must not be zero address")
+	errProxyAdminIsSystemCaller = errors.New("proxy contracts admin address must not be system caller address")
+	errBladeAdminNotProvided    = errors.New("blade admin address must be set")
+	errBladeAdminIsZeroAddress  = errors.New("blade admin address must not be zero address")
+	errBladeAdminIsSystemCaller = errors.New("blade admin address must not be system caller address")
 )
 
 type contractInfo struct {
@@ -79,16 +84,6 @@ func (p *genesisParams) generateChainConfig(o command.OutputFormatter) error {
 	walletPremineInfo, err := helper.ParsePremineInfo(p.rewardWallet)
 	if err != nil {
 		return fmt.Errorf("invalid reward wallet configuration provided '%s' : %w", p.rewardWallet, err)
-	}
-
-	if !p.nativeTokenConfig.IsMintable {
-		// validate premine map, no premine is allowed if token is not mintable,
-		// except for the reward wallet (if native token is used as reward token) and zero address
-		for a := range premineBalances {
-			if a != types.ZeroAddress && (p.rewardTokenCode != "" || a != walletPremineInfo.Address) {
-				return errNoPremineAllowed
-			}
-		}
 	}
 
 	var (
@@ -151,6 +146,7 @@ func (p *genesisParams) generateChainConfig(o command.OutputFormatter) error {
 		BlockTimeDrift:           p.blockTimeDrift,
 		BlockTrackerPollInterval: common.Duration{Duration: p.blockTrackerPollInterval},
 		ProxyContractsAdmin:      types.StringToAddress(p.proxyContractsAdmin),
+		BladeAdmin:               types.StringToAddress(p.bladeAdmin),
 	}
 
 	enabledForks := chain.AllForksEnabled
@@ -339,20 +335,10 @@ func (p *genesisParams) deployContracts(
 			artifact: contractsapi.RootERC20,
 			address:  contracts.ERC20Contract,
 		},
-	}
-
-	if !params.nativeTokenConfig.IsMintable {
-		genesisContracts = append(genesisContracts,
-			&contractInfo{
-				artifact: contractsapi.NativeERC20,
-				address:  contracts.NativeERC20TokenContractV1,
-			})
-	} else {
-		genesisContracts = append(genesisContracts,
-			&contractInfo{
-				artifact: contractsapi.NativeERC20,
-				address:  contracts.NativeERC20TokenContractV1,
-			})
+		{
+			artifact: contractsapi.NativeERC20,
+			address:  contracts.NativeERC20TokenContractV1,
+		},
 	}
 
 	if len(params.bridgeAllowListAdmin) != 0 || len(params.bridgeBlockListAdmin) != 0 {
@@ -510,38 +496,10 @@ func (p *genesisParams) getValidatorAccounts() ([]*validator.GenesisValidator, e
 	return validators, nil
 }
 
-// validatePolyBFTParams validates params for polybft consensus
-func (p *genesisParams) validatePolyBFTParams() error {
-	if err := p.extractNativeTokenMetadata(); err != nil {
-		return err
-	}
-
-	if err := p.validateRewardWalletAndToken(); err != nil {
-		return err
-	}
-
-	if err := p.validatePremineInfo(); err != nil {
-		return err
-	}
-
-	if p.epochSize < 2 {
-		// Epoch size must be greater than 1, so new transactions have a chance to be added to a block.
-		// Otherwise, every block would be an endblock (meaning it will not have any transactions).
-		// Check is placed here to avoid additional parsing if epochSize < 2
-		return errInvalidEpochSize
-	}
-
-	return p.validateProxyContractsAdmin()
-}
-
 // validateRewardWalletAndToken validates reward wallet flag
 func (p *genesisParams) validateRewardWalletAndToken() error {
 	if p.rewardWallet == "" {
 		return errRewardWalletNotDefined
-	}
-
-	if !p.nativeTokenConfig.IsMintable && p.rewardTokenCode == "" {
-		return errRewardTokenOnNonMintable
 	}
 
 	premineInfo, err := helper.ParsePremineInfo(p.rewardWallet)
@@ -563,16 +521,41 @@ func (p *genesisParams) validateRewardWalletAndToken() error {
 
 func (p *genesisParams) validateProxyContractsAdmin() error {
 	if strings.TrimSpace(p.proxyContractsAdmin) == "" {
-		return errors.New("proxy contracts admin address must be set")
+		return errProxyAdminNotProvided
+	}
+
+	if err := types.IsValidAddress(p.proxyContractsAdmin); err != nil {
+		return fmt.Errorf("proxy contracts admin address is not a valid address: %w", err)
 	}
 
 	proxyContractsAdminAddr := types.StringToAddress(p.proxyContractsAdmin)
 	if proxyContractsAdminAddr == types.ZeroAddress {
-		return errors.New("proxy contracts admin address must not be zero address")
+		return errProxyAdminIsZeroAddress
 	}
 
 	if proxyContractsAdminAddr == contracts.SystemCaller {
-		return errors.New("proxy contracts admin address must not be system caller address")
+		return errProxyAdminIsSystemCaller
+	}
+
+	return nil
+}
+
+func (p *genesisParams) validateBladeAdminFlag() error {
+	if strings.TrimSpace(p.bladeAdmin) == "" {
+		return errBladeAdminNotProvided
+	}
+
+	if err := types.IsValidAddress(p.bladeAdmin); err != nil {
+		return fmt.Errorf("blade admin address is not a valid address: %w", err)
+	}
+
+	bladeAdminAddr := types.StringToAddress(p.proxyContractsAdmin)
+	if bladeAdminAddr == types.ZeroAddress {
+		return errBladeAdminIsZeroAddress
+	}
+
+	if bladeAdminAddr == contracts.SystemCaller {
+		return errBladeAdminIsSystemCaller
 	}
 
 	return nil

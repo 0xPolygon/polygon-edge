@@ -53,10 +53,9 @@ func TestDeployContracts_NoPanics(t *testing.T) {
 	params.proxyContractsAdmin = "0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed"
 	consensusCfg = polybft.PolyBFTConfig{
 		NativeTokenConfig: &polybft.TokenConfig{
-			Name:       "Test",
-			Symbol:     "TST",
-			Decimals:   18,
-			IsMintable: false,
+			Name:     "Test",
+			Symbol:   "TST",
+			Decimals: 18,
 		},
 	}
 

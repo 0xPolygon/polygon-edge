@@ -47,9 +47,7 @@ var (
 	errBaseFeeEMZero            = errors.New("base fee elasticity multiplier must be greater than 0")
 	errBaseFeeZero              = errors.New("base fee  must be greater than 0")
 	errRewardWalletNotDefined   = errors.New("reward wallet address must be defined")
-	errRewardTokenOnNonMintable = errors.New("a custom reward token must be defined when " +
-		"native ERC20 token is non-mintable")
-	errRewardWalletZero = errors.New("reward wallet address must not be zero address")
+	errRewardWalletZero         = errors.New("reward wallet address must not be zero address")
 )
 
 type genesisParams struct {
@@ -113,6 +111,7 @@ type genesisParams struct {
 	blockTrackerPollInterval time.Duration
 
 	proxyContractsAdmin string
+	bladeAdmin          string
 }
 
 func (p *genesisParams) validateFlags() error {
@@ -153,6 +152,10 @@ func (p *genesisParams) validateFlags() error {
 		}
 
 		if err := p.validateProxyContractsAdmin(); err != nil {
+			return err
+		}
+
+		if err := p.validateBladeAdminFlag(); err != nil {
 			return err
 		}
 

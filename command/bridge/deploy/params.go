@@ -12,7 +12,6 @@ import (
 const (
 	deployerKeyFlag = "deployer-key"
 	jsonRPCFlag     = "json-rpc"
-	erc20AddrFlag   = "erc20-token"
 )
 
 type deployParams struct {
@@ -20,7 +19,6 @@ type deployParams struct {
 	deployerKey         string
 	jsonRPCAddress      string
 	stakeTokenAddr      string
-	rootERC20TokenAddr  string
 	stakeManagerAddr    string
 	proxyContractsAdmin string
 	isTestMode          bool
@@ -40,11 +38,6 @@ func (ip *deployParams) validateFlags() error {
 
 	if consensusCfg.NativeTokenConfig == nil {
 		return errors.New("native token configuration is undefined")
-	}
-
-	// when using mintable native token, child native token on root chain gets mapped automatically
-	if consensusCfg.NativeTokenConfig.IsMintable && ip.rootERC20TokenAddr != "" {
-		return errors.New("if child chain native token is mintable, root native token must not pre-exist on root chain")
 	}
 
 	if params.stakeTokenAddr == "" {

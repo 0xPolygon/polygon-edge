@@ -35,18 +35,12 @@ func TestE2E_Consensus_Basic(t *testing.T) {
 	)
 
 	var (
-		initMinterBalance = ethgo.Ether(4)
-		premineBalance    = ethgo.Ether(2)
+		premineBalance = ethgo.Ether(2)
 	)
-
-	minter, err := wallet.GenerateKey()
-	require.NoError(t, err)
 
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithEpochSize(epochSize), framework.WithTestRewardToken(),
-		framework.WithNativeTokenConfig(fmt.Sprintf(framework.NativeTokenMintableTestCfg, minter.Address())),
 		framework.WithSecretsCallback(func(addresses []types.Address, config *framework.TestClusterConfig) {
-			config.Premine = append(config.Premine, fmt.Sprintf("%s:%s", minter.Address(), initMinterBalance))
 			for _, a := range addresses {
 				config.Premine = append(config.Premine, fmt.Sprintf("%s:%s", a, premineBalance))
 			}
@@ -143,20 +137,14 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 		firstValidatorDataDir  = fmt.Sprintf("test-chain-%d", validatorSetSize+1) // directory where the first validator secrets will be stored
 		secondValidatorDataDir = fmt.Sprintf("test-chain-%d", validatorSetSize+2) // directory where the second validator secrets will be stored
 
-		initMinterBalance = ethgo.Ether(4e6)
-		premineBalance    = ethgo.Ether(2e6) // 2M native tokens (so that we have enough balance to fund new validator)
+		premineBalance = ethgo.Ether(2e6) // 2M native tokens (so that we have enough balance to fund new validator)
 	)
-
-	minter, err := wallet.GenerateKey()
-	require.NoError(t, err)
 
 	// start cluster with 'validatorSize' validators
 	cluster := framework.NewTestCluster(t, validatorSetSize,
 		framework.WithEpochSize(epochSize),
 		framework.WithEpochReward(int(ethgo.Ether(1).Uint64())),
-		framework.WithNativeTokenConfig(fmt.Sprintf(framework.NativeTokenMintableTestCfg, minter.Address())),
 		framework.WithSecretsCallback(func(addresses []types.Address, config *framework.TestClusterConfig) {
-			config.Premine = append(config.Premine, fmt.Sprintf("%s:%s", minter.Address(), initMinterBalance))
 			for _, a := range addresses {
 				config.Premine = append(config.Premine, fmt.Sprintf("%s:%s", a, premineBalance))
 			}
@@ -326,18 +314,12 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	var (
 		premineAmount = ethgo.Ether(10)
-		minterBalance = ethgo.Ether(1e6)
 	)
-
-	minter, err := wallet.GenerateKey()
-	require.NoError(t, err)
 
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithEpochReward(int(ethgo.Ether(1).Uint64())),
 		framework.WithEpochSize(5),
-		framework.WithNativeTokenConfig(fmt.Sprintf(framework.NativeTokenMintableTestCfg, minter.Address())),
 		framework.WithSecretsCallback(func(addresses []types.Address, config *framework.TestClusterConfig) {
-			config.Premine = append(config.Premine, fmt.Sprintf("%s:%d", minter.Address(), minterBalance))
 			for _, a := range addresses {
 				config.Premine = append(config.Premine, fmt.Sprintf("%s:%d", a, premineAmount))
 				config.StakeAmounts = append(config.StakeAmounts, new(big.Int).Set(premineAmount))
@@ -468,10 +450,6 @@ func TestE2E_Consensus_MintableERC20NativeToken(t *testing.T) {
 
 	validatorsAddrs := make([]types.Address, validatorCount)
 	initValidatorsBalance := ethgo.Ether(1)
-	initMinterBalance := ethgo.Ether(100000)
-
-	minter, err := wallet.GenerateKey()
-	require.NoError(t, err)
 
 	// because we are using native token as reward wallet, and it has default premine balance
 	initialTotalSupply := new(big.Int).Set(command.DefaultPremineBalance)
@@ -479,12 +457,9 @@ func TestE2E_Consensus_MintableERC20NativeToken(t *testing.T) {
 	cluster := framework.NewTestCluster(t,
 		validatorCount,
 		framework.WithNativeTokenConfig(
-			fmt.Sprintf("%s:%s:%d:true:%s", tokenName, tokenSymbol, decimals, minter.Address())),
+			fmt.Sprintf("%s:%s:%d", tokenName, tokenSymbol, decimals)),
 		framework.WithEpochSize(epochSize),
 		framework.WithSecretsCallback(func(addrs []types.Address, config *framework.TestClusterConfig) {
-			config.Premine = append(config.Premine, fmt.Sprintf("%s:%d", minter.Address(), initMinterBalance))
-			initialTotalSupply.Add(initialTotalSupply, initMinterBalance)
-
 			for i, addr := range addrs {
 				config.Premine = append(config.Premine, fmt.Sprintf("%s:%d", addr, initValidatorsBalance))
 				config.StakeAmounts = append(config.StakeAmounts, new(big.Int).Set(initValidatorsBalance))
@@ -497,6 +472,9 @@ func TestE2E_Consensus_MintableERC20NativeToken(t *testing.T) {
 	targetJSONRPC := cluster.Servers[0].JSONRPC()
 
 	cluster.WaitForReady(t)
+
+	nativeTokenAdmin, err := validatorHelper.GetAccountFromDir(cluster.Servers[0].DataDir())
+	require.NoError(t, err)
 
 	// initialize tx relayer
 	relayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(targetJSONRPC))
@@ -523,7 +501,7 @@ func TestE2E_Consensus_MintableERC20NativeToken(t *testing.T) {
 	mintFn, exists := contractsapi.NativeERC20.Abi.Methods["mint"]
 	require.True(t, exists)
 
-	mintAmount := ethgo.Ether(10)
+	mintAmount := ethgo.Gwei(1)
 	nativeTokenAddr := ethgo.Address(contracts.NativeERC20TokenContract)
 
 	// make sure minter account can mint tokens
@@ -540,7 +518,7 @@ func TestE2E_Consensus_MintableERC20NativeToken(t *testing.T) {
 				To:    &nativeTokenAddr,
 				Input: mintInput,
 				Type:  ethgo.TransactionDynamicFee,
-			}, minter)
+			}, nativeTokenAdmin.Ecdsa)
 		require.NoError(t, err)
 		require.Equal(t, uint64(types.ReceiptSuccess), receipt.Status)
 
@@ -552,9 +530,9 @@ func TestE2E_Consensus_MintableERC20NativeToken(t *testing.T) {
 	}
 
 	// assert that minter balance remained the same
-	minterBalance, err := targetJSONRPC.Eth().GetBalance(minter.Address(), ethgo.Latest)
+	minterBalance, err := targetJSONRPC.Eth().GetBalance(ethgo.Address(nativeTokenAdmin.Address()), ethgo.Latest)
 	require.NoError(t, err)
-	require.Equal(t, initMinterBalance, minterBalance)
+	require.Equal(t, initValidatorsBalance, minterBalance)
 
 	// try sending mint transaction from non minter account and make sure it would fail
 	nonMinterAcc, err := validatorHelper.GetAccountFromDir(cluster.Servers[1].DataDir())
