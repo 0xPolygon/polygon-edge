@@ -31,6 +31,8 @@ The site runs at: http://127.0.0.1:8000/
 
 ### Run with Docker
 
+:warning: > Remove line 10 from the `Dockerfile` to run locally.
+
 1. Spin up the image:
 
 ```sh
