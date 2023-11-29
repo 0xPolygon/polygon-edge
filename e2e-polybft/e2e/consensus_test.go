@@ -289,16 +289,15 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 
 func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	var (
-		premineAmount = ethgo.Ether(10)
+		stakeAmount = ethgo.Ether(100)
 	)
 
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithEpochReward(int(ethgo.Ether(1).Uint64())),
 		framework.WithEpochSize(5),
 		framework.WithSecretsCallback(func(addresses []types.Address, config *framework.TestClusterConfig) {
-			for _, a := range addresses {
-				config.Premine = append(config.Premine, fmt.Sprintf("%s:%d", a, premineAmount))
-				config.StakeAmounts = append(config.StakeAmounts, new(big.Int).Set(premineAmount))
+			for range addresses {
+				config.StakeAmounts = append(config.StakeAmounts, new(big.Int).Set(stakeAmount))
 			}
 		}),
 	)
@@ -379,6 +378,10 @@ func TestE2E_Consensus_MintableERC20NativeToken(t *testing.T) {
 
 	validatorsAddrs := make([]types.Address, validatorCount)
 	initValidatorsBalance := ethgo.Ether(1)
+	initMinterBalance := ethgo.Ether(100000)
+
+	minter, err := wallet.GenerateKey()
+	require.NoError(t, err)
 
 	// because we are using native token as reward wallet, and it has default premine balance
 	initialTotalSupply := new(big.Int).Set(command.DefaultPremineBalance)
@@ -387,8 +390,12 @@ func TestE2E_Consensus_MintableERC20NativeToken(t *testing.T) {
 		validatorCount,
 		framework.WithNativeTokenConfig(
 			fmt.Sprintf("%s:%s:%d", tokenName, tokenSymbol, decimals)),
+		framework.WithBladeAdmin(minter.Address().String()),
 		framework.WithEpochSize(epochSize),
 		framework.WithSecretsCallback(func(addrs []types.Address, config *framework.TestClusterConfig) {
+			config.Premine = append(config.Premine, fmt.Sprintf("%s:%d", minter.Address(), initMinterBalance))
+			initialTotalSupply.Add(initialTotalSupply, initMinterBalance)
+
 			for i, addr := range addrs {
 				config.Premine = append(config.Premine, fmt.Sprintf("%s:%d", addr, initValidatorsBalance))
 				config.StakeAmounts = append(config.StakeAmounts, new(big.Int).Set(initValidatorsBalance))
@@ -401,9 +408,6 @@ func TestE2E_Consensus_MintableERC20NativeToken(t *testing.T) {
 	targetJSONRPC := cluster.Servers[0].JSONRPC()
 
 	cluster.WaitForReady(t)
-
-	nativeTokenAdmin, err := validatorHelper.GetAccountFromDir(cluster.Servers[0].DataDir())
-	require.NoError(t, err)
 
 	// initialize tx relayer
 	relayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(targetJSONRPC))
@@ -435,9 +439,9 @@ func TestE2E_Consensus_MintableERC20NativeToken(t *testing.T) {
 
 	// make sure minter account can mint tokens
 	for _, addr := range validatorsAddrs {
-		balance, err := targetJSONRPC.Eth().GetBalance(ethgo.Address(addr), ethgo.Latest)
+		balanceBefore, err := targetJSONRPC.Eth().GetBalance(ethgo.Address(addr), ethgo.Latest)
 		require.NoError(t, err)
-		t.Logf("Pre-mint balance: %v=%d\n", addr, balance)
+		t.Logf("Pre-mint balance: %v=%d\n", addr, balanceBefore)
 
 		mintInput, err := mintFn.Encode([]interface{}{addr, mintAmount})
 		require.NoError(t, err)
@@ -447,21 +451,16 @@ func TestE2E_Consensus_MintableERC20NativeToken(t *testing.T) {
 				To:    &nativeTokenAddr,
 				Input: mintInput,
 				Type:  ethgo.TransactionDynamicFee,
-			}, nativeTokenAdmin.Ecdsa)
+			}, minter)
 		require.NoError(t, err)
 		require.Equal(t, uint64(types.ReceiptSuccess), receipt.Status)
 
-		balance, err = targetJSONRPC.Eth().GetBalance(ethgo.Address(addr), ethgo.Latest)
+		balanceAfter, err := targetJSONRPC.Eth().GetBalance(ethgo.Address(addr), ethgo.Latest)
 		require.NoError(t, err)
 
-		t.Logf("Post-mint balance: %v=%d\n", addr, balance)
-		require.Equal(t, new(big.Int).Add(initValidatorsBalance, mintAmount), balance)
+		t.Logf("Post-mint balance: %v=%d\n", addr, balanceAfter)
+		require.True(t, balanceAfter.Cmp(new(big.Int).Add(mintAmount, balanceBefore)) >= 0)
 	}
-
-	// assert that minter balance remained the same
-	minterBalance, err := targetJSONRPC.Eth().GetBalance(ethgo.Address(nativeTokenAdmin.Address()), ethgo.Latest)
-	require.NoError(t, err)
-	require.Equal(t, initValidatorsBalance, minterBalance)
 
 	// try sending mint transaction from non minter account and make sure it would fail
 	nonMinterAcc, err := validatorHelper.GetAccountFromDir(cluster.Servers[1].DataDir())

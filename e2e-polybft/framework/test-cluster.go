@@ -17,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
@@ -110,6 +111,7 @@ type TestClusterConfig struct {
 	EpochReward          int
 	NativeTokenConfigRaw string
 	SecretsCallback      func([]types.Address, *TestClusterConfig)
+	BladeAdmin           string
 
 	ContractDeployerAllowListAdmin   []types.Address
 	ContractDeployerAllowListEnabled []types.Address
@@ -399,6 +401,12 @@ func WithProxyContractsAdmin(address string) ClusterOption {
 	}
 }
 
+func WithBladeAdmin(address string) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.BladeAdmin = address
+	}
+}
+
 func isTrueEnv(e string) bool {
 	return strings.ToLower(os.Getenv(e)) == "true"
 }
@@ -494,8 +502,14 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			"--premine", "0x0000000000000000000000000000000000000000",
 			"--reward-wallet", testRewardWalletAddr.String(),
 			"--trieroot", cluster.Config.InitialStateRoot.String(),
-			"--blade-admin", addresses[0].String(), // we put first validator as owner by default
 		}
+
+		bladeAdmin := cluster.Config.BladeAdmin
+		if cluster.Config.BladeAdmin == "" {
+			bladeAdmin = addresses[0].String()
+		}
+
+		args = append(args, "--blade-admin", bladeAdmin)
 
 		if cluster.Config.BlockTime != 0 {
 			args = append(args, "--block-time",
@@ -518,6 +532,12 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 
 		for _, premine := range cluster.Config.Premine {
 			args = append(args, "--premine", premine)
+		}
+
+		if len(cluster.Config.StakeAmounts) > 0 {
+			for i, addr := range addresses {
+				args = append(args, "--stake", fmt.Sprintf("%s:%s", addr.String(), cluster.getStakeAmount(i).String()))
+			}
 		}
 
 		validators, err := genesis.ReadValidatorsByPrefix(
@@ -793,6 +813,15 @@ func (c *TestCluster) getOpenPort() int64 {
 	c.initialPort++
 
 	return c.initialPort
+}
+
+func (c *TestCluster) getStakeAmount(validatorIndex int) *big.Int {
+	l := len(c.Config.StakeAmounts)
+	if l == 0 || l <= validatorIndex || validatorIndex < 0 {
+		return command.DefaultStake
+	}
+
+	return c.Config.StakeAmounts[validatorIndex]
 }
 
 // runCommand executes command with given arguments
