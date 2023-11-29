@@ -6,7 +6,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	bridgeHelper "github.com/0xPolygon/polygon-edge/command/bridge/helper"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -43,33 +42,6 @@ func Test_validateFlags(t *testing.T) {
 				}
 			},
 			err: "address \x10 has invalid length",
-		},
-		{
-			// stake token address omitted
-			buildParamsFn: func() *fundParams {
-				return &fundParams{
-					mintStakeToken: true,
-					addresses: []string{
-						types.StringToAddress("0x10").String(),
-						types.StringToAddress("0x20").String()},
-					amounts: []string{"10", "20"},
-				}
-			},
-			err: bridgeHelper.ErrMandatoryStakeToken.Error(),
-		},
-		{
-			// stake token address omitted
-			buildParamsFn: func() *fundParams {
-				return &fundParams{
-					mintStakeToken: true,
-					stakeTokenAddr: "0xA",
-					addresses: []string{
-						types.StringToAddress("0x10").String(),
-						types.StringToAddress("0x20").String()},
-					amounts: []string{"10", "20"},
-				}
-			},
-			err: "invalid stake token address is provided",
 		},
 		{
 			// valid scenario

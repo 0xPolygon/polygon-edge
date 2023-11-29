@@ -270,9 +270,9 @@ func mintRewardTokensToWallet(polyBFTConfig PolyBFTConfig, transition *state.Tra
 		"RewardToken.mint", transition)
 }
 
-// approveRewardPoolAsSpender approves reward pool contract as reward token spender
-// since reward pool distributes rewards.
-func approveRewardPoolAsSpender(polyBFTConfig PolyBFTConfig, transition *state.Transition) error {
+// approveEpochManagerAsSpender approves EpochManager contract as reward token spender
+// since EpochManager distributes rewards
+func approveEpochManagerAsSpender(polyBFTConfig PolyBFTConfig, transition *state.Transition) error {
 	approveFn := &contractsapi.ApproveRootERC20Fn{
 		Spender: contracts.EpochManagerContract,
 		Amount:  polyBFTConfig.RewardConfig.WalletAmount,

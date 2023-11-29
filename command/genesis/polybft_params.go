@@ -480,11 +480,17 @@ func (p *genesisParams) getValidatorAccounts() ([]*validator.GenesisValidator, e
 			}
 
 			addr := types.StringToAddress(trimmedAddress)
+
+			stake, exists := p.stakeInfos[addr]
+			if !exists {
+				stake = command.DefaultStake
+			}
+
 			validators[i] = &validator.GenesisValidator{
 				MultiAddr: parts[0],
 				Address:   addr,
 				BlsKey:    trimmedBLSKey,
-				Stake:     p.stakeInfos[addr],
+				Stake:     stake,
 			}
 		}
 

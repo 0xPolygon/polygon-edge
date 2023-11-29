@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/command"
-	rootHelper "github.com/0xPolygon/polygon-edge/command/bridge/helper"
+	bridgeHelper "github.com/0xPolygon/polygon-edge/command/bridge/helper"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	polybftsecrets "github.com/0xPolygon/polygon-edge/command/secrets/init"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
@@ -40,25 +40,18 @@ func preRunCommand(cmd *cobra.Command, _ []string) error {
 }
 
 func setFlags(cmd *cobra.Command) {
-	cmd.Flags().StringSliceVar(
-		&params.addresses,
-		rootHelper.AddressesFlag,
-		nil,
-		"addresses to which tokens should be minted",
-	)
-
-	cmd.Flags().StringSliceVar(
-		&params.amounts,
-		rootHelper.AmountsFlag,
-		nil,
-		"token amounts which should be minted to given addresses",
+	cmd.Flags().StringVar(
+		&params.accountDir,
+		polybftsecrets.AccountDirFlag,
+		"",
+		polybftsecrets.AccountDirFlagDesc,
 	)
 
 	cmd.Flags().StringVar(
-		&params.tokenAddr,
-		rootHelper.Erc20TokenFlag,
+		&params.accountConfig,
+		polybftsecrets.AccountConfigFlag,
 		"",
-		"address of the erc20 token to be minted",
+		polybftsecrets.AccountConfigFlagDesc,
 	)
 
 	cmd.Flags().StringVar(
@@ -67,6 +60,31 @@ func setFlags(cmd *cobra.Command) {
 		"",
 		"private key of the token deployer (minter)",
 	)
+
+	cmd.Flags().StringSliceVar(
+		&params.addresses,
+		bridgeHelper.AddressesFlag,
+		nil,
+		"addresses to which tokens should be minted",
+	)
+
+	cmd.Flags().StringSliceVar(
+		&params.amounts,
+		bridgeHelper.AmountsFlag,
+		nil,
+		"token amounts which should be minted to given addresses",
+	)
+
+	cmd.Flags().StringVar(
+		&params.tokenAddr,
+		bridgeHelper.Erc20TokenFlag,
+		"",
+		"address of the erc20 token to be minted",
+	)
+
+	cmd.MarkFlagsMutuallyExclusive(polybftsecrets.AccountDirFlag, polybftsecrets.AccountConfigFlag)
+	cmd.MarkFlagsMutuallyExclusive(polybftsecrets.PrivateKeyFlag, polybftsecrets.AccountConfigFlag)
+	cmd.MarkFlagsMutuallyExclusive(polybftsecrets.PrivateKeyFlag, polybftsecrets.AccountDirFlag)
 }
 
 func runCommand(cmd *cobra.Command, _ []string) {
@@ -80,7 +98,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	deployerKey, err := rootHelper.DecodePrivateKey(params.deployerPrivateKey)
+	deployerKey, err := bridgeHelper.GetECDSAKey(params.deployerPrivateKey, params.accountDir, params.accountConfig)
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to initialize deployer private key: %w", err))
 
@@ -105,7 +123,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 				addr := types.StringToAddress(params.addresses[i])
 				amount := params.amountValues[i]
 
-				mintTxn, err := rootHelper.CreateMintTxn(addr, tokenAddr, amount, true)
+				mintTxn, err := bridgeHelper.CreateMintTxn(addr, tokenAddr, amount, true)
 				if err != nil {
 					return fmt.Errorf("failed to create mint native tokens transaction for validator '%s'. err: %w",
 						addr, err)

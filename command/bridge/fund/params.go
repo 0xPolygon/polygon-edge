@@ -2,7 +2,6 @@ package fund
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 
 	bridgeHelper "github.com/0xPolygon/polygon-edge/command/bridge/helper"
@@ -23,9 +22,7 @@ var (
 type fundParams struct {
 	addresses          []string
 	amounts            []string
-	stakeTokenAddr     string
 	deployerPrivateKey string
-	mintStakeToken     bool
 	jsonRPCAddress     string
 
 	amountValues []*big.Int
@@ -54,16 +51,6 @@ func (fp *fundParams) validateFlags() error {
 		}
 
 		fp.amountValues[i] = amountValue
-	}
-
-	if fp.mintStakeToken {
-		if fp.stakeTokenAddr == "" {
-			return bridgeHelper.ErrMandatoryStakeToken
-		}
-
-		if err := types.IsValidAddress(fp.stakeTokenAddr); err != nil {
-			return fmt.Errorf("invalid stake token address is provided: %w", err)
-		}
 	}
 
 	return nil

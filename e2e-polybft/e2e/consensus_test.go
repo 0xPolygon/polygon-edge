@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"bytes"
 	"fmt"
 	"math/big"
 	"path"
@@ -34,55 +35,66 @@ func TestE2E_Consensus_Basic(t *testing.T) {
 		validatorsNum = 5
 	)
 
-	var (
-		premineBalance = ethgo.Ether(2)
+	cluster := framework.NewTestCluster(t, validatorsNum,
+		framework.WithEpochSize(epochSize),
+		framework.WithNonValidators(2),
 	)
-
-	cluster := framework.NewTestCluster(t, 5,
-		framework.WithEpochSize(epochSize), framework.WithTestRewardToken(),
-		framework.WithSecretsCallback(func(addresses []types.Address, config *framework.TestClusterConfig) {
-			for _, a := range addresses {
-				config.Premine = append(config.Premine, fmt.Sprintf("%s:%s", a, premineBalance))
-			}
-		}))
 	defer cluster.Stop()
 
 	cluster.WaitForReady(t)
 
 	// initialize tx relayer
-	//relayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(cluster.Servers[0].JSONRPC()))
-	//require.NoError(t, err)
+	relayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(cluster.Servers[0].JSONRPC()))
+	require.NoError(t, err)
 
-	// because we are using native token as reward wallet, and it has default premine balance
-	//initialTotalSupply := new(big.Int).Set(command.DefaultPremineBalance)
+	initialTotalSupply := new(big.Int).Mul(big.NewInt(validatorsNum+1 /*because of reward token*/),
+		command.DefaultPremineBalance)
 
 	// check if initial total supply of native ERC20 token is the same as expected
-	//totalSupply := queryNativeERC20Metadata(t, "totalSupply", uint256ABIType, relayer)
-	//require.True(t, initialTotalSupply.Cmp(totalSupply.(*big.Int)) == 0) //nolint:forcetypeassert
+	totalSupply := queryNativeERC20Metadata(t, "totalSupply", uint256ABIType, relayer)
+	require.True(t, initialTotalSupply.Cmp(totalSupply.(*big.Int)) == 0) //nolint:forcetypeassert
 
-	require.NoError(t, cluster.WaitForBlock(10, 1*time.Minute))
+	t.Run("consensus protocol", func(t *testing.T) {
+		require.NoError(t, cluster.WaitForBlock(2*epochSize+1, 1*time.Minute))
+	})
 
-	polybftConfig, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
-	require.NoError(t, err)
+	t.Run("sync protocol, drop single validator node", func(t *testing.T) {
+		// query the current block number, as it is a starting point for the test
+		currentBlockNum, err := cluster.Servers[0].JSONRPC().Eth().BlockNumber()
+		require.NoError(t, err)
 
-	srv := cluster.Servers[0]
+		// stop one node
+		node := cluster.Servers[0]
+		node.Stop()
 
-	childChainRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(srv.JSONRPCAddr()))
-	require.NoError(t, err)
+		// wait for 2 epochs to elapse, so that rest of the network progresses
+		require.NoError(t, cluster.WaitForBlock(currentBlockNum+2*epochSize, 2*time.Minute))
 
-	require.NoError(t, srv.Stake(polybftConfig, big.NewInt(500)))
+		// start the node again
+		node.Start()
 
-	require.NoError(t, cluster.WaitForBlock(26, 1*time.Minute))
+		// wait 2 more epochs to elapse and make sure that stopped node managed to catch up
+		require.NoError(t, cluster.WaitForBlock(currentBlockNum+4*epochSize, 2*time.Minute))
+	})
 
-	validatorAcc, err := validatorHelper.GetAccountFromDir(srv.DataDir())
-	require.NoError(t, err)
-	// check that validator is no longer active (out of validator set)
-	validatorInfo, err := validatorHelper.GetValidatorInfo(validatorAcc.Ecdsa.Address(), childChainRelayer)
-	require.NoError(t, err)
+	t.Run("sync protocol, drop single non-validator node", func(t *testing.T) {
+		// query the current block number, as it is a starting point for the test
+		currentBlockNum, err := cluster.Servers[0].JSONRPC().Eth().BlockNumber()
+		require.NoError(t, err)
 
-	t.Log(validatorInfo.Stake)
+		// stop one non-validator node
+		node := cluster.Servers[6]
+		node.Stop()
 
-	require.NoError(t, cluster.WaitForBlock(35, 1*time.Minute))
+		// wait for 2 epochs to elapse, so that rest of the network progresses
+		require.NoError(t, cluster.WaitForBlock(currentBlockNum+2*epochSize, 2*time.Minute))
+
+		// start the node again
+		node.Start()
+
+		// wait 2 more epochs to elapse and make sure that stopped node managed to catch up
+		require.NoError(t, cluster.WaitForBlock(currentBlockNum+4*epochSize, 2*time.Minute))
+	})
 }
 
 func TestE2E_Consensus_BulkDrop(t *testing.T) {
@@ -95,7 +107,6 @@ func TestE2E_Consensus_BulkDrop(t *testing.T) {
 	cluster := framework.NewTestCluster(t, clusterSize,
 		framework.WithEpochSize(epochSize),
 		framework.WithBlockTime(time.Second),
-		framework.WithTestRewardToken(),
 	)
 	defer cluster.Stop()
 
@@ -156,10 +167,7 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 
 	// first validator is the owner of ChildValidator set smart contract
 	owner := cluster.Servers[0]
-	childChainRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(owner.JSONRPCAddr()))
-	require.NoError(t, err)
-
-	rootChainRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
+	relayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(owner.JSONRPCAddr()))
 	require.NoError(t, err)
 
 	polybftConfig, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
@@ -182,10 +190,6 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, validatorSetSize+2, len(validatorSecrets))
 
-	// collect owners validator secrets
-	firstValidatorSecrets := validatorSecrets[validatorSetSize]
-	secondValidatorSecrets := validatorSecrets[validatorSetSize+1]
-
 	genesisBlock, err := owner.JSONRPC().Eth().GetBlockByNumber(0, false)
 	require.NoError(t, err)
 
@@ -196,28 +200,22 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	require.NoError(t, owner.WhitelistValidators([]string{
 		firstValidatorAddr.String(),
 		secondValidatorAddr.String(),
-	}, polybftConfig.Bridge.CustomSupernetManagerAddr))
+	}))
 
-	// set the initial balance of the new validators at the rootchain
+	// set the initial balance of the new validators
 	initialBalance := ethgo.Ether(500)
 
-	// fund first new validator
-	err = cluster.Bridge.FundValidators(polybftConfig.Bridge.StakeTokenAddr,
-		[]string{path.Join(cluster.Config.TmpDir, firstValidatorSecrets)}, []*big.Int{initialBalance})
-	require.NoError(t, err)
-
-	// fund second new validator
-	err = cluster.Bridge.FundValidators(polybftConfig.Bridge.StakeTokenAddr,
-		[]string{path.Join(cluster.Config.TmpDir, secondValidatorSecrets)}, []*big.Int{initialBalance})
-	require.NoError(t, err)
+	// mint tokens to new validators
+	require.NoError(t, owner.MintNativeERC20Token([]string{firstValidatorAddr.String(), secondValidatorAddr.String()},
+		[]*big.Int{initialBalance, initialBalance}))
 
 	// first validator's balance to be received
-	firstBalance, err := rootChainRelayer.Client().Eth().GetBalance(firstValidatorAddr, ethgo.Latest)
+	firstBalance, err := relayer.Client().Eth().GetBalance(firstValidatorAddr, ethgo.Latest)
 	require.NoError(t, err)
 	t.Logf("First validator balance=%d\n", firstBalance)
 
 	// second validator's balance to be received
-	secondBalance, err := rootChainRelayer.Client().Eth().GetBalance(secondValidatorAddr, ethgo.Latest)
+	secondBalance, err := relayer.Client().Eth().GetBalance(secondValidatorAddr, ethgo.Latest)
 	require.NoError(t, err)
 	t.Logf("Second validator balance=%d\n", secondBalance)
 
@@ -228,6 +226,9 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	cluster.InitTestServer(t, cluster.Config.ValidatorPrefix+strconv.Itoa(validatorSetSize+2),
 		cluster.Bridge.JSONRPCAddr(), framework.Validator)
 
+	// wait for couple of epochs until new validators start
+	require.NoError(t, cluster.WaitForBlock(epochSize*3, time.Minute))
+
 	// collect the first and the second validator from the cluster
 	firstValidator := cluster.Servers[validatorSetSize]
 	secondValidator := cluster.Servers[validatorSetSize+1]
@@ -235,10 +236,10 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	initialStake := ethgo.Ether(499)
 
 	// register the first validator with stake
-	require.NoError(t, firstValidator.RegisterValidator(polybftConfig.Bridge.CustomSupernetManagerAddr))
+	require.NoError(t, firstValidator.RegisterValidator())
 
 	// register the second validator without stake
-	require.NoError(t, secondValidator.RegisterValidator(polybftConfig.Bridge.CustomSupernetManagerAddr))
+	require.NoError(t, secondValidator.RegisterValidator())
 
 	// stake manually for the first validator
 	require.NoError(t, firstValidator.Stake(polybftConfig, initialStake))
@@ -246,51 +247,15 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	// stake manually for the second validator
 	require.NoError(t, secondValidator.Stake(polybftConfig, initialStake))
 
-	firstValidatorInfo, err := validatorHelper.GetValidatorInfo(firstValidatorAddr, childChainRelayer)
+	firstValidatorInfo, err := validatorHelper.GetValidatorInfo(firstValidatorAddr, relayer)
 	require.NoError(t, err)
 	require.True(t, firstValidatorInfo.IsActive)
 	require.True(t, firstValidatorInfo.Stake.Cmp(initialStake) == 0)
 
-	secondValidatorInfo, err := validatorHelper.GetValidatorInfo(secondValidatorAddr, childChainRelayer)
+	secondValidatorInfo, err := validatorHelper.GetValidatorInfo(secondValidatorAddr, relayer)
 	require.NoError(t, err)
 	require.True(t, secondValidatorInfo.IsActive)
 	require.True(t, secondValidatorInfo.Stake.Cmp(initialStake) == 0)
-
-	// wait for the stake to be bridged
-	require.NoError(t, cluster.WaitForBlock(polybftConfig.EpochSize*4, time.Minute))
-
-	checkpointManagerAddr := ethgo.Address(polybftConfig.Bridge.CheckpointManagerAddr)
-
-	// check if the validators are added to active validator set
-	rootchainValidators := []*polybft.ValidatorInfo{}
-	err = cluster.Bridge.WaitUntil(time.Second, time.Minute, func() (bool, error) {
-		rootchainValidators, err = getCheckpointManagerValidators(rootChainRelayer, checkpointManagerAddr)
-		if err != nil {
-			return true, err
-		}
-
-		return len(rootchainValidators) == validatorSetSize+2, nil
-	})
-
-	require.NoError(t, err)
-	require.Equal(t, validatorSetSize+2, len(rootchainValidators))
-
-	var (
-		isFirstValidatorFound  bool
-		isSecondValidatorFound bool
-	)
-
-	for _, v := range rootchainValidators {
-		if v.Address == firstValidatorAddr {
-			isFirstValidatorFound = true
-		} else if v.Address == secondValidatorAddr {
-			isSecondValidatorFound = true
-		}
-	}
-
-	// new validators should be in the active validator set
-	require.True(t, isFirstValidatorFound)
-	require.True(t, isSecondValidatorFound)
 
 	currentBlock, err := owner.JSONRPC().Eth().GetBlockByNumber(ethgo.Latest, false)
 	require.NoError(t, err)
@@ -300,15 +265,26 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 
 	bigZero := big.NewInt(0)
 
-	firstValidatorInfo, err = validatorHelper.GetValidatorInfo(firstValidatorAddr, childChainRelayer)
+	firstValidatorInfo, err = validatorHelper.GetValidatorInfo(firstValidatorAddr, relayer)
 	require.NoError(t, err)
 	require.True(t, firstValidatorInfo.IsActive)
 	require.True(t, firstValidatorInfo.WithdrawableRewards.Cmp(bigZero) > 0)
 
-	secondValidatorInfo, err = validatorHelper.GetValidatorInfo(secondValidatorAddr, childChainRelayer)
+	secondValidatorInfo, err = validatorHelper.GetValidatorInfo(secondValidatorAddr, relayer)
 	require.NoError(t, err)
 	require.True(t, secondValidatorInfo.IsActive)
 	require.True(t, secondValidatorInfo.WithdrawableRewards.Cmp(bigZero) > 0)
+
+	// wait until one of the validators mine one block to check if they joined consensus
+	require.NoError(t, cluster.WaitUntil(3*time.Minute, 2*time.Second, func() bool {
+		latestBlock, err := cluster.Servers[0].JSONRPC().Eth().GetBlockByNumber(ethgo.Latest, false)
+		require.NoError(t, err)
+
+		blockMiner := latestBlock.Miner.Bytes()
+
+		return bytes.Equal(firstValidatorAddr.Bytes(), blockMiner) ||
+			bytes.Equal(secondValidatorAddr.Bytes(), blockMiner)
+	}))
 }
 
 func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
@@ -332,10 +308,7 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 
 	srv := cluster.Servers[0]
 
-	childChainRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(srv.JSONRPCAddr()))
-	require.NoError(t, err)
-
-	rootChainRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
+	relayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(srv.JSONRPCAddr()))
 	require.NoError(t, err)
 
 	validatorAcc, err := validatorHelper.GetAccountFromDir(srv.DataDir())
@@ -352,7 +325,7 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	// wait for some rewards to get accumulated
 	require.NoError(t, cluster.WaitForBlock(polybftCfg.EpochSize*3, time.Minute))
 
-	validatorInfo, err := validatorHelper.GetValidatorInfo(validatorAddr, childChainRelayer)
+	validatorInfo, err := validatorHelper.GetValidatorInfo(validatorAddr, relayer)
 	require.NoError(t, err)
 	require.True(t, validatorInfo.IsActive)
 
@@ -366,39 +339,20 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	// unstake entire balance (which should remove validator from the validator set in next epoch)
 	require.NoError(t, srv.Unstake(initialStake))
 
-	// wait for one epoch to withdraw from child
-	require.NoError(t, cluster.WaitForBlock(polybftCfg.EpochSize*4, time.Minute))
-
-	// withdraw from child
-	require.NoError(t, srv.WithdrawChildChain())
-
 	currentBlock, err := srv.JSONRPC().Eth().GetBlockByNumber(ethgo.Latest, false)
 	require.NoError(t, err)
 
-	currentExtra, err := polybft.GetIbftExtra(currentBlock.ExtraData)
-	require.NoError(t, err)
-
-	t.Logf("Latest block number: %d, epoch number: %d\n", currentBlock.Number, currentExtra.Checkpoint.EpochNumber)
-
-	currentEpoch := currentExtra.Checkpoint.EpochNumber
-
-	// wait for checkpoint to be submitted
-	require.NoError(t, waitForRootchainEpoch(currentEpoch, time.Minute,
-		rootChainRelayer, polybftCfg.Bridge.CheckpointManagerAddr))
-
-	exitEventID := uint64(1)
-
-	// send exit transaction to exit helper
-	err = cluster.Bridge.SendExitTransaction(polybftCfg.Bridge.ExitHelperAddr, exitEventID, srv.JSONRPCAddr())
-	require.NoError(t, err)
+	// wait for couple of epochs to withdraw stake
+	require.NoError(t, cluster.WaitForBlock(currentBlock.Number+(polybftCfg.EpochSize*2), time.Minute))
+	require.NoError(t, srv.WithdrawChildChain())
 
 	// check that validator is no longer active (out of validator set)
-	validatorInfo, err = validatorHelper.GetValidatorInfo(validatorAddr, childChainRelayer)
+	validatorInfo, err = validatorHelper.GetValidatorInfo(validatorAddr, relayer)
 	require.NoError(t, err)
 	require.False(t, validatorInfo.IsActive)
 	require.True(t, validatorInfo.Stake.Cmp(big.NewInt(0)) == 0)
 
-	t.Logf("Stake (after unstake)=%d\n", validatorInfo.Stake)
+	t.Logf("Stake (after unstake and withdraw)=%d\n", validatorInfo.Stake)
 
 	balanceBeforeRewardsWithdraw, err := srv.JSONRPC().Eth().GetBalance(validatorAcc.Ecdsa.Address(), ethgo.Latest)
 	require.NoError(t, err)
@@ -411,31 +365,6 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	require.NoError(t, err)
 	t.Logf("Balance (after withdrawal of rewards)=%s\n", newValidatorBalance)
 	require.True(t, newValidatorBalance.Cmp(balanceBeforeRewardsWithdraw) > 0)
-
-	l1Relayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
-	require.NoError(t, err)
-
-	checkpointManagerAddr := ethgo.Address(polybftCfg.Bridge.CheckpointManagerAddr)
-
-	// query rootchain validator set and make sure that validator which unstaked all the funds isn't present in validator set anymore
-	// (execute it multiple times if needed, because it is unknown in advance how much time it is going to take until checkpoint is submitted)
-	rootchainValidators := []*polybft.ValidatorInfo{}
-	err = cluster.Bridge.WaitUntil(time.Second, 10*time.Second, func() (bool, error) {
-		rootchainValidators, err = getCheckpointManagerValidators(l1Relayer, checkpointManagerAddr)
-		if err != nil {
-			return true, err
-		}
-
-		return len(rootchainValidators) == 4, nil
-	})
-	require.NoError(t, err)
-	require.Equal(t, 4, len(rootchainValidators))
-
-	for _, validator := range rootchainValidators {
-		if validator.Address == validatorAddr {
-			t.Fatalf("not expected to find validator %v in the current validator set", validator.Address)
-		}
-	}
 }
 
 func TestE2E_Consensus_MintableERC20NativeToken(t *testing.T) {
@@ -598,7 +527,6 @@ func TestE2E_Consensus_EIP1559Check(t *testing.T) {
 
 	// first account should have some matics premined
 	cluster := framework.NewTestCluster(t, 5,
-		framework.WithNativeTokenConfig(fmt.Sprintf(framework.NativeTokenMintableTestCfg, sender1.Address())),
 		framework.WithPremine(types.Address(sender1.Address()), types.Address(sender2.Address())),
 	)
 	defer cluster.Stop()
@@ -678,8 +606,8 @@ func TestE2E_Consensus_EIP1559Check(t *testing.T) {
 		receiverFinalBalance, _ := client.GetBalance(recipient, ethgo.Latest)
 		burnContractFinalBalance, _ := client.GetBalance(ethgo.Address(types.ZeroAddress), ethgo.Latest)
 
-		diffReciverBalance := new(big.Int).Sub(receiverFinalBalance, receiverInitialBalance)
-		assert.Equal(t, sendAmount, diffReciverBalance, "Receiver balance should be increased by send amount")
+		diffReceiverBalance := new(big.Int).Sub(receiverFinalBalance, receiverInitialBalance)
+		assert.Equal(t, sendAmount, diffReceiverBalance, "Receiver balance should be increased by send amount")
 
 		if i == 1 && prevMiner != block.Miner {
 			initialMinerBalance = big.NewInt(0)
@@ -689,7 +617,7 @@ func TestE2E_Consensus_EIP1559Check(t *testing.T) {
 		diffSenderBalance := new(big.Int).Sub(senderInitialBalance, senderFinalBalance)
 		diffMinerBalance := new(big.Int).Sub(finalMinerFinalBalance, initialMinerBalance)
 
-		diffSenderBalance.Sub(diffSenderBalance, diffReciverBalance)
+		diffSenderBalance.Sub(diffSenderBalance, diffReceiverBalance)
 		diffSenderBalance.Sub(diffSenderBalance, diffBurnContractBalance)
 		diffSenderBalance.Sub(diffSenderBalance, diffMinerBalance)
 

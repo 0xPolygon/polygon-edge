@@ -863,7 +863,7 @@ func TestE2E_Bridge_ChildChainMintableTokensTransfer(t *testing.T) {
 	childEthEndpoint := validatorSrv.JSONRPC().Eth()
 
 	// fund accounts on rootchain
-	require.NoError(t, validatorSrv.RootchainFundFor(depositors, funds, polybftCfg.Bridge.StakeTokenAddr))
+	require.NoError(t, validatorSrv.RootchainFundFor(depositors, funds))
 
 	cluster.WaitForReady(t)
 
@@ -1259,7 +1259,7 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 		validatorSrv := cluster.Servers[idx]
 
 		// fund validators (send accumulated rewards amount)
-		require.NoError(t, validatorSrv.RootchainFund(polybftCfg.Bridge.StakeTokenAddr, validator.WithdrawableRewards))
+		require.NoError(t, validatorSrv.RootchainFund(validator.WithdrawableRewards))
 
 		// stake previously funded amount
 		require.NoError(t, validatorSrv.Stake(polybftCfg, validator.WithdrawableRewards))
@@ -1356,8 +1356,7 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 	var stateSyncedResult contractsapi.StateSyncResultEvent
 
 	// fund admin on rootchain
-	require.NoError(t, cluster.Servers[0].RootchainFundFor([]types.Address{adminAddr}, []*big.Int{ethgo.Ether(10)},
-		polybftCfg.Bridge.StakeTokenAddr))
+	require.NoError(t, cluster.Servers[0].RootchainFundFor([]types.Address{adminAddr}, []*big.Int{ethgo.Ether(10)}))
 
 	adminBalanceOnChild := ethgo.Ether(5)
 

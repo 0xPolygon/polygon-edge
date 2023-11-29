@@ -26,29 +26,22 @@ import (
 const (
 	TestAccountPrivKey      = "aa75e9a7d427efc732f8e4f1a5b7646adcc61fd5bae40f80d13c8419c9f43d6d"
 	TestModeFlag            = "test"
-	SupernetManagerFlag     = "supernet-manager"
-	SupernetManagerFlagDesc = "address of supernet manager contract"
-	StakeManagerFlag        = "stake-manager"
-	StakeManagerFlagDesc    = "address of stake manager contract"
-	NativeRootTokenFlag     = "native-root-token"
-	NativeRootTokenFlagDesc = "address of native root token"
 	GenesisPathFlag         = "genesis"
 	GenesisPathFlagDesc     = "genesis file path, which contains chain configuration"
 	DefaultGenesisPath      = "./genesis.json"
-	StakeTokenFlag          = "stake-token"
-	StakeTokenFlagDesc      = "address of ERC20 token used for staking on rootchain"
 	ProxyContractsAdminFlag = "proxy-contracts-admin"
 	ProxyContractsAdminDesc = "admin for proxy contracts"
+	StakeTokenFlag          = "stake-token"
+	StakeTokenFlagDesc      = "address of ERC20 token used for staking"
 	AddressesFlag           = "addresses"
 	AmountsFlag             = "amounts"
 	Erc20TokenFlag          = "erc20-token" //nolint:gosec
 )
 
 var (
-	ErrRootchainNotFound   = errors.New("rootchain not found")
-	ErrRootchainPortBind   = errors.New("port 8545 is not bind with localhost")
-	ErrMandatoryStakeToken = errors.New("stake token address is mandatory")
-	errTestModeSecrets     = errors.New("rootchain test mode does not imply specifying secrets parameters")
+	ErrRootchainNotFound = errors.New("rootchain not found")
+	ErrRootchainPortBind = errors.New("port 8545 is not bind with localhost")
+	errTestModeSecrets   = errors.New("rootchain test mode does not imply specifying secrets parameters")
 
 	ErrNoAddressesProvided = errors.New("no addresses provided")
 	ErrInconsistentLength  = errors.New("addresses and amounts must be equal length")

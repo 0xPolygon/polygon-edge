@@ -188,8 +188,6 @@ func createTestBridgeConfig() *BridgeConfig {
 		ChildMintableERC721PredicateAddr:  types.StringToAddress("9"),
 		RootERC1155PredicateAddr:          types.StringToAddress("11"),
 		ChildMintableERC1155PredicateAddr: types.StringToAddress("12"),
-		CustomSupernetManagerAddr:         types.StringToAddress("13"),
-		StakeManagerAddr:                  types.StringToAddress("14"),
 		JSONRPCEndpoint:                   "http://localhost:8545",
 	}
 }

@@ -21,8 +21,8 @@ var params withdrawParams
 
 func GetCommand() *cobra.Command {
 	withdrawCmd := &cobra.Command{
-		Use:     "withdraw-root",
-		Short:   "Withdraws sender's withdrawable amount to specified address on the root chain",
+		Use:     "withdraw",
+		Short:   "Withdraws validator's withdrawable stake",
 		PreRunE: runPreRun,
 		RunE:    runCommand,
 	}
@@ -45,27 +45,6 @@ func setFlags(cmd *cobra.Command) {
 		polybftsecrets.AccountConfigFlag,
 		"",
 		polybftsecrets.AccountConfigFlagDesc,
-	)
-
-	cmd.Flags().StringVar(
-		&params.addressTo,
-		addressToFlag,
-		"",
-		"address where to withdraw withdrawable amount",
-	)
-
-	cmd.Flags().StringVar(
-		&params.stakeManagerAddr,
-		bridgeHelper.StakeManagerFlag,
-		"",
-		bridgeHelper.StakeManagerFlagDesc,
-	)
-
-	cmd.Flags().StringVar(
-		&params.amount,
-		validatorHelper.AmountFlag,
-		"",
-		"amount to withdraw",
 	)
 
 	cmd.MarkFlagsMutuallyExclusive(polybftsecrets.AccountDirFlag, polybftsecrets.AccountConfigFlag)

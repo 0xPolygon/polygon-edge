@@ -9,10 +9,9 @@ import (
 )
 
 type registerParams struct {
-	accountDir             string
-	accountConfig          string
-	supernetManagerAddress string
-	jsonRPC                string
+	accountDir    string
+	accountConfig string
+	jsonRPC       string
 }
 
 func (rp *registerParams) validateFlags() error {

@@ -55,20 +55,6 @@ func setFlags(cmd *cobra.Command) {
 	)
 
 	cmd.Flags().StringVar(
-		&params.stakeTokenAddr,
-		helper.StakeTokenFlag,
-		"",
-		helper.StakeTokenFlagDesc,
-	)
-
-	cmd.Flags().BoolVar(
-		&params.mintStakeToken,
-		mintStakeTokenFlag,
-		false,
-		"indicates if stake token deployer should mint root tokens to given validators",
-	)
-
-	cmd.Flags().StringVar(
 		&params.deployerPrivateKey,
 		polybftsecrets.PrivateKeyFlag,
 		"",
@@ -96,12 +82,6 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		outputter.SetError(fmt.Errorf("failed to initialize deployer private key: %w", err))
 
 		return
-	}
-
-	var stakeTokenAddr types.Address
-
-	if params.mintStakeToken {
-		stakeTokenAddr = types.StringToAddress(params.stakeTokenAddr)
 	}
 
 	results := make([]command.CommandResult, len(params.addresses))
@@ -139,28 +119,9 @@ func runCommand(cmd *cobra.Command, _ []string) {
 					return fmt.Errorf("failed to fund validator '%s'", validatorAddr)
 				}
 
-				if params.mintStakeToken {
-					// mint tokens to validator, so he is able to send them
-					mintTxn, err := helper.CreateMintTxn(validatorAddr, stakeTokenAddr, params.amountValues[i], true)
-					if err != nil {
-						return fmt.Errorf("failed to create mint native tokens transaction for validator '%s'. err: %w",
-							validatorAddr, err)
-					}
-
-					receipt, err := txRelayer.SendTransaction(mintTxn, deployerKey)
-					if err != nil {
-						return fmt.Errorf("failed to send mint native tokens transaction to validator '%s'. err: %w", validatorAddr, err)
-					}
-
-					if receipt.Status == uint64(types.ReceiptFailed) {
-						return fmt.Errorf("failed to mint native tokens to validator '%s'", validatorAddr)
-					}
-				}
-
 				results[i] = &result{
 					ValidatorAddr: validatorAddr,
 					TxHash:        types.Hash(receipt.TransactionHash),
-					IsMinted:      params.mintStakeToken,
 				}
 			}
 

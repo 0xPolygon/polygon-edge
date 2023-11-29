@@ -198,7 +198,7 @@ func ReadValidatorsByPrefix(dir, prefix string,
 
 		stake, exists := stakeInfos[types.Address(account.Ecdsa.Address())]
 		if !exists {
-			stake = big.NewInt(0)
+			stake = command.DefaultStake
 		}
 
 		validators[i] = &validator.GenesisValidator{

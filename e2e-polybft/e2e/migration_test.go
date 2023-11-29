@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -32,7 +33,10 @@ func TestE2E_Migration(t *testing.T) {
 		config.SetConsensus(framework.ConsensusDev)
 		config.Premine(types.Address(userAddr), initialBalance)
 	})
+
 	srv := srvs[0]
+
+	require.NoError(t, srv.WaitForReady(context.TODO()))
 
 	rpcClient := srv.JSONRPC()
 

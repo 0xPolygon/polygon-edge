@@ -301,6 +301,9 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 			contracts.NativeERC20TokenContract: {
 				Code: contractsapi.NativeERC20.DeployedBytecode,
 			},
+			contracts.StakeManagerContract: {
+				Code: contractsapi.StakeManager.DeployedBytecode,
+			},
 			walletAddress: {
 				Balance: new(big.Int).SetUint64(initialBalance),
 			},
@@ -332,20 +335,18 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 				WalletAddress: walletAddress,
 				WalletAmount:  new(big.Int).SetUint64(initialBalance),
 			},
-			Bridge: &BridgeConfig{
-				CustomSupernetManagerAddr: types.StringToAddress("0x12312451"),
-			},
 		}
 
 		transition := newTestTransition(t, alloc)
 
-		// init RewardPool
-		err := initEpochManager(polyBFTConfig, transition)
-		require.NoError(t, err)
+		// init StakeManager
+		require.NoError(t, initStakeManager(polyBFTConfig, transition))
 
-		// approve reward pool as reward token spender
-		err = approveRewardPoolAsSpender(polyBFTConfig, transition)
-		require.NoError(t, err)
+		// init EpochManager
+		require.NoError(t, initEpochManager(polyBFTConfig, transition))
+
+		// approve EpochManager as reward token spender
+		require.NoError(t, approveEpochManagerAsSpender(polyBFTConfig, transition))
 
 		// create input for commit epoch
 		commitEpoch := createTestCommitEpochInput(t, 1, polyBFTConfig.EpochSize)

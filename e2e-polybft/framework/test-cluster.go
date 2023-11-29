@@ -516,11 +516,8 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			args = append(args, "--native-token-config", cluster.Config.NativeTokenConfigRaw)
 		}
 
-		if len(cluster.Config.Premine) != 0 {
-			// only add premine flags in genesis if token is mintable
-			for _, premine := range cluster.Config.Premine {
-				args = append(args, "--premine", premine)
-			}
+		for _, premine := range cluster.Config.Premine {
+			args = append(args, "--premine", premine)
 		}
 
 		validators, err := genesis.ReadValidatorsByPrefix(
@@ -597,12 +594,6 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			if len(cluster.Config.BridgeBlockListEnabled) != 0 {
 				args = append(args, "--bridge-block-list-enabled",
 					strings.Join(sliceAddressToSliceString(cluster.Config.BridgeBlockListEnabled), ","))
-			}
-		}
-
-		if len(validators) != 0 {
-			for _, validator := range validators {
-				args = append(args, "--stake", fmt.Sprintf("%s:%s", validator.Address.String(), "1000000000000000"))
 			}
 		}
 

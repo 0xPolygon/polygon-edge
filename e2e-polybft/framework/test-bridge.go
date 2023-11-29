@@ -307,16 +307,9 @@ func (t *TestBridge) cmdRun(args ...string) error {
 
 // deployRootchainContracts deploys and initializes rootchain contracts
 func (t *TestBridge) deployRootchainContracts(genesisPath string) error {
-	polybftConfig, err := polybft.LoadPolyBFTConfig(genesisPath)
-	if err != nil {
-		return err
-	}
-
 	args := []string{
 		"bridge",
 		"deploy",
-		"--stake-manager", polybftConfig.Bridge.StakeManagerAddr.String(),
-		"--stake-token", polybftConfig.Bridge.StakeTokenAddr.String(),
 		"--proxy-contracts-admin", t.clusterConfig.GetProxyContractsAdmin(),
 		"--genesis", genesisPath,
 		"--test",
@@ -345,7 +338,7 @@ func (t *TestBridge) fundAddressesOnRoot(tokenConfig *polybft.TokenConfig, polyb
 		balances[i] = command.DefaultPremineBalance
 	}
 
-	if err := t.FundValidators(polybftConfig.Bridge.StakeTokenAddr,
+	if err := t.FundValidators(
 		secrets, balances); err != nil {
 		return fmt.Errorf("failed to fund validators on the rootchain: %w", err)
 	}
@@ -389,7 +382,6 @@ func (t *TestBridge) whitelistValidators(validatorAddresses []types.Address,
 		"whitelist-validators",
 		"--addresses", strings.Join(addressesAsString, ","),
 		"--jsonrpc", t.JSONRPCAddr(),
-		"--supernet-manager", polybftConfig.Bridge.CustomSupernetManagerAddr.String(),
 		"--private-key", bridgeHelper.TestAccountPrivKey,
 	}
 
@@ -420,7 +412,6 @@ func (t *TestBridge) registerGenesisValidators(polybftConfig polybft.PolyBFTConf
 					"validator",
 					"register-validator",
 					"--jsonrpc", t.JSONRPCAddr(),
-					"--supernet-manager", polybftConfig.Bridge.CustomSupernetManagerAddr.String(),
 					"--" + polybftsecrets.AccountDirFlag, path.Join(t.clusterConfig.TmpDir, secret),
 				}
 
@@ -457,10 +448,8 @@ func (t *TestBridge) initialStakingOfGenesisValidators(polybftConfig polybft.Pol
 					"validator",
 					"stake",
 					"--jsonrpc", t.JSONRPCAddr(),
-					"--stake-manager", polybftConfig.Bridge.StakeManagerAddr.String(),
 					"--" + polybftsecrets.AccountDirFlag, path.Join(t.clusterConfig.TmpDir, secret),
 					"--amount", t.getStakeAmount(i).String(),
-					"--stake-token", polybftConfig.Bridge.StakeTokenAddr.String(),
 				}
 
 				if err := t.cmdRun(args...); err != nil {
@@ -485,17 +474,12 @@ func (t *TestBridge) getStakeAmount(validatorIndex int) *big.Int {
 }
 
 // FundValidators sends tokens to a rootchain validators
-func (t *TestBridge) FundValidators(tokenAddress types.Address, secretsPaths []string, amounts []*big.Int) error {
+func (t *TestBridge) FundValidators(secretsPaths []string, amounts []*big.Int) error {
 	if len(secretsPaths) != len(amounts) {
 		return errors.New("expected the same length of secrets paths and amounts")
 	}
 
-	args := []string{
-		"bridge",
-		"fund",
-		"--stake-token", tokenAddress.String(),
-		"--mint",
-	}
+	args := []string{"bridge", "fund"}
 
 	for i := 0; i < len(secretsPaths); i++ {
 		secretsManager, err := polybftsecrets.GetSecretsManager(secretsPaths[i], "", true)

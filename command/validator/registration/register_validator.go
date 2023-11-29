@@ -13,6 +13,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/spf13/cobra"
@@ -47,13 +48,6 @@ func setFlags(cmd *cobra.Command) {
 		polybftsecrets.AccountConfigFlag,
 		"",
 		polybftsecrets.AccountConfigFlagDesc,
-	)
-
-	cmd.Flags().StringVar(
-		&params.supernetManagerAddress,
-		bridgeHelper.SupernetManagerFlag,
-		"",
-		bridgeHelper.SupernetManagerFlagDesc,
 	)
 
 	helper.RegisterJSONRPCFlag(cmd)
@@ -92,7 +86,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 
 	koskSignature, err := signer.MakeKOSKSignature(
 		newValidatorAccount.Bls, newValidatorAccount.Address(),
-		rootChainID.Int64(), signer.DomainValidatorSet, types.StringToAddress(params.supernetManagerAddress))
+		rootChainID.Int64(), signer.DomainValidatorSet, contracts.StakeManagerContract)
 	if err != nil {
 		return err
 	}
@@ -159,8 +153,8 @@ func registerValidator(sender txrelayer.TxRelayer, account *wallet.Account,
 		return nil, fmt.Errorf("register validator failed: %w", err)
 	}
 
-	supernetAddr := ethgo.Address(types.StringToAddress(params.supernetManagerAddress))
-	txn := bridgeHelper.CreateTransaction(ethgo.ZeroAddress, &supernetAddr, input, nil, true)
+	stakeManagerAddr := ethgo.Address(contracts.StakeManagerContract)
+	txn := bridgeHelper.CreateTransaction(ethgo.ZeroAddress, &stakeManagerAddr, input, nil, true)
 
 	return sender.SendTransaction(txn, account.Ecdsa)
 }

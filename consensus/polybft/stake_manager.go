@@ -362,15 +362,22 @@ func (s *stakeManager) getBlsKey(address types.Address) (*bls.PublicKey, error) 
 
 	stakeManagerContractContract := contract.NewContract(
 		ethgo.Address(s.stakeManagerContractAddr),
-		contractsapi.EpochManager.Abi, contract.WithProvider(provider),
+		contractsapi.StakeManager.Abi, contract.WithProvider(provider),
 	)
 
-	rawResult, err := stakeManagerContractContract.Call("currentEpochId", ethgo.Latest)
+	rawResult, err := stakeManagerContractContract.Call("getValidator", ethgo.Latest, address)
 	if err != nil {
 		return nil, err
 	}
 
-	blsKey, ok := rawResult["blsKey"].([4]*big.Int)
+	validatorData, ok := rawResult["0"].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("could not collect validator: %s data from StakeManager", address)
+	}
+
+	s.logger.Info("[Aaaa] Validator data", validatorData)
+
+	blsKey, ok := validatorData["blsKey"].([4]*big.Int)
 	if !ok {
 		return nil, fmt.Errorf("failed to decode blskey")
 	}

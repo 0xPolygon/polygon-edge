@@ -41,8 +41,6 @@ const (
 	rootERC1155PredicateName          = "RootERC1155Predicate"
 	childERC1155MintablePredicateName = "ChildERC1155MintablePredicate"
 	erc1155TemplateName               = "ERC1155Template"
-	customSupernetManagerName         = "CustomSupernetManager"
-	stakeManagerName                  = "StakeManager"
 )
 
 var (
@@ -99,9 +97,6 @@ var (
 		},
 		erc1155TemplateName: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
 			rootchainConfig.ChildERC1155Address = addr
-		},
-		getProxyNameForImpl(customSupernetManagerName): func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
-			rootchainConfig.CustomSupernetManagerAddress = addr
 		},
 	}
 
@@ -252,20 +247,6 @@ func GetCommand() *cobra.Command {
 	)
 
 	cmd.Flags().StringVar(
-		&params.stakeTokenAddr,
-		helper.StakeTokenFlag,
-		"",
-		helper.StakeTokenFlagDesc,
-	)
-
-	cmd.Flags().StringVar(
-		&params.stakeManagerAddr,
-		helper.StakeManagerFlag,
-		"",
-		helper.StakeManagerFlagDesc,
-	)
-
-	cmd.Flags().StringVar(
 		&params.proxyContractsAdmin,
 		helper.ProxyContractsAdminFlag,
 		"",
@@ -273,8 +254,6 @@ func GetCommand() *cobra.Command {
 	)
 
 	cmd.MarkFlagsMutuallyExclusive(helper.TestModeFlag, deployerKeyFlag)
-	_ = cmd.MarkFlagRequired(helper.StakeManagerFlag)
-	_ = cmd.MarkFlagRequired(helper.StakeTokenFlag)
 
 	return cmd
 }
@@ -341,15 +320,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	}
 
 	// populate bridge configuration
-	bridgeConfig := deploymentResultInfo.RootchainCfg.ToBridgeConfig()
-	if consensusCfg.Bridge != nil {
-		// only true if stake-manager-deploy command was executed
-		// users can still deploy stake manager manually
-		// only used for e2e tests
-		bridgeConfig.StakeTokenAddr = consensusCfg.Bridge.StakeTokenAddr
-	}
-
-	consensusCfg.Bridge = bridgeConfig
+	consensusCfg.Bridge = deploymentResultInfo.RootchainCfg.ToBridgeConfig()
 
 	consensusCfg.Bridge.EventTrackerStartBlocks = map[types.Address]uint64{
 		deploymentResultInfo.RootchainCfg.StateSenderAddress: blockNum,
@@ -402,11 +373,7 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 		byteCodeBuilder func() ([]byte, error)
 	}
 
-	rootchainConfig := &polybft.RootchainConfig{
-		JSONRPCAddr: params.jsonRPCAddress,
-		// update stake manager address in genesis in case if stake manager was deployed manually
-		StakeManagerAddress: types.StringToAddress(params.stakeManagerAddr),
-	}
+	rootchainConfig := &polybft.RootchainConfig{JSONRPCAddr: params.jsonRPCAddress}
 
 	allContracts := []*contractInfo{
 		{

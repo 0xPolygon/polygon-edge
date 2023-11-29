@@ -208,11 +208,14 @@ func (p *genesisParams) initGenesisConfig() error {
 	chainConfig := &chain.Chain{
 		Name: p.name,
 		Genesis: &chain.Genesis{
-			GasLimit:   p.blockGasLimit,
-			Difficulty: 1,
-			Alloc:      map[types.Address]*chain.GenesisAccount{},
-			ExtraData:  p.extraData,
-			GasUsed:    command.DefaultGenesisGasUsed,
+			GasLimit:           p.blockGasLimit,
+			Difficulty:         1,
+			Alloc:              map[types.Address]*chain.GenesisAccount{},
+			ExtraData:          p.extraData,
+			GasUsed:            command.DefaultGenesisGasUsed,
+			BaseFee:            p.parsedBaseFeeConfig.baseFee,
+			BaseFeeEM:          p.parsedBaseFeeConfig.baseFeeEM,
+			BaseFeeChangeDenom: p.parsedBaseFeeConfig.baseFeeChangeDenom,
 		},
 		Params: &chain.Params{
 			ChainID: int64(p.chainID),
