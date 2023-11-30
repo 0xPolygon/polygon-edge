@@ -16,7 +16,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/bridge/common"
 	bridgeHelper "github.com/0xPolygon/polygon-edge/command/bridge/helper"
-	"github.com/0xPolygon/polygon-edge/command/genesis"
 	validatorHelper "github.com/0xPolygon/polygon-edge/command/validator/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
@@ -1195,117 +1194,6 @@ func TestE2E_CheckpointSubmission(t *testing.T) {
 		return testCheckpointBlockNumber(20)
 	})
 	require.NoError(t, err)
-}
-
-func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
-	const (
-		votingPowerChanges = 2
-		epochSize          = 5
-	)
-
-	cluster := framework.NewTestCluster(t, 5,
-		framework.WithEpochSize(epochSize),
-		framework.WithEpochReward(1000000),
-	)
-	defer cluster.Stop()
-
-	// load polybft config
-	polybftCfg, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
-	require.NoError(t, err)
-
-	validatorSecretFiles, err := genesis.GetValidatorKeyFiles(cluster.Config.TmpDir, cluster.Config.ValidatorPrefix)
-	require.NoError(t, err)
-
-	votingPowerChangeValidators := make([]ethgo.Address, votingPowerChanges)
-
-	for i := 0; i < votingPowerChanges; i++ {
-		validator, err := validatorHelper.GetAccountFromDir(path.Join(cluster.Config.TmpDir, validatorSecretFiles[i]))
-		require.NoError(t, err)
-
-		votingPowerChangeValidators[i] = validator.Ecdsa.Address()
-	}
-
-	// child chain tx relayer
-	childRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Servers[0].JSONRPCAddr()))
-	require.NoError(t, err)
-
-	// root chain tx relayer
-	rootRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
-	require.NoError(t, err)
-
-	// waiting two epochs, so that some rewards get accumulated
-	require.NoError(t, cluster.WaitForBlock(2*epochSize, 1*time.Minute))
-
-	queryValidators := func(handler func(idx int, validatorInfo *polybft.ValidatorInfo)) {
-		for i, validatorAddr := range votingPowerChangeValidators {
-			// query validator info
-			validatorInfo, err := validatorHelper.GetValidatorInfo(
-				validatorAddr,
-				childRelayer)
-			require.NoError(t, err)
-
-			handler(i, validatorInfo)
-		}
-	}
-
-	// validatorsMap holds only changed validators
-	validatorsMap := make(map[ethgo.Address]*polybft.ValidatorInfo, votingPowerChanges)
-
-	queryValidators(func(idx int, validator *polybft.ValidatorInfo) {
-		t.Logf("[Validator#%d] Voting power (original)=%d, rewards=%d\n",
-			idx+1, validator.Stake, validator.WithdrawableRewards)
-
-		validatorsMap[validator.Address] = validator
-		validatorSrv := cluster.Servers[idx]
-
-		// fund validators (send accumulated rewards amount)
-		require.NoError(t, validatorSrv.RootchainFund(validator.WithdrawableRewards))
-
-		// stake previously funded amount
-		require.NoError(t, validatorSrv.Stake(polybftCfg, validator.WithdrawableRewards))
-	})
-
-	queryValidators(func(idx int, validator *polybft.ValidatorInfo) {
-		t.Logf("[Validator#%d] Voting power (after stake)=%d\n", idx+1, validator.Stake)
-
-		previousValidatorInfo := validatorsMap[validator.Address]
-		stakedAmount := new(big.Int).Add(previousValidatorInfo.WithdrawableRewards, previousValidatorInfo.Stake)
-
-		// assert that total stake has increased by staked amount
-		require.Equal(t, stakedAmount, validator.Stake)
-
-		validatorsMap[validator.Address] = validator
-	})
-
-	currentBlockNum, err := childRelayer.Client().Eth().BlockNumber()
-	require.NoError(t, err)
-
-	// wait for next epoch-ending block as the starting point,
-	// in order to be able to easier track checkpoints submission
-	endOfEpochBlockNum := currentBlockNum + epochSize - (currentBlockNum % epochSize)
-	require.NoError(t, cluster.WaitForBlock(endOfEpochBlockNum, 1*time.Minute))
-
-	currentBlock, err := childRelayer.Client().Eth().GetBlockByNumber(ethgo.Latest, false)
-	require.NoError(t, err)
-
-	currentExtra, err := polybft.GetIbftExtra(currentBlock.ExtraData)
-	require.NoError(t, err)
-
-	targetEpoch := currentExtra.Checkpoint.EpochNumber + 2
-	require.NoError(t, waitForRootchainEpoch(targetEpoch, 2*time.Minute,
-		rootRelayer, polybftCfg.Bridge.CheckpointManagerAddr))
-
-	// make sure that correct validator set is submitted to the checkpoint manager
-	checkpointValidators, err := getCheckpointManagerValidators(rootRelayer, ethgo.Address(polybftCfg.Bridge.CheckpointManagerAddr))
-	require.NoError(t, err)
-
-	for _, checkpointValidator := range checkpointValidators {
-		if validator, ok := validatorsMap[checkpointValidator.Address]; ok {
-			require.Equal(t, validator.Stake, checkpointValidator.Stake)
-		} else {
-			require.Equal(t, command.DefaultPremineBalance, checkpointValidator.Stake)
-		}
-	}
 }
 
 func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {

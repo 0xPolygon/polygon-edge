@@ -343,7 +343,7 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 
 	// wait for couple of epochs to withdraw stake
 	require.NoError(t, cluster.WaitForBlock(currentBlock.Number+(polybftCfg.EpochSize*2), time.Minute))
-	require.NoError(t, srv.WithdrawChildChain())
+	require.NoError(t, srv.WitdhrawStake())
 
 	// check that validator is no longer active (out of validator set)
 	validatorInfo, err = validatorHelper.GetValidatorInfo(validatorAddr, relayer)
@@ -496,13 +496,13 @@ func TestE2E_Consensus_CustomRewardToken(t *testing.T) {
 
 	// first validator is the owner of ChildValidator set smart contract
 	owner := cluster.Servers[0]
-	childChainRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(owner.JSONRPCAddr()))
+	relayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(owner.JSONRPCAddr()))
 	require.NoError(t, err)
 
 	validatorAcc, err := validatorHelper.GetAccountFromDir(owner.DataDir())
 	require.NoError(t, err)
 
-	validatorInfo, err := validatorHelper.GetValidatorInfo(validatorAcc.Ecdsa.Address(), childChainRelayer)
+	validatorInfo, err := validatorHelper.GetValidatorInfo(validatorAcc.Ecdsa.Address(), relayer)
 	t.Logf("[Validator#%v] Witdhrawable rewards=%d\n", validatorInfo.Address, validatorInfo.WithdrawableRewards)
 
 	require.NoError(t, err)
@@ -623,5 +623,139 @@ func TestE2E_Consensus_EIP1559Check(t *testing.T) {
 		assert.Zero(t, diffSenderBalance.Int64(), "Sender balance should be decreased by send amount + gas")
 
 		initialMinerBalance = finalMinerFinalBalance
+	}
+}
+
+func TestE2E_Consensus_ChangeVotingPowerByStakingPendingRewards(t *testing.T) {
+	const (
+		votingPowerChanges       = 2
+		epochSize                = 10
+		numOfEpochsToCheckChange = 2
+	)
+
+	stakeAmount := ethgo.Ether(1)
+
+	cluster := framework.NewTestCluster(t, 5,
+		framework.WithEpochSize(epochSize),
+		framework.WithEpochReward(1000000),
+		framework.WithSecretsCallback(func(addresses []types.Address, config *framework.TestClusterConfig) {
+			for range addresses {
+				config.StakeAmounts = append(config.StakeAmounts, stakeAmount)
+			}
+		}),
+	)
+	defer cluster.Stop()
+
+	// load polybft config
+	polybftCfg, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
+	require.NoError(t, err)
+
+	validatorSecretFiles, err := genesis.GetValidatorKeyFiles(cluster.Config.TmpDir, cluster.Config.ValidatorPrefix)
+	require.NoError(t, err)
+
+	votingPowerChangeValidators := make([]ethgo.Address, votingPowerChanges)
+
+	for i := 0; i < votingPowerChanges; i++ {
+		validator, err := validatorHelper.GetAccountFromDir(path.Join(cluster.Config.TmpDir, validatorSecretFiles[i]))
+		require.NoError(t, err)
+
+		votingPowerChangeValidators[i] = validator.Ecdsa.Address()
+	}
+
+	// tx relayer
+	relayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Servers[0].JSONRPCAddr()))
+	require.NoError(t, err)
+
+	epochEndingBlock := uint64(2 * epochSize)
+
+	// waiting two epochs, so that some rewards get accumulated
+	require.NoError(t, cluster.WaitForBlock(epochEndingBlock, 1*time.Minute))
+
+	queryValidators := func(handler func(idx int, validatorInfo *polybft.ValidatorInfo)) {
+		for i, validatorAddr := range votingPowerChangeValidators {
+			// query validator info
+			validatorInfo, err := validatorHelper.GetValidatorInfo(
+				validatorAddr,
+				relayer)
+			require.NoError(t, err)
+
+			handler(i, validatorInfo)
+		}
+	}
+
+	bigZero := big.NewInt(0)
+
+	// validatorsMap holds only changed validators
+	validatorsMap := make(map[ethgo.Address]*polybft.ValidatorInfo, votingPowerChanges)
+
+	queryValidators(func(idx int, validator *polybft.ValidatorInfo) {
+		t.Logf("[Validator#%d] Voting power (original)=%d, rewards=%d\n",
+			idx+1, validator.Stake, validator.WithdrawableRewards)
+
+		validatorsMap[validator.Address] = validator
+		validatorSrv := cluster.Servers[idx]
+
+		// validator should have some withdrawable rewards by now
+		require.True(t, validator.WithdrawableRewards.Cmp(bigZero) > 0)
+
+		// withdraw pending rewards
+		require.NoError(t, validatorSrv.WithdrawRewards())
+
+		// stake withdrawable rewards (since rewards are in native erc20 token in this test)
+		require.NoError(t, validatorSrv.Stake(polybftCfg, validator.WithdrawableRewards))
+	})
+
+	queryValidators(func(idx int, validator *polybft.ValidatorInfo) {
+		t.Logf("[Validator#%d] Voting power (after stake)=%d\n", idx+1, validator.Stake)
+
+		previousValidatorInfo := validatorsMap[validator.Address]
+		stakedAmount := new(big.Int).Add(previousValidatorInfo.WithdrawableRewards, previousValidatorInfo.Stake)
+
+		// assert that total stake has increased by staked amount
+		require.Equal(t, stakedAmount, validator.Stake)
+
+		validatorsMap[validator.Address] = validator
+	})
+
+	// start checking for delta from this epoch ending block
+	epochEndingBlock += epochSize
+
+	didVotingPowerChangeInConsensus := false
+
+	// we will check for couple of epoch ending blocks to see Voting Power change
+	for i := 0; i < numOfEpochsToCheckChange; i++ {
+		require.NoError(t, cluster.WaitForBlock(epochEndingBlock, time.Minute))
+
+		latestBlock, err := cluster.Servers[0].JSONRPC().Eth().GetBlockByNumber(ethgo.BlockNumber(epochEndingBlock), false)
+		require.NoError(t, err)
+
+		epochEndingBlock += epochSize
+
+		currentExtra, err := polybft.GetIbftExtra(latestBlock.ExtraData)
+		require.NoError(t, err)
+
+		if currentExtra.Validators == nil || currentExtra.Validators.IsEmpty() {
+			continue
+		}
+
+		for addr, validator := range validatorsMap {
+			a := types.Address(addr)
+
+			if !currentExtra.Validators.Updated.ContainsAddress(a) {
+				continue
+			}
+
+			if currentExtra.Validators.Updated.GetValidatorMetadata(a).VotingPower.Cmp(validator.Stake) != 0 {
+				continue
+			}
+		}
+
+		didVotingPowerChangeInConsensus = true
+
+		break
+	}
+
+	if !didVotingPowerChangeInConsensus {
+		t.Errorf("voting power did not change in consensus for %d epochs", numOfEpochsToCheckChange)
 	}
 }

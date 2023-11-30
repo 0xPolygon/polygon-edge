@@ -303,8 +303,8 @@ func (t *TestServer) MintNativeERC20Token(addresses []string, amounts []*big.Int
 	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("mint-erc20"))
 }
 
-// WithdrawChildChain withdraws available balance from child chain
-func (t *TestServer) WithdrawChildChain() error {
+// WitdhrawStake withdraws given amount of stake back to the validator address
+func (t *TestServer) WitdhrawStake() error {
 	args := []string{
 		"validator",
 		"withdraw",
@@ -313,22 +313,6 @@ func (t *TestServer) WithdrawChildChain() error {
 	}
 
 	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("withdraw"))
-}
-
-// WithdrawRootChain withdraws available balance from root chain
-func (t *TestServer) WithdrawRootChain(recipient string, amount *big.Int,
-	stakeManager ethgo.Address, bridgeJSONRPC string) error {
-	args := []string{
-		"validator",
-		"withdraw-root",
-		"--" + polybftsecrets.AccountDirFlag, t.config.DataDir,
-		"--to", recipient,
-		"--amount", amount.String(),
-		"--stake-manager", stakeManager.String(),
-		"--jsonrpc", bridgeJSONRPC,
-	}
-
-	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("withdraw-root"))
 }
 
 // WithdrawRewards withdraws pending rewards for given validator on RewardPool contract
