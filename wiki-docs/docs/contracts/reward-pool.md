@@ -1,6 +1,6 @@
 ## Overview
 
-`RewardPool` is library for the management and distributiion validator rewards.
+`RewardPool` is library for the management and distribution of validator rewards.
 Each validator has a reward pool for delegators delegating funds to them.
 
 ## Functions
