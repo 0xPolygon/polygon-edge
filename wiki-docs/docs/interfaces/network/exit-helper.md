@@ -28,10 +28,10 @@ This function allows you to perform a batch exit for multiple events.
 #### Parameters
 
 - `inputs` (BatchExitInput[]): An array of BatchExitInput structs, where each struct contains the following fields:
-- `blockNumber` (uint256): The block number of the exit event on L2.
-- `leafIndex` (uint256): The leaf index in the exit event Merkle tree.
-- `unhashedLeaf` (bytes): The ABI-encoded exit event leaf.
-- `proof` (bytes32[]): The proof of the event inclusion in the tree.
+    - `blockNumber` (uint256): The block number of the exit event on L2.
+    - `leafIndex` (uint256): The leaf index in the exit event Merkle tree.
+    - `unhashedLeaf` (bytes): The ABI-encoded exit event leaf.
+    - `proof` (bytes32[]): The proof of the event inclusion in the tree.
 
 #### Usage
 

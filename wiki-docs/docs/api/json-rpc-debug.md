@@ -22,6 +22,8 @@ Executes all transactions in the block specified by number with a tracer and ret
   +  <b>  disableStorage: Boolean </b> - (optional, default: false) The flag indicating disabling storage capture.
   +  <b>  enableReturnData: Boolean </b> - (optional, default: false) The flag indicating enabling return data capture.
   +  <b>  timeOut: String </b> - (optional, default: "5s") The timeout for cancellation of execution.
+  +  <b>  tracer: String </b> - (default: "structTracer") Defines the debug tracer used for given call. Supported values: structTracer, callTracer.
+
 
 ### Returns
 

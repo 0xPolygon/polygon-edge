@@ -18,30 +18,11 @@ function initialize(
     address newStateReceiver,
     address newRootERC20Predicate,
     address newChildTokenTemplate,
-    address newNativeTokenRootAddress,
-    string calldata newNativeTokenName,
-    string calldata newNativeTokenSymbol,
-    uint8 newNativeTokenDecimals
-) external;
+    address newNativeTokenRootAddress
+) public virtual onlySystemCall initializer {
 ```
 
 The parameters for initialization include the addresses of the L2 state sender, the state receiver, the root ERC20 predicate, and the child token template. The initialization also requires the native token's root address, name, symbol, and decimals.
-
-## Deploy a new child token
-
-To create a new child token on the L2 side, call the deployChildToken method:
-
-```solidity
-function deployChildToken(
-    address rootToken,
-    bytes32 salt,
-    string calldata name,
-    string calldata symbol,
-    uint8 decimals
-) external;
-```
-
-The parameters for deploying a new child token include the address of the corresponding root token on L1, a unique salt value, and the token's name, symbol, and decimals.
 
 ## Process state updates
 

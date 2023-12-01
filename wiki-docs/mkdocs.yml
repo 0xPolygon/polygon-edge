@@ -57,15 +57,14 @@ nav:
               - Upgrade using hardfork:  operate/deploy/upgrades/hardfork.md
               - Edge v1.1 upgrade requirements:  operate/deploy/upgrades/v1.1.md
   - Reference:
-      - Contracts:
-         - Checkpoint manager: contracts/checkpoint-manager.md
-         - Exit helper: contracts/exit-helper.md
-         - Reward pool: contracts/reward-pool.md
-         - State receiver: contracts/state-receiver.md
-         - State sender: contracts/state-sender.md
-         - Validator queue: contracts/validator-queue.md
-         - Validator set: contracts/validator-set.md
-         - Withdrawal queue: contracts/withdrawal-queue.md
+      #- Contracts:
+      #   - Checkpoint manager: contracts/checkpoint-manager.md
+      #   - Exit helper: contracts/exit-helper.md
+      #   - Reward pool: contracts/reward-pool.md
+      #   - State receiver: contracts/state-receiver.md
+      #   - State sender: contracts/state-sender.md
+      #   - Validator set: contracts/validator-set.md
+      #   - Withdrawal queue: contracts/withdrawal-queue.md
       - Config parameter reference:  operate/param-reference.md 
       - Smart contract interfaces:
          - ERC20:
@@ -88,9 +87,7 @@ nav:
              - StateReceiver:  interfaces/network/state-receiver.md
              - StateSender:  interfaces/network/state-sender.md
          - Validators:
-             - Validator:  interfaces/validators/validators.md 
              - ValidatorSetBase:  interfaces/validators/validator-set-base.md
-             - RootValidatorSet:  interfaces/validators/root-validator-set.md
          - Staking:
              - StakeManager:  interfaces/staking/stake-manager.md
              - SupernetManager:  interfaces/staking/supernet-manager.md

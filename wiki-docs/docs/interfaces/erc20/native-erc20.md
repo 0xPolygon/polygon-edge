@@ -13,6 +13,7 @@ This function sets the values for the predicate, rootToken, name, symbol, and de
 - `name_` (string): The token's name.
 - `symbol_` (string): The token's symbol.
 - `decimals_` (uint8): The number of decimals for the token.
+- `tokenSupply_` (uint256): Initial total supply of token.
 
 #### Usage
 
