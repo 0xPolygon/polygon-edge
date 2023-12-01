@@ -2,7 +2,7 @@ In this section, we'll walkthrough how to stake WMATIC on the associated rootcha
 
 ## i. Initial Staking on the Rootchain
 
-Each validator needs to perform initial staking on the rootchain `StakeManager` contract. This is done using the `polygon-edge polybft stake` command. **Note that this command is for testing purposes only.**
+Each validator needs to perform initial staking on the rootchain `StakeManager` contract. This is done using the `polygon-edge root stake` command. **Note that this command is for testing purposes only.**
 
 <details>
 <summary>Flags ↓</summary>
