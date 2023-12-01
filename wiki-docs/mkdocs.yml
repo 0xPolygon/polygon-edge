@@ -35,8 +35,7 @@ nav:
   - Build an Edge-powered chain:
       - Prepare your environment:
           - System requirements:  operate/system.md
-          - Install binaries:  operate/install.md
-      - Migrate from Edge PoA:  operate/ibft-to-polybft.md      
+          - Install binaries:  operate/install.md    
       - Deploy a chain:
           - Get started:  operate/deploy/index.md
           - How to spawn a new child chain:  operate/deploy/local-chain.md
@@ -103,7 +102,6 @@ nav:
          - Debug:  api/json-rpc-debug.md
          - Bridge:  api/json-rpc-bridge.md 
       - Performance benchmarks:  operate/benchmarks.md
-  - FAQ: faq.md
   - Disclaimer: disclaimer.md
 
 
