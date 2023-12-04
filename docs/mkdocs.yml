@@ -22,6 +22,7 @@ nav:
               - ERC-20:  design/bridge/assets/erc/erc20.md
               - ERC-721:  design/bridge/assets/erc/erc721.md
               - ERC-1155:  design/bridge/assets/erc/erc1155.md
+          - Sequences: design/bridge/sequences.md
       - Networking: design/libp2p.md
       - Runtime:
           - Overview:  design/runtime/overview.md
