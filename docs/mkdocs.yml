@@ -1,0 +1,119 @@
+site_name: Polygon Edge docs
+
+theme:
+  name: material
+  palette:
+    scheme: slate
+
+nav:
+  - What is Edge: index.md
+  - Quickstart: quickstart.md
+  - System design:
+      - Overview:  design/overview.md
+      - Consensus:
+          - Consensus protocol: design/consensus/polybft/protocol.md
+          - Polygon Byzantine Fault Tolerance (PolyBFT): design/consensus/polybft/overview.md
+          - Istanbul Byzantine Fault Tolerance (IBFT) 2.0:  design/consensus/polybft/ibft.md
+      - Bridge:
+          - Overview:  design/bridge/overview.md
+          - StateSyncs:  design/bridge/statesync.md
+          - Checkpoints:  design/bridge/checkpoint.md
+          - Assets:
+              - ERC-20:  design/bridge/assets/erc/erc20.md
+              - ERC-721:  design/bridge/assets/erc/erc721.md
+              - ERC-1155:  design/bridge/assets/erc/erc1155.md
+          - Sequences: design/bridge/sequences.md
+      - Networking: design/libp2p.md
+      - Runtime:
+          - Overview:  design/runtime/overview.md
+          - Access control list:  design/runtime/allowlist.md
+      - Blockchain:  design/blockchain.md
+      - MemoryPool:  design/mempool.md
+      - Transaction pool:  design/txpool.md
+      - Transaction relayer:  design/txrelayer.md
+      - JSON-RPC:  design/jsonrpc.md
+      - GRPC:  design/grpc.md
+  - Build an Edge-powered chain:
+      - Prepare your environment:
+          - System requirements:  operate/system.md
+          - Install binaries:  operate/install.md    
+      - Deploy a chain:
+          - Get started:  operate/deploy/index.md
+          - How to spawn a new child chain:  operate/deploy/local-chain.md
+          - How to configure a new child chain:  operate/deploy/genesis.md
+          - How to configure the rootchain:  operate/deploy/rootchain-config.md
+          - How to configure the initial validator set:  operate/deploy/genesis-validators.md
+          - How to start your chain:  operate/deploy/start-chain.md
+      - Operate your chain:
+          - Access control:
+              - How to add and remove accounts:  operate/deploy/access-control/allowlist-general.md
+          - Staking:
+              - How to stake:  operate/deploy/staking/stake.md
+              - How to unstake:  operate/deploy/staking/unstake.md
+          - Transfers:
+              - How to deposit (rootchain->childchain):  operate/deploy/transfers/deposit.md
+              - How to withdrw (childchain->rootchain):  operate/deploy/transfers/withdraw.md
+          - Upgrade your chain:
+              - Upgrade using hardfork:  operate/deploy/upgrades/hardfork.md
+              - Edge v1.1 upgrade requirements:  operate/deploy/upgrades/v1.1.md
+  - Reference:
+      #- Contracts:
+      #   - Checkpoint manager: contracts/checkpoint-manager.md
+      #   - Exit helper: contracts/exit-helper.md
+      #   - Reward pool: contracts/reward-pool.md
+      #   - State receiver: contracts/state-receiver.md
+      #   - State sender: contracts/state-sender.md
+      #   - Validator set: contracts/validator-set.md
+      #   - Withdrawal queue: contracts/withdrawal-queue.md
+      - Config parameter reference:  operate/param-reference.md 
+      - Smart contract interfaces:
+         - ERC20:
+             - NativeERC20:  interfaces/erc20/native-erc20.md
+             - ChildERC20Predicate:  interfaces/erc20/childerc20-predicate.md
+             - ChildERC20:  interfaces/erc20/childerc20.md
+             - RootERC20Predicate:  interfaces/erc20/rooterc20-predicate.md
+         - ERC721:
+             - ChildERC721:  interfaces/erc721/childerc721.md
+             - ChildERC721Predicate:  interfaces/erc721/childerc721-predicate.md
+             - RootERC721Predicate:  interfaces/erc721/rooterc721-predicate.md
+         - ERC1155:
+             - ChildERC1155:  interfaces/erc1155/childerc1155.md
+             - ChildERC1155Predicate:  interfaces/erc1155/childerc1155-predicate.md
+             - RootERC1155Predicate:  interfaces/erc1155/rooterc1155-predicate.md
+         - EIP1559Burn:  interfaces/eip1559.md
+         - Network:
+             - CheckpointManager:  interfaces/network/checkpoint-manager.md
+             - ExitHelper:  interfaces/network/exit-helper.md
+             - StateReceiver:  interfaces/network/state-receiver.md
+             - StateSender:  interfaces/network/state-sender.md
+         - Validators:
+             - ValidatorSetBase:  interfaces/validators/validator-set-base.md
+         - Staking:
+             - StakeManager:  interfaces/staking/stake-manager.md
+             - SupernetManager:  interfaces/staking/supernet-manager.md
+             - CustomSupernetManager:  interfaces/staking/custom-supernet-manager.md
+         - Cryptography:
+             - BLS:  interfaces/cryptography/bls.md
+             - BN256G2:  interfaces/cryptography/bn256g2.md
+      - RPC APIs:
+         - Ethereum:  api/json-rpc-eth.md
+         - Net:  api/json-rpc-net.md
+         - Web3:  api/json-rpc-web3.md
+         - TxPool:  api/json-rpc-txpool.md
+         - Debug:  api/json-rpc-debug.md
+         - Bridge:  api/json-rpc-bridge.md 
+      - Performance benchmarks:  operate/benchmarks.md
+  - Disclaimer: disclaimer.md
+
+
+
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed
+
+
+validation:
+  absolute_links: warn

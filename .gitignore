@@ -31,3 +31,12 @@ node_modules
 
 vendor/
 coverage.out
+
+# for the docs folder
+.code
+docs/site/
+docs/venv/
+docs/env/
+*.out
+node_modules/
+*.iml
