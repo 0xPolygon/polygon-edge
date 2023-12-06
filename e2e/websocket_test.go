@@ -60,6 +60,7 @@ func TestWS_Response(t *testing.T) {
 
 	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDev)
+		config.SetBaseFeeConfig("")
 
 		for _, account := range preminedAccounts {
 			config.Premine(account.address, account.balance)

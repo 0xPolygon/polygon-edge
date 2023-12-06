@@ -6,7 +6,7 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
 
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
@@ -58,8 +58,8 @@ func TestPreminedBalance(t *testing.T) {
 	for _, testCase := range testTable {
 		t.Run(testCase.name, func(t *testing.T) {
 			balance, err := rpcClient.Eth().GetBalance(ethgo.Address(testCase.address), ethgo.Latest)
-			assert.NoError(t, err)
-			assert.Equal(t, testCase.balance, balance)
+			require.NoError(t, err)
+			require.Equal(t, testCase.balance, balance)
 		})
 	}
 }
@@ -124,6 +124,7 @@ func TestEthTransfer(t *testing.T) {
 		config.SetConsensus(framework.ConsensusDev)
 		for _, acc := range validAccounts {
 			config.Premine(acc.address, acc.balance)
+			config.SetBaseFeeConfig("")
 		}
 	})
 	srv := srvs[0]
@@ -137,13 +138,13 @@ func TestEthTransfer(t *testing.T) {
 				ethgo.Address(testCase.sender),
 				ethgo.Latest,
 			)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			balanceReceiver, err := rpcClient.Eth().GetBalance(
 				ethgo.Address(testCase.recipient),
 				ethgo.Latest,
 			)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			// Set the preSend balances
 			previousSenderBalance := balanceSender
@@ -164,11 +165,11 @@ func TestEthTransfer(t *testing.T) {
 			receipt, err := srv.SendRawTx(ctx, txn, testCase.senderKey)
 
 			if testCase.shouldSucceed {
-				assert.NoError(t, err)
-				assert.NotNil(t, receipt)
+				require.NoError(t, err)
+				require.NotNil(t, receipt)
 			} else { // When an invalid transaction is supplied, there should be no receipt.
-				assert.Error(t, err)
-				assert.Nil(t, receipt)
+				require.Error(t, err)
+				require.Nil(t, receipt)
 			}
 
 			// Fetch the balances after sending
@@ -176,13 +177,13 @@ func TestEthTransfer(t *testing.T) {
 				ethgo.Address(testCase.sender),
 				ethgo.Latest,
 			)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			balanceReceiver, err = rpcClient.Eth().GetBalance(
 				ethgo.Address(testCase.recipient),
 				ethgo.Latest,
 			)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			expectedSenderBalance := previousSenderBalance
 			expectedReceiverBalance := previousReceiverBalance
@@ -204,11 +205,11 @@ func TestEthTransfer(t *testing.T) {
 			}
 
 			// Check the balances
-			assert.Equalf(t,
+			require.Equalf(t,
 				expectedSenderBalance,
 				balanceSender,
 				"Sender balance incorrect")
-			assert.Equalf(t,
+			require.Equalf(t,
 				expectedReceiverBalance,
 				balanceReceiver,
 				"Receiver balance incorrect")

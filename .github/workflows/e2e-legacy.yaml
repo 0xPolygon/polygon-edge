@@ -1,16 +1,17 @@
 ---
-name: IBFT E2E tests
+name: Legacy E2E tests
 on:  # yamllint disable-line rule:truthy
   push:
     branches:
       - main
       - develop
+  pull_request:
   workflow_dispatch:
   workflow_call:
     outputs:
       workflow_output:
-        description: "E2E IBFT output"
-        value: ${{ jobs.build.outputs.e2eibft_output_failure }}
+        description: "E2E Legacy output"
+        value: ${{ jobs.build.outputs.e2e_legacy_output_failure }}
 
 jobs:
   build:
@@ -20,7 +21,7 @@ jobs:
       E2E_LOGS: true
       CI_VERBOSE: true
     outputs:
-      e2eibft_output_failure: ${{ steps.run_e2eibft_failure.outputs.test_output }}
+      e2e_legacy_output_failure: ${{ steps.run_e2e_legacy_failure.outputs.test_output }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -37,7 +38,7 @@ jobs:
 
       - name: Run tests failed
         if: failure()
-        id: run_e2eibft_failure
+        id: run_e2e_legacy_failure
         run: echo "test_output=false" >> $GITHUB_OUTPUT
 
       - name: Archive test logs
