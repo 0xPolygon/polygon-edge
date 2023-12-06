@@ -37,6 +37,7 @@ function showhelp() {
   echo "  stop            Stop the running environment"
   echo "  destroy         Destroy the running environment"
   echo "  write-logs      Writes STDOUT and STDERR output to log file. Not applicable when using --docker flag."
+  echo "  with-bridge     Run with native bridge enabled"
   echo "Flags:"
   echo "  --docker        Run using Docker (requires docker-compose)."
   echo "  --help          Display this help information"
@@ -63,19 +64,19 @@ function createGenesis() {
     --premine 0x0000000000000000000000000000000000000000 \
     --epoch-size 10 \
     --reward-wallet 0xDEADBEEF:1000000 \
-    --native-token-config "Polygon:MATIC:18:true:$address1" \
-    --burn-contract 0:0x0000000000000000000000000000000000000000 \
+    --native-token-config "Blade:BLADE:18" \
+    --blade-admin $address1 \
     --proxy-contracts-admin 0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed
 }
 
-function initRootchain() {
-  echo "Initializing rootchain"
+function initBridge() {
+  echo "Initializing bridge"
 
-  if [ "$1" == "write-logs" ]; then
-    echo "Writing rootchain server logs to the file..."
-    ./polygon-edge rootchain server 2>&1 | tee ./rootchain-server.log &
+  if [ "$1" == "write-logs" ] || [ "$2" == "write-logs" ]; then
+    echo "Writing bridge server logs to the file..."
+    ./polygon-edge bridge server 2>&1 | tee ./bridge-server.log &
   else
-    ./polygon-edge rootchain server >/dev/null &
+    ./polygon-edge bridge server >/dev/null &
   fi
 
   set +e
@@ -89,61 +90,13 @@ function initRootchain() {
 
   proxyContractsAdmin=0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed
 
-  ./polygon-edge polybft stake-manager-deploy \
-    --jsonrpc http://127.0.0.1:8545 \
-    --proxy-contracts-admin ${proxyContractsAdmin} \
-    --test
-
-  stakeManagerAddr=$(cat genesis.json | jq -r '.params.engine.polybft.bridge.stakeManagerAddr')
-  stakeToken=$(cat genesis.json | jq -r '.params.engine.polybft.bridge.stakeTokenAddr')
-
-  ./polygon-edge rootchain deploy \
-    --stake-manager ${stakeManagerAddr} \
-    --stake-token ${stakeToken} \
-    --proxy-contracts-admin ${proxyContractsAdmin} \
-    --test
-
-  customSupernetManagerAddr=$(cat genesis.json | jq -r '.params.engine.polybft.bridge.customSupernetManagerAddr')
-  supernetID=$(cat genesis.json | jq -r '.params.engine.polybft.supernetID')
-
-  ./polygon-edge rootchain fund \
-    --stake-token ${stakeToken} \
-    --mint \
+  ./polygon-edge bridge fund \
     --addresses ${address1},${address2},${address3},${address4} \
     --amounts 1000000000000000000000000,1000000000000000000000000,1000000000000000000000000,1000000000000000000000000
 
-  ./polygon-edge polybft whitelist-validators \
-    --addresses ${address1},${address2},${address3},${address4} \
-    --supernet-manager ${customSupernetManagerAddr} \
-    --private-key aa75e9a7d427efc732f8e4f1a5b7646adcc61fd5bae40f80d13c8419c9f43d6d \
-    --jsonrpc http://127.0.0.1:8545
-
-  counter=1
-  while [ $counter -le 4 ]; do
-    echo "Registering validator: ${counter}"
-
-    ./polygon-edge polybft register-validator \
-      --supernet-manager ${customSupernetManagerAddr} \
-      --data-dir test-chain-${counter} \
-      --jsonrpc http://127.0.0.1:8545
-
-    ./polygon-edge polybft stake \
-      --data-dir test-chain-${counter} \
-      --amount 1000000000000000000000000 \
-      --supernet-id ${supernetID} \
-      --stake-manager ${stakeManagerAddr} \
-      --stake-token ${stakeToken} \
-      --jsonrpc http://127.0.0.1:8545
-
-    ((counter++))
-  done
-
-  ./polygon-edge polybft supernet \
-    --private-key aa75e9a7d427efc732f8e4f1a5b7646adcc61fd5bae40f80d13c8419c9f43d6d \
-    --supernet-manager ${customSupernetManagerAddr} \
-    --finalize-genesis-set \
-    --enable-staking \
-    --jsonrpc http://127.0.0.1:8545
+  ./polygon-edge bridge deploy \
+    --proxy-contracts-admin ${proxyContractsAdmin} \
+    --test
 }
 
 function startNodes() {
@@ -247,7 +200,10 @@ case "$2" in
     initPolybftConsensus
     # Create genesis file and start the server from binary
     createGenesis
-    initRootchain $2
+    if [ "$2" == "with-bridge" ] || [ "$3" == "with-bridge" ]; then
+      echo "Running bridge"
+      initBridge $2 $3
+    fi
     startNodes $1 $2
     exit 0
   else

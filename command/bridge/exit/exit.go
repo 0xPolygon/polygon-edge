@@ -14,8 +14,8 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/bridge/common"
+	"github.com/0xPolygon/polygon-edge/command/bridge/helper"
 	cmdHelper "github.com/0xPolygon/polygon-edge/command/helper"
-	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"

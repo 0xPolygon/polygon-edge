@@ -59,7 +59,7 @@ func createSignature(t *testing.T, accounts []*wallet.Account, hash types.Hash, 
 }
 
 func createTestCommitEpochInput(t *testing.T, epochID uint64,
-	epochSize uint64) *contractsapi.CommitEpochValidatorSetFn {
+	epochSize uint64) *contractsapi.CommitEpochEpochManagerFn {
 	t.Helper()
 
 	var startBlock uint64 = 0
@@ -67,7 +67,7 @@ func createTestCommitEpochInput(t *testing.T, epochID uint64,
 		startBlock = (epochID - 1) * epochSize
 	}
 
-	commitEpoch := &contractsapi.CommitEpochValidatorSetFn{
+	commitEpoch := &contractsapi.CommitEpochEpochManagerFn{
 		ID: new(big.Int).SetUint64(epochID),
 		Epoch: &contractsapi.Epoch{
 			StartBlock: new(big.Int).SetUint64(startBlock + 1),
@@ -80,7 +80,7 @@ func createTestCommitEpochInput(t *testing.T, epochID uint64,
 }
 
 func createTestDistributeRewardsInput(t *testing.T, epochID uint64,
-	validatorSet validator.AccountSet, epochSize uint64) *contractsapi.DistributeRewardForRewardPoolFn {
+	validatorSet validator.AccountSet, epochSize uint64) *contractsapi.DistributeRewardForEpochManagerFn {
 	t.Helper()
 
 	if validatorSet == nil {
@@ -96,7 +96,7 @@ func createTestDistributeRewardsInput(t *testing.T, epochID uint64,
 		}
 	}
 
-	return &contractsapi.DistributeRewardForRewardPoolFn{
+	return &contractsapi.DistributeRewardForEpochManagerFn{
 		EpochID: new(big.Int).SetUint64(epochID),
 		Uptime:  uptime,
 	}
@@ -184,13 +184,10 @@ func createTestBridgeConfig() *BridgeConfig {
 		ExitHelperAddr:                    types.StringToAddress("3"),
 		RootERC20PredicateAddr:            types.StringToAddress("4"),
 		ChildMintableERC20PredicateAddr:   types.StringToAddress("5"),
-		RootNativeERC20Addr:               types.StringToAddress("6"),
 		RootERC721PredicateAddr:           types.StringToAddress("8"),
 		ChildMintableERC721PredicateAddr:  types.StringToAddress("9"),
 		RootERC1155PredicateAddr:          types.StringToAddress("11"),
 		ChildMintableERC1155PredicateAddr: types.StringToAddress("12"),
-		CustomSupernetManagerAddr:         types.StringToAddress("13"),
-		StakeManagerAddr:                  types.StringToAddress("14"),
 		JSONRPCEndpoint:                   "http://localhost:8545",
 	}
 }

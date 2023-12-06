@@ -3,9 +3,6 @@ package validator
 import (
 	"math/big"
 
-	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/forkmanager"
-	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 )
@@ -112,10 +109,5 @@ func getQuorumSize(blockNumber uint64, totalVotingPower *big.Int) *big.Int {
 	quorum := new(big.Int)
 	quorum.Mul(totalVotingPower, big.NewInt(2))
 
-	if forkmanager.GetInstance().IsForkEnabled(chain.QuorumCalcAlignment, blockNumber) {
-		// this will floor the 2 * totalVotingPower / 3 and add one to it
-		return quorum.Div(quorum, big.NewInt(3)).Add(quorum, big.NewInt(1))
-	}
-
-	return common.BigIntDivCeil(quorum, big.NewInt(3))
+	return quorum.Div(quorum, big.NewInt(3)).Add(quorum, big.NewInt(1))
 }

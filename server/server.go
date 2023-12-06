@@ -563,18 +563,23 @@ func (s *Server) setupConsensus() error {
 
 	consensus, err := engine(
 		&consensus.Params{
-			Context:               context.Background(),
-			Config:                config,
-			TxPool:                s.txpool,
-			Network:               s.network,
-			Blockchain:            s.blockchain,
-			Executor:              s.executor,
-			Grpc:                  s.grpcServer,
-			Logger:                s.logger,
-			SecretsManager:        s.secretsManager,
-			BlockTime:             uint64(blockTime.Seconds()),
-			NumBlockConfirmations: s.config.NumBlockConfirmations,
-			MetricsInterval:       s.config.MetricsInterval,
+			Context:         context.Background(),
+			Config:          config,
+			TxPool:          s.txpool,
+			Network:         s.network,
+			Blockchain:      s.blockchain,
+			Executor:        s.executor,
+			Grpc:            s.grpcServer,
+			Logger:          s.logger,
+			SecretsManager:  s.secretsManager,
+			BlockTime:       uint64(blockTime.Seconds()),
+			MetricsInterval: s.config.MetricsInterval,
+			// event tracker
+			EventTracker: &consensus.EventTracker{
+				NumBlockConfirmations:  s.config.EventTracker.NumBlockConfirmations,
+				SyncBatchSize:          s.config.EventTracker.SyncBatchSize,
+				NumOfBlocksToReconcile: s.config.EventTracker.NumOfBlocksToReconcile,
+			},
 		},
 	)
 
@@ -1004,16 +1009,6 @@ func initForkManager(engineName string, config *chain.Chain) error {
 		}
 
 		fm.RegisterFork(name, f.Params)
-	}
-
-	// Register handlers and additional forks here
-	if err := types.RegisterTxHashFork(chain.TxHashWithType); err != nil {
-		return err
-	}
-
-	// Register Handler for London fork fix
-	if err := state.RegisterLondonFixFork(chain.LondonFix); err != nil {
-		return err
 	}
 
 	if factory := forkManagerFactory[ConsensusType(engineName)]; factory != nil {

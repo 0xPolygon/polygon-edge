@@ -74,16 +74,19 @@ type guardedDataDTO struct {
 
 // runtimeConfig is a struct that holds configuration data for given consensus runtime
 type runtimeConfig struct {
-	PolyBFTConfig         *PolyBFTConfig
-	DataDir               string
-	Key                   *wallet.Key
-	State                 *State
-	blockchain            blockchainBackend
-	polybftBackend        polybftBackend
-	txPool                txPoolInterface
-	bridgeTopic           topic
-	numBlockConfirmations uint64
-	consensusConfig       *consensus.Config
+	PolyBFTConfig  *PolyBFTConfig
+	DataDir        string
+	Key            *wallet.Key
+	State          *State
+	blockchain     blockchainBackend
+	polybftBackend polybftBackend
+	txPool         txPoolInterface
+	bridgeTopic    topic
+
+	// event tracker
+	eventTracker *consensus.EventTracker
+
+	consensusConfig *consensus.Config
 }
 
 // consensusRuntime is a struct that provides consensus runtime features like epoch, state and event management
@@ -197,15 +200,17 @@ func (c *consensusRuntime) initStateSyncManager(logger hcf.Logger) error {
 			logger.Named("state-sync-manager"),
 			c.config.State,
 			&stateSyncConfig{
-				key:                      c.config.Key,
-				stateSenderAddr:          stateSenderAddr,
-				stateSenderStartBlock:    c.config.PolyBFTConfig.Bridge.EventTrackerStartBlocks[stateSenderAddr],
-				jsonrpcAddr:              c.config.PolyBFTConfig.Bridge.JSONRPCEndpoint,
-				dataDir:                  c.config.DataDir,
-				topic:                    c.config.bridgeTopic,
-				maxCommitmentSize:        maxCommitmentSize,
-				numBlockConfirmations:    c.config.numBlockConfirmations,
-				blockTrackerPollInterval: c.config.PolyBFTConfig.BlockTrackerPollInterval.Duration,
+				key:               c.config.Key,
+				dataDir:           c.config.DataDir,
+				topic:             c.config.bridgeTopic,
+				maxCommitmentSize: maxCommitmentSize,
+				eventTrackerConfig: &eventTrackerConfig{
+					jsonrpcAddr:           c.config.PolyBFTConfig.Bridge.JSONRPCEndpoint,
+					stateSenderAddr:       stateSenderAddr,
+					stateSenderStartBlock: c.config.PolyBFTConfig.Bridge.EventTrackerStartBlocks[stateSenderAddr],
+					trackerPollInterval:   c.config.PolyBFTConfig.BlockTrackerPollInterval.Duration,
+					EventTracker:          *c.config.eventTracker,
+				},
 			},
 			c,
 		)
@@ -251,7 +256,7 @@ func (c *consensusRuntime) initCheckpointManager(logger hcf.Logger) error {
 // initStateSyncRelayer initializes state sync relayer
 // if not enabled, then a dummy state sync relayer will be used
 func (c *consensusRuntime) initStateSyncRelayer(logger hcf.Logger) error {
-	if c.config.consensusConfig.IsRelayer {
+	if c.IsBridgeEnabled() && c.config.consensusConfig.IsRelayer {
 		txRelayer, err := getStateSyncTxRelayer(c.config.consensusConfig.RPCEndpoint, logger)
 		if err != nil {
 			return err
@@ -277,18 +282,13 @@ func (c *consensusRuntime) initStateSyncRelayer(logger hcf.Logger) error {
 
 // initStakeManager initializes stake manager
 func (c *consensusRuntime) initStakeManager(logger hcf.Logger, dbTx *bolt.Tx) error {
-	rootRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(c.config.PolyBFTConfig.Bridge.JSONRPCEndpoint))
-	if err != nil {
-		return err
-	}
+	var err error
 
 	c.stakeManager, err = newStakeManager(
 		logger.Named("stake-manager"),
 		c.state,
-		rootRelayer,
 		wallet.NewEcdsaSigner(c.config.Key),
-		contracts.ValidatorSetContract,
-		c.config.PolyBFTConfig.Bridge.CustomSupernetManagerAddr,
+		contracts.StakeManagerContract,
 		c.config.blockchain,
 		c.config.polybftBackend,
 		int(c.config.PolyBFTConfig.MaxValidatorSetSize),
@@ -614,8 +614,8 @@ func (c *consensusRuntime) restartEpoch(header *types.Header, dbTx *bolt.Tx) (*e
 func (c *consensusRuntime) calculateCommitEpochInput(
 	currentBlock *types.Header,
 	epoch *epochMetadata,
-) (*contractsapi.CommitEpochValidatorSetFn,
-	*contractsapi.DistributeRewardForRewardPoolFn, error) {
+) (*contractsapi.CommitEpochEpochManagerFn,
+	*contractsapi.DistributeRewardForEpochManagerFn, error) {
 	uptimeCounter := map[types.Address]int64{}
 	blockHeader := currentBlock
 	epochID := epoch.Number
@@ -693,7 +693,7 @@ func (c *consensusRuntime) calculateCommitEpochInput(
 		}
 	}
 
-	commitEpoch := &contractsapi.CommitEpochValidatorSetFn{
+	commitEpoch := &contractsapi.CommitEpochEpochManagerFn{
 		ID: new(big.Int).SetUint64(epochID),
 		Epoch: &contractsapi.Epoch{
 			StartBlock: new(big.Int).SetUint64(epoch.FirstBlockInEpoch),
@@ -702,7 +702,7 @@ func (c *consensusRuntime) calculateCommitEpochInput(
 		},
 	}
 
-	distributeRewards := &contractsapi.DistributeRewardForRewardPoolFn{
+	distributeRewards := &contractsapi.DistributeRewardForEpochManagerFn{
 		EpochID: new(big.Int).SetUint64(epochID),
 		Uptime:  uptime,
 	}

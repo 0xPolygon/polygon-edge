@@ -4,8 +4,11 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/0xPolygon/polygon-edge/bls"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/contracts"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo/abi"
@@ -15,49 +18,77 @@ const (
 	contractCallGasLimit = 100_000_000
 )
 
-// initValidatorSet initializes ValidatorSet SC
-func initValidatorSet(polyBFTConfig PolyBFTConfig, transition *state.Transition) error {
-	initialValidators := make([]*contractsapi.ValidatorInit, len(polyBFTConfig.InitialValidatorSet))
+func initStakeManager(polyBFTConfig PolyBFTConfig, transition *state.Transition) error {
+	startValidators := make([]*contractsapi.GenesisValidator, len(polyBFTConfig.InitialValidatorSet))
+
 	for i, validator := range polyBFTConfig.InitialValidatorSet {
-		initialValidators[i] = &contractsapi.ValidatorInit{
-			Addr:  validator.Address,
-			Stake: validator.Stake,
+		blsRaw, err := hex.DecodeHex(validator.BlsKey)
+		if err != nil {
+			return err
+		}
+
+		key, err := bls.UnmarshalPublicKey(blsRaw)
+		if err != nil {
+			return err
+		}
+
+		startValidators[i] = &contractsapi.GenesisValidator{
+			Addr:   validator.Address,
+			Stake:  validator.Stake,
+			BlsKey: key.ToBigInt(),
+		}
+
+		approveFn := &contractsapi.ApproveNativeERC20Fn{
+			Spender: contracts.StakeManagerContract,
+			Amount:  validator.Stake,
+		}
+
+		input, err := approveFn.EncodeAbi()
+		if err != nil {
+			return fmt.Errorf("NativeERC20.approve params encoding failed: %w", err)
+		}
+
+		err = callContract(validator.Address, contracts.NativeERC20TokenContract, input, "NativeERC20.approve", transition)
+		if err != nil {
+			return fmt.Errorf("Error while calling contract %w", err)
 		}
 	}
 
-	initFn := &contractsapi.InitializeValidatorSetFn{
-		NewStateSender:      contracts.L2StateSenderContract,
-		NewStateReceiver:    contracts.StateReceiverContract,
-		NewRootChainManager: polyBFTConfig.Bridge.CustomSupernetManagerAddr,
-		NewEpochSize:        new(big.Int).SetUint64(polyBFTConfig.EpochSize),
-		InitialValidators:   initialValidators,
+	initFn := &contractsapi.InitializeStakeManagerFn{
+		GenesisValidators: startValidators,
+		NewStakingToken:   contracts.NativeERC20TokenContract,
+		NewBls:            contracts.BLSContract,
+		EpochManager:      contracts.EpochManagerContract,
+		NewDomain:         signer.DomainValidatorSetString,
+		Owner:             polyBFTConfig.BladeAdmin,
 	}
 
 	input, err := initFn.EncodeAbi()
 	if err != nil {
-		return fmt.Errorf("ValidatorSet.initialize params encoding failed: %w", err)
+		return fmt.Errorf("StakeManager.initialize params encoding failed: %w", err)
 	}
 
 	return callContract(contracts.SystemCaller,
-		contracts.ValidatorSetContract, input, "ValidatorSet.initialize", transition)
+		contracts.StakeManagerContract, input, "StakeManager.initialize", transition)
 }
 
-// initRewardPool initializes RewardPool SC
-func initRewardPool(polybftConfig PolyBFTConfig, transition *state.Transition) error {
-	initFn := &contractsapi.InitializeRewardPoolFn{
+// initEpochManager initializes EpochManager SC
+func initEpochManager(polybftConfig PolyBFTConfig, transition *state.Transition) error {
+	initFn := &contractsapi.InitializeEpochManagerFn{
 		NewRewardToken:  polybftConfig.RewardConfig.TokenAddress,
 		NewRewardWallet: polybftConfig.RewardConfig.WalletAddress,
-		NewValidatorSet: contracts.ValidatorSetContract,
+		NewStakeManager: contracts.StakeManagerContract,
 		NewBaseReward:   new(big.Int).SetUint64(polybftConfig.EpochReward),
+		NewEpochSize:    new(big.Int).SetUint64(polybftConfig.EpochSize),
 	}
 
 	input, err := initFn.EncodeAbi()
 	if err != nil {
-		return fmt.Errorf("RewardPool.initialize params encoding failed: %w", err)
+		return fmt.Errorf("EpochManager.initialize params encoding failed: %w", err)
 	}
 
 	return callContract(contracts.SystemCaller,
-		contracts.RewardPoolContract, input, "RewardPool.initialize", transition)
+		contracts.EpochManagerContract, input, "EpochManager.initialize", transition)
 }
 
 // getInitERC20PredicateInput builds initialization input parameters for child chain ERC20Predicate SC
@@ -76,7 +107,7 @@ func getInitERC20PredicateInput(config *BridgeConfig, childChainMintable bool) (
 			NewStateReceiver:          contracts.StateReceiverContract,
 			NewRootERC20Predicate:     config.RootERC20PredicateAddr,
 			NewChildTokenTemplate:     contracts.ChildERC20Contract,
-			NewNativeTokenRootAddress: config.RootNativeERC20Addr,
+			NewNativeTokenRootAddress: types.ZeroAddress,
 		}
 	}
 
@@ -103,7 +134,7 @@ func getInitERC20PredicateACLInput(config *BridgeConfig, owner types.Address,
 			NewStateReceiver:          contracts.StateReceiverContract,
 			NewRootERC20Predicate:     config.RootERC20PredicateAddr,
 			NewChildTokenTemplate:     contracts.ChildERC20Contract,
-			NewNativeTokenRootAddress: config.RootNativeERC20Addr,
+			NewNativeTokenRootAddress: types.ZeroAddress,
 			NewUseAllowList:           useAllowList,
 			NewUseBlockList:           useBlockList,
 			NewOwner:                  owner,
@@ -239,11 +270,11 @@ func mintRewardTokensToWallet(polyBFTConfig PolyBFTConfig, transition *state.Tra
 		"RewardToken.mint", transition)
 }
 
-// approveRewardPoolAsSpender approves reward pool contract as reward token spender
-// since reward pool distributes rewards.
-func approveRewardPoolAsSpender(polyBFTConfig PolyBFTConfig, transition *state.Transition) error {
+// approveEpochManagerAsSpender approves EpochManager contract as reward token spender
+// since EpochManager distributes rewards
+func approveEpochManagerAsSpender(polyBFTConfig PolyBFTConfig, transition *state.Transition) error {
 	approveFn := &contractsapi.ApproveRootERC20Fn{
-		Spender: contracts.RewardPoolContract,
+		Spender: contracts.EpochManagerContract,
 		Amount:  polyBFTConfig.RewardConfig.WalletAmount,
 	}
 

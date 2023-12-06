@@ -100,7 +100,7 @@ func TestFSM_verifyCommitEpochTx(t *testing.T) {
 
 	// submit tampered commit epoch transaction to the epoch ending block
 	alteredCommitEpochTx := &types.Transaction{
-		To:    &contracts.ValidatorSetContract,
+		To:    &contracts.EpochManagerContract,
 		Input: []byte{},
 		Gas:   0,
 		Type:  types.StateTx,
@@ -485,7 +485,7 @@ func TestFSM_VerifyStateTransactions_EndOfEpochWrongCommitEpochTx(t *testing.T) 
 	commitEpochInput, err := createTestCommitEpochInput(t, 1, 5).EncodeAbi()
 	require.NoError(t, err)
 
-	commitEpochTx := createStateTransactionWithData(1, contracts.ValidatorSetContract, commitEpochInput)
+	commitEpochTx := createStateTransactionWithData(1, contracts.EpochManagerContract, commitEpochInput)
 	assert.ErrorContains(t, fsm.VerifyStateTransactions([]*types.Transaction{commitEpochTx}), "invalid commit epoch transaction")
 }
 
@@ -832,8 +832,8 @@ func TestFSM_Validate_EpochEndingBlock_MismatchInDeltas(t *testing.T) {
 	stateBlock.Block.Header.ParentHash = parent.Hash
 	stateBlock.Block.Header.Timestamp = uint64(time.Now().UTC().Unix())
 	stateBlock.Block.Transactions = []*types.Transaction{
-		createStateTransactionWithData(1, contracts.ValidatorSetContract, commitEpochTxInput),
-		createStateTransactionWithData(1, contracts.RewardPoolContract, distributeRewardsTxInput),
+		createStateTransactionWithData(1, contracts.EpochManagerContract, commitEpochTxInput),
+		createStateTransactionWithData(1, contracts.EpochManagerContract, distributeRewardsTxInput),
 	}
 
 	proposal := stateBlock.Block.MarshalRLP()
@@ -1308,11 +1308,11 @@ func TestFSM_DecodeCommitEpochStateTx(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, input)
 
-	tx := createStateTransactionWithData(1, contracts.ValidatorSetContract, input)
+	tx := createStateTransactionWithData(1, contracts.EpochManagerContract, input)
 	decodedInputData, err := decodeStateTransaction(tx.Input)
 	require.NoError(t, err)
 
-	decodedCommitEpoch, ok := decodedInputData.(*contractsapi.CommitEpochValidatorSetFn)
+	decodedCommitEpoch, ok := decodedInputData.(*contractsapi.CommitEpochEpochManagerFn)
 	require.True(t, ok)
 	require.True(t, commitEpoch.ID.Cmp(decodedCommitEpoch.ID) == 0)
 	require.NotNil(t, decodedCommitEpoch.Epoch)
@@ -1426,7 +1426,7 @@ func TestFSM_VerifyStateTransaction_InvalidSignature(t *testing.T) {
 
 	var txns []*types.Transaction
 
-	signature := createSignature(t, validators.GetPrivateIdentities("A", "B", "C", "D"), hash, signer.DomainStateReceiver)
+	signature := createSignature(t, validators.GetPrivateIdentities("A", "B", "C", "D", "E"), hash, signer.DomainStateReceiver)
 	invalidValidator := validator.NewTestValidator(t, "G", 1)
 	invalidSignature, err := invalidValidator.MustSign([]byte("malicious message"), signer.DomainStateReceiver).Marshal()
 	require.NoError(t, err)
@@ -1464,7 +1464,7 @@ func TestFSM_VerifyStateTransaction_TwoCommitmentMessages(t *testing.T) {
 
 	var txns []*types.Transaction
 
-	signature := createSignature(t, validators.GetPrivateIdentities("A", "B", "C", "D"), hash, signer.DomainStateReceiver)
+	signature := createSignature(t, validators.GetPrivateIdentities("A", "B", "C", "D", "E"), hash, signer.DomainStateReceiver)
 	commitmentMessageSigned.AggSignature = *signature
 
 	inputData, err := commitmentMessageSigned.EncodeAbi()

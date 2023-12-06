@@ -40,7 +40,7 @@ func TestValidatorSet_getQuorumSize(t *testing.T) {
 		expectedQuorumSize int64
 	}{
 		{10, 7},
-		{12, 8},
+		{12, 9},
 		{13, 9},
 		{50, 34},
 		{100, 67},

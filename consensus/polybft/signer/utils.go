@@ -36,13 +36,13 @@ var (
 
 // MakeKOSKSignature creates KOSK signature which prevents rogue attack
 func MakeKOSKSignature(privateKey *bls.PrivateKey, address types.Address,
-	chainID int64, domain []byte, supernetManagerAddr types.Address) (*bls.Signature, error) {
+	chainID int64, domain []byte, stakeManagerAddr types.Address) (*bls.Signature, error) {
 	spenderABI, err := addressABIType.Encode(address)
 	if err != nil {
 		return nil, err
 	}
 
-	supernetManagerABI, err := addressABIType.Encode(supernetManagerAddr)
+	supernetManagerABI, err := addressABIType.Encode(stakeManagerAddr)
 	if err != nil {
 		return nil, err
 	}

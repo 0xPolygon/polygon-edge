@@ -21,7 +21,7 @@ func TestStateTransaction_Signature(t *testing.T) {
 		sig string
 	}{
 		{
-			contractsapi.ValidatorSet.Abi.GetMethod("commitEpoch"),
+			contractsapi.EpochManager.Abi.GetMethod("commitEpoch"),
 			"0f50287c",
 		},
 	}
@@ -35,7 +35,7 @@ func TestStateTransaction_Encoding(t *testing.T) {
 	t.Parallel()
 
 	cases := []contractsapi.StateTransactionInput{
-		&contractsapi.CommitEpochValidatorSetFn{
+		&contractsapi.CommitEpochEpochManagerFn{
 			ID: big.NewInt(1),
 			Epoch: &contractsapi.Epoch{
 				StartBlock: big.NewInt(1),

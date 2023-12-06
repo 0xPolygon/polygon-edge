@@ -17,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
@@ -50,7 +51,7 @@ const (
 	nonValidatorPrefix = "test-non-validator-"
 
 	// NativeTokenMintableTestCfg is the test native token config for Supernets originated native tokens
-	NativeTokenMintableTestCfg = "Mintable Edge Coin:MEC:18:true:%s" //nolint:gosec
+	NativeTokenMintableTestCfg = "Mintable Edge Coin:MEC:18" //nolint:gosec
 )
 
 type NodeType int
@@ -98,18 +99,20 @@ type TestClusterConfig struct {
 	NonValidatorCount    int
 	WithLogs             bool
 	WithStdout           bool
+	HasBridge            bool
 	LogsDir              string
 	TmpDir               string
 	BlockGasLimit        uint64
 	BlockTime            time.Duration
-	BurnContract         *polybft.BurnContractInfo
 	ValidatorPrefix      string
 	Binary               string
 	ValidatorSetSize     uint64
 	EpochSize            int
 	EpochReward          int
 	NativeTokenConfigRaw string
+	BaseFeeConfig        string
 	SecretsCallback      func([]types.Address, *TestClusterConfig)
+	BladeAdmin           string
 
 	ContractDeployerAllowListAdmin   []types.Address
 	ContractDeployerAllowListEnabled []types.Address
@@ -248,6 +251,22 @@ func WithValidatorSnapshot(validatorsLen uint64) ClusterOption {
 	}
 }
 
+func WithBridge() ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.HasBridge = true
+	}
+}
+
+func WithBaseFeeConfig(config string) ClusterOption {
+	return func(h *TestClusterConfig) {
+		if config == "" {
+			h.BaseFeeConfig = command.DefaultGenesisBaseFeeConfig
+		} else {
+			h.BaseFeeConfig = config
+		}
+	}
+}
+
 func WithGenesisState(databasePath string, stateRoot types.Hash) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.InitialTrieDB = databasePath
@@ -282,12 +301,6 @@ func WithBlockTime(blockTime time.Duration) ClusterOption {
 func WithBlockGasLimit(blockGasLimit uint64) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.BlockGasLimit = blockGasLimit
-	}
-}
-
-func WithBurnContract(burnContract *polybft.BurnContractInfo) ClusterOption {
-	return func(h *TestClusterConfig) {
-		h.BurnContract = burnContract
 	}
 }
 
@@ -399,6 +412,12 @@ func WithProxyContractsAdmin(address string) ClusterOption {
 	}
 }
 
+func WithBladeAdmin(address string) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.BladeAdmin = address
+	}
+}
+
 func isTrueEnv(e string) bool {
 	return strings.ToLower(os.Getenv(e)) == "true"
 }
@@ -425,6 +444,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		EpochReward:   1,
 		BlockGasLimit: 1e7, // 10M
 		StakeAmounts:  []*big.Int{},
+		HasBridge:     false,
 	}
 
 	if config.ValidatorPrefix == "" {
@@ -495,6 +515,13 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			"--trieroot", cluster.Config.InitialStateRoot.String(),
 		}
 
+		bladeAdmin := cluster.Config.BladeAdmin
+		if cluster.Config.BladeAdmin == "" {
+			bladeAdmin = addresses[0].String()
+		}
+
+		args = append(args, "--blade-admin", bladeAdmin)
+
 		if cluster.Config.BlockTime != 0 {
 			args = append(args, "--block-time",
 				cluster.Config.BlockTime.String())
@@ -509,30 +536,26 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			args = append(args, "--reward-token-code", cluster.Config.TestRewardToken)
 		}
 
-		// add optional genesis flags
+		if cluster.Config.BaseFeeConfig != "" {
+			args = append(args, "--base-fee-config", cluster.Config.BaseFeeConfig)
+		}
+
 		if cluster.Config.NativeTokenConfigRaw != "" {
 			args = append(args, "--native-token-config", cluster.Config.NativeTokenConfigRaw)
 		}
 
-		tokenConfig, err := polybft.ParseRawTokenConfig(cluster.Config.NativeTokenConfigRaw)
-		require.NoError(t, err)
+		for _, premine := range cluster.Config.Premine {
+			args = append(args, "--premine", premine)
+		}
 
-		if len(cluster.Config.Premine) != 0 && tokenConfig.IsMintable {
-			// only add premine flags in genesis if token is mintable
-			for _, premine := range cluster.Config.Premine {
-				args = append(args, "--premine", premine)
+		if len(cluster.Config.StakeAmounts) > 0 {
+			for i, addr := range addresses {
+				args = append(args, "--stake", fmt.Sprintf("%s:%s", addr.String(), cluster.getStakeAmount(i).String()))
 			}
 		}
 
-		burnContract := cluster.Config.BurnContract
-		if burnContract != nil {
-			args = append(args, "--burn-contract",
-				fmt.Sprintf("%d:%s:%s",
-					burnContract.BlockNumber, burnContract.Address, burnContract.DestinationAddress))
-		}
-
 		validators, err := genesis.ReadValidatorsByPrefix(
-			cluster.Config.TmpDir, cluster.Config.ValidatorPrefix)
+			cluster.Config.TmpDir, cluster.Config.ValidatorPrefix, nil)
 		require.NoError(t, err)
 
 		if cluster.Config.BootnodeCount > 0 {
@@ -586,24 +609,26 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 				strings.Join(sliceAddressToSliceString(cluster.Config.TransactionsBlockListEnabled), ","))
 		}
 
-		if len(cluster.Config.BridgeAllowListAdmin) != 0 {
-			args = append(args, "--bridge-allow-list-admin",
-				strings.Join(sliceAddressToSliceString(cluster.Config.BridgeAllowListAdmin), ","))
-		}
+		if cluster.Config.HasBridge {
+			if len(cluster.Config.BridgeAllowListAdmin) != 0 {
+				args = append(args, "--bridge-allow-list-admin",
+					strings.Join(sliceAddressToSliceString(cluster.Config.BridgeAllowListAdmin), ","))
+			}
 
-		if len(cluster.Config.BridgeAllowListEnabled) != 0 {
-			args = append(args, "--bridge-allow-list-enabled",
-				strings.Join(sliceAddressToSliceString(cluster.Config.BridgeAllowListEnabled), ","))
-		}
+			if len(cluster.Config.BridgeAllowListEnabled) != 0 {
+				args = append(args, "--bridge-allow-list-enabled",
+					strings.Join(sliceAddressToSliceString(cluster.Config.BridgeAllowListEnabled), ","))
+			}
 
-		if len(cluster.Config.BridgeBlockListAdmin) != 0 {
-			args = append(args, "--bridge-block-list-admin",
-				strings.Join(sliceAddressToSliceString(cluster.Config.BridgeBlockListAdmin), ","))
-		}
+			if len(cluster.Config.BridgeBlockListAdmin) != 0 {
+				args = append(args, "--bridge-block-list-admin",
+					strings.Join(sliceAddressToSliceString(cluster.Config.BridgeBlockListAdmin), ","))
+			}
 
-		if len(cluster.Config.BridgeBlockListEnabled) != 0 {
-			args = append(args, "--bridge-block-list-enabled",
-				strings.Join(sliceAddressToSliceString(cluster.Config.BridgeBlockListEnabled), ","))
+			if len(cluster.Config.BridgeBlockListEnabled) != 0 {
+				args = append(args, "--bridge-block-list-enabled",
+					strings.Join(sliceAddressToSliceString(cluster.Config.BridgeBlockListEnabled), ","))
+			}
 		}
 
 		proxyAdminAddr := cluster.Config.ProxyContractsAdmin
@@ -617,50 +642,22 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		require.NoError(t, err)
 	}
 
-	// start bridge
-	cluster.Bridge, err = NewTestBridge(t, cluster.Config)
-	require.NoError(t, err)
-
-	// deploy stake manager contract
-	err = cluster.Bridge.deployStakeManager(genesisPath)
-	require.NoError(t, err)
-
-	// deploy rootchain contracts
-	err = cluster.Bridge.deployRootchainContracts(genesisPath)
-	require.NoError(t, err)
-
 	polybftConfig, err := polybft.LoadPolyBFTConfig(genesisPath)
 	require.NoError(t, err)
 
-	tokenConfig, err := polybft.ParseRawTokenConfig(cluster.Config.NativeTokenConfigRaw)
-	require.NoError(t, err)
+	if cluster.Config.HasBridge {
+		// start bridge
+		cluster.Bridge, err = NewTestBridge(t, cluster.Config)
+		require.NoError(t, err)
 
-	// fund addresses on the rootchain
-	err = cluster.Bridge.fundAddressesOnRoot(tokenConfig, polybftConfig)
-	require.NoError(t, err)
+		// fund addresses on the rootchain
+		err = cluster.Bridge.fundAddressesOnRoot(polybftConfig)
+		require.NoError(t, err)
 
-	// whitelist genesis validators on the rootchain
-	err = cluster.Bridge.whitelistValidators(addresses, polybftConfig)
-	require.NoError(t, err)
-
-	// register genesis validators on the rootchain
-	err = cluster.Bridge.registerGenesisValidators(polybftConfig)
-	require.NoError(t, err)
-
-	// do initial staking for genesis validators on the rootchain
-	err = cluster.Bridge.initialStakingOfGenesisValidators(polybftConfig)
-	require.NoError(t, err)
-
-	// add premine if token is non-mintable
-	err = cluster.Bridge.mintNativeRootToken(addresses, tokenConfig, polybftConfig)
-	require.NoError(t, err)
-
-	err = cluster.Bridge.premineNativeRootToken(tokenConfig, polybftConfig)
-	require.NoError(t, err)
-
-	// finalize genesis validators on the rootchain
-	err = cluster.Bridge.finalizeGenesis(genesisPath, polybftConfig)
-	require.NoError(t, err)
+		// deploy rootchain contracts
+		err = cluster.Bridge.deployRootchainContracts(genesisPath)
+		require.NoError(t, err)
+	}
 
 	for i := 1; i <= int(cluster.Config.ValidatorSetSize); i++ {
 		nodeType := Validator
@@ -828,6 +825,15 @@ func (c *TestCluster) getOpenPort() int64 {
 	c.initialPort++
 
 	return c.initialPort
+}
+
+func (c *TestCluster) getStakeAmount(validatorIndex int) *big.Int {
+	l := len(c.Config.StakeAmounts)
+	if l == 0 || l <= validatorIndex || validatorIndex < 0 {
+		return command.DefaultStake
+	}
+
+	return c.Config.StakeAmounts[validatorIndex]
 }
 
 // runCommand executes command with given arguments

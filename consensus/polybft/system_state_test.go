@@ -52,7 +52,7 @@ func TestSystemState_GetNextCommittedIndex(t *testing.T) {
 		transition: transition,
 	}
 
-	systemState := NewSystemState(contracts.ValidatorSetContract, result.Address, provider)
+	systemState := NewSystemState(contracts.EpochManagerContract, result.Address, provider)
 
 	expectedNextCommittedIndex := uint64(45)
 	input, err := sideChainBridgeABI.Encode([1]interface{}{expectedNextCommittedIndex})

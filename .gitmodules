@@ -2,6 +2,6 @@
 	path = tests/tests
 	url = https://github.com/ethereum/tests.git
 	shallow = true
-[submodule "core-contracts"]
-	path = core-contracts
-	url = https://github.com/0xPolygon/core-contracts
+[submodule "blade-contracts"]
+	path = blade-contracts
+	url = https://github.com/Ethernal-Tech/blade-contracts

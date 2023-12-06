@@ -1,24 +1,19 @@
 package framework
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"math/big"
 	"path"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
-	"golang.org/x/sync/errgroup"
-
 	"github.com/0xPolygon/polygon-edge/command"
 	bridgeCommon "github.com/0xPolygon/polygon-edge/command/bridge/common"
+	"github.com/0xPolygon/polygon-edge/command/bridge/server"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	cmdHelper "github.com/0xPolygon/polygon-edge/command/helper"
-	rootHelper "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
-	"github.com/0xPolygon/polygon-edge/command/rootchain/server"
 	polybftsecrets "github.com/0xPolygon/polygon-edge/command/secrets/init"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
@@ -50,7 +45,7 @@ func NewTestBridge(t *testing.T, clusterConfig *TestClusterConfig) (*TestBridge,
 func (t *TestBridge) Start() error {
 	// Build arguments
 	args := []string{
-		"rootchain",
+		"bridge",
 		"server",
 		"--data-dir", t.clusterConfig.Dir("test-rootchain"),
 	}
@@ -307,16 +302,9 @@ func (t *TestBridge) cmdRun(args ...string) error {
 
 // deployRootchainContracts deploys and initializes rootchain contracts
 func (t *TestBridge) deployRootchainContracts(genesisPath string) error {
-	polybftConfig, err := polybft.LoadPolyBFTConfig(genesisPath)
-	if err != nil {
-		return err
-	}
-
 	args := []string{
-		"rootchain",
+		"bridge",
 		"deploy",
-		"--stake-manager", polybftConfig.Bridge.StakeManagerAddr.String(),
-		"--stake-token", polybftConfig.Bridge.StakeTokenAddr.String(),
 		"--proxy-contracts-admin", t.clusterConfig.GetProxyContractsAdmin(),
 		"--genesis", genesisPath,
 		"--test",
@@ -330,7 +318,7 @@ func (t *TestBridge) deployRootchainContracts(genesisPath string) error {
 }
 
 // fundAddressesOnRoot sends predefined amount of tokens to rootchain addresses
-func (t *TestBridge) fundAddressesOnRoot(tokenConfig *polybft.TokenConfig, polybftConfig polybft.PolyBFTConfig) error {
+func (t *TestBridge) fundAddressesOnRoot(polybftConfig polybft.PolyBFTConfig) error {
 	validatorSecrets, err := genesis.GetValidatorKeyFiles(t.clusterConfig.TmpDir, t.clusterConfig.ValidatorPrefix)
 	if err != nil {
 		return fmt.Errorf("could not get validator secrets on initial rootchain funding of genesis validators: %w", err)
@@ -345,23 +333,20 @@ func (t *TestBridge) fundAddressesOnRoot(tokenConfig *polybft.TokenConfig, polyb
 		balances[i] = command.DefaultPremineBalance
 	}
 
-	if err := t.FundValidators(polybftConfig.Bridge.StakeTokenAddr,
+	if err := t.FundValidators(
 		secrets, balances); err != nil {
 		return fmt.Errorf("failed to fund validators on the rootchain: %w", err)
 	}
 
 	// then fund all other addresses if token is non-mintable
 	// so that they can do premine on SupernetMAnager
-	if tokenConfig.IsMintable || len(t.clusterConfig.Premine) == 0 {
+	if len(t.clusterConfig.Premine) == 0 {
 		return nil
 	}
 
 	// non-validator addresses don't need to mint stake token,
 	// they only need to be funded with root token
-	args := []string{
-		"rootchain",
-		"fund",
-	}
+	args := []string{"bridge", "fund"}
 
 	for _, premineRaw := range t.clusterConfig.Premine {
 		premineInfo, err := cmdHelper.ParsePremineInfo(premineRaw)
@@ -380,145 +365,13 @@ func (t *TestBridge) fundAddressesOnRoot(tokenConfig *polybft.TokenConfig, polyb
 	return nil
 }
 
-func (t *TestBridge) whitelistValidators(validatorAddresses []types.Address,
-	polybftConfig polybft.PolyBFTConfig) error {
-	addressesAsString := make([]string, len(validatorAddresses))
-	for i := 0; i < len(validatorAddresses); i++ {
-		addressesAsString[i] = validatorAddresses[i].String()
-	}
-
-	args := []string{
-		"polybft",
-		"whitelist-validators",
-		"--addresses", strings.Join(addressesAsString, ","),
-		"--jsonrpc", t.JSONRPCAddr(),
-		"--supernet-manager", polybftConfig.Bridge.CustomSupernetManagerAddr.String(),
-		"--private-key", rootHelper.TestAccountPrivKey,
-	}
-
-	if err := t.cmdRun(args...); err != nil {
-		return fmt.Errorf("failed to whitelist genesis validators on supernet manager: %w", err)
-	}
-
-	return nil
-}
-
-func (t *TestBridge) registerGenesisValidators(polybftConfig polybft.PolyBFTConfig) error {
-	validatorSecrets, err := genesis.GetValidatorKeyFiles(t.clusterConfig.TmpDir, t.clusterConfig.ValidatorPrefix)
-	if err != nil {
-		return fmt.Errorf("could not get validator secrets on whitelist of genesis validators: %w", err)
-	}
-
-	g, ctx := errgroup.WithContext(context.Background())
-
-	for _, secret := range validatorSecrets {
-		secret := secret
-
-		g.Go(func() error {
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			default:
-				args := []string{
-					"polybft",
-					"register-validator",
-					"--jsonrpc", t.JSONRPCAddr(),
-					"--supernet-manager", polybftConfig.Bridge.CustomSupernetManagerAddr.String(),
-					"--" + polybftsecrets.AccountDirFlag, path.Join(t.clusterConfig.TmpDir, secret),
-				}
-
-				if err := t.cmdRun(args...); err != nil {
-					return fmt.Errorf("failed to register genesis validator on supernet manager: %w", err)
-				}
-
-				return nil
-			}
-		})
-	}
-
-	return g.Wait()
-}
-
-func (t *TestBridge) initialStakingOfGenesisValidators(polybftConfig polybft.PolyBFTConfig) error {
-	validatorSecrets, err := genesis.GetValidatorKeyFiles(t.clusterConfig.TmpDir, t.clusterConfig.ValidatorPrefix)
-	if err != nil {
-		return fmt.Errorf("could not get validator secrets on initial staking of genesis validators: %w", err)
-	}
-
-	g, ctx := errgroup.WithContext(context.Background())
-
-	for i, secret := range validatorSecrets {
-		secret := secret
-		i := i
-
-		g.Go(func() error {
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			default:
-				args := []string{
-					"polybft",
-					"stake",
-					"--jsonrpc", t.JSONRPCAddr(),
-					"--stake-manager", polybftConfig.Bridge.StakeManagerAddr.String(),
-					"--" + polybftsecrets.AccountDirFlag, path.Join(t.clusterConfig.TmpDir, secret),
-					"--amount", t.getStakeAmount(i).String(),
-					"--supernet-id", strconv.FormatInt(polybftConfig.SupernetID, 10),
-					"--stake-token", polybftConfig.Bridge.StakeTokenAddr.String(),
-				}
-
-				if err := t.cmdRun(args...); err != nil {
-					return fmt.Errorf("failed to do initial staking for genesis validator on stake manager: %w", err)
-				}
-
-				return nil
-			}
-		})
-	}
-
-	return g.Wait()
-}
-
-func (t *TestBridge) getStakeAmount(validatorIndex int) *big.Int {
-	l := len(t.clusterConfig.StakeAmounts)
-	if l == 0 || l <= validatorIndex {
-		return command.DefaultStake
-	}
-
-	return t.clusterConfig.StakeAmounts[validatorIndex]
-}
-
-func (t *TestBridge) finalizeGenesis(genesisPath string, polybftConfig polybft.PolyBFTConfig) error {
-	args := []string{
-		"polybft",
-		"supernet",
-		"--jsonrpc", t.JSONRPCAddr(),
-		"--private-key", rootHelper.TestAccountPrivKey,
-		"--genesis", genesisPath,
-		"--supernet-manager", polybftConfig.Bridge.CustomSupernetManagerAddr.String(),
-		"--finalize-genesis-set",
-		"--enable-staking",
-	}
-
-	if err := t.cmdRun(args...); err != nil {
-		return fmt.Errorf("failed to finalize genesis validators on supernet manager: %w", err)
-	}
-
-	return nil
-}
-
 // FundValidators sends tokens to a rootchain validators
-func (t *TestBridge) FundValidators(tokenAddress types.Address, secretsPaths []string, amounts []*big.Int) error {
+func (t *TestBridge) FundValidators(secretsPaths []string, amounts []*big.Int) error {
 	if len(secretsPaths) != len(amounts) {
 		return errors.New("expected the same length of secrets paths and amounts")
 	}
 
-	args := []string{
-		"rootchain",
-		"fund",
-		"--stake-token", tokenAddress.String(),
-		"--mint",
-	}
+	args := []string{"bridge", "fund"}
 
 	for i := 0; i < len(secretsPaths); i++ {
 		secretsManager, err := polybftsecrets.GetSecretsManager(secretsPaths[i], "", true)
@@ -540,141 +393,4 @@ func (t *TestBridge) FundValidators(tokenAddress types.Address, secretsPaths []s
 	}
 
 	return nil
-}
-
-func (t *TestBridge) deployStakeManager(genesisPath string) error {
-	args := []string{
-		"polybft",
-		"stake-manager-deploy",
-		"--jsonrpc", t.JSONRPCAddr(),
-		"--genesis", genesisPath,
-		"--proxy-contracts-admin", t.clusterConfig.GetProxyContractsAdmin(),
-		"--test",
-	}
-
-	if err := t.cmdRun(args...); err != nil {
-		return fmt.Errorf("failed to deploy stake manager contract: %w", err)
-	}
-
-	return nil
-}
-
-func (t *TestBridge) mintNativeRootToken(validatorAddresses []types.Address, tokenConfig *polybft.TokenConfig,
-	polybftConfig polybft.PolyBFTConfig) error {
-	if tokenConfig.IsMintable {
-		// if token is mintable, it is premined in genesis command,
-		// so we just return here
-		return nil
-	}
-
-	// if token is non-mintable, then to do premine we first need to mint those tokens
-	// to validators and other provided addresses
-	args := []string{
-		"bridge",
-		"mint-erc20",
-		"--jsonrpc", t.JSONRPCAddr(),
-		"--erc20-token", polybftConfig.Bridge.RootNativeERC20Addr.String(),
-	}
-
-	// mint something for every validator
-	for _, addr := range validatorAddresses {
-		args = append(args, "--addresses", addr.String())
-		args = append(args, "--amounts", command.DefaultPremineBalance.String())
-	}
-
-	// mint something to others as well
-	for _, premineRaw := range t.clusterConfig.Premine {
-		premineInfo, err := cmdHelper.ParsePremineInfo(premineRaw)
-		if err != nil {
-			return err
-		}
-
-		args = append(args, "--addresses", premineInfo.Address.String())
-		args = append(args, "--amounts", premineInfo.Amount.String())
-	}
-
-	return t.cmdRun(args...)
-}
-
-func (t *TestBridge) premineNativeRootToken(tokenConfig *polybft.TokenConfig,
-	polybftConfig polybft.PolyBFTConfig) error {
-	if tokenConfig.IsMintable {
-		// if token is mintable, it is premined in genesis command,
-		// so we just return here
-		return nil
-	}
-
-	validatorSecrets, err := genesis.GetValidatorKeyFiles(t.clusterConfig.TmpDir, t.clusterConfig.ValidatorPrefix)
-	if err != nil {
-		return fmt.Errorf("could not get validator secrets on premining native root"+
-			" token for genesis validators: %w", err)
-	}
-
-	premineCmdArgs := func(secret, key string, amount *big.Int) error {
-		args := []string{
-			"rootchain",
-			"premine",
-			"--jsonrpc", t.JSONRPCAddr(),
-			"--supernet-manager", polybftConfig.Bridge.CustomSupernetManagerAddr.String(),
-			"--amount", amount.String(),
-			"--erc20-token", polybftConfig.Bridge.RootNativeERC20Addr.String(),
-			"--root-erc20-predicate", polybftConfig.Bridge.RootERC20PredicateAddr.String(),
-		}
-
-		if secret != "" {
-			args = append(args, "--"+polybftsecrets.AccountDirFlag, path.Join(t.clusterConfig.TmpDir, secret))
-		} else {
-			args = append(args, "--private-key", key)
-		}
-
-		return t.cmdRun(args...)
-	}
-
-	g, ctx := errgroup.WithContext(context.Background())
-
-	// premine validators
-	for _, secret := range validatorSecrets {
-		secret := secret
-
-		g.Go(func() error {
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			default:
-				if err := premineCmdArgs(secret, "", command.DefaultPremineBalance); err != nil {
-					return fmt.Errorf("failed to do premine of native root token for genesis validator: %w",
-						err)
-				}
-
-				return nil
-			}
-		})
-	}
-
-	// now premine for other addresses
-	for _, premineRaw := range t.clusterConfig.Premine {
-		premineRaw := premineRaw
-
-		g.Go(func() error {
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			default:
-				premineInfo, err := cmdHelper.ParsePremineInfo(premineRaw)
-				if err != nil {
-					return fmt.Errorf("failed to do premine of native root token for non-validator"+
-						" account: %w. premine raw: %s", err, premineRaw)
-				}
-
-				if err := premineCmdArgs("", premineInfo.Key, premineInfo.Amount); err != nil {
-					return fmt.Errorf("failed to do premine of native root token for "+
-						"non-validator account: %w. premine raw: %s", err, premineRaw)
-				}
-
-				return nil
-			}
-		})
-	}
-
-	return g.Wait()
 }

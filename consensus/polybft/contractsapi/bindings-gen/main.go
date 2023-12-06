@@ -34,7 +34,7 @@ type generatedData struct {
 }
 
 func main() {
-	cases := []struct {
+	contractsMetadata := []struct {
 		contractName        string
 		artifact            *artifact.Artifact
 		generateConstructor bool
@@ -140,15 +140,7 @@ func main() {
 			false,
 			[]string{
 				"initialize",
-			},
-			[]string{},
-		},
-		{
-			"NativeERC20Mintable",
-			gensc.NativeERC20Mintable,
-			false,
-			[]string{
-				"initialize",
+				"approve",
 			},
 			[]string{},
 		},
@@ -344,70 +336,36 @@ func main() {
 			[]string{},
 		},
 		{
-			"CustomSupernetManager",
-			gensc.CustomSupernetManager,
-			false,
-			[]string{
-				"initialize",
-				"whitelistValidators",
-				"register",
-				"getValidator",
-				"addGenesisBalance",
-			},
-			[]string{
-				"ValidatorRegistered",
-				"AddedToWhitelist",
-			},
-		},
-		{
 			"StakeManager",
 			gensc.StakeManager,
 			false,
 			[]string{
 				"initialize",
-				"registerChildChain",
-				"stakeFor",
-				"releaseStakeOf",
-				"withdrawStake",
+				"stake",
 				"stakeOf",
+				"withdraw",
+				"getValidator",
+				"whitelistValidators",
+				"register",
+				"unstake",
 			},
 			[]string{
-				"ChildManagerRegistered",
 				"StakeAdded",
+				"StakeRemoved",
 				"StakeWithdrawn",
+				"ValidatorRegistered",
+				"AddedToWhitelist",
+				"Transfer",
 			},
 		},
 		{
-			"ValidatorSet",
-			gensc.ValidatorSet,
+			"EpochManager",
+			gensc.EpochManager,
 			false,
 			[]string{
 				"commitEpoch",
-				"unstake",
-				"initialize",
-			},
-			[]string{
-				"Transfer",
-				"WithdrawalRegistered",
-				"Withdrawal",
-			},
-		},
-		{
-			"RewardPool",
-			gensc.RewardPool,
-			false,
-			[]string{
 				"initialize",
 				"distributeRewardFor",
-			},
-			[]string{},
-		},
-		{
-			"EIP1559Burn",
-			gensc.EIP1559Burn,
-			false,
-			[]string{
-				"initialize",
 			},
 			[]string{},
 		},
@@ -432,7 +390,7 @@ func main() {
 
 	generatedData := &generatedData{}
 
-	for _, c := range cases {
+	for _, c := range contractsMetadata {
 		if c.generateConstructor {
 			if err := generateConstructor(generatedData, c.contractName, c.artifact.Abi.Constructor); err != nil {
 				log.Fatal(err)
@@ -456,12 +414,14 @@ func main() {
 			}
 
 			if err := generateFunction(generatedData, c.contractName, method, resolvedBySignature); err != nil {
+				fmt.Println("Contract name", c.contractName, "Function name", methodRaw)
 				log.Fatal(err)
 			}
 		}
 
 		for _, event := range c.events {
 			if err := generateEvent(generatedData, c.contractName, c.artifact.Abi.Events[event]); err != nil {
+				fmt.Println("Contract name", c.contractName, "Event name", event)
 				log.Fatal(err)
 			}
 		}

@@ -296,7 +296,7 @@ func erc721OwnerOf(t *testing.T, tokenID *big.Int, tokenAddr types.Address, rela
 func queryNativeERC20Metadata(t *testing.T, funcName string, abiType *abi.Type, relayer txrelayer.TxRelayer) interface{} {
 	t.Helper()
 
-	valueHex, err := ABICall(relayer, contractsapi.NativeERC20Mintable,
+	valueHex, err := ABICall(relayer, contractsapi.NativeERC20,
 		ethgo.Address(contracts.NativeERC20TokenContract),
 		ethgo.ZeroAddress, funcName)
 	require.NoError(t, err)

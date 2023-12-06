@@ -3,6 +3,7 @@ package framework
 import (
 	"math/big"
 
+	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -40,13 +41,12 @@ type TestServerConfig struct {
 	DevInterval             int             // Dev consensus update interval [s]
 	BlockGasLimit           uint64          // Block gas limit
 	BlockGasTarget          uint64          // Gas target for new blocks
-	BaseFee                 uint64          // Initial base fee
+	BaseFeeConfig           string          // Base fee configuration
 	ShowsLog                bool            // Flag specifying if logs are shown
 	Name                    string          // Name of the server
 	SaveLogs                bool            // Flag specifying if logs are saved
 	LogsDir                 string          // Directory where logs are saved
 	Signer                  crypto.TxSigner // Signer used for transactions
-
 }
 
 // DataDir returns path of data directory server uses
@@ -121,4 +121,13 @@ func (t *TestServerConfig) SetLogsDir(dir string) {
 // SetName sets the name of the server
 func (t *TestServerConfig) SetName(name string) {
 	t.Name = name
+}
+
+// SetBaseFeeConfig sets base fee configuration
+func (t *TestServerConfig) SetBaseFeeConfig(baseFeeConfig string) {
+	if baseFeeConfig == "" {
+		t.BaseFeeConfig = command.DefaultGenesisBaseFeeConfig
+	} else {
+		t.BaseFeeConfig = baseFeeConfig
+	}
 }

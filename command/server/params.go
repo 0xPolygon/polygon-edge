@@ -38,13 +38,17 @@ const (
 	corsOriginFlag               = "access-control-allow-origins"
 	logFileLocationFlag          = "log-to"
 
-	relayerFlag               = "relayer"
-	numBlockConfirmationsFlag = "num-block-confirmations"
+	relayerFlag = "relayer"
 
 	concurrentRequestsDebugFlag = "concurrent-requests-debug"
 	webSocketReadLimitFlag      = "websocket-read-limit"
 
 	metricsIntervalFlag = "metrics-interval"
+
+	// event tracker
+	trackerSyncBatchSizeFlag          = "sync-batch-size"
+	trackerNumBlockConfirmationsFlag  = "num-block-confirmations"
+	trackerNumOfBlocksToReconcileFlag = "num-blocks-reconcile"
 )
 
 const (
@@ -54,9 +58,10 @@ const (
 var (
 	params = &serverParams{
 		rawConfig: &config.Config{
-			Telemetry: &config.Telemetry{},
-			Network:   &config.Network{},
-			TxPool:    &config.TxPool{},
+			Telemetry:    &config.Telemetry{},
+			Network:      &config.Network{},
+			TxPool:       &config.TxPool{},
+			EventTracker: &config.EventTracker{},
 		},
 	}
 )
@@ -179,8 +184,12 @@ func (p *serverParams) generateConfig() *server.Config {
 		JSONLogFormat:      p.rawConfig.JSONLogFormat,
 		LogFilePath:        p.logFileLocation,
 
-		Relayer:               p.relayer,
-		NumBlockConfirmations: p.rawConfig.NumBlockConfirmations,
-		MetricsInterval:       p.rawConfig.MetricsInterval,
+		Relayer:         p.relayer,
+		MetricsInterval: p.rawConfig.MetricsInterval,
+		EventTracker: &server.EventTracker{
+			SyncBatchSize:          p.rawConfig.EventTracker.SyncBatchSize,
+			NumBlockConfirmations:  p.rawConfig.EventTracker.NumBlockConfirmations,
+			NumOfBlocksToReconcile: p.rawConfig.EventTracker.NumOfBlocksToReconcile,
+		},
 	}
 }

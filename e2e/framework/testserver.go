@@ -195,13 +195,7 @@ func (t *TestServer) GenerateGenesis() error {
 	blockGasLimit := strconv.FormatUint(t.Config.BlockGasLimit, 10)
 	args = append(args, "--block-gas-limit", blockGasLimit)
 
-	// add base fee
-	if t.Config.BaseFee != 0 {
-		args = append(args, "--base-fee-config", *common.EncodeUint64(t.Config.BaseFee))
-	}
-
-	// london hardfork is enabled by default so there must be a default burn contract
-	args = append(args, "--burn-contract", "0:0x0000000000000000000000000000000000000000")
+	args = append(args, "--base-fee-config", t.Config.BaseFeeConfig)
 
 	cmd := exec.Command(resolveBinary(), args...) //nolint:gosec
 	cmd.Dir = t.Config.RootDir

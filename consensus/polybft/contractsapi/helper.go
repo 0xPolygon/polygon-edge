@@ -1,7 +1,6 @@
 package contractsapi
 
 import (
-	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
 )
@@ -39,17 +38,6 @@ func (sse *StateSyncedEvent) EncodeAbi() ([]byte, error) {
 }
 
 var (
-	_ StateTransactionInput = &CommitEpochValidatorSetFn{}
-	_ StateTransactionInput = &DistributeRewardForRewardPoolFn{}
+	_ StateTransactionInput = &CommitEpochEpochManagerFn{}
+	_ StateTransactionInput = &DistributeRewardForEpochManagerFn{}
 )
-
-// IsStake indicates if transfer event (from ERC20 implementation) mints tokens to a non zero address
-func (t *TransferEvent) IsStake() bool {
-	return t.To != types.ZeroAddress && t.From == types.ZeroAddress
-}
-
-// IsUnstake indicates if transfer event (from ERC20 implementation) burns tokens from a non zero address
-// meaning, it transfers them to zero address
-func (t *TransferEvent) IsUnstake() bool {
-	return t.To == types.ZeroAddress && t.From != types.ZeroAddress
-}

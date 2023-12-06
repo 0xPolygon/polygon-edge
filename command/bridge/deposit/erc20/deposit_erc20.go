@@ -10,7 +10,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/bridge/common"
-	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
+	"github.com/0xPolygon/polygon-edge/command/bridge/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	helperCommon "github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/txrelayer"

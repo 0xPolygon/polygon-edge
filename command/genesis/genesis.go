@@ -60,6 +60,16 @@ func setFlags(cmd *cobra.Command) {
 		),
 	)
 
+	cmd.Flags().StringArrayVar(
+		&params.stake,
+		stakeFlag,
+		[]string{},
+		fmt.Sprintf(
+			"the staked accounts and balances (format: <address>[:<stake>]). Default staked balance: %d",
+			command.DefaultStake,
+		),
+	)
+
 	cmd.Flags().Uint64Var(
 		&params.blockGasLimit,
 		blockGasLimitFlag,
@@ -68,16 +78,9 @@ func setFlags(cmd *cobra.Command) {
 	)
 
 	cmd.Flags().StringVar(
-		&params.burnContract,
-		burnContractFlag,
-		"",
-		"the burn contract block and address (format: <block>:<address>[:<burn destination>])",
-	)
-
-	cmd.Flags().StringVar(
 		&params.baseFeeConfig,
 		genesisBaseFeeConfigFlag,
-		command.DefaultGenesisBaseFeeConfig,
+		"",
 		`initial base fee(in wei), base fee elasticity multiplier, and base fee change denominator
 		(provided in the following format: [<baseFee>][:<baseFeeEM>][:<baseFeeChangeDenom>]). 
 		BaseFeeChangeDenom represents the value to bound the amount the base fee can change between blocks.
@@ -187,7 +190,7 @@ func setFlags(cmd *cobra.Command) {
 			nativeTokenConfigFlag,
 			"",
 			"native token configuration, provided in the following format: "+
-				"<name:symbol:decimals count:mintable flag:[mintable token owner address]>",
+				"<name:symbol:decimals count>",
 		)
 
 		cmd.Flags().StringVar(
@@ -216,6 +219,13 @@ func setFlags(cmd *cobra.Command) {
 			blockTrackerPollIntervalFlag,
 			defaultBlockTrackerPollInterval,
 			"interval (number of seconds) at which block tracker polls for latest block at rootchain",
+		)
+
+		cmd.Flags().StringVar(
+			&params.bladeAdmin,
+			bladeAdminFlag,
+			"",
+			"address of owner/admin of NativeERC20 token and StakeManager",
 		)
 	}
 

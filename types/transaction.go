@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 
 	"github.com/0xPolygon/polygon-edge/helper/common"
+	"github.com/0xPolygon/polygon-edge/helper/keccak"
 )
 
 const (
@@ -84,7 +85,9 @@ func (t *Transaction) IsValueTransfer() bool {
 
 // ComputeHash computes the hash of the transaction
 func (t *Transaction) ComputeHash(blockNumber uint64) *Transaction {
-	GetTransactionHashHandler(blockNumber).ComputeHash(t)
+	hash := keccak.DefaultKeccakPool.Get()
+	hash.WriteFn(t.Hash[:0], t.MarshalRLPTo)
+	keccak.DefaultKeccakPool.Put(hash)
 
 	return t
 }

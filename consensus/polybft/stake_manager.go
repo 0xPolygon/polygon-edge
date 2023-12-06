@@ -14,17 +14,19 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
-	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
+	"github.com/umbracle/ethgo/contract"
 	bolt "go.etcd.io/bbolt"
 )
 
 var (
 	bigZero          = big.NewInt(0)
-	validatorTypeABI = abi.MustNewType("tuple(uint256[4] blsKey, uint256 stake, bool isWhitelisted, bool isActive)")
+	validatorTypeABI = abi.MustNewType("tuple(uint256[4] blsKey," +
+		"uint256 stake, bool isWhitelisted, bool isActive)")
+	errUnknownStakeManagerEvent = errors.New("unknown event from stake manager contract")
 )
 
 // StakeManager interface provides functions for handling stake change of validators
@@ -42,6 +44,7 @@ var _ StakeManager = (*dummyStakeManager)(nil)
 type dummyStakeManager struct{}
 
 func (d *dummyStakeManager) PostBlock(req *PostBlockRequest) error { return nil }
+
 func (d *dummyStakeManager) UpdateValidatorSet(epoch uint64,
 	currentValidatorSet validator.AccountSet) (*validator.ValidatorSetDelta, error) {
 	return &validator.ValidatorSetDelta{}, nil
@@ -51,6 +54,7 @@ func (d *dummyStakeManager) UpdateValidatorSet(epoch uint64,
 func (d *dummyStakeManager) GetLogFilters() map[types.Address][]types.Hash {
 	return make(map[types.Address][]types.Hash)
 }
+
 func (d *dummyStakeManager) ProcessLog(header *types.Header, log *ethgo.Log, dbTx *bolt.Tx) error {
 	return nil
 }
@@ -60,37 +64,36 @@ var _ StakeManager = (*stakeManager)(nil)
 // stakeManager saves transfer events that happened in each block
 // and calculates updated validator set based on changed stake
 type stakeManager struct {
-	logger                  hclog.Logger
-	state                   *State
-	rootChainRelayer        txrelayer.TxRelayer
-	key                     ethgo.Key
-	supernetManagerContract types.Address
-	validatorSetContract    types.Address
-	maxValidatorSetSize     int
-	polybftBackend          polybftBackend
+	logger                   hclog.Logger
+	state                    *State
+	key                      ethgo.Key
+	stakeManagerContractAddr types.Address
+	validatorSetContract     types.Address
+	maxValidatorSetSize      int
+	polybftBackend           polybftBackend
+	stakeManagerContract     *contract.Contract
+	blockchain               blockchainBackend
 }
 
 // newStakeManager returns a new instance of stake manager
 func newStakeManager(
 	logger hclog.Logger,
 	state *State,
-	rootchainRelayer txrelayer.TxRelayer,
 	key ethgo.Key,
-	validatorSetAddr, supernetManagerAddr types.Address,
+	stakeManagerAddr types.Address,
 	blockchain blockchainBackend,
 	polybftBackend polybftBackend,
 	maxValidatorSetSize int,
 	dbTx *bolt.Tx,
 ) (*stakeManager, error) {
 	sm := &stakeManager{
-		logger:                  logger,
-		state:                   state,
-		rootChainRelayer:        rootchainRelayer,
-		key:                     key,
-		supernetManagerContract: supernetManagerAddr,
-		validatorSetContract:    validatorSetAddr,
-		maxValidatorSetSize:     maxValidatorSetSize,
-		polybftBackend:          polybftBackend,
+		logger:                   logger,
+		state:                    state,
+		key:                      key,
+		stakeManagerContractAddr: stakeManagerAddr,
+		maxValidatorSetSize:      maxValidatorSetSize,
+		polybftBackend:           polybftBackend,
+		blockchain:               blockchain,
 	}
 
 	if err := sm.init(blockchain, dbTx); err != nil {
@@ -151,27 +154,46 @@ func (s *stakeManager) init(blockchain blockchainBackend, dbTx *bolt.Tx) error {
 
 	// we will use eventsGetter to update the fullValidatorSet if
 	// for any reason, we don't have the correct state
-	eventsGetter := &eventsGetter[*contractsapi.TransferEvent]{
+	eventsGetter := &eventsGetter[contractsapi.EventAbi]{
 		receiptsGetter: receiptsGetter{
 			blockchain: blockchain,
 		},
 		isValidLogFn: func(l *types.Log) bool {
-			return l.Address == s.validatorSetContract
+			return l.Address == s.stakeManagerContractAddr
 		},
-		parseEventFn: func(h *types.Header, l *ethgo.Log) (*contractsapi.TransferEvent, bool, error) {
-			var transferEvent contractsapi.TransferEvent
-			doesMatch, err := transferEvent.ParseLog(l)
+		parseEventFn: func(h *types.Header, l *ethgo.Log) (contractsapi.EventAbi, bool, error) {
+			var (
+				stakeAddedEvent   contractsapi.StakeAddedEvent
+				stakeRemovedEvent contractsapi.StakeRemovedEvent
+			)
 
-			return &transferEvent, doesMatch, err
+			switch l.Topics[0] {
+			case stakeAddedEvent.Sig():
+				doesMatch, err := stakeAddedEvent.ParseLog(l)
+				if err != nil {
+					return nil, false, err
+				}
+
+				return &stakeAddedEvent, doesMatch, err
+			case stakeRemovedEvent.Sig():
+				doesMatch, err := stakeRemovedEvent.ParseLog(l)
+				if err != nil {
+					return nil, false, err
+				}
+
+				return &stakeRemovedEvent, doesMatch, err
+			default:
+				return nil, false, nil
+			}
 		},
 	}
 
-	transferEvents, err := eventsGetter.getEventsFromBlocksRange(validatorSet.BlockNumber+1, currentBlockNumber)
+	stakeEvents, err := eventsGetter.getEventsFromBlocksRange(validatorSet.BlockNumber+1, currentBlockNumber)
 	if err != nil {
 		return err
 	}
 
-	if err := s.updateWithReceipts(&validatorSet, transferEvents, currentBlockNumber); err != nil {
+	if err := s.updateWithReceipts(&validatorSet, stakeEvents, currentBlockNumber); err != nil {
 		return err
 	}
 
@@ -212,26 +234,25 @@ func (s *stakeManager) getOrInitValidatorSet(dbTx *bolt.Tx) (validatorSetState, 
 
 func (s *stakeManager) updateWithReceipts(
 	fullValidatorSet *validatorSetState,
-	transferEvents []*contractsapi.TransferEvent,
+	events []contractsapi.EventAbi,
 	blockNumber uint64) error {
-	if len(transferEvents) == 0 {
+	if len(events) == 0 {
 		return nil
 	}
 
-	for _, event := range transferEvents {
-		if event.IsStake() {
-			s.logger.Debug("Stake transfer event", "to", event.To, "value", event.Value)
+	for _, event := range events {
+		switch stakeEvent := event.(type) {
+		case *contractsapi.StakeAddedEvent:
+			s.logger.Debug("Stake added event", "to", stakeEvent.Validator, "amount", stakeEvent.Amount)
 
-			// then this amount was minted To validator address
-			fullValidatorSet.Validators.addStake(event.To, event.Value)
-		} else if event.IsUnstake() {
-			s.logger.Debug("Unstake transfer event", "from", event.From, "value", event.Value)
+			fullValidatorSet.Validators.addStake(stakeEvent.Validator, stakeEvent.Amount)
+		case *contractsapi.StakeRemovedEvent:
+			s.logger.Debug("Stake removed event", "from", stakeEvent.Validator, "value", stakeEvent.Amount)
 
-			// then this amount was burned From validator address
-			fullValidatorSet.Validators.removeStake(event.From, event.Value)
-		} else {
+			fullValidatorSet.Validators.removeStake(stakeEvent.Validator, stakeEvent.Amount)
+		default:
 			// this should not happen, but lets log it if it does
-			s.logger.Warn("Found a transfer event that represents neither stake nor unstake")
+			s.logger.Warn("Found a stake event that represents neither stake nor unstake")
 		}
 	}
 
@@ -334,39 +355,27 @@ func (s *stakeManager) UpdateValidatorSet(
 
 // getBlsKey returns bls key for validator from the supernet contract
 func (s *stakeManager) getBlsKey(address types.Address) (*bls.PublicKey, error) {
-	getValidatorFn := &contractsapi.GetValidatorCustomSupernetManagerFn{
-		Validator_: address,
-	}
-
-	encoded, err := getValidatorFn.EncodeAbi()
+	provider, err := s.blockchain.GetStateProviderForBlock(s.blockchain.CurrentHeader())
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := s.rootChainRelayer.Call(
-		s.key.Address(),
-		ethgo.Address(s.supernetManagerContract),
-		encoded)
-	if err != nil {
-		return nil, fmt.Errorf("failed to invoke validators function on the supernet manager: %w", err)
-	}
+	stakeManagerContractContract := contract.NewContract(
+		ethgo.Address(s.stakeManagerContractAddr),
+		contractsapi.StakeManager.Abi, contract.WithProvider(provider),
+	)
 
-	byteResponse, err := hex.DecodeHex(response)
-	if err != nil {
-		return nil, fmt.Errorf("unable to decode hex response, %w", err)
-	}
-
-	decoded, err := validatorTypeABI.Decode(byteResponse)
+	rawResult, err := stakeManagerContractContract.Call("getValidator", ethgo.Latest, address)
 	if err != nil {
 		return nil, err
 	}
 
-	output, ok := decoded.(map[string]interface{})
+	validatorData, ok := rawResult["0"].(map[string]interface{})
 	if !ok {
-		return nil, fmt.Errorf("could not convert decoded outputs to map")
+		return nil, fmt.Errorf("could not collect validator's data (%s) from StakeManager", address)
 	}
 
-	blsKey, ok := output["blsKey"].([4]*big.Int)
+	blsKey, ok := validatorData["blsKey"].([4]*big.Int)
 	if !ok {
 		return nil, fmt.Errorf("failed to decode blskey")
 	}
@@ -386,25 +395,48 @@ func (s *stakeManager) getBlsKey(address types.Address) (*bls.PublicKey, error) 
 // and the value is a slice of signatures of events we want to get.
 // This function is the implementation of EventSubscriber interface
 func (s *stakeManager) GetLogFilters() map[types.Address][]types.Hash {
-	var transferEvent contractsapi.TransferEvent
-
 	return map[types.Address][]types.Hash{
-		s.validatorSetContract: {types.Hash(transferEvent.Sig())},
+		s.stakeManagerContractAddr: {
+			types.Hash(new(contractsapi.StakeAddedEvent).Sig()),
+			types.Hash(new(contractsapi.StakeRemovedEvent).Sig()),
+		},
 	}
 }
 
 // ProcessLog is the implementation of EventSubscriber interface,
 // used to handle a log defined in GetLogFilters, provided by event provider
 func (s *stakeManager) ProcessLog(header *types.Header, log *ethgo.Log, dbTx *bolt.Tx) error {
-	var transferEvent contractsapi.TransferEvent
+	var (
+		stakeAddedEvent   contractsapi.StakeAddedEvent
+		stakeRemovedEvent contractsapi.StakeRemovedEvent
+		stakeEvents       = make([]contractsapi.EventAbi, 1)
+	)
 
-	doesMatch, err := transferEvent.ParseLog(log)
-	if err != nil {
-		return err
-	}
+	switch log.Topics[0] {
+	case stakeAddedEvent.Sig():
+		doesMatch, err := stakeAddedEvent.ParseLog(log)
+		if err != nil {
+			return err
+		}
 
-	if !doesMatch {
-		return nil
+		if !doesMatch {
+			return nil
+		}
+
+		stakeEvents[0] = &stakeAddedEvent
+	case stakeRemovedEvent.Sig():
+		doesMatch, err := stakeRemovedEvent.ParseLog(log)
+		if err != nil {
+			return err
+		}
+
+		if !doesMatch {
+			return nil
+		}
+
+		stakeEvents[0] = &stakeRemovedEvent
+	default:
+		return errUnknownStakeManagerEvent
 	}
 
 	fullValidatorSet, err := s.getOrInitValidatorSet(dbTx)
@@ -412,8 +444,7 @@ func (s *stakeManager) ProcessLog(header *types.Header, log *ethgo.Log, dbTx *bo
 		return err
 	}
 
-	if err := s.updateWithReceipts(&fullValidatorSet,
-		[]*contractsapi.TransferEvent{&transferEvent}, header.Number); err != nil {
+	if err := s.updateWithReceipts(&fullValidatorSet, stakeEvents, header.Number); err != nil {
 		return err
 	}
 

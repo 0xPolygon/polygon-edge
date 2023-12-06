@@ -268,8 +268,8 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 	// init validator sets
 	validatorSetSize := []int{5, 10, 50, 100}
 
-	intialBalance := uint64(5 * math.Pow(10, 18)) // 5 tokens
-	reward := uint64(math.Pow(10, 18))            // 1 token
+	initialBalance := uint64(5 * math.Pow(10, 18)) // 5 tokens
+	reward := uint64(math.Pow(10, 18))             // 1 token
 	walletAddress := types.StringToAddress("1234889893")
 
 	validatorSets := make([]*validator.TestValidators, len(validatorSetSize), len(validatorSetSize))
@@ -281,7 +281,7 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 
 		for j := 0; j < size; j++ {
 			aliases[j] = "v" + strconv.Itoa(j)
-			vps[j] = intialBalance
+			vps[j] = initialBalance
 		}
 
 		validatorSets[i] = validator.NewTestValidatorsWithAliases(t, aliases, vps)
@@ -295,17 +295,17 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 		initValidators := make([]*validator.GenesisValidator, accSet.Len())
 		// add contracts to genesis data
 		alloc := map[types.Address]*chain.GenesisAccount{
-			contracts.ValidatorSetContract: {
-				Code: contractsapi.ValidatorSet.DeployedBytecode,
-			},
-			contracts.RewardPoolContract: {
-				Code: contractsapi.RewardPool.DeployedBytecode,
+			contracts.EpochManagerContract: {
+				Code: contractsapi.EpochManager.DeployedBytecode,
 			},
 			contracts.NativeERC20TokenContract: {
 				Code: contractsapi.NativeERC20.DeployedBytecode,
 			},
+			contracts.StakeManagerContract: {
+				Code: contractsapi.StakeManager.DeployedBytecode,
+			},
 			walletAddress: {
-				Balance: new(big.Int).SetUint64(intialBalance),
+				Balance: new(big.Int).SetUint64(initialBalance),
 			},
 		}
 
@@ -333,26 +333,20 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 			RewardConfig: &RewardsConfig{
 				TokenAddress:  contracts.NativeERC20TokenContract,
 				WalletAddress: walletAddress,
-				WalletAmount:  new(big.Int).SetUint64(intialBalance),
-			},
-			Bridge: &BridgeConfig{
-				CustomSupernetManagerAddr: types.StringToAddress("0x12312451"),
+				WalletAmount:  new(big.Int).SetUint64(initialBalance),
 			},
 		}
 
 		transition := newTestTransition(t, alloc)
 
-		// init ValidatorSet
-		err := initValidatorSet(polyBFTConfig, transition)
-		require.NoError(t, err)
+		// init StakeManager
+		require.NoError(t, initStakeManager(polyBFTConfig, transition))
 
-		// init RewardPool
-		err = initRewardPool(polyBFTConfig, transition)
-		require.NoError(t, err)
+		// init EpochManager
+		require.NoError(t, initEpochManager(polyBFTConfig, transition))
 
-		// approve reward pool as reward token spender
-		err = approveRewardPoolAsSpender(polyBFTConfig, transition)
-		require.NoError(t, err)
+		// approve EpochManager as reward token spender
+		require.NoError(t, approveEpochManagerAsSpender(polyBFTConfig, transition))
 
 		// create input for commit epoch
 		commitEpoch := createTestCommitEpochInput(t, 1, polyBFTConfig.EpochSize)
@@ -360,7 +354,7 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 		require.NoError(t, err)
 
 		// call commit epoch
-		result := transition.Call2(contracts.SystemCaller, contracts.ValidatorSetContract, input, big.NewInt(0), 10000000000)
+		result := transition.Call2(contracts.SystemCaller, contracts.EpochManagerContract, input, big.NewInt(0), 10000000000)
 		require.NoError(t, result.Err)
 		t.Logf("Number of validators %d on commit epoch, Gas used %+v\n", accSet.Len(), result.GasUsed)
 
@@ -370,7 +364,7 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 		require.NoError(t, err)
 
 		// call reward distributor
-		result = transition.Call2(contracts.SystemCaller, contracts.RewardPoolContract, input, big.NewInt(0), 10000000000)
+		result = transition.Call2(contracts.SystemCaller, contracts.EpochManagerContract, input, big.NewInt(0), 10000000000)
 		require.NoError(t, result.Err)
 		t.Logf("Number of validators %d on reward distribution, Gas used %+v\n", accSet.Len(), result.GasUsed)
 
@@ -379,7 +373,7 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 		require.NoError(t, err)
 
 		// call commit epoch
-		result = transition.Call2(contracts.SystemCaller, contracts.ValidatorSetContract, input, big.NewInt(0), 10000000000)
+		result = transition.Call2(contracts.SystemCaller, contracts.EpochManagerContract, input, big.NewInt(0), 10000000000)
 		require.NoError(t, result.Err)
 		t.Logf("Number of validators %d on commit epoch, Gas used %+v\n", accSet.Len(), result.GasUsed)
 
@@ -388,7 +382,7 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 		require.NoError(t, err)
 
 		// call reward distributor
-		result = transition.Call2(contracts.SystemCaller, contracts.RewardPoolContract, input, big.NewInt(0), 10000000000)
+		result = transition.Call2(contracts.SystemCaller, contracts.EpochManagerContract, input, big.NewInt(0), 10000000000)
 		require.NoError(t, result.Err)
 		t.Logf("Number of validators %d on reward distribution, Gas used %+v\n", accSet.Len(), result.GasUsed)
 	}

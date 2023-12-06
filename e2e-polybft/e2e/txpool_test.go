@@ -1,7 +1,6 @@
 package e2e
 
 import (
-	"fmt"
 	"math/big"
 	"sync"
 	"testing"
@@ -13,7 +12,6 @@ import (
 	"github.com/umbracle/ethgo/jsonrpc"
 	"github.com/umbracle/ethgo/wallet"
 
-	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
@@ -26,9 +24,9 @@ func TestE2E_TxPool_Transfer(t *testing.T) {
 	require.NoError(t, err)
 
 	cluster := framework.NewTestCluster(t, 5,
-		framework.WithNativeTokenConfig(fmt.Sprintf(framework.NativeTokenMintableTestCfg, sender.Address())),
 		framework.WithPremine(types.Address(sender.Address())),
-		framework.WithBurnContract(&polybft.BurnContractInfo{BlockNumber: 0, Address: types.ZeroAddress}))
+		framework.WithBaseFeeConfig(""),
+	)
 	defer cluster.Stop()
 
 	cluster.WaitForReady(t)
@@ -102,9 +100,8 @@ func TestE2E_TxPool_Transfer_Linear(t *testing.T) {
 
 	// first account should have some matics premined
 	cluster := framework.NewTestCluster(t, 5,
-		framework.WithNativeTokenConfig(fmt.Sprintf(framework.NativeTokenMintableTestCfg, premine.Address())),
 		framework.WithPremine(types.Address(premine.Address())),
-		framework.WithBurnContract(&polybft.BurnContractInfo{BlockNumber: 0, Address: types.ZeroAddress}),
+		framework.WithBaseFeeConfig(""),
 	)
 	defer cluster.Stop()
 
@@ -191,7 +188,6 @@ func TestE2E_TxPool_TransactionWithHeaderInstructions(t *testing.T) {
 	require.NoError(t, err)
 
 	cluster := framework.NewTestCluster(t, 4,
-		framework.WithNativeTokenConfig(fmt.Sprintf(framework.NativeTokenMintableTestCfg, sidechainKey.Address())),
 		framework.WithPremine(types.Address(sidechainKey.Address())),
 	)
 	defer cluster.Stop()
@@ -237,9 +233,8 @@ func TestE2E_TxPool_BroadcastTransactions(t *testing.T) {
 
 	// First account should have some matics premined
 	cluster := framework.NewTestCluster(t, 5,
-		framework.WithNativeTokenConfig(fmt.Sprintf(framework.NativeTokenMintableTestCfg, sender.Address())),
 		framework.WithPremine(types.Address(sender.Address())),
-		framework.WithBurnContract(&polybft.BurnContractInfo{BlockNumber: 0, Address: types.ZeroAddress}),
+		framework.WithBaseFeeConfig(""),
 	)
 	defer cluster.Stop()
 

@@ -315,18 +315,13 @@ func Test_GenesisPostHookFactory(t *testing.T) {
 				Bridge:              bridgeCfg,
 				EpochSize:           epochSize,
 				RewardConfig:        &RewardsConfig{WalletAmount: ethgo.Ether(1000)},
-				NativeTokenConfig:   &TokenConfig{Name: "Test Mintable", Symbol: "TEST_MNT", Decimals: 18, IsMintable: true},
+				NativeTokenConfig:   &TokenConfig{Name: "Test Mintable", Symbol: "TEST_MNT", Decimals: 18},
 				MaxValidatorSetSize: maxValidators,
 			},
 			bridgeAllowList: &chain.AddressListConfig{
 				AdminAddresses:   []types.Address{validators.Validators["0"].Address()},
 				EnabledAddresses: []types.Address{validators.Validators["1"].Address()},
 			},
-		},
-		{
-			name:        "missing bridge configuration",
-			config:      &PolyBFTConfig{},
-			expectedErr: errMissingBridgeConfig,
 		},
 	}
 

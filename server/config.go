@@ -44,8 +44,9 @@ type Config struct {
 
 	Relayer bool
 
-	NumBlockConfirmations uint64
-	MetricsInterval       time.Duration
+	MetricsInterval time.Duration
+
+	EventTracker *EventTracker
 }
 
 // Telemetry holds the config details for metric services
@@ -61,4 +62,10 @@ type JSONRPC struct {
 	BlockRangeLimit          uint64
 	ConcurrentRequestsDebug  uint64
 	WebSocketReadLimit       uint64
+}
+
+type EventTracker struct {
+	SyncBatchSize          uint64
+	NumBlockConfirmations  uint64
+	NumOfBlocksToReconcile uint64
 }

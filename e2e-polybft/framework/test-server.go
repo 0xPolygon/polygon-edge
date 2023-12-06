@@ -11,11 +11,11 @@ import (
 	"testing"
 	"time"
 
-	rootHelper "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	polybftsecrets "github.com/0xPolygon/polygon-edge/command/secrets/init"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/server/proto"
 	txpoolProto "github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -196,22 +196,20 @@ func (t *TestServer) Stop() {
 }
 
 // RootchainFund funds given validator account on the rootchain
-func (t *TestServer) RootchainFund(stakeToken types.Address, amount *big.Int) error {
-	return t.RootchainFundFor([]types.Address{t.address}, []*big.Int{amount}, stakeToken)
+func (t *TestServer) RootchainFund(amount *big.Int) error {
+	return t.RootchainFundFor([]types.Address{t.address}, []*big.Int{amount})
 }
 
 // RootchainFundFor funds given account on the rootchain
-func (t *TestServer) RootchainFundFor(accounts []types.Address, amounts []*big.Int, stakeToken types.Address) error {
+func (t *TestServer) RootchainFundFor(accounts []types.Address, amounts []*big.Int) error {
 	if len(accounts) != len(amounts) {
 		return errors.New("same size for accounts and amounts must be provided to the rootchain funding")
 	}
 
 	args := []string{
-		"rootchain",
+		"bridge",
 		"fund",
 		"--json-rpc", t.BridgeJSONRPCAddr(),
-		"--stake-token", stakeToken.String(),
-		"--mint",
 	}
 
 	for i := 0; i < len(accounts); i++ {
@@ -234,14 +232,11 @@ func (t *TestServer) RootchainFundFor(accounts []types.Address, amounts []*big.I
 // Stake stakes given amount to validator account encapsulated by given server instance
 func (t *TestServer) Stake(polybftConfig polybft.PolyBFTConfig, amount *big.Int) error {
 	args := []string{
-		"polybft",
+		"validator",
 		"stake",
-		"--jsonrpc", t.BridgeJSONRPCAddr(),
-		"--stake-manager", polybftConfig.Bridge.StakeManagerAddr.String(),
+		"--jsonrpc", t.JSONRPCAddr(),
 		"--" + polybftsecrets.AccountDirFlag, t.config.DataDir,
 		"--amount", amount.String(),
-		"--supernet-id", strconv.FormatInt(polybftConfig.SupernetID, 10),
-		"--stake-token", polybftConfig.Bridge.StakeTokenAddr.String(),
 	}
 
 	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("stake"))
@@ -250,7 +245,7 @@ func (t *TestServer) Stake(polybftConfig polybft.PolyBFTConfig, amount *big.Int)
 // Unstake unstakes given amount from validator account encapsulated by given server instance
 func (t *TestServer) Unstake(amount *big.Int) error {
 	args := []string{
-		"polybft",
+		"validator",
 		"unstake",
 		"--" + polybftsecrets.AccountDirFlag, t.config.DataDir,
 		"--jsonrpc", t.JSONRPCAddr(),
@@ -261,67 +256,69 @@ func (t *TestServer) Unstake(amount *big.Int) error {
 }
 
 // RegisterValidator is a wrapper function which registers new validator on a root chain
-func (t *TestServer) RegisterValidator(supernetManagerAddr types.Address) error {
+func (t *TestServer) RegisterValidator() error {
 	args := []string{
-		"polybft",
+		"validator",
 		"register-validator",
-		"--jsonrpc", t.BridgeJSONRPCAddr(),
-		"--supernet-manager", supernetManagerAddr.String(),
+		"--jsonrpc", t.JSONRPCAddr(),
 		"--" + polybftsecrets.AccountDirFlag, t.DataDir(),
 	}
 
-	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("bridge"))
+	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("validator"))
 }
 
 // WhitelistValidators invokes whitelist-validators helper CLI command,
 // that whitelists validators on the root chain
-func (t *TestServer) WhitelistValidators(addresses []string, supernetManager types.Address) error {
+func (t *TestServer) WhitelistValidators(addresses []string) error {
 	args := []string{
-		"polybft",
+		"validator",
 		"whitelist-validators",
-		"--private-key", rootHelper.TestAccountPrivKey,
-		"--jsonrpc", t.BridgeJSONRPCAddr(),
-		"--supernet-manager", supernetManager.String(),
+		"--" + polybftsecrets.AccountDirFlag, t.config.DataDir,
+		"--jsonrpc", t.JSONRPCAddr(),
 	}
 	for _, addr := range addresses {
 		args = append(args, "--addresses", addr)
 	}
 
-	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("bridge"))
+	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("validator"))
 }
 
-// WithdrawChildChain withdraws available balance from child chain
-func (t *TestServer) WithdrawChildChain() error {
+// MintNativeERC20Token mints given amounts of native erc20 token on blade to given addresses
+func (t *TestServer) MintNativeERC20Token(addresses []string, amounts []*big.Int) error {
 	args := []string{
-		"polybft",
-		"withdraw-child",
+		"mint-erc20",
+		"--" + polybftsecrets.AccountDirFlag, t.config.DataDir,
+		"--jsonrpc", t.JSONRPCAddr(),
+		"--erc20-token", contracts.NativeERC20TokenContract.String(),
+	}
+
+	for _, addr := range addresses {
+		args = append(args, "--addresses", addr)
+	}
+
+	for _, amount := range amounts {
+		args = append(args, "--amounts", amount.String())
+	}
+
+	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("mint-erc20"))
+}
+
+// WitdhrawStake withdraws given amount of stake back to the validator address
+func (t *TestServer) WitdhrawStake() error {
+	args := []string{
+		"validator",
+		"withdraw",
 		"--" + polybftsecrets.AccountDirFlag, t.config.DataDir,
 		"--jsonrpc", t.JSONRPCAddr(),
 	}
 
-	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("withdraw-child"))
-}
-
-// WithdrawRootChain withdraws available balance from root chain
-func (t *TestServer) WithdrawRootChain(recipient string, amount *big.Int,
-	stakeManager ethgo.Address, bridgeJSONRPC string) error {
-	args := []string{
-		"polybft",
-		"withdraw-root",
-		"--" + polybftsecrets.AccountDirFlag, t.config.DataDir,
-		"--to", recipient,
-		"--amount", amount.String(),
-		"--stake-manager", stakeManager.String(),
-		"--jsonrpc", bridgeJSONRPC,
-	}
-
-	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("withdraw-root"))
+	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("withdraw"))
 }
 
 // WithdrawRewards withdraws pending rewards for given validator on RewardPool contract
 func (t *TestServer) WithdrawRewards() error {
 	args := []string{
-		"polybft",
+		"validator",
 		"withdraw-rewards",
 		"--" + polybftsecrets.AccountDirFlag, t.config.DataDir,
 		"--jsonrpc", t.JSONRPCAddr(),

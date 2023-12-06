@@ -5,14 +5,12 @@ import (
 	"math/rand"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
-	"github.com/umbracle/ethgo/testutil"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
@@ -37,8 +35,10 @@ func newTestStateSyncManager(t *testing.T, key *validator.TestValidator, runtime
 
 	s := newStateSyncManager(hclog.NewNullLogger(), state,
 		&stateSyncConfig{
-			stateSenderAddr:   types.Address{},
-			jsonrpcAddr:       "",
+			eventTrackerConfig: &eventTrackerConfig{
+				stateSenderAddr: types.Address{},
+				jsonrpcAddr:     "",
+			},
 			dataDir:           tmpDir,
 			topic:             topic,
 			key:               key.Key(),
@@ -474,49 +474,6 @@ func TestStateSyncerManager_AddLog_BuildCommitments(t *testing.T) {
 		require.Equal(t, uint64(0), stateSyncs[0].ID.Uint64())
 		require.Len(t, s.pendingCommitments, 0)
 	})
-}
-
-func TestStateSyncerManager_EventTracker_Sync(t *testing.T) {
-	t.Parallel()
-
-	vals := validator.NewTestValidators(t, 5)
-	s := newTestStateSyncManager(t, vals.GetValidator("0"), &mockRuntime{isActiveValidator: true})
-
-	server := testutil.DeployTestServer(t, nil)
-
-	// Deploy contract
-	contractReceipt, err := server.SendTxn(&ethgo.Transaction{
-		Input: contractsapi.StateSender.Bytecode,
-	})
-	require.NoError(t, err)
-
-	// Create contract function call payload
-	encodedSyncStateData, err := (&contractsapi.SyncStateStateSenderFn{
-		Receiver: types.BytesToAddress(server.Account(0).Bytes()),
-		Data:     []byte{},
-	}).EncodeAbi()
-	require.NoError(t, err)
-
-	// prefill with 10 events
-	for i := 0; i < 10; i++ {
-		receipt, err := server.SendTxn(&ethgo.Transaction{
-			To:    &contractReceipt.ContractAddress,
-			Input: encodedSyncStateData,
-		})
-		require.NoError(t, err)
-		require.Equal(t, uint64(types.ReceiptSuccess), receipt.Status)
-	}
-
-	s.config.stateSenderAddr = types.Address(contractReceipt.ContractAddress)
-	s.config.jsonrpcAddr = server.HTTPAddr()
-
-	require.NoError(t, s.initTracker())
-
-	time.Sleep(2 * time.Second)
-
-	events, err := s.state.StateSyncStore.getStateSyncEventsForCommitment(1, 10, nil)
-	require.NoError(t, err)
-	require.Len(t, events, 10)
 }
 
 func TestStateSyncManager_Close(t *testing.T) {
