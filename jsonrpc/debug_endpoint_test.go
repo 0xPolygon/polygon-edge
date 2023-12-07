@@ -617,7 +617,7 @@ func TestTraceCall(t *testing.T) {
 		}
 	)
 
-	decodedTx.ComputeHash(1)
+	decodedTx.ComputeHash()
 
 	tests := []struct {
 		name   string

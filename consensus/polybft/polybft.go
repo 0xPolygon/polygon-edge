@@ -63,13 +63,13 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 		txPool:  params.TxPool,
 	}
 
-	// initialize polybft consensus config
+	// initialize genesis consensus config
 	customConfigJSON, err := json.Marshal(params.Config.Config)
 	if err != nil {
 		return nil, err
 	}
 
-	err = json.Unmarshal(customConfigJSON, &polybft.consensusConfig)
+	err = json.Unmarshal(customConfigJSON, &polybft.genesisClientConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -90,8 +90,8 @@ type Polybft struct {
 	// consensus parameters
 	config *consensus.Params
 
-	// consensusConfig is genesis configuration for polybft consensus protocol
-	consensusConfig *PolyBFTConfig
+	// genesisClientConfig is genesis configuration for polybft consensus protocol
+	genesisClientConfig *PolyBFTConfig
 
 	// blockchain is a reference to the blockchain object
 	blockchain blockchainBackend
@@ -129,7 +129,7 @@ type Polybft struct {
 
 func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *state.Transition) error {
 	return func(transition *state.Transition) error {
-		polyBFTConfig, err := GetPolyBFTConfig(config)
+		polyBFTConfig, err := GetPolyBFTConfig(config.Params)
 		if err != nil {
 			return err
 		}
@@ -154,6 +154,26 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 		}
 
 		if err = initProxies(transition, polyBFTConfig.ProxyContractsAdmin, proxyAddrMapping); err != nil {
+			return err
+		}
+
+		// initialize NetworkParams SC
+		if err = initNetworkParamsContract(config.Params.BaseFeeChangeDenom, polyBFTConfig, transition); err != nil {
+			return err
+		}
+
+		// initialize ForkParams SC
+		if err = initForkParamsContract(polyBFTConfig, transition); err != nil {
+			return err
+		}
+
+		// initialize ChildTimelock SC
+		if err = initChildTimelock(polyBFTConfig, transition); err != nil {
+			return err
+		}
+
+		// initialize ChildGovernor SC
+		if err = initChildGovernor(polyBFTConfig, transition); err != nil {
 			return err
 		}
 
@@ -439,7 +459,7 @@ func (p *Polybft) Initialize() error {
 }
 
 func ForkManagerInitialParamsFactory(config *chain.Chain) (*forkmanager.ForkParams, error) {
-	pbftConfig, err := GetPolyBFTConfig(config)
+	pbftConfig, err := GetPolyBFTConfig(config.Params)
 	if err != nil {
 		return nil, err
 	}
@@ -495,7 +515,9 @@ func (p *Polybft) Start() error {
 // initRuntime creates consensus runtime
 func (p *Polybft) initRuntime() error {
 	runtimeConfig := &runtimeConfig{
-		PolyBFTConfig:   p.consensusConfig,
+		genesisParams:   p.config.Config.Params,
+		GenesisConfig:   p.genesisClientConfig,
+		Forks:           p.config.Config.Params.Forks,
 		Key:             p.key,
 		DataDir:         p.dataDir,
 		State:           p.state,
@@ -658,7 +680,7 @@ func (p *Polybft) VerifyHeader(header *types.Header) error {
 		)
 	}
 
-	return p.verifyHeaderImpl(parent, header, p.consensusConfig.BlockTimeDrift, nil)
+	return p.verifyHeaderImpl(parent, header, p.runtime.getCurrentBlockTimeDrift(), nil)
 }
 
 func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, blockTimeDrift uint64, parents []*types.Header) error {
@@ -736,6 +758,15 @@ func (p *Polybft) PreCommitState(block *types.Block, _ *state.Transition) error 
 	}
 
 	return nil
+}
+
+// GetLatestChainConfig returns the latest chain configuration
+func (p *Polybft) GetLatestChainConfig() (*chain.Params, error) {
+	if p.runtime != nil {
+		return p.runtime.governanceManager.GetClientConfig(nil)
+	}
+
+	return nil, nil
 }
 
 // GetBridgeProvider is an implementation of Consensus interface

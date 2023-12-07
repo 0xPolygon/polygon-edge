@@ -68,6 +68,12 @@ type PolyBFTConfig struct {
 	// MaxValidatorSetSize indicates the maximum size of validator set
 	MaxValidatorSetSize uint64 `json:"maxValidatorSetSize"`
 
+	// CheckpointInterval indicates the number of blocks after which a new checkpoint is submitted
+	CheckpointInterval uint64 `json:"checkpointInterval"`
+
+	// WithdrawalWaitPeriod indicates a number of epochs after which withdrawal can be done from child chain
+	WithdrawalWaitPeriod uint64 `json:"withdrawalWaitPeriod"`
+
 	// RewardConfig defines rewards configuration
 	RewardConfig *RewardsConfig `json:"rewardConfig"`
 
@@ -85,6 +91,9 @@ type PolyBFTConfig struct {
 	// BladeAdmin is the address that will be the owner of the NativeERC20 mintable token,
 	// and StakeManager contract which manages validators
 	BladeAdmin types.Address `json:"bladeAdmin"`
+
+	// GovernanceConfig defines on chain governance configuration
+	GovernanceConfig *GovernanceConfig `json:"governanceConfig"`
 }
 
 // LoadPolyBFTConfig loads chain config from provided path and unmarshals PolyBFTConfig
@@ -94,7 +103,7 @@ func LoadPolyBFTConfig(chainConfigFile string) (PolyBFTConfig, error) {
 		return PolyBFTConfig{}, err
 	}
 
-	polybftConfig, err := GetPolyBFTConfig(chainCfg)
+	polybftConfig, err := GetPolyBFTConfig(chainCfg.Params)
 	if err != nil {
 		return PolyBFTConfig{}, err
 	}
@@ -103,8 +112,8 @@ func LoadPolyBFTConfig(chainConfigFile string) (PolyBFTConfig, error) {
 }
 
 // GetPolyBFTConfig deserializes provided chain config and returns PolyBFTConfig
-func GetPolyBFTConfig(chainConfig *chain.Chain) (PolyBFTConfig, error) {
-	consensusConfigJSON, err := json.Marshal(chainConfig.Params.Engine[ConsensusName])
+func GetPolyBFTConfig(chainParams *chain.Params) (PolyBFTConfig, error) {
+	consensusConfigJSON, err := json.Marshal(chainParams.Engine[ConsensusName])
 	if err != nil {
 		return PolyBFTConfig{}, err
 	}
@@ -267,6 +276,86 @@ func (r *RewardsConfig) UnmarshalJSON(data []byte) error {
 	}
 
 	return nil
+}
+
+type GovernanceConfig struct {
+	// VotingDelay indicates number of blocks after proposal is submitted before voting starts
+	VotingDelay *big.Int
+	// VotingPeriod indicates number of blocks that the voting period for a proposal lasts
+	VotingPeriod *big.Int
+	// ProposalThreshold indicates number of vote tokens required in order for a voter to become a proposer
+	ProposalThreshold *big.Int
+	// ProposalQuorumPercentage is the percentage of total validator stake needed for a
+	// governance proposal to be accepted
+	ProposalQuorumPercentage uint64
+	// ChildGovernorAddr is the address of ChildGovernor contract
+	ChildGovernorAddr types.Address
+	// ChildTimelockAddr is the address of ChildTimelock contract
+	ChildTimelockAddr types.Address
+	// NetworkParamsAddr is the address of NetworkParams contract
+	NetworkParamsAddr types.Address
+	// ForkParamsAddr is the address of ForkParams contract
+	ForkParamsAddr types.Address
+}
+
+func (g *GovernanceConfig) MarshalJSON() ([]byte, error) {
+	raw := &governanceConfigRaw{
+		VotingDelay:              common.EncodeBigInt(g.VotingDelay),
+		VotingPeriod:             common.EncodeBigInt(g.VotingPeriod),
+		ProposalThreshold:        common.EncodeBigInt(g.ProposalThreshold),
+		ProposalQuorumPercentage: g.ProposalQuorumPercentage,
+		ChildGovernorAddr:        g.ChildGovernorAddr,
+		ChildTimelockAddr:        g.ChildTimelockAddr,
+		NetworkParamsAddr:        g.NetworkParamsAddr,
+		ForkParamsAddr:           g.ForkParamsAddr,
+	}
+
+	return json.Marshal(raw)
+}
+
+func (g *GovernanceConfig) UnmarshalJSON(data []byte) error {
+	var (
+		raw governanceConfigRaw
+		err error
+	)
+
+	if err = json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	g.VotingDelay, err = common.ParseUint256orHex(raw.VotingDelay)
+	if err != nil {
+		return err
+	}
+
+	g.VotingPeriod, err = common.ParseUint256orHex(raw.VotingPeriod)
+	if err != nil {
+		return err
+	}
+
+	g.ProposalThreshold, err = common.ParseUint256orHex(raw.ProposalThreshold)
+	if err != nil {
+		return err
+	}
+
+	g.ProposalQuorumPercentage = raw.ProposalQuorumPercentage
+	g.ChildGovernorAddr = raw.ChildGovernorAddr
+	g.ChildTimelockAddr = raw.ChildTimelockAddr
+	g.NetworkParamsAddr = raw.NetworkParamsAddr
+	g.ForkParamsAddr = raw.ForkParamsAddr
+
+	return nil
+}
+
+type governanceConfigRaw struct {
+	VotingDelay              *string       `json:"votingDelay"`
+	VotingPeriod             *string       `json:"votingPeriod"`
+	ProposalThreshold        *string       `json:"proposalThreshold"`
+	ProposalQuorumPercentage uint64        `json:"proposalQuorumPercentage"`
+	ChildGovernorAddr        types.Address `json:"childGovernorAddr"`
+	ChildTimelockAddr        types.Address `json:"childTimelockAddr"`
+	NetworkParamsAddr        types.Address `json:"networkParamsAddr"`
+	ForkParamsAddr           types.Address `json:"forkParamsAddr"`
 }
 
 type rewardsConfigRaw struct {

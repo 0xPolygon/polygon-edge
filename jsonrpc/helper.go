@@ -235,7 +235,7 @@ func DecodeTxn(arg *txnArgs, blockNumber uint64, store nonceGetter, forceSetNonc
 		txn.To = arg.To
 	}
 
-	txn.ComputeHash(blockNumber)
+	txn.ComputeHash()
 
 	return txn, nil
 }

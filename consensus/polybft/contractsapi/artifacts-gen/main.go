@@ -180,6 +180,22 @@ func main() {
 			"../@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol",
 			"TransparentUpgradeableProxy",
 		},
+		{
+			"blade/NetworkParams.sol",
+			"NetworkParams",
+		},
+		{
+			"blade/ForkParams.sol",
+			"ForkParams",
+		},
+		{
+			"blade/governance/ChildGovernor.sol",
+			"ChildGovernor",
+		},
+		{
+			"blade/governance/ChildTimelock.sol",
+			"ChildTimelock",
+		},
 	}
 
 	str := `// This is auto-generated file. DO NOT EDIT.

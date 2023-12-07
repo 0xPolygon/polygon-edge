@@ -66,7 +66,8 @@ function createGenesis() {
     --reward-wallet 0xDEADBEEF:1000000 \
     --native-token-config "Blade:BLADE:18" \
     --blade-admin $address1 \
-    --proxy-contracts-admin 0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed
+    --proxy-contracts-admin 0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed \
+    --base-fee-config 1000000000
 }
 
 function initBridge() {

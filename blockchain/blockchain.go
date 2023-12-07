@@ -49,8 +49,8 @@ type Blockchain struct {
 	executor  Executor
 	txSigner  TxSigner
 
-	config  *chain.Chain // Config containing chain information
-	genesis types.Hash   // The hash of the genesis block
+	genesisConfig *chain.Chain // Config containing chain information
+	genesis       types.Hash   // The hash of the genesis block
 
 	headersCache    *lru.Cache // LRU cache for the headers
 	difficultyCache *lru.Cache // LRU cache for the difficulty
@@ -89,6 +89,7 @@ type Verifier interface {
 	ProcessHeaders(headers []*types.Header) error
 	GetBlockCreator(header *types.Header) (types.Address, error)
 	PreCommitState(block *types.Block, txn *state.Transition) error
+	GetLatestChainConfig() (*chain.Params, error)
 }
 
 type Executor interface {
@@ -188,19 +189,19 @@ func (b *Blockchain) GetAvgGasPrice() *big.Int {
 func NewBlockchain(
 	logger hclog.Logger,
 	db storage.Storage,
-	config *chain.Chain,
+	genesisConfig *chain.Chain,
 	consensus Verifier,
 	executor Executor,
 	txSigner TxSigner,
 ) (*Blockchain, error) {
 	b := &Blockchain{
-		logger:    logger.Named("blockchain"),
-		config:    config,
-		consensus: consensus,
-		db:        db,
-		executor:  executor,
-		txSigner:  txSigner,
-		stream:    newEventStream(),
+		logger:        logger.Named("blockchain"),
+		genesisConfig: genesisConfig,
+		consensus:     consensus,
+		db:            db,
+		executor:      executor,
+		txSigner:      txSigner,
+		stream:        newEventStream(),
 		gpAverage: &gasPriceAverage{
 			price: big.NewInt(0),
 			count: big.NewInt(0),
@@ -252,7 +253,7 @@ func (b *Blockchain) ComputeGenesis() error {
 		}
 
 		// validate that the genesis file in storage matches the chain.Genesis
-		if b.genesis != b.config.Genesis.Hash() {
+		if b.genesis != b.genesisConfig.Genesis.Hash() {
 			return fmt.Errorf("genesis file does not match current genesis")
 		}
 
@@ -277,12 +278,12 @@ func (b *Blockchain) ComputeGenesis() error {
 		b.setCurrentHeader(header, diff)
 	} else {
 		// empty storage, write the genesis
-		if err := b.writeGenesis(b.config.Genesis); err != nil {
+		if err := b.writeGenesis(b.genesisConfig.Genesis); err != nil {
 			return err
 		}
 	}
 
-	b.logger.Info("genesis", "hash", b.config.Genesis.Hash())
+	b.logger.Info("genesis", "hash", b.genesisConfig.Genesis.Hash())
 
 	return nil
 }
@@ -319,7 +320,7 @@ func (b *Blockchain) CurrentTD() *big.Int {
 
 // Config returns the blockchain configuration
 func (b *Blockchain) Config() *chain.Params {
-	return b.config.Params
+	return b.genesisConfig.Params
 }
 
 // GetHeader returns the block header using the hash
@@ -1354,21 +1355,21 @@ func (b *Blockchain) Close() error {
 // CalculateBaseFee calculates the basefee of the header.
 func (b *Blockchain) CalculateBaseFee(parent *types.Header) uint64 {
 	// Return zero base fee is a london hardfork is not enabled
-	if !b.config.Params.Forks.IsActive(chain.London, parent.Number) {
+	if !b.genesisConfig.Params.Forks.IsActive(chain.London, parent.Number) {
 		return 0
 	}
 
 	// Check if this is the first London hardfork block.
 	// Should return chain.GenesisBaseFee ins this case.
 	if parent.BaseFee == 0 {
-		if b.config.Genesis.BaseFee > 0 {
-			return b.config.Genesis.BaseFee
+		if b.genesisConfig.Genesis.BaseFee > 0 {
+			return b.genesisConfig.Genesis.BaseFee
 		}
 
 		return chain.GenesisBaseFee
 	}
 
-	parentGasTarget := parent.GasLimit / b.config.Genesis.BaseFeeEM
+	parentGasTarget := parent.GasLimit / b.genesisConfig.Params.BaseFeeEM
 
 	// If the parent gasUsed is the same as the target, the baseFee remains unchanged.
 	if parent.GasUsed == parentGasTarget {
@@ -1391,9 +1392,24 @@ func (b *Blockchain) CalculateBaseFee(parent *types.Header) uint64 {
 }
 
 func (b *Blockchain) calcBaseFeeDelta(gasUsedDelta, parentGasTarget, baseFee uint64) uint64 {
+	baseFeeChangeDenom := b.genesisConfig.Params.BaseFeeChangeDenom
+
+	if b.Config().Forks.IsActive(chain.Governance, b.Header().Number) {
+		chainConfig, err := b.consensus.GetLatestChainConfig()
+		if err != nil {
+			b.logger.Error("failed to calculate base fee delta", "error", err)
+
+			return b.genesisConfig.Params.BaseFeeChangeDenom
+		}
+
+		if chainConfig != nil {
+			baseFeeChangeDenom = chainConfig.BaseFeeChangeDenom
+		}
+	}
+
 	y := baseFee * gasUsedDelta / parentGasTarget
 
-	return y / b.config.Genesis.BaseFeeChangeDenom
+	return y / baseFeeChangeDenom
 }
 
 func (b *Blockchain) writeBatchAndUpdate(

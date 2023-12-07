@@ -81,7 +81,7 @@ func setFlags(cmd *cobra.Command) {
 		&params.baseFeeConfig,
 		genesisBaseFeeConfigFlag,
 		"",
-		`initial base fee(in wei), base fee elasticity multiplier, and base fee change denominator
+		`initial base fee (in wei), base fee elasticity multiplier, and base fee change denominator
 		(provided in the following format: [<baseFee>][:<baseFeeEM>][:<baseFeeChangeDenom>]). 
 		BaseFeeChangeDenom represents the value to bound the amount the base fee can change between blocks.
 		Default BaseFee is 1 Gwei, BaseFeeEM is 2 and BaseFeeChangeDenom is 8.
@@ -226,6 +226,51 @@ func setFlags(cmd *cobra.Command) {
 			bladeAdminFlag,
 			"",
 			"address of owner/admin of NativeERC20 token and StakeManager",
+		)
+
+		cmd.Flags().Uint64Var(
+			&params.checkpointInterval,
+			checkpointIntervalFlag,
+			defaultCheckpointInterval,
+			"checkpoint submission interval in blocks",
+		)
+
+		cmd.Flags().Uint64Var(
+			&params.withdrawalWaitPeriod,
+			withdrawalWaitPeriodFlag,
+			defaultWithdrawalWaitPeriod,
+			"number of epochs after which withdrawal can be done from child chain",
+		)
+	}
+
+	// Governance
+	{
+		cmd.Flags().StringVar(
+			&params.voteDelay,
+			voteDelayFlag,
+			defaultVotingDelay,
+			"number of blocks after proposal is submitted before voting starts",
+		)
+
+		cmd.Flags().StringVar(
+			&params.votingPeriod,
+			votePeriodFlag,
+			defaultVotingPeriod,
+			"number of blocks that the voting period for a proposal lasts",
+		)
+
+		cmd.Flags().StringVar(
+			&params.proposalThreshold,
+			voteProposalThresholdFlag,
+			defaultVoteProposalThreshold,
+			"number of vote tokens (in wei) required in order for a voter to submit a proposal",
+		)
+
+		cmd.Flags().Uint64Var(
+			&params.proposalQuorum,
+			proposalQuorumFlag,
+			defaultProposalQuorumPercentage,
+			"percentage of total validator stake needed for a governance proposal to be accepted (from 0 to 100%)",
 		)
 	}
 

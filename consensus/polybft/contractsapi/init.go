@@ -54,6 +54,12 @@ var (
 	GenesisProxy                    *artifact.Artifact
 	TransparentUpgradeableProxy     *artifact.Artifact
 
+	// Governance
+	NetworkParams *artifact.Artifact
+	ForkParams    *artifact.Artifact
+	ChildGovernor *artifact.Artifact
+	ChildTimelock *artifact.Artifact
+
 	// test smart contracts
 	//go:embed test-contracts/*
 	testContracts          embed.FS
@@ -267,6 +273,26 @@ func init() {
 	}
 
 	TransparentUpgradeableProxy, err = artifact.DecodeArtifact([]byte(TransparentUpgradeableProxyArtifact))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	NetworkParams, err = artifact.DecodeArtifact([]byte(NetworkParamsArtifact))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	ForkParams, err = artifact.DecodeArtifact([]byte(ForkParamsArtifact))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	ChildGovernor, err = artifact.DecodeArtifact([]byte(ChildGovernorArtifact))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	ChildTimelock, err = artifact.DecodeArtifact([]byte(ChildTimelockArtifact))
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -313,8 +313,10 @@ func TestCheckpointManager_IsCheckpointBlock(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 
-			checkpointMgr := newCheckpointManager(wallet.NewEcdsaSigner(createTestKey(t)), c.checkpointsOffset, types.ZeroAddress, nil, nil, nil, hclog.NewNullLogger(), nil)
-			require.Equal(t, c.isCheckpointBlock, checkpointMgr.isCheckpointBlock(c.blockNumber, c.isEpochEndingBlock))
+			checkpointMgr := newCheckpointManager(wallet.NewEcdsaSigner(createTestKey(t)),
+				types.ZeroAddress, nil, nil, nil, hclog.NewNullLogger(), nil)
+			require.Equal(t, c.isCheckpointBlock,
+				checkpointMgr.isCheckpointBlock(c.blockNumber, c.checkpointsOffset, c.isEpochEndingBlock))
 		})
 	}
 }
@@ -385,7 +387,6 @@ func TestCheckpointManager_GenerateExitProof(t *testing.T) {
 	// create checkpoint manager and insert exit events
 	checkpointMgr := newCheckpointManager(wallet.NewEcdsaSigner(
 		createTestKey(t)),
-		0,
 		types.ZeroAddress,
 		dummyTxRelayer,
 		nil,

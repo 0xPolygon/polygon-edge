@@ -249,7 +249,7 @@ func NewServer(config *Config) (*Server, error) {
 	var initialStateRoot = types.ZeroHash
 
 	if ConsensusType(engineName) == PolyBFTConsensus {
-		polyBFTConfig, err := consensusPolyBFT.GetPolyBFTConfig(config.Chain)
+		polyBFTConfig, err := consensusPolyBFT.GetPolyBFTConfig(config.Chain.Params)
 		if err != nil {
 			return nil, err
 		}

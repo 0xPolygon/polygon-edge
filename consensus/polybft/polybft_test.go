@@ -2,6 +2,7 @@ package polybft
 
 import (
 	"errors"
+	"math/big"
 	"testing"
 	"time"
 
@@ -113,15 +114,20 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 
 	// create polybft with appropriate mocks
 	polybft := &Polybft{
-		closeCh:         make(chan struct{}),
-		logger:          hclog.NewNullLogger(),
-		consensusConfig: &polyBftConfig,
-		blockchain:      blockchainMock,
+		closeCh:             make(chan struct{}),
+		logger:              hclog.NewNullLogger(),
+		genesisClientConfig: &polyBftConfig,
+		blockchain:          blockchainMock,
 		validatorsCache: newValidatorsSnapshotCache(
 			hclog.NewNullLogger(),
 			newTestState(t),
 			blockchainMock,
 		),
+		runtime: &consensusRuntime{
+			epoch: &epochMetadata{
+				CurrentClientConfig: &polyBftConfig,
+			},
+		},
 	}
 
 	// create parent header (block 10)
@@ -277,7 +283,7 @@ func Test_Factory(t *testing.T) {
 	require.True(t, ok)
 
 	assert.Equal(t, txPool, polybft.txPool)
-	assert.Equal(t, epochSize, polybft.consensusConfig.EpochSize)
+	assert.Equal(t, epochSize, polybft.genesisClientConfig.EpochSize)
 	assert.Equal(t, params, polybft.config)
 }
 
@@ -290,6 +296,7 @@ func Test_GenesisPostHookFactory(t *testing.T) {
 	)
 
 	validators := validator.NewTestValidators(t, 6)
+	admin := validators.ToValidatorSet().Accounts().GetAddresses()[0]
 	bridgeCfg := createTestBridgeConfig()
 	cases := []struct {
 		name            string
@@ -298,7 +305,7 @@ func Test_GenesisPostHookFactory(t *testing.T) {
 		expectedErr     error
 	}{
 		{
-			name: "non-mintable native token; access lists disabled",
+			name: "access lists disabled",
 			config: &PolyBFTConfig{
 				InitialValidatorSet: validators.GetParamValidators(),
 				Bridge:              bridgeCfg,
@@ -306,10 +313,17 @@ func Test_GenesisPostHookFactory(t *testing.T) {
 				RewardConfig:        &RewardsConfig{WalletAmount: ethgo.Ether(1000)},
 				NativeTokenConfig:   &TokenConfig{Name: "Test", Symbol: "TEST", Decimals: 18},
 				MaxValidatorSetSize: maxValidators,
+				BladeAdmin:          admin,
+				GovernanceConfig: &GovernanceConfig{
+					VotingDelay:              bigZero,
+					VotingPeriod:             big.NewInt(10),
+					ProposalThreshold:        big.NewInt(25),
+					ProposalQuorumPercentage: 67,
+				},
 			},
 		},
 		{
-			name: "mintable native token; access lists enabled",
+			name: "access lists enabled",
 			config: &PolyBFTConfig{
 				InitialValidatorSet: validators.GetParamValidators(),
 				Bridge:              bridgeCfg,
@@ -317,6 +331,13 @@ func Test_GenesisPostHookFactory(t *testing.T) {
 				RewardConfig:        &RewardsConfig{WalletAmount: ethgo.Ether(1000)},
 				NativeTokenConfig:   &TokenConfig{Name: "Test Mintable", Symbol: "TEST_MNT", Decimals: 18},
 				MaxValidatorSetSize: maxValidators,
+				BladeAdmin:          admin,
+				GovernanceConfig: &GovernanceConfig{
+					VotingDelay:              bigZero,
+					VotingPeriod:             big.NewInt(10),
+					ProposalThreshold:        big.NewInt(25),
+					ProposalQuorumPercentage: 67,
+				},
 			},
 			bridgeAllowList: &chain.AddressListConfig{
 				AdminAddresses:   []types.Address{validators.Validators["0"].Address()},

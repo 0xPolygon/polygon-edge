@@ -154,7 +154,7 @@ func (s *KeyValueStorage) ReadBody(hash types.Hash) (*types.Body, error) {
 	}
 
 	for _, tx := range body.Transactions {
-		tx.ComputeHash(header.Number)
+		tx.ComputeHash()
 	}
 
 	return body, nil

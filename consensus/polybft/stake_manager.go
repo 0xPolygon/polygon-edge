@@ -34,7 +34,8 @@ var (
 type StakeManager interface {
 	EventSubscriber
 	PostBlock(req *PostBlockRequest) error
-	UpdateValidatorSet(epoch uint64, currentValidatorSet validator.AccountSet) (*validator.ValidatorSetDelta, error)
+	UpdateValidatorSet(epoch uint64, maxValidatorSetSize uint64,
+		currentValidatorSet validator.AccountSet) (*validator.ValidatorSetDelta, error)
 }
 
 var _ StakeManager = (*dummyStakeManager)(nil)
@@ -45,7 +46,7 @@ type dummyStakeManager struct{}
 
 func (d *dummyStakeManager) PostBlock(req *PostBlockRequest) error { return nil }
 
-func (d *dummyStakeManager) UpdateValidatorSet(epoch uint64,
+func (d *dummyStakeManager) UpdateValidatorSet(epoch uint64, maxValidatorSetSize uint64,
 	currentValidatorSet validator.AccountSet) (*validator.ValidatorSetDelta, error) {
 	return &validator.ValidatorSetDelta{}, nil
 }
@@ -69,7 +70,6 @@ type stakeManager struct {
 	key                      ethgo.Key
 	stakeManagerContractAddr types.Address
 	validatorSetContract     types.Address
-	maxValidatorSetSize      int
 	polybftBackend           polybftBackend
 	stakeManagerContract     *contract.Contract
 	blockchain               blockchainBackend
@@ -83,7 +83,6 @@ func newStakeManager(
 	stakeManagerAddr types.Address,
 	blockchain blockchainBackend,
 	polybftBackend polybftBackend,
-	maxValidatorSetSize int,
 	dbTx *bolt.Tx,
 ) (*stakeManager, error) {
 	sm := &stakeManager{
@@ -91,7 +90,6 @@ func newStakeManager(
 		state:                    state,
 		key:                      key,
 		stakeManagerContractAddr: stakeManagerAddr,
-		maxValidatorSetSize:      maxValidatorSetSize,
 		polybftBackend:           polybftBackend,
 		blockchain:               blockchain,
 	}
@@ -280,8 +278,8 @@ func (s *stakeManager) updateWithReceipts(
 
 // UpdateValidatorSet returns an updated validator set
 // based on stake change (transfer) events from ValidatorSet contract
-func (s *stakeManager) UpdateValidatorSet(
-	epoch uint64, oldValidatorSet validator.AccountSet) (*validator.ValidatorSetDelta, error) {
+func (s *stakeManager) UpdateValidatorSet(epoch uint64, maxValidatorSetSize uint64,
+	oldValidatorSet validator.AccountSet) (*validator.ValidatorSetDelta, error) {
 	s.logger.Info("Calculating validators set update...", "epoch", epoch)
 
 	fullValidatorSet, err := s.state.StakeStore.getFullValidatorSet(nil)
@@ -293,7 +291,7 @@ func (s *stakeManager) UpdateValidatorSet(
 	stakeMap := fullValidatorSet.Validators
 
 	// slice of all validator set
-	newValidatorSet := stakeMap.getSorted(s.maxValidatorSetSize)
+	newValidatorSet := stakeMap.getSorted(int(maxValidatorSetSize))
 	// set of all addresses that will be in next validator set
 	addressesSet := make(map[types.Address]struct{}, len(newValidatorSet))
 

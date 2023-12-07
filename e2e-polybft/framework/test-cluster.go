@@ -139,6 +139,9 @@ type TestClusterConfig struct {
 
 	ProxyContractsAdmin string
 
+	VotingPeriod uint64
+	VotingDelay  uint64
+
 	logsDirOnce sync.Once
 }
 
@@ -418,6 +421,18 @@ func WithBladeAdmin(address string) ClusterOption {
 	}
 }
 
+func WithGovernanceVotingPeriod(votingPeriod uint64) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.VotingPeriod = votingPeriod
+	}
+}
+
+func WithGovernanceVotingDelay(votingDelay uint64) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.VotingDelay = votingDelay
+	}
+}
+
 func isTrueEnv(e string) bool {
 	return strings.ToLower(os.Getenv(e)) == "true"
 }
@@ -445,6 +460,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		BlockGasLimit: 1e7, // 10M
 		StakeAmounts:  []*big.Int{},
 		HasBridge:     false,
+		VotingDelay:   10,
 	}
 
 	if config.ValidatorPrefix == "" {
@@ -513,6 +529,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			"--premine", "0x0000000000000000000000000000000000000000",
 			"--reward-wallet", testRewardWalletAddr.String(),
 			"--trieroot", cluster.Config.InitialStateRoot.String(),
+			"--vote-delay", fmt.Sprint(cluster.Config.VotingDelay),
 		}
 
 		bladeAdmin := cluster.Config.BladeAdmin
@@ -521,6 +538,10 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		}
 
 		args = append(args, "--blade-admin", bladeAdmin)
+
+		if cluster.Config.VotingPeriod > 0 {
+			args = append(args, "--vote-period", fmt.Sprint(cluster.Config.VotingPeriod))
+		}
 
 		if cluster.Config.BlockTime != 0 {
 			args = append(args, "--block-time",

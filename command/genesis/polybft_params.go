@@ -31,11 +31,17 @@ const (
 
 	blockTimeDriftFlag = "block-time-drift"
 
-	defaultSprintSize               = uint64(5)
+	defaultSprintSize               = uint64(5) // in blocks
+	defaultEpochReward              = 1         // in blocks
 	defaultBlockTime                = 2 * time.Second
-	defaultEpochReward              = 1
-	defaultBlockTimeDrift           = uint64(10)
+	defaultBlockTimeDrift           = uint64(10) // in seconds
 	defaultBlockTrackerPollInterval = time.Second
+	defaultCheckpointInterval       = uint64(900) // in blocks
+	defaultWithdrawalWaitPeriod     = uint64(1)   // in epochs
+	defaultVotingDelay              = "10"        // in blocks
+	defaultVotingPeriod             = "10000"     // in blocks
+	defaultVoteProposalThreshold    = "1000"      // in blocks
+	defaultProposalQuorumPercentage = uint64(67)  // percentage
 
 	contractDeployerAllowListAdminFlag   = "contract-deployer-allow-list-admin"
 	contractDeployerAllowListEnabledFlag = "contract-deployer-allow-list-enabled"
@@ -55,6 +61,8 @@ const (
 
 	ecdsaAddressLength = 40
 	blsKeyLength       = 256
+
+	proposalQuorumMax = uint64(100)
 )
 
 var (
@@ -126,6 +134,31 @@ func (p *genesisParams) generateChainConfig(o command.OutputFormatter) error {
 		}
 	}
 
+	voteDelay, err := common.ParseUint256orHex(&p.voteDelay)
+	if err != nil {
+		return err
+	}
+
+	votingPeriod, err := common.ParseUint256orHex(&p.votingPeriod)
+	if err != nil {
+		return err
+	}
+
+	if votingPeriod.Cmp(big.NewInt(0)) == 0 {
+		return errInvalidVotingPeriod
+	}
+
+	proposalThreshold, err := common.ParseUint256orHex(&p.proposalThreshold)
+	if err != nil {
+		return err
+	}
+
+	proposalQuorum := p.proposalQuorum
+	if proposalQuorum > proposalQuorumMax {
+		// proposal can be from 0 to 100, so we sanitize the value
+		proposalQuorum = proposalQuorumMax
+	}
+
 	polyBftConfig := &polybft.PolyBFTConfig{
 		InitialValidatorSet: initialValidators,
 		BlockTime:           common.Duration{Duration: p.blockTime},
@@ -133,11 +166,13 @@ func (p *genesisParams) generateChainConfig(o command.OutputFormatter) error {
 		SprintSize:          p.sprintSize,
 		EpochReward:         p.epochReward,
 		// use 1st account as governance address
-		Governance:          types.ZeroAddress,
-		InitialTrieRoot:     types.StringToHash(p.initialStateRoot),
-		NativeTokenConfig:   p.nativeTokenConfig,
-		MinValidatorSetSize: p.minNumValidators,
-		MaxValidatorSetSize: p.maxNumValidators,
+		Governance:           types.ZeroAddress,
+		InitialTrieRoot:      types.StringToHash(p.initialStateRoot),
+		NativeTokenConfig:    p.nativeTokenConfig,
+		MinValidatorSetSize:  p.minNumValidators,
+		MaxValidatorSetSize:  p.maxNumValidators,
+		CheckpointInterval:   p.checkpointInterval,
+		WithdrawalWaitPeriod: p.withdrawalWaitPeriod,
 		RewardConfig: &polybft.RewardsConfig{
 			TokenAddress:  rewardTokenAddr,
 			WalletAddress: walletPremineInfo.Address,
@@ -147,6 +182,17 @@ func (p *genesisParams) generateChainConfig(o command.OutputFormatter) error {
 		BlockTrackerPollInterval: common.Duration{Duration: p.blockTrackerPollInterval},
 		ProxyContractsAdmin:      types.StringToAddress(p.proxyContractsAdmin),
 		BladeAdmin:               types.StringToAddress(p.bladeAdmin),
+		GovernanceConfig: &polybft.GovernanceConfig{
+			VotingDelay:              voteDelay,
+			VotingPeriod:             votingPeriod,
+			ProposalThreshold:        proposalThreshold,
+			ProposalQuorumPercentage: proposalQuorum,
+			// on genesis we deploy governance contracts on predefined addresses
+			ChildGovernorAddr: contracts.ChildGovernorContract,
+			ChildTimelockAddr: contracts.ChildTimelockContract,
+			NetworkParamsAddr: contracts.NetworkParamsContract,
+			ForkParamsAddr:    contracts.ForkParamsContract,
+		},
 	}
 
 	enabledForks := chain.AllForksEnabled.Copy()
@@ -230,8 +276,8 @@ func (p *genesisParams) generateChainConfig(o command.OutputFormatter) error {
 
 	if p.parsedBaseFeeConfig != nil {
 		chainConfig.Genesis.BaseFee = p.parsedBaseFeeConfig.baseFee
-		chainConfig.Genesis.BaseFeeChangeDenom = p.parsedBaseFeeConfig.baseFeeChangeDenom
-		chainConfig.Genesis.BaseFeeEM = p.parsedBaseFeeConfig.baseFeeEM
+		chainConfig.Params.BaseFeeEM = p.parsedBaseFeeConfig.baseFeeEM
+		chainConfig.Params.BaseFeeChangeDenom = p.parsedBaseFeeConfig.baseFeeChangeDenom
 	}
 
 	if len(p.contractDeployerAllowListAdmin) != 0 {
@@ -353,6 +399,22 @@ func (p *genesisParams) deployContracts(
 		{
 			artifact: contractsapi.NativeERC20,
 			address:  contracts.NativeERC20TokenContractV1,
+		},
+		{
+			artifact: contractsapi.NetworkParams,
+			address:  contracts.NetworkParamsContractV1,
+		},
+		{
+			artifact: contractsapi.ForkParams,
+			address:  contracts.ForkParamsContractV1,
+		},
+		{
+			artifact: contractsapi.ChildGovernor,
+			address:  contracts.ChildGovernorContractV1,
+		},
+		{
+			artifact: contractsapi.ChildTimelock,
+			address:  contracts.ChildTimelockContractV1,
 		},
 	}
 

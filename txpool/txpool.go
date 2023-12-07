@@ -774,7 +774,7 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 	}
 
 	// calculate tx hash
-	tx.ComputeHash(p.store.Header().Number)
+	tx.ComputeHash()
 
 	// initialize account for this address once or retrieve existing one
 	account := p.getOrCreateAccount(tx.From)

@@ -136,10 +136,10 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	return nil
 }
 
-func stringSliceToAddressSlice(addrs []string) []ethgo.Address {
-	res := make([]ethgo.Address, len(addrs))
+func stringSliceToAddressSlice(addrs []string) []types.Address {
+	res := make([]types.Address, len(addrs))
 	for indx, addr := range addrs {
-		res[indx] = ethgo.Address(types.StringToAddress(addr))
+		res[indx] = types.StringToAddress(addr)
 	}
 
 	return res

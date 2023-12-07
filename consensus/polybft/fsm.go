@@ -13,6 +13,7 @@ import (
 	hcf "github.com/hashicorp/go-hclog"
 
 	"github.com/0xPolygon/polygon-edge/bls"
+	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
@@ -38,11 +39,11 @@ var (
 	errCommitEpochTxSingleExpected = errors.New("only one commit epoch transaction is allowed " +
 		"in an epoch ending block")
 	errDistributeRewardsTxDoesNotExist = errors.New("distribute rewards transaction is " +
-		"not found in the epoch ending block")
-	errDistributeRewardsTxNotExpected = errors.New("didn't expect distribute rewards transaction " +
-		"in a non epoch ending block")
+		"not found in the given block, though it is expected to be present")
+	errDistributeRewardsTxNotExpected = errors.New("distribute rewards transaction " +
+		"is not expected at this block")
 	errDistributeRewardsTxSingleExpected = errors.New("only one distribute rewards transaction is " +
-		"allowed in an epoch ending block")
+		"allowed in the given block")
 	errProposalDontMatch = errors.New("failed to insert proposal, because the validated proposal " +
 		"is either nil or it does not match the received one")
 	errValidatorSetDeltaMismatch           = errors.New("validator set delta mismatch")
@@ -53,6 +54,9 @@ var (
 type fsm struct {
 	// PolyBFT consensus protocol configuration
 	config *PolyBFTConfig
+
+	// forks holds forks configuration
+	forks *chain.Forks
 
 	// parent block header
 	parent *types.Header
@@ -89,6 +93,9 @@ type fsm struct {
 
 	// isEndOfSprint indicates if sprint reached its end
 	isEndOfSprint bool
+
+	// isFirstBlockOfEpoch indicates if this is the start of new epoch
+	isFirstBlockOfEpoch bool
 
 	// proposerCommitmentToRegister is a commitment that is registered via state transaction by proposer
 	proposerCommitmentToRegister *CommitmentMessageSigned
@@ -136,8 +143,10 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 		if err := f.blockBuilder.WriteTx(tx); err != nil {
 			return nil, fmt.Errorf("failed to apply commit epoch transaction: %w", err)
 		}
+	}
 
-		tx, err = f.createDistributeRewardsTx()
+	if isRewardDistributionBlock(f.forks, f.isFirstBlockOfEpoch, f.isEndOfEpoch, f.Height()) {
+		tx, err := f.createDistributeRewardsTx()
 		if err != nil {
 			return nil, err
 		}
@@ -234,7 +243,7 @@ func (f *fsm) createBridgeCommitmentTx() (*types.Transaction, error) {
 		return nil, fmt.Errorf("failed to encode input data for bridge commitment registration: %w", err)
 	}
 
-	return createStateTransactionWithData(f.Height(), contracts.StateReceiverContract, inputData), nil
+	return createStateTransactionWithData(contracts.StateReceiverContract, inputData), nil
 }
 
 // getValidatorsTransition applies delta to the current validators,
@@ -257,7 +266,7 @@ func (f *fsm) createCommitEpochTx() (*types.Transaction, error) {
 		return nil, err
 	}
 
-	return createStateTransactionWithData(f.Height(), contracts.EpochManagerContract, input), nil
+	return createStateTransactionWithData(contracts.EpochManagerContract, input), nil
 }
 
 // createDistributeRewardsTx create a StateTransaction, which invokes RewardPool smart contract
@@ -268,7 +277,7 @@ func (f *fsm) createDistributeRewardsTx() (*types.Transaction, error) {
 		return nil, err
 	}
 
-	return createStateTransactionWithData(f.Height(), contracts.EpochManagerContract, input), nil
+	return createStateTransactionWithData(contracts.EpochManagerContract, input), nil
 }
 
 // ValidateCommit is used to validate that a given commit is valid
@@ -485,7 +494,9 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 			// but it should be
 			return errCommitEpochTxDoesNotExist
 		}
+	}
 
+	if isRewardDistributionBlock(f.forks, f.isFirstBlockOfEpoch, f.isEndOfEpoch, f.Height()) {
 		if !distributeRewardsTxExists {
 			// this is a check if distribute rewards transaction is not in the list of transactions at all
 			// but it should be
@@ -604,7 +615,8 @@ func (f *fsm) verifyCommitEpochTx(commitEpochTx *types.Transaction) error {
 // verifyDistributeRewardsTx creates distribute rewards transaction
 // and compares its hash with the one extracted from the block.
 func (f *fsm) verifyDistributeRewardsTx(distributeRewardsTx *types.Transaction) error {
-	if f.isEndOfEpoch {
+	// we don't have distribute rewards tx if we just started the chain
+	if isRewardDistributionBlock(f.forks, f.isFirstBlockOfEpoch, f.isEndOfEpoch, f.Height()) {
 		localDistributeRewardsTx, err := f.createDistributeRewardsTx()
 		if err != nil {
 			return err
@@ -703,7 +715,7 @@ func validateHeaderFields(parent *types.Header, header *types.Header, blockTimeD
 
 // createStateTransactionWithData creates a state transaction
 // with provided target address and inputData parameter which is ABI encoded byte array.
-func createStateTransactionWithData(blockNumber uint64, target types.Address, inputData []byte) *types.Transaction {
+func createStateTransactionWithData(target types.Address, inputData []byte) *types.Transaction {
 	tx := &types.Transaction{
 		From:     contracts.SystemCaller,
 		To:       &target,
@@ -713,5 +725,5 @@ func createStateTransactionWithData(blockNumber uint64, target types.Address, in
 		GasPrice: big.NewInt(0),
 	}
 
-	return tx.ComputeHash(blockNumber)
+	return tx.ComputeHash()
 }

@@ -35,6 +35,9 @@ type Consensus interface {
 	// GetSyncProgression retrieves the current sync progression, if any
 	GetSyncProgression() *progress.Progression
 
+	// GetLatestChainConfig retrieves the latest chain configuration
+	GetLatestChainConfig() (*chain.Params, error)
+
 	// GetBridgeProvider returns an instance of BridgeDataProvider
 	GetBridgeProvider() BridgeDataProvider
 

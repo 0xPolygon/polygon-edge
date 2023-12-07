@@ -874,7 +874,7 @@ func TestDecodeTxn(t *testing.T) {
 
 			// DecodeTxn computes hash of tx
 			if !test.err {
-				test.expected.ComputeHash(1)
+				test.expected.ComputeHash()
 			}
 
 			assert.Equal(t, test.expected, tx)

@@ -162,7 +162,7 @@ func TestEth_DecodeTxn(t *testing.T) {
 			t.Parallel()
 
 			if tt.res != nil {
-				tt.res.ComputeHash(1)
+				tt.res.ComputeHash()
 			}
 
 			store := newMockStore()
@@ -292,7 +292,7 @@ func TestEth_TxnType(t *testing.T) {
 	}
 	res, err := DecodeTxn(args, 1, store, false)
 
-	expectedRes.ComputeHash(1)
+	expectedRes.ComputeHash()
 	assert.NoError(t, err)
 	assert.Equal(t, expectedRes, res)
 }

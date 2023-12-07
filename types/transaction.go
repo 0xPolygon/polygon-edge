@@ -84,7 +84,7 @@ func (t *Transaction) IsValueTransfer() bool {
 }
 
 // ComputeHash computes the hash of the transaction
-func (t *Transaction) ComputeHash(blockNumber uint64) *Transaction {
+func (t *Transaction) ComputeHash() *Transaction {
 	hash := keccak.DefaultKeccakPool.Get()
 	hash.WriteFn(t.Hash[:0], t.MarshalRLPTo)
 	keccak.DefaultKeccakPool.Put(hash)

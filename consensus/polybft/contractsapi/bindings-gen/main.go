@@ -386,6 +386,69 @@ func main() {
 			[]string{},
 			[]string{},
 		},
+		{
+			"NetworkParams",
+			gensc.NetworkParams,
+			false,
+			[]string{
+				"initialize",
+				"setNewEpochSize",
+				"setNewSprintSize",
+				"setNewBaseFeeChangeDenom",
+			},
+			[]string{
+				"NewCheckpointBlockInterval",
+				"NewEpochSize",
+				"NewEpochReward",
+				"NewMinValidatorSetSize",
+				"NewMaxValidatorSetSize",
+				"NewWithdrawalWaitPeriod",
+				"NewBlockTime",
+				"NewBlockTimeDrift",
+				"NewVotingDelay",
+				"NewVotingPeriod",
+				"NewProposalThreshold",
+				"NewSprintSize",
+				"NewBaseFeeChangeDenom",
+			},
+		},
+		{
+			"ForkParams",
+			gensc.ForkParams,
+			false,
+			[]string{
+				"initialize",
+			},
+			[]string{
+				"NewFeature",
+				"UpdatedFeature",
+			},
+		},
+		{
+			"ChildGovernor",
+			gensc.ChildGovernor,
+			false,
+			[]string{
+				"initialize",
+				"propose",
+				"execute",
+				"castVote",
+				"state",
+				"queue",
+			},
+			[]string{
+				"ProposalCreated",
+			},
+		},
+		{
+			"ChildTimelock",
+			gensc.ChildTimelock,
+			false,
+			[]string{
+				"initialize",
+			},
+			[]string{},
+		},
 	}
 
 	generatedData := &generatedData{}
@@ -512,10 +575,12 @@ func generateType(generatedData *generatedData, name string, obj *abi.Type, res 
 
 			typ = "[" + strconv.Itoa(elem.Size()) + "]" + nestedType
 		} else if elem.Kind() == abi.KindAddress {
-			// for address use the native `types.Address` type instead of `ethgo.Address`. Note that
-			// this only works for simple types and not for []address inputs. This is good enough since
-			// there are no kinds like that in our smart contracts.
+			// for address use the native `types.Address` type instead of `ethgo.Address`
 			typ = "types.Address"
+		} else if (elem.Kind() == abi.KindArray || elem.Kind() == abi.KindSlice) &&
+			elem.Elem().Kind() == abi.KindAddress {
+			// for address slice or arrays use the native `types.Address` type instead of `ethgo.Address`
+			typ = "[]types.Address"
 		} else {
 			// for the rest of the types use the go type returned by abi
 			typ = elem.GoType().String()

@@ -594,7 +594,7 @@ func TestBlockchainWriteBody(t *testing.T) {
 			},
 		}
 
-		tx.ComputeHash(1)
+		tx.ComputeHash()
 		block.Header.ComputeHash()
 
 		txFromByTxHash := map[types.Hash]types.Address{}
@@ -625,7 +625,7 @@ func TestBlockchainWriteBody(t *testing.T) {
 			},
 		}
 
-		tx.ComputeHash(1)
+		tx.ComputeHash()
 		block.Header.ComputeHash()
 
 		txFromByTxHash := map[types.Hash]types.Address{}
@@ -657,7 +657,7 @@ func TestBlockchainWriteBody(t *testing.T) {
 			},
 		}
 
-		tx.ComputeHash(1)
+		tx.ComputeHash()
 		block.Header.ComputeHash()
 
 		txFromByTxHash := map[types.Hash]types.Address{
@@ -692,7 +692,7 @@ func Test_recoverFromFieldsInBlock(t *testing.T) {
 
 	computeTxHashes := func(txs ...*types.Transaction) {
 		for _, tx := range txs {
-			tx.ComputeHash(1)
+			tx.ComputeHash()
 		}
 	}
 
@@ -777,7 +777,7 @@ func Test_recoverFromFieldsInTransactions(t *testing.T) {
 
 	computeTxHashes := func(txs ...*types.Transaction) {
 		for _, tx := range txs {
-			tx.ComputeHash(1)
+			tx.ComputeHash()
 		}
 	}
 
@@ -896,7 +896,7 @@ func TestBlockchainReadBody(t *testing.T) {
 		V:     big.NewInt(1),
 	}
 
-	tx.ComputeHash(1)
+	tx.ComputeHash()
 
 	block := &types.Block{
 		Header: &types.Header{},
@@ -980,7 +980,7 @@ func TestCalculateGasLimit(t *testing.T) {
 				t.Fatalf("unable to construct the blockchain, %v", blockchainErr)
 			}
 
-			b.config.Params = &chain.Params{
+			b.genesisConfig.Params = &chain.Params{
 				BlockGasTarget: tt.blockGasTarget,
 			}
 
@@ -1369,41 +1369,165 @@ func TestBlockchain_CalculateBaseFee(t *testing.T) {
 		parentBaseFee        uint64
 		parentGasLimit       uint64
 		parentGasUsed        uint64
-		expectedBaseFee      uint64
 		elasticityMultiplier uint64
+		forks                *chain.Forks
+		getLatestConfigFn    getChainConfigDelegate
+		expectedBaseFee      uint64
 	}{
-		{6, chain.GenesisBaseFee, 20000000, 10000000, chain.GenesisBaseFee, 2}, // usage == target
-		{6, chain.GenesisBaseFee, 20000000, 10000000, 1125000000, 4},           // usage == target
-		{6, chain.GenesisBaseFee, 20000000, 9000000, 987500000, 2},             // usage below target
-		{6, chain.GenesisBaseFee, 20000000, 9000000, 1100000000, 4},            // usage below target
-		{6, chain.GenesisBaseFee, 20000000, 11000000, 1012500000, 2},           // usage above target
-		{6, chain.GenesisBaseFee, 20000000, 11000000, 1150000000, 4},           // usage above target
-		{6, chain.GenesisBaseFee, 20000000, 20000000, 1125000000, 2},           // usage full
-		{6, chain.GenesisBaseFee, 20000000, 20000000, 1375000000, 4},           // usage full
-		{6, chain.GenesisBaseFee, 20000000, 0, 875000000, 2},                   // usage 0
-		{6, chain.GenesisBaseFee, 20000000, 0, 875000000, 4},                   // usage 0
+		{
+			blockNumber:          6,
+			parentBaseFee:        chain.GenesisBaseFee,
+			parentGasLimit:       20000000,
+			parentGasUsed:        10000000,
+			elasticityMultiplier: 2,
+			expectedBaseFee:      chain.GenesisBaseFee,
+		}, // usage == target
+		{
+			blockNumber:          6,
+			parentBaseFee:        chain.GenesisBaseFee,
+			parentGasLimit:       20000000,
+			parentGasUsed:        10000000,
+			elasticityMultiplier: 4,
+			expectedBaseFee:      1125000000,
+		}, // usage == target
+		{
+			blockNumber:          6,
+			parentBaseFee:        chain.GenesisBaseFee,
+			parentGasLimit:       20000000,
+			parentGasUsed:        9000000,
+			elasticityMultiplier: 2,
+			expectedBaseFee:      987500000,
+		}, // usage below target
+		{
+			blockNumber:          6,
+			parentBaseFee:        chain.GenesisBaseFee,
+			parentGasLimit:       20000000,
+			parentGasUsed:        9000000,
+			elasticityMultiplier: 4,
+			expectedBaseFee:      1100000000,
+		}, // usage below target
+		{
+			blockNumber:          6,
+			parentBaseFee:        chain.GenesisBaseFee,
+			parentGasLimit:       20000000,
+			parentGasUsed:        11000000,
+			elasticityMultiplier: 2,
+			expectedBaseFee:      1012500000,
+		}, // usage above target
+		{
+			blockNumber:          6,
+			parentBaseFee:        chain.GenesisBaseFee,
+			parentGasLimit:       20000000,
+			parentGasUsed:        11000000,
+			elasticityMultiplier: 4,
+			expectedBaseFee:      1150000000,
+		}, // usage above target
+		{
+			blockNumber:          6,
+			parentBaseFee:        chain.GenesisBaseFee,
+			parentGasLimit:       20000000,
+			parentGasUsed:        20000000,
+			elasticityMultiplier: 2,
+			expectedBaseFee:      1125000000,
+		}, // usage full
+		{
+			blockNumber:          6,
+			parentBaseFee:        chain.GenesisBaseFee,
+			parentGasLimit:       20000000,
+			parentGasUsed:        20000000,
+			elasticityMultiplier: 4,
+			expectedBaseFee:      1375000000,
+		}, // usage full
+		{
+			blockNumber:          6,
+			parentBaseFee:        chain.GenesisBaseFee,
+			parentGasLimit:       20000000,
+			parentGasUsed:        0,
+			elasticityMultiplier: 2,
+			expectedBaseFee:      875000000,
+		}, // usage 0
+		{
+			blockNumber:          6,
+			parentBaseFee:        chain.GenesisBaseFee,
+			parentGasLimit:       20000000,
+			parentGasUsed:        0,
+			elasticityMultiplier: 4,
+			expectedBaseFee:      875000000,
+		}, // usage 0
+		{
+			blockNumber:     6,
+			forks:           &chain.Forks{chain.London: chain.NewFork(10)},
+			expectedBaseFee: 0,
+		}, // London hard fork disabled
+		{
+			blockNumber:     6,
+			parentBaseFee:   0,
+			expectedBaseFee: 10,
+		},
+		// first block with London hard fork
+		// (return base fee value configured in the genesis)
+		{
+			blockNumber:          6,
+			parentBaseFee:        chain.GenesisBaseFee,
+			parentGasLimit:       20000000,
+			parentGasUsed:        10000000,
+			elasticityMultiplier: 4,
+			forks:                chain.AllForksEnabled,
+			getLatestConfigFn: func() (*chain.Params, error) {
+				return &chain.Params{BaseFeeChangeDenom: 4}, nil
+			},
+			expectedBaseFee: 1250000000,
+		}, // governance hard fork enabled
+		{
+			blockNumber:          6,
+			parentBaseFee:        chain.GenesisBaseFee,
+			parentGasLimit:       20000000,
+			parentGasUsed:        10000000,
+			elasticityMultiplier: 4,
+			forks:                chain.AllForksEnabled,
+			getLatestConfigFn: func() (*chain.Params, error) {
+				return nil, errors.New("failed to retrieve chain config")
+			},
+			expectedBaseFee: 1000000008,
+		}, // governance hard fork enabled
 	}
 
 	for i, test := range tests {
-		i := i
 		test := test
 
-		t.Run(fmt.Sprintf("test case #%d", i+1), func(t *testing.T) {
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			t.Parallel()
 
+			forks := &chain.Forks{
+				chain.London: chain.NewFork(5),
+			}
+
+			if test.forks != nil {
+				forks = test.forks
+			}
+
 			blockchain := &Blockchain{
-				config: &chain.Chain{
+				logger: hclog.NewNullLogger(),
+				genesisConfig: &chain.Chain{
 					Params: &chain.Params{
-						Forks: &chain.Forks{
-							chain.London: chain.NewFork(5),
-						},
+						Forks:              forks,
+						BaseFeeChangeDenom: chain.BaseFeeChangeDenom,
+						BaseFeeEM:          test.elasticityMultiplier,
 					},
 					Genesis: &chain.Genesis{
-						BaseFeeEM:          test.elasticityMultiplier,
-						BaseFeeChangeDenom: chain.BaseFeeChangeDenom,
+						BaseFee: 10,
 					},
 				},
 			}
+
+			blockchain.setCurrentHeader(&types.Header{
+				Number:   test.blockNumber + 1,
+				GasLimit: test.parentGasLimit,
+				GasUsed:  test.parentGasUsed,
+				BaseFee:  test.parentBaseFee,
+			}, big.NewInt(1))
+
+			blockchain.SetConsensus(&MockVerifier{getChainConfigFn: test.getLatestConfigFn})
 
 			parent := &types.Header{
 				Number:   test.blockNumber,
@@ -1445,15 +1569,14 @@ func TestBlockchain_WriteFullBlock(t *testing.T) {
 		logger:    hclog.NewNullLogger(),
 		db:        storageMock,
 		consensus: consensusMock,
-		config: &chain.Chain{
+		genesisConfig: &chain.Chain{
 			Params: &chain.Params{
 				Forks: &chain.Forks{
 					chain.London: chain.NewFork(5),
 				},
-			},
-			Genesis: &chain.Genesis{
 				BaseFeeEM: 4,
 			},
+			Genesis: &chain.Genesis{},
 		},
 		stream: newEventStream(),
 	}
@@ -1474,7 +1597,7 @@ func TestBlockchain_WriteFullBlock(t *testing.T) {
 		Value: big.NewInt(1),
 	}
 
-	tx.ComputeHash(1)
+	tx.ComputeHash()
 	header.ComputeHash()
 	existingHeader.ComputeHash()
 	bc.currentHeader.Store(existingHeader)

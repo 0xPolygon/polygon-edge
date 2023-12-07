@@ -71,6 +71,25 @@ var (
 	// RootMintableERC1155PredicateContractV1 is an address of mintable ERC1155 predicate on the child chain
 	RootMintableERC1155PredicateContractV1 = types.StringToAddress("0x100b1")
 
+	// Governance contracts ===============================================================================
+
+	// ChildGovernorContract is the proxy address of main governance contract
+	ChildGovernorContract = types.StringToAddress("0x100c")
+	// ChildGovernorContract is an address of main governance contract
+	ChildGovernorContractV1 = types.StringToAddress("0x100c1")
+	// ChildTimelockContract is the proxy address of timelock contract used by the governor contract
+	ChildTimelockContract = types.StringToAddress("0x100d")
+	// ChildTimelockContract is an address of timelock contract used by the governor contract
+	ChildTimelockContractV1 = types.StringToAddress("0x100d1")
+	// NetworkParamsContract is the proxy address of NetworkParams contract which holds network config params
+	NetworkParamsContract = types.StringToAddress("0x100e")
+	// NetworkParamsContract is an address of NetworkParams contract which holds network config params
+	NetworkParamsContractV1 = types.StringToAddress("0x100e1")
+	// ForkParamsContract is an address of ForkParams contract which holds data of enabled forks
+	ForkParamsContract = types.StringToAddress("0x100f")
+	// ForkParamsContract is the proxy address of ForkParams contract which holds data of enabled forks
+	ForkParamsContractV1 = types.StringToAddress("0x100f1")
+
 	// SystemCaller is address of account, used for system calls to smart contracts
 	SystemCaller = types.StringToAddress("0xffffFFFfFFffffffffffffffFfFFFfffFFFfFFfE")
 
@@ -112,5 +131,9 @@ func GetProxyImplementationMapping() map[types.Address]types.Address {
 		RootMintableERC20PredicateContract:   RootMintableERC20PredicateContractV1,
 		RootMintableERC721PredicateContract:  RootMintableERC721PredicateContractV1,
 		RootMintableERC1155PredicateContract: RootMintableERC1155PredicateContractV1,
+		NetworkParamsContract:                NetworkParamsContractV1,
+		ForkParamsContract:                   ForkParamsContractV1,
+		ChildTimelockContract:                ChildTimelockContractV1,
+		ChildGovernorContract:                ChildGovernorContractV1,
 	}
 }

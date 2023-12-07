@@ -2,6 +2,7 @@ package dummy
 
 import (
 	"github.com/0xPolygon/polygon-edge/blockchain"
+	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/state"
@@ -63,6 +64,11 @@ func (d *Dummy) GetBlockCreator(header *types.Header) (types.Address, error) {
 // PreCommitState a hook to be called before finalizing state transition on inserting block
 func (d *Dummy) PreCommitState(_ *types.Block, _ *state.Transition) error {
 	return nil
+}
+
+// GetLatestChainConfig returns the latest chain configuration
+func (d *Dummy) GetLatestChainConfig() (*chain.Params, error) {
+	return nil, nil
 }
 
 func (d *Dummy) GetSyncProgression() *progress.Progression {

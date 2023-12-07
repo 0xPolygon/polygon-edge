@@ -163,7 +163,7 @@ func (s *State) startStatsReleasing() {
 func (p *Polybft) publishRootchainMetrics(logger hclog.Logger) {
 	interval := p.config.MetricsInterval
 	validatorAddr := p.key.Address()
-	bridgeCfg := p.consensusConfig.Bridge
+	bridgeCfg := p.genesisClientConfig.Bridge
 
 	// zero means metrics are disabled
 	if interval <= 0 {

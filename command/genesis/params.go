@@ -30,6 +30,12 @@ const (
 	rewardWalletFlag             = "reward-wallet"
 	blockTrackerPollIntervalFlag = "block-tracker-poll-interval"
 	proxyContractsAdminFlag      = "proxy-contracts-admin"
+	checkpointIntervalFlag       = "checkpoint-interval"
+	withdrawalWaitPeriodFlag     = "withdrawal-wait-period"
+	voteDelayFlag                = "vote-delay"
+	votePeriodFlag               = "vote-period"
+	voteProposalThresholdFlag    = "vote-proposal-threshold"
+	proposalQuorumFlag           = "proposal-quorum"
 )
 
 var (
@@ -48,6 +54,7 @@ var (
 	errBaseFeeZero              = errors.New("base fee  must be greater than 0")
 	errRewardWalletNotDefined   = errors.New("reward wallet address must be defined")
 	errRewardWalletZero         = errors.New("reward wallet address must not be zero address")
+	errInvalidVotingPeriod      = errors.New("voting period can not be zero")
 )
 
 type genesisParams struct {
@@ -110,8 +117,17 @@ type genesisParams struct {
 
 	blockTrackerPollInterval time.Duration
 
+	checkpointInterval   uint64
+	withdrawalWaitPeriod uint64
+
 	proxyContractsAdmin string
 	bladeAdmin          string
+
+	// governance
+	voteDelay         string
+	votingPeriod      string
+	proposalThreshold string
+	proposalQuorum    uint64
 }
 
 func (p *genesisParams) validateFlags() error {
@@ -229,8 +245,8 @@ func (p *genesisParams) initGenesisConfig() error {
 
 	if p.parsedBaseFeeConfig != nil {
 		chainConfig.Genesis.BaseFee = p.parsedBaseFeeConfig.baseFee
-		chainConfig.Genesis.BaseFeeChangeDenom = p.parsedBaseFeeConfig.baseFeeChangeDenom
-		chainConfig.Genesis.BaseFeeEM = p.parsedBaseFeeConfig.baseFeeEM
+		chainConfig.Params.BaseFeeEM = p.parsedBaseFeeConfig.baseFeeEM
+		chainConfig.Params.BaseFeeChangeDenom = p.parsedBaseFeeConfig.baseFeeChangeDenom
 	}
 
 	chainConfig.Params.BurnContract = make(map[uint64]types.Address, 1)

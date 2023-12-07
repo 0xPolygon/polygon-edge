@@ -19,7 +19,7 @@ const (
 	DefaultGenesisBaseFeeEM          = chain.GenesisBaseFeeEM
 	DefaultGenesisBaseFeeChangeDenom = chain.BaseFeeChangeDenom
 	DefaultEpochSize                 = 10
-	DefaultMinValidatorCount         = uint64(3)
+	DefaultMinValidatorCount         = uint64(4)
 )
 
 var (
