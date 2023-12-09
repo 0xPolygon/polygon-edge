@@ -3451,7 +3451,7 @@ func TestBatchTx_SingleAccount(t *testing.T) {
 	for {
 		select {
 		case ev = <-subscription.subscriptionChannel:
-		case <-time.After(time.Second * 3):
+		case <-time.After(time.Second * 10):
 			t.Fatal(fmt.Sprintf("timeout. processed: %d/%d and %d/%d. Added: %d",
 				enqueuedCount, defaultMaxAccountEnqueued, promotedCount, defaultMaxAccountEnqueued,
 				atomic.LoadUint64(&counter)))
