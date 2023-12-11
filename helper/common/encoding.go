@@ -9,7 +9,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 )
 
-// ParseUint64orHex parses the given uint64 hex string into the number.
+// ParseUint64orHex converts the given uint64 string into the number.
 // It can parse the string with 0x prefix as well.
 func ParseUint64orHex(val *string) (uint64, error) {
 	if val == nil {
@@ -26,6 +26,9 @@ func ParseUint64orHex(val *string) (uint64, error) {
 
 	return strconv.ParseUint(str, base, 64)
 }
+
+// ParseUint256orHex converts the given uint256 string into the number.
+// It can parse the string with 0x prefix as well.
 func ParseUint256orHex(val *string) (*big.Int, error) {
 	if val == nil {
 		return nil, nil
@@ -41,7 +44,7 @@ func ParseUint256orHex(val *string) (*big.Int, error) {
 
 	b, ok := new(big.Int).SetString(str, base)
 	if !ok {
-		return nil, fmt.Errorf("could not parse")
+		return nil, fmt.Errorf("could not convert provided value (%s) to numeric", str)
 	}
 
 	return b, nil

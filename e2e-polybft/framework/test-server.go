@@ -255,20 +255,20 @@ func (t *TestServer) Unstake(amount *big.Int) error {
 	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("unstake"))
 }
 
-// RegisterValidator is a wrapper function which registers new validator on a root chain
-func (t *TestServer) RegisterValidator() error {
+// RegisterValidator is a wrapper function which registers new validator
+func (t *TestServer) RegisterValidatorWithStake(amount *big.Int) error {
 	args := []string{
 		"validator",
 		"register-validator",
-		"--jsonrpc", t.JSONRPCAddr(),
 		"--" + polybftsecrets.AccountDirFlag, t.DataDir(),
+		"--jsonrpc", t.JSONRPCAddr(),
+		"--amount", amount.String(),
 	}
 
 	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("validator"))
 }
 
-// WhitelistValidators invokes whitelist-validators helper CLI command,
-// that whitelists validators on the root chain
+// WhitelistValidators invokes whitelist-validators helper CLI command that whitelists validators
 func (t *TestServer) WhitelistValidators(addresses []string) error {
 	args := []string{
 		"validator",

@@ -14,11 +14,13 @@ const (
 	AccountConfigFlag = "config"
 	PrivateKeyFlag    = "private-key"
 	ChainIDFlag       = "chain-id"
+	AmountFlag        = "amount"
 
 	AccountDirFlagDesc    = "the directory for the Polygon Edge data if the local FS is used"
 	AccountConfigFlagDesc = "the path to the SecretsManager config file, if omitted, the local FS secrets manager is used"
 	PrivateKeyFlagDesc    = "hex-encoded private key of the account which executes command"
 	ChainIDFlagDesc       = "ID of child chain"
+	AmountFlagDesc        = "amount to stake"
 )
 
 // common errors for all polybft commands

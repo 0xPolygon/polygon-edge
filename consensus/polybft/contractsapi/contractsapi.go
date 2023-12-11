@@ -1335,8 +1335,9 @@ func (w *WhitelistValidatorsStakeManagerFn) DecodeAbi(buf []byte) error {
 }
 
 type RegisterStakeManagerFn struct {
-	Signature [2]*big.Int `abi:"signature"`
-	Pubkey    [4]*big.Int `abi:"pubkey"`
+	Signature   [2]*big.Int `abi:"signature"`
+	Pubkey      [4]*big.Int `abi:"pubkey"`
+	StakeAmount *big.Int    `abi:"stakeAmount"`
 }
 
 func (r *RegisterStakeManagerFn) Sig() []byte {
@@ -1445,6 +1446,7 @@ func (s *StakeWithdrawnEvent) Decode(input []byte) error {
 type ValidatorRegisteredEvent struct {
 	Validator types.Address `abi:"validator"`
 	BlsKey    [4]*big.Int   `abi:"blsKey"`
+	Amount    *big.Int      `abi:"amount"`
 }
 
 func (*ValidatorRegisteredEvent) Sig() ethgo.Hash {
