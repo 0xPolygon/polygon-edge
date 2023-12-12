@@ -215,8 +215,7 @@ func TestPolybft_Close(t *testing.T) {
 		closeCh: make(chan struct{}),
 		syncer:  syncer,
 		runtime: &consensusRuntime{
-			stateSyncManager: &dummyStateSyncManager{},
-			stateSyncRelayer: &dummyStateSyncRelayer{},
+			bridgeManager: &dummyBridgeManager{},
 		},
 	}
 

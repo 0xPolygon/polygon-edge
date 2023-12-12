@@ -18,7 +18,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/forkmanager"
-	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	bolt "go.etcd.io/bbolt"
 
@@ -116,22 +115,16 @@ type consensusRuntime struct {
 	// activeValidatorFlag indicates whether the given node is amongst currently active validator set
 	activeValidatorFlag atomic.Bool
 
-	// checkpointManager represents abstraction for checkpoint submission
-	checkpointManager CheckpointManager
-
 	// proposerCalculator is the object which manipulates with ProposerSnapshot
 	proposerCalculator *ProposerCalculator
-
-	// manager for state sync bridge transactions
-	stateSyncManager StateSyncManager
 
 	// manager for handling validator stake change and updating validator set
 	stakeManager StakeManager
 
 	eventProvider *EventProvider
 
-	// stateSyncRelayer is relayer for commitment events
-	stateSyncRelayer StateSyncRelayer
+	// bridgeManager handles storing, processing and executing bridge events
+	bridgeManager BridgeManager
 
 	// governanceManager is used for handling governance events gotten from proposals execution
 	// also handles updating client configuration based on governance proposals
@@ -164,19 +157,14 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 		eventProvider:      NewEventProvider(config.blockchain),
 	}
 
-	if err := runtime.initStateSyncManager(log); err != nil {
+	bridgeManager, err := newBridgeManager(runtime, config, runtime.eventProvider, log)
+	if err != nil {
 		return nil, err
 	}
 
-	if err := runtime.initCheckpointManager(log); err != nil {
-		return nil, err
-	}
+	runtime.bridgeManager = bridgeManager
 
 	if err := runtime.initStakeManager(log, dbTx); err != nil {
-		return nil, err
-	}
-
-	if err := runtime.initStateSyncRelayer(log); err != nil {
 		return nil, err
 	}
 
@@ -199,96 +187,7 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 
 // close is used to tear down allocated resources
 func (c *consensusRuntime) close() {
-	c.stateSyncRelayer.Close()
-	c.stateSyncManager.Close()
-}
-
-// initStateSyncManager initializes state sync manager
-// if bridge is not enabled, then a dummy state sync manager will be used
-func (c *consensusRuntime) initStateSyncManager(logger hcf.Logger) error {
-	if c.IsBridgeEnabled() {
-		stateSenderAddr := c.config.GenesisConfig.Bridge.StateSenderAddr
-		stateSyncManager := newStateSyncManager(
-			logger.Named("state-sync-manager"),
-			c.config.State,
-			&stateSyncConfig{
-				key:               c.config.Key,
-				dataDir:           c.config.DataDir,
-				topic:             c.config.bridgeTopic,
-				maxCommitmentSize: maxCommitmentSize,
-				eventTrackerConfig: &eventTrackerConfig{
-					jsonrpcAddr:           c.config.GenesisConfig.Bridge.JSONRPCEndpoint,
-					stateSenderAddr:       stateSenderAddr,
-					stateSenderStartBlock: c.config.GenesisConfig.Bridge.EventTrackerStartBlocks[stateSenderAddr],
-					trackerPollInterval:   c.config.GenesisConfig.BlockTrackerPollInterval.Duration,
-					EventTracker:          *c.config.eventTracker,
-				},
-			},
-			c,
-		)
-
-		c.stateSyncManager = stateSyncManager
-	} else {
-		c.stateSyncManager = &dummyStateSyncManager{}
-	}
-
-	return c.stateSyncManager.Init()
-}
-
-// initCheckpointManager initializes checkpoint manager
-// if bridge is not enabled, then a dummy checkpoint manager will be used
-func (c *consensusRuntime) initCheckpointManager(logger hcf.Logger) error {
-	if c.IsBridgeEnabled() {
-		// enable checkpoint manager
-		txRelayer, err := txrelayer.NewTxRelayer(
-			txrelayer.WithIPAddress(c.config.GenesisConfig.Bridge.JSONRPCEndpoint),
-			txrelayer.WithWriter(logger.StandardWriter(&hcf.StandardLoggerOptions{})))
-		if err != nil {
-			return err
-		}
-
-		c.checkpointManager = newCheckpointManager(
-			wallet.NewEcdsaSigner(c.config.Key),
-			c.config.GenesisConfig.Bridge.CheckpointManagerAddr,
-			txRelayer,
-			c.config.blockchain,
-			c.config.polybftBackend,
-			logger.Named("checkpoint_manager"),
-			c.state)
-	} else {
-		c.checkpointManager = &dummyCheckpointManager{}
-	}
-
-	c.eventProvider.Subscribe(c.checkpointManager)
-
-	return nil
-}
-
-// initStateSyncRelayer initializes state sync relayer
-// if not enabled, then a dummy state sync relayer will be used
-func (c *consensusRuntime) initStateSyncRelayer(logger hcf.Logger) error {
-	if c.IsBridgeEnabled() && c.config.consensusConfig.IsRelayer {
-		txRelayer, err := getStateSyncTxRelayer(c.config.consensusConfig.RPCEndpoint, logger)
-		if err != nil {
-			return err
-		}
-
-		c.stateSyncRelayer = NewStateSyncRelayer(
-			txRelayer,
-			contracts.StateReceiverContract,
-			c.state.StateSyncStore,
-			c,
-			c.config.blockchain,
-			wallet.NewEcdsaSigner(c.config.Key),
-			nil,
-			logger.Named("state_sync_relayer"))
-	} else {
-		c.stateSyncRelayer = &dummyStateSyncRelayer{}
-	}
-
-	c.eventProvider.Subscribe(c.stateSyncRelayer)
-
-	return c.stateSyncRelayer.Init()
+	c.bridgeManager.Close()
 }
 
 // initStakeManager initializes stake manager
@@ -421,12 +320,6 @@ func (c *consensusRuntime) OnBlockInserted(fullBlock *types.FullBlock) {
 		Forks:               c.config.Forks,
 	}
 
-	if err := c.stateSyncManager.PostBlock(postBlock); err != nil {
-		c.logger.Error("failed to post block state sync", "err", err)
-
-		return
-	}
-
 	// update proposer priorities
 	if err := c.proposerCalculator.PostBlock(postBlock); err != nil {
 		c.logger.Error("Could not update proposer calculator", "err", err)
@@ -441,9 +334,11 @@ func (c *consensusRuntime) OnBlockInserted(fullBlock *types.FullBlock) {
 		return
 	}
 
-	// handle state sync relayer events that happened in block
-	if err := c.stateSyncRelayer.PostBlock(postBlock); err != nil {
-		c.logger.Error("post block callback failed in state sync relayer", "err", err)
+	// handle bridge events
+	if err := c.bridgeManager.PostBlock(postBlock); err != nil {
+		c.logger.Error("failed to post block in bridge manager", "err", err)
+
+		return
 	}
 
 	// handle governance events that happened in block
@@ -476,12 +371,6 @@ func (c *consensusRuntime) OnBlockInserted(fullBlock *types.FullBlock) {
 	// finally update runtime state (lastBuiltBlock, epoch, proposerSnapshot)
 	c.epoch = epoch
 	c.lastBuiltBlock = fullBlock.Block.Header
-
-	// we will do PostBlock on checkpoint manager at the end, because it only
-	// sends a checkpoint in a separate routine. It doesn't do any db operations
-	if err := c.checkpointManager.PostBlock(postBlock); err != nil {
-		c.logger.Error("failed to post block in checkpoint manager", "err", err)
-	}
 
 	endTime := time.Now().UTC()
 
@@ -522,7 +411,7 @@ func (c *consensusRuntime) FSM() error {
 
 	valSet := validator.NewValidatorSet(epoch.Validators, c.logger)
 
-	exitRootHash, err := c.checkpointManager.BuildEventRoot(epoch.Number)
+	exitRootHash, err := c.bridgeManager.BuildExitEventRoot(epoch.Number)
 	if err != nil {
 		return fmt.Errorf("could not build exit root hash for fsm: %w", err)
 	}
@@ -545,7 +434,7 @@ func (c *consensusRuntime) FSM() error {
 	}
 
 	if isEndOfSprint {
-		commitment, err := c.stateSyncManager.Commitment(pendingBlockNumber)
+		commitment, err := c.bridgeManager.Commitment(pendingBlockNumber)
 		if err != nil {
 			return err
 		}
@@ -646,7 +535,7 @@ func (c *consensusRuntime) restartEpoch(header *types.Header, dbTx *bolt.Tx) (*e
 		Forks:             c.config.Forks,
 	}
 
-	if err := c.stateSyncManager.PostEpoch(reqObj); err != nil {
+	if err := c.bridgeManager.PostEpoch(reqObj); err != nil {
 		return nil, err
 	}
 
@@ -812,12 +701,12 @@ func (c *consensusRuntime) calculateDistributeRewardsInput(
 
 // GenerateExitProof generates proof of exit and is a bridge endpoint store function
 func (c *consensusRuntime) GenerateExitProof(exitID uint64) (types.Proof, error) {
-	return c.checkpointManager.GenerateExitProof(exitID)
+	return c.bridgeManager.GenerateProof(exitID, Exit)
 }
 
 // GetStateSyncProof returns the proof for the state sync
 func (c *consensusRuntime) GetStateSyncProof(stateSyncID uint64) (types.Proof, error) {
-	return c.stateSyncManager.GetStateSyncProof(stateSyncID)
+	return c.bridgeManager.GenerateProof(stateSyncID, StateSync)
 }
 
 // setIsActiveValidator updates the activeValidatorFlag field

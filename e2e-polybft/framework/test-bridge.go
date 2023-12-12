@@ -291,7 +291,6 @@ func (t *TestBridge) SendExitTransaction(exitHelper types.Address, exitID uint64
 		"--exit-id", strconv.FormatUint(exitID, 10),
 		"--root-json-rpc", t.JSONRPCAddr(),
 		"--child-json-rpc", childJSONRPCAddr,
-		"--test",
 	)
 }
 

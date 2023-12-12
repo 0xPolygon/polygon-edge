@@ -336,6 +336,32 @@ func (g *GetCheckpointBlockCheckpointManagerFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(CheckpointManager.Abi.Methods["getCheckpointBlock"], buf, g)
 }
 
+type CheckpointSubmittedEvent struct {
+	Epoch       *big.Int   `abi:"epoch"`
+	BlockNumber *big.Int   `abi:"blockNumber"`
+	EventRoot   types.Hash `abi:"eventRoot"`
+}
+
+func (*CheckpointSubmittedEvent) Sig() ethgo.Hash {
+	return CheckpointManager.Abi.Events["CheckpointSubmitted"].ID()
+}
+
+func (c *CheckpointSubmittedEvent) Encode() ([]byte, error) {
+	return CheckpointManager.Abi.Events["CheckpointSubmitted"].Inputs.Encode(c)
+}
+
+func (c *CheckpointSubmittedEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !CheckpointManager.Abi.Events["CheckpointSubmitted"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(CheckpointManager.Abi.Events["CheckpointSubmitted"], log, c)
+}
+
+func (c *CheckpointSubmittedEvent) Decode(input []byte) error {
+	return CheckpointManager.Abi.Events["CheckpointSubmitted"].Inputs.DecodeStruct(input, &c)
+}
+
 type InitializeExitHelperFn struct {
 	NewCheckpointManager types.Address `abi:"newCheckpointManager"`
 }
@@ -369,6 +395,65 @@ func (e *ExitExitHelperFn) EncodeAbi() ([]byte, error) {
 
 func (e *ExitExitHelperFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(ExitHelper.Abi.Methods["exit"], buf, e)
+}
+
+type BatchExitInput struct {
+	BlockNumber  *big.Int     `abi:"blockNumber"`
+	LeafIndex    *big.Int     `abi:"leafIndex"`
+	UnhashedLeaf []byte       `abi:"unhashedLeaf"`
+	Proof        []types.Hash `abi:"proof"`
+}
+
+var BatchExitInputABIType = abi.MustNewType("tuple(uint256 blockNumber,uint256 leafIndex,bytes unhashedLeaf,bytes32[] proof)")
+
+func (b *BatchExitInput) EncodeAbi() ([]byte, error) {
+	return BatchExitInputABIType.Encode(b)
+}
+
+func (b *BatchExitInput) DecodeAbi(buf []byte) error {
+	return decodeStruct(BatchExitInputABIType, buf, &b)
+}
+
+type BatchExitExitHelperFn struct {
+	Inputs []*BatchExitInput `abi:"inputs"`
+}
+
+func (b *BatchExitExitHelperFn) Sig() []byte {
+	return ExitHelper.Abi.Methods["batchExit"].ID()
+}
+
+func (b *BatchExitExitHelperFn) EncodeAbi() ([]byte, error) {
+	return ExitHelper.Abi.Methods["batchExit"].Encode(b)
+}
+
+func (b *BatchExitExitHelperFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(ExitHelper.Abi.Methods["batchExit"], buf, b)
+}
+
+type ExitProcessedEvent struct {
+	ID         *big.Int `abi:"id"`
+	Success    bool     `abi:"success"`
+	ReturnData []byte   `abi:"returnData"`
+}
+
+func (*ExitProcessedEvent) Sig() ethgo.Hash {
+	return ExitHelper.Abi.Events["ExitProcessed"].ID()
+}
+
+func (e *ExitProcessedEvent) Encode() ([]byte, error) {
+	return ExitHelper.Abi.Events["ExitProcessed"].Inputs.Encode(e)
+}
+
+func (e *ExitProcessedEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !ExitHelper.Abi.Events["ExitProcessed"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(ExitHelper.Abi.Events["ExitProcessed"], log, e)
+}
+
+func (e *ExitProcessedEvent) Decode(input []byte) error {
+	return ExitHelper.Abi.Events["ExitProcessed"].Inputs.DecodeStruct(input, &e)
 }
 
 type InitializeChildERC20PredicateFn struct {

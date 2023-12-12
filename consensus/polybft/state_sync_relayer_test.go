@@ -33,7 +33,7 @@ func TestStateSyncRelayer_FullWorkflow(t *testing.T) {
 	}
 
 	headers := []*types.Header{
-		{Number: 2}, {Number: 3}, {Number: 4}, {Number: 5}, {Number: 5},
+		{Number: 2}, {Number: 3}, {Number: 4}, {Number: 5},
 	}
 
 	proofMock := &mockStateSyncProofRetriever{
@@ -55,17 +55,17 @@ func TestStateSyncRelayer_FullWorkflow(t *testing.T) {
 	dummyTxRelayer := newDummyStakeTxRelayer(t, nil)
 	state := newTestState(t)
 
-	stateSyncRelayer := NewStateSyncRelayer(
+	stateSyncRelayer := newStateSyncRelayer(
 		dummyTxRelayer,
-		stateSyncAddr,
 		state.StateSyncStore,
 		proofMock,
 		blockhainMock,
 		testKey,
-		&stateSyncRelayerConfig{
+		&relayerConfig{
 			maxAttemptsToSend:        6,
 			maxBlocksToWaitForResend: 1,
 			maxEventsPerBatch:        1,
+			eventExecutionAddr:       stateSyncAddr,
 		},
 		hclog.Default(),
 	)
@@ -91,7 +91,7 @@ func TestStateSyncRelayer_FullWorkflow(t *testing.T) {
 
 	time.Sleep(time.Second * 2) // wait for some time
 
-	events, err := state.StateSyncStore.getAllAvailableEvents(0)
+	events, err := state.StateSyncStore.GetAllAvailableRelayerEvents(0)
 
 	require.NoError(t, err)
 	require.Len(t, events, 3)
@@ -107,7 +107,7 @@ func TestStateSyncRelayer_FullWorkflow(t *testing.T) {
 
 	time.Sleep(time.Second * 2) // wait for some time
 
-	events, err = state.StateSyncStore.getAllAvailableEvents(0)
+	events, err = state.StateSyncStore.GetAllAvailableRelayerEvents(0)
 
 	require.NoError(t, err)
 	require.Len(t, events, 4)
@@ -122,7 +122,7 @@ func TestStateSyncRelayer_FullWorkflow(t *testing.T) {
 
 	time.Sleep(time.Second * 2) // wait for some time
 
-	events, err = state.StateSyncStore.getAllAvailableEvents(0)
+	events, err = state.StateSyncStore.GetAllAvailableRelayerEvents(0)
 
 	require.NoError(t, err)
 	require.Len(t, events, 3)
@@ -137,21 +137,21 @@ func TestStateSyncRelayer_FullWorkflow(t *testing.T) {
 
 	time.Sleep(time.Second * 2) // wait for some time
 
-	events, err = state.StateSyncStore.getAllAvailableEvents(0)
+	events, err = state.StateSyncStore.GetAllAvailableRelayerEvents(0)
 
 	require.NoError(t, err)
 	require.Len(t, events, 3)
 	require.True(t, events[0].SentStatus && events[1].SentStatus && events[2].SentStatus)
 
 	// post 5th block
-	require.NoError(t, stateSyncRelayer.ProcessLog(headers[4], convertLog(resultLogs[2]), nil))
-	require.NoError(t, stateSyncRelayer.ProcessLog(headers[4], convertLog(resultLogs[3]), nil))
-	require.NoError(t, stateSyncRelayer.ProcessLog(headers[4], convertLog(resultLogs[4]), nil))
+	require.NoError(t, stateSyncRelayer.ProcessLog(headers[3], convertLog(resultLogs[2]), nil))
+	require.NoError(t, stateSyncRelayer.ProcessLog(headers[3], convertLog(resultLogs[3]), nil))
+	require.NoError(t, stateSyncRelayer.ProcessLog(headers[3], convertLog(resultLogs[4]), nil))
 	require.NoError(t, stateSyncRelayer.PostBlock(&PostBlockRequest{}))
 
 	time.Sleep(time.Second * 2) // wait for some time
 
-	events, err = state.StateSyncStore.getAllAvailableEvents(0)
+	events, err = state.StateSyncStore.GetAllAvailableRelayerEvents(0)
 
 	require.NoError(t, err)
 	require.Len(t, events, 0)

@@ -345,3 +345,21 @@ func getLastExitEventID(t *testing.T, relayer txrelayer.TxRelayer) uint64 {
 
 	return exitEventID
 }
+
+func isExitEventProcessed(t *testing.T, exitHelperAddr types.Address,
+	relayer txrelayer.TxRelayer, exitEventID uint64) bool {
+	t.Helper()
+
+	processedExitsFn := contractsapi.ExitHelper.Abi.Methods["processedExits"]
+
+	input, err := processedExitsFn.Encode([]interface{}{exitEventID})
+	require.NoError(t, err)
+
+	isProcessedRaw, err := relayer.Call(ethgo.ZeroAddress, ethgo.Address(exitHelperAddr), input)
+	require.NoError(t, err)
+
+	isProcessedAsNumber, err := common.ParseUint64orHex(&isProcessedRaw)
+	require.NoError(t, err)
+
+	return isProcessedAsNumber == 1
+}

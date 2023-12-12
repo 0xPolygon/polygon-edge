@@ -35,10 +35,6 @@ func newTestStateSyncManager(t *testing.T, key *validator.TestValidator, runtime
 
 	s := newStateSyncManager(hclog.NewNullLogger(), state,
 		&stateSyncConfig{
-			eventTrackerConfig: &eventTrackerConfig{
-				stateSenderAddr: types.Address{},
-				jsonrpcAddr:     "",
-			},
 			dataDir:           tmpDir,
 			topic:             topic,
 			key:               key.Key(),
@@ -474,13 +470,6 @@ func TestStateSyncerManager_AddLog_BuildCommitments(t *testing.T) {
 		require.Equal(t, uint64(0), stateSyncs[0].ID.Uint64())
 		require.Len(t, s.pendingCommitments, 0)
 	})
-}
-
-func TestStateSyncManager_Close(t *testing.T) {
-	t.Parallel()
-
-	mgr := newTestStateSyncManager(t, validator.NewTestValidator(t, "A", 100), &mockRuntime{isActiveValidator: true})
-	require.NotPanics(t, func() { mgr.Close() })
 }
 
 func TestStateSyncManager_GetProofs(t *testing.T) {

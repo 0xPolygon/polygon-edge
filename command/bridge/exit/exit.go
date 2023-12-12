@@ -2,10 +2,7 @@ package exit
 
 import (
 	"bytes"
-	"encoding/hex"
-	"errors"
 	"fmt"
-	"math/big"
 	"strconv"
 
 	"github.com/spf13/cobra"
@@ -16,6 +13,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/bridge/common"
 	"github.com/0xPolygon/polygon-edge/command/bridge/helper"
 	cmdHelper "github.com/0xPolygon/polygon-edge/command/helper"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -38,7 +36,6 @@ type exitParams struct {
 	exitID            uint64
 	rootJSONRPCAddr   string
 	childJSONRPCAddr  string
-	isTestMode        bool
 }
 
 var (
@@ -89,15 +86,7 @@ func GetCommand() *cobra.Command {
 		"the JSON RPC child chain endpoint",
 	)
 
-	exitCmd.Flags().BoolVar(
-		&ep.isTestMode,
-		helper.TestModeFlag,
-		false,
-		"test indicates whether exit transaction sender is hardcoded test account",
-	)
-
 	_ = exitCmd.MarkFlagRequired(exitHelperFlag)
-	exitCmd.MarkFlagsMutuallyExclusive(helper.TestModeFlag, common.SenderKeyFlag)
 
 	return exitCmd
 }
@@ -169,36 +158,21 @@ func run(cmd *cobra.Command, _ []string) {
 // createExitTxn encodes parameters for exit function on root chain ExitHelper contract
 func createExitTxn(sender ethgo.Address, proof types.Proof) (*ethgo.Transaction,
 	*contractsapi.L2StateSyncedEvent, error) {
-	leafIndex, ok := proof.Metadata["LeafIndex"].(float64)
-	if !ok {
-		return nil, nil, errors.New("failed to convert proof leaf index")
-	}
-
-	checkpointBlock, ok := proof.Metadata["CheckpointBlock"].(float64)
-	if !ok {
-		return nil, nil, errors.New("failed to convert proof checkpoint block")
-	}
-
-	exitEventHex, ok := proof.Metadata["ExitEvent"].(string)
-	if !ok {
-		return nil, nil, errors.New("failed to convert exit event")
-	}
-
-	exitEventEncoded, err := hex.DecodeString(exitEventHex)
+	exitInput, err := polybft.GetExitInputFromProof(proof)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to decode hex-encoded exit event '%s': %w", exitEventHex, err)
+		return nil, nil, err
 	}
 
 	exitEvent := new(contractsapi.L2StateSyncedEvent)
-	if err := exitEvent.Decode(exitEventEncoded); err != nil {
+	if err := exitEvent.Decode(exitInput.UnhashedLeaf); err != nil {
 		return nil, nil, fmt.Errorf("failed to decode exit event: %w", err)
 	}
 
 	exitFn := &contractsapi.ExitExitHelperFn{
-		BlockNumber:  new(big.Int).SetUint64(uint64(checkpointBlock)),
-		LeafIndex:    new(big.Int).SetUint64(uint64(leafIndex)),
-		UnhashedLeaf: exitEventEncoded,
-		Proof:        proof.Data,
+		BlockNumber:  exitInput.BlockNumber,
+		LeafIndex:    exitInput.LeafIndex,
+		UnhashedLeaf: exitInput.UnhashedLeaf,
+		Proof:        exitInput.Proof,
 	}
 
 	input, err := exitFn.EncodeAbi()

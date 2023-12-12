@@ -20,7 +20,7 @@ var (
 	// bucket to store message votes (signatures)
 	messageVotesBucket = []byte("votes")
 	// bucket to store all state sync relayer events
-	stateSyncRelayerEventsBucket = []byte("relayerEvents")
+	stateSyncRelayerEventsBucket = []byte("stateSyncRelayerEvents")
 
 	// errNotEnoughStateSyncs error message
 	errNotEnoughStateSyncs = errors.New("there is either a gap or not enough sync events")
@@ -43,7 +43,7 @@ stateSyncProofs/
 |--> stateSyncProof.StateSync.Id -> *StateSyncProof (json marshalled)
 
 relayerEvents/
-|--> StateSyncRelayerEventData.EventID -> *StateSyncRelayerEventData (json marshalled)
+|--> RelayerEventData.EventID -> *RelayerEventData (json marshalled)
 */
 
 type StateSyncStore struct {
@@ -375,62 +375,18 @@ func (s *StateSyncStore) getStateSyncProof(stateSyncID uint64) (*StateSyncProof,
 	return ssp, err
 }
 
-// updateStateSyncRelayerEvents updates/remove desired events
-func (s *StateSyncStore) updateStateSyncRelayerEvents(
-	events []*StateSyncRelayerEventData, removeIDs []uint64, dbTx *bolt.Tx) error {
-	updateFn := func(tx *bolt.Tx) error {
-		relayerEventsBucket := tx.Bucket(stateSyncRelayerEventsBucket)
-
-		for _, evnt := range events {
-			raw, err := json.Marshal(evnt)
-			if err != nil {
-				return err
-			}
-
-			key := common.EncodeUint64ToBytes(evnt.EventID)
-
-			if err := relayerEventsBucket.Put(key, raw); err != nil {
-				return err
-			}
-		}
-
-		for _, stateSyncEventID := range removeIDs {
-			stateSyncEventIDKey := common.EncodeUint64ToBytes(stateSyncEventID)
-
-			if err := relayerEventsBucket.Delete(stateSyncEventIDKey); err != nil {
-				return fmt.Errorf("failed to remove state sync relayer event (ID=%d): %w", stateSyncEventID, err)
-			}
-		}
-
-		return nil
-	}
-
-	if dbTx == nil {
-		return s.db.Update(func(tx *bolt.Tx) error {
-			return updateFn(tx)
-		})
-	}
-
-	return updateFn(dbTx)
+// updateRelayerEvents updates/remove desired state sync relayer events
+func (s *StateSyncStore) UpdateRelayerEvents(
+	events []*RelayerEventMetaData, removeIDs []uint64, dbTx *bolt.Tx) error {
+	return updateRelayerEvents(stateSyncRelayerEventsBucket, events, removeIDs, s.db, dbTx)
 }
 
-// getAllAvailableEvents retrieves all StateSyncRelayerEventData that should be sent as a transactions
-func (s *StateSyncStore) getAllAvailableEvents(limit int) (result []*StateSyncRelayerEventData, err error) {
+// getAllAvailableRelayerEvents retrieves all StateSync RelayerEventData that should be sent as a transactions
+func (s *StateSyncStore) GetAllAvailableRelayerEvents(limit int) (result []*RelayerEventMetaData, err error) {
 	if err = s.db.View(func(tx *bolt.Tx) error {
-		cursor := tx.Bucket(stateSyncRelayerEventsBucket).Cursor()
-
-		for k, v := cursor.First(); k != nil; k, v = cursor.Next() {
-			var event *StateSyncRelayerEventData
-
-			if err := json.Unmarshal(v, &event); err != nil {
-				return err
-			}
-
-			result = append(result, event)
-
-			if limit > 0 && len(result) >= limit {
-				break
-			}
+		result, err = getAvailableRelayerEvents(limit, stateSyncRelayerEventsBucket, tx)
+		if err != nil {
+			return err
 		}
 
 		return nil
@@ -439,4 +395,68 @@ func (s *StateSyncStore) getAllAvailableEvents(limit int) (result []*StateSyncRe
 	}
 
 	return result, nil
+}
+
+// getAvailableRelayerEvents retrieves all relayer that should be sent as a transactions
+func getAvailableRelayerEvents(limit int, bucket []byte, tx *bolt.Tx) (result []*RelayerEventMetaData, err error) {
+	cursor := tx.Bucket(bucket).Cursor()
+
+	for k, v := cursor.First(); k != nil; k, v = cursor.Next() {
+		var event *RelayerEventMetaData
+
+		if err = json.Unmarshal(v, &event); err != nil {
+			return
+		}
+
+		result = append(result, event)
+
+		if limit > 0 && len(result) >= limit {
+			break
+		}
+	}
+
+	return
+}
+
+// updateRelayerEvents updates/remove desired relayer events
+func updateRelayerEvents(
+	bucket []byte,
+	events []*RelayerEventMetaData,
+	removeIDs []uint64,
+	db *bolt.DB,
+	openedTx *bolt.Tx) error {
+	updateFn := func(tx *bolt.Tx) error {
+		relayerEventsBucket := tx.Bucket(bucket)
+
+		for _, event := range events {
+			raw, err := json.Marshal(event)
+			if err != nil {
+				return err
+			}
+
+			key := common.EncodeUint64ToBytes(event.EventID)
+
+			if err := relayerEventsBucket.Put(key, raw); err != nil {
+				return err
+			}
+		}
+
+		for _, eventID := range removeIDs {
+			eventIDKey := common.EncodeUint64ToBytes(eventID)
+
+			if err := relayerEventsBucket.Delete(eventIDKey); err != nil {
+				return fmt.Errorf("failed to remove relayer event (ID=%d): %w", eventID, err)
+			}
+		}
+
+		return nil
+	}
+
+	if openedTx == nil {
+		return db.Update(func(tx *bolt.Tx) error {
+			return updateFn(tx)
+		})
+	}
+
+	return updateFn(openedTx)
 }

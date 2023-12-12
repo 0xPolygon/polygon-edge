@@ -84,7 +84,9 @@ func main() {
 				"initialize",
 				"getCheckpointBlock",
 			},
-			[]string{},
+			[]string{
+				"CheckpointSubmitted",
+			},
 		},
 		{
 			"ExitHelper",
@@ -93,8 +95,11 @@ func main() {
 			[]string{
 				"initialize",
 				"exit",
+				"batchExit",
 			},
-			[]string{},
+			[]string{
+				"ExitProcessed",
+			},
 		},
 		{
 			"ChildERC20Predicate",
