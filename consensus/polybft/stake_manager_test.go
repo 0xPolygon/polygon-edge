@@ -407,93 +407,39 @@ func TestStakeManager_UpdateOnInit(t *testing.T) {
 	var (
 		allAliases       = []string{"A", "B", "C", "D", "E", "F"}
 		stakeManagerAddr = types.StringToAddress("0xf001")
-		epochID          = uint64(120)
 	)
 
-	success := types.ReceiptSuccess
-	contractProvider := &stateProvider{}
-	header1Hash := types.StringToHash("0x99aa")
-	header2Hash := types.StringToHash("0xffee")
-	header3Hash := types.StringToHash("0xeeff")
-	header4Hash := types.StringToHash("0xaaff")
-	currentHeader := &types.Header{Number: 4}
-	validators := validator.NewTestValidatorsWithAliases(t, allAliases)
+	votingPowers := []uint64{1, 1, 1, 1, 5, 7}
+	validators := validator.NewTestValidatorsWithAliases(t, allAliases, votingPowers)
 	accountSet := validators.GetPublicIdentities(allAliases...)
-	addresses := accountSet.GetAddresses()
 	state := newTestState(t)
-
-	sysStateMock := &systemStateMock{}
-	sysStateMock.On("GetEpoch").Return(epochID, nil).Once()
 
 	polyBackendMock := new(polybftBackendMock)
 	polyBackendMock.On("GetValidatorsWithTx", uint64(0), []*types.Header(nil), mock.Anything).Return(accountSet, nil).Once()
-
-	bcMock := new(blockchainMock)
-	bcMock.On("GetStateProviderForBlock", currentHeader).Return(contractProvider, nil).Once()
-	bcMock.On("GetSystemState", contractProvider).Return(sysStateMock, nil).Once()
-	bcMock.On("CurrentHeader", mock.Anything).Return(currentHeader, true).Once()
-	bcMock.On("GetHeaderByNumber", uint64(1)).Return(&types.Header{Number: 1, Hash: header1Hash}, true).Once()
-	bcMock.On("GetHeaderByNumber", uint64(2)).Return(&types.Header{Number: 2, Hash: header2Hash}, true).Once()
-	bcMock.On("GetHeaderByNumber", uint64(3)).Return(&types.Header{Number: 3, Hash: header3Hash}, true).Once()
-	bcMock.On("GetHeaderByNumber", uint64(4)).Return(&types.Header{Number: 4, Hash: header4Hash}, true).Once()
-	bcMock.On("GetReceiptsByHash", header1Hash).Return([]*types.Receipt(nil), nil).Once()
-	bcMock.On("GetReceiptsByHash", header2Hash).Return([]*types.Receipt{
-		{
-			Status: &success,
-			Logs: []*types.Log{
-				createTestLogForStakeAddedEvent(
-					t,
-					stakeManagerAddr,
-					addresses[len(addresses)-2],
-					4,
-				),
-			},
-		},
-	}, nil).Once()
-	bcMock.On("GetReceiptsByHash", header3Hash).Return([]*types.Receipt{
-		{
-			Status: &success,
-			Logs: []*types.Log{
-				createTestLogForStakeAddedEvent(
-					t,
-					stakeManagerAddr,
-					addresses[len(addresses)-1],
-					6,
-				),
-			},
-		},
-	}, nil).Once()
-	bcMock.On("GetReceiptsByHash", header4Hash).Return([]*types.Receipt{{}}, nil).Once()
 
 	_, err := newStakeManager(
 		hclog.NewNullLogger(),
 		state,
 		wallet.NewEcdsaSigner(validators.GetValidator("A").Key()),
 		stakeManagerAddr,
-		bcMock,
+		nil,
 		polyBackendMock,
 		nil,
 	)
 	require.NoError(t, err)
 
-	bcMock.AssertExpectations(t)
-	sysStateMock.AssertExpectations(t)
-
 	fullValidatorSet, err := state.StakeStore.getFullValidatorSet(nil)
 	require.NoError(t, err)
 
-	require.Equal(t, uint64(4), fullValidatorSet.BlockNumber)
-	require.Equal(t, uint64(4), fullValidatorSet.UpdatedAtBlockNumber)
-	require.Equal(t, epochID, fullValidatorSet.EpochID)
+	require.Equal(t, uint64(0), fullValidatorSet.BlockNumber)
+	require.Equal(t, uint64(0), fullValidatorSet.UpdatedAtBlockNumber)
+	require.Equal(t, uint64(0), fullValidatorSet.EpochID)
 
-	for _, x := range fullValidatorSet.Validators {
-		if x.Address == addresses[len(addresses)-1] {
-			require.Equal(t, new(big.Int).SetUint64(7), x.VotingPower)
-		} else if x.Address == addresses[len(addresses)-2] {
-			require.Equal(t, new(big.Int).SetUint64(5), x.VotingPower)
-		} else {
-			require.Equal(t, new(big.Int).SetUint64(1), x.VotingPower)
-		}
+	for i, addr := range accountSet.GetAddresses() {
+		v, exists := fullValidatorSet.Validators[addr]
+
+		require.True(t, exists)
+		require.Equal(t, big.NewInt(int64(votingPowers[i])), v.VotingPower)
 	}
 }
 

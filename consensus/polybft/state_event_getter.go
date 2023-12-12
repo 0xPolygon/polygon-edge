@@ -2,7 +2,6 @@ package polybft
 
 import (
 	"github.com/0xPolygon/polygon-edge/blockchain"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo"
 	bolt "go.etcd.io/bbolt"
@@ -143,89 +142,6 @@ func (e *EventProvider) getEventsFromReceipts(blockHeader *types.Header,
 	}
 
 	return nil
-}
-
-// eventsGetter is a struct for getting missed and current events
-// of specified type from specified blocks
-type eventsGetter[T contractsapi.EventAbi] struct {
-	receiptsGetter
-	// parseEventFn is a plugin function used to parse the event from transaction log
-	parseEventFn func(*types.Header, *ethgo.Log) (T, bool, error)
-	// isValidLogFn is a plugin function that validates the log
-	// for example: if it was sent from the desired address
-	isValidLogFn func(*types.Log) bool
-}
-
-// getFromBlocks gets events of specified type from specified blocks
-// and saves them using the provided saveEventsFn
-func (e *eventsGetter[T]) getFromBlocks(lastProcessedBlock uint64,
-	currentBlock *types.FullBlock) ([]T, error) {
-	allEvents, err := e.getEventsFromBlocksRange(lastProcessedBlock+1, currentBlock.Block.Number()-1)
-	if err != nil {
-		return nil, err
-	}
-
-	currentEvents, err := e.getEventsFromReceipts(currentBlock.Block.Header, currentBlock.Receipts)
-	if err != nil {
-		return nil, err
-	}
-
-	allEvents = append(allEvents, currentEvents...)
-
-	return allEvents, nil
-}
-
-// getEventsFromBlocksRange gets events of specified type from all the blocks specified [from, to]
-func (e *eventsGetter[T]) getEventsFromBlocksRange(from, to uint64) ([]T, error) {
-	var allEvents []T
-
-	receiptsHandler := func(header *types.Header, receipts []*types.Receipt) error {
-		events, err := e.getEventsFromReceipts(header, receipts)
-		if err != nil {
-			return err
-		}
-
-		allEvents = append(allEvents, events...)
-
-		return nil
-	}
-
-	if err := e.receiptsGetter.getReceiptsFromBlocksRange(from, to, receiptsHandler); err != nil {
-		return nil, err
-	}
-
-	return allEvents, nil
-}
-
-// getEventsFromReceipts returns events of specified type from block transaction receipts
-func (e *eventsGetter[T]) getEventsFromReceipts(blockHeader *types.Header,
-	receipts []*types.Receipt) ([]T, error) {
-	var events []T
-
-	for _, receipt := range receipts {
-		if receipt.Status == nil || *receipt.Status != types.ReceiptSuccess {
-			continue
-		}
-
-		for _, log := range receipt.Logs {
-			if e.isValidLogFn != nil && !e.isValidLogFn(log) {
-				continue
-			}
-
-			event, doesMatch, err := e.parseEventFn(blockHeader, convertLog(log))
-			if err != nil {
-				return nil, err
-			}
-
-			if !doesMatch {
-				continue
-			}
-
-			events = append(events, event)
-		}
-	}
-
-	return events, nil
 }
 
 type receiptsGetter struct {
