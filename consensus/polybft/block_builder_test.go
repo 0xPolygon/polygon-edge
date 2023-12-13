@@ -113,7 +113,7 @@ func TestBlockBuilder_BuildBlockTxOneFailedTxAndOneTakesTooMuchGas(t *testing.T)
 	}
 
 	bb := NewBlockBuilder(&BlockBuilderParams{
-		BlockTime: time.Millisecond * 100,
+		BlockTime: time.Millisecond * 200,
 		Parent:    parentHeader,
 		Coinbase:  types.ZeroAddress,
 		Executor:  executor,

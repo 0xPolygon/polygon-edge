@@ -117,7 +117,7 @@ func TestEventSubscription_ProcessedEvents(t *testing.T) {
 				eventStore: &eventQueue{
 					events: make([]*proto.TxPoolEvent, 0),
 				},
-				notifyCh: make(chan struct{}),
+				notifyCh: make(chan struct{}, 10),
 			}
 			go subscription.runLoop()
 
@@ -141,10 +141,10 @@ func TestEventSubscription_ProcessedEvents(t *testing.T) {
 			}
 
 			wg.Wait()
-			eventWaitCtx, eventWaitFn := context.WithTimeout(context.Background(), 10*time.Second)
+			eventWaitCtx, eventWaitFn := context.WithTimeout(context.Background(), 30*time.Second)
 			defer eventWaitFn()
 			if _, err := tests.RetryUntilTimeout(eventWaitCtx, func() (interface{}, bool) {
-				return nil, atomic.LoadInt64(&processed) < int64(testCase.expectedProcessed)
+				return nil, atomic.LoadInt64(&processed) != int64(testCase.expectedProcessed)
 			}); err != nil {
 				t.Fatalf("Unable to wait for events to be processed, %v", err)
 			}

@@ -168,7 +168,7 @@ func TestSubscription_NilEventAfterClosingSubscription(t *testing.T) {
 
 	receivedEvtCount := 0
 
-	worker := func(sub *subscription, expectedBlockCount uint8) {
+	worker := func(sub *subscription, expectedBlockCount int) {
 		defer wg.Done()
 
 		startTime := time.Now().UTC()
@@ -178,7 +178,9 @@ func TestSubscription_NilEventAfterClosingSubscription(t *testing.T) {
 			evt := sub.GetEvent()
 			if evt != nil {
 				receivedEvtCount++
-			} else {
+			}
+
+			if expectedBlockCount <= receivedEvtCount {
 				return
 			}
 

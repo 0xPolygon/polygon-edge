@@ -211,6 +211,7 @@ func TestStatusPubSub(t *testing.T) {
 
 	assert.NoError(t, err)
 
+	time.Sleep(3 * time.Second)
 	// close channel and wait for events
 	close(client.closeCh)
 

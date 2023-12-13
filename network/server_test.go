@@ -697,8 +697,6 @@ func TestRunDial(t *testing.T) {
 }
 
 func TestSubscribe(t *testing.T) {
-	t.Parallel()
-
 	setupServer := func(t *testing.T, shouldCloseAfterTest bool) *Server {
 		t.Helper()
 
@@ -764,8 +762,6 @@ func TestSubscribe(t *testing.T) {
 	}
 
 	t.Run("should call callback", func(t *testing.T) {
-		t.Parallel()
-
 		server := setupServer(t, true)
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -784,8 +780,6 @@ func TestSubscribe(t *testing.T) {
 	})
 
 	t.Run("should not call callback after context is closed", func(t *testing.T) {
-		t.Parallel()
-
 		server := setupServer(t, true)
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -803,8 +797,6 @@ func TestSubscribe(t *testing.T) {
 	})
 
 	t.Run("should not call callback after server closed", func(t *testing.T) {
-		t.Parallel()
-
 		server := setupServer(t, false)
 
 		ctx, cancel := context.WithCancel(context.Background())
