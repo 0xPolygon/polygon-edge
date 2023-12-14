@@ -1,6 +1,7 @@
 package deploy
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -11,12 +12,14 @@ import (
 const (
 	deployerKeyFlag = "deployer-key"
 	jsonRPCFlag     = "json-rpc"
+	erc20AddrFlag   = "erc20-token"
 )
 
 type deployParams struct {
 	genesisPath         string
 	deployerKey         string
 	jsonRPCAddress      string
+	rootERC20TokenAddr  string
 	proxyContractsAdmin string
 	isTestMode          bool
 }
@@ -31,6 +34,15 @@ func (ip *deployParams) validateFlags() error {
 	consensusCfg, err = polybft.LoadPolyBFTConfig(ip.genesisPath)
 	if err != nil {
 		return err
+	}
+
+	if consensusCfg.NativeTokenConfig == nil {
+		return errors.New("native token configuration is undefined")
+	}
+
+	// when using mintable native token, child native token on root chain gets mapped automatically
+	if consensusCfg.NativeTokenConfig.IsMintable && ip.rootERC20TokenAddr != "" {
+		return errors.New("if child chain native token is mintable, root native token must not pre-exist on root chain")
 	}
 
 	return helper.ValidateProxyContractsAdmin(ip.proxyContractsAdmin)

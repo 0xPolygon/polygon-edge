@@ -28,6 +28,8 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
+const nativeTokenNonMintableConfig = "Blade:BLD:18:false"
+
 // getCheckpointManagerValidators queries rootchain validator set on CheckpointManager contract
 func getCheckpointManagerValidators(relayer txrelayer.TxRelayer, checkpointManagerAddr ethgo.Address) ([]*polybft.ValidatorInfo, error) {
 	validatorsCountRaw, err := ABICall(relayer, contractsapi.CheckpointManager,
@@ -296,7 +298,7 @@ func erc721OwnerOf(t *testing.T, tokenID *big.Int, tokenAddr types.Address, rela
 func queryNativeERC20Metadata(t *testing.T, funcName string, abiType *abi.Type, relayer txrelayer.TxRelayer) interface{} {
 	t.Helper()
 
-	valueHex, err := ABICall(relayer, contractsapi.NativeERC20,
+	valueHex, err := ABICall(relayer, contractsapi.NativeERC20Mintable,
 		ethgo.Address(contracts.NativeERC20TokenContract),
 		ethgo.ZeroAddress, funcName)
 	require.NoError(t, err)

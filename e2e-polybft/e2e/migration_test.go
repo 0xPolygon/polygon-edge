@@ -32,7 +32,6 @@ func TestE2E_Migration(t *testing.T) {
 	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDev)
 		config.Premine(types.Address(userAddr), initialBalance)
-		config.SetBaseFeeConfig("")
 	})
 
 	srv := srvs[0]

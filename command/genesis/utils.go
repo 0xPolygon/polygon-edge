@@ -92,6 +92,46 @@ func parseTrackerStartBlocks(trackerStartBlocksRaw []string) (map[types.Address]
 	return trackerStartBlocksConfig, nil
 }
 
+// parseBurnContractInfo parses provided burn contract information and returns burn contract block and address
+func parseBurnContractInfo(burnContractInfoRaw string) (*polybft.BurnContractInfo, error) {
+	// <block>:<address>[:<burn destination address>]
+	burnContractParts := strings.Split(burnContractInfoRaw, ":")
+	if len(burnContractParts) < 2 || len(burnContractParts) > 3 {
+		return nil, fmt.Errorf("expected format: <block>:<address>[:<burn destination>]")
+	}
+
+	blockRaw := burnContractParts[0]
+
+	blockNum, err := common.ParseUint64orHex(&blockRaw)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse block number %s: %w", blockRaw, err)
+	}
+
+	contractAddress := burnContractParts[1]
+	if err = types.IsValidAddress(contractAddress); err != nil {
+		return nil, fmt.Errorf("failed to parse contract address %s: %w", contractAddress, err)
+	}
+
+	if len(burnContractParts) == 2 {
+		return &polybft.BurnContractInfo{
+			BlockNumber:        blockNum,
+			Address:            types.StringToAddress(contractAddress),
+			DestinationAddress: types.ZeroAddress,
+		}, nil
+	}
+
+	destinationAddress := burnContractParts[2]
+	if err = types.IsValidAddress(destinationAddress); err != nil {
+		return nil, fmt.Errorf("failed to parse burn destination address %s: %w", destinationAddress, err)
+	}
+
+	return &polybft.BurnContractInfo{
+		BlockNumber:        blockNum,
+		Address:            types.StringToAddress(contractAddress),
+		DestinationAddress: types.StringToAddress(destinationAddress),
+	}, nil
+}
+
 type baseFeeInfo struct {
 	baseFee            uint64
 	baseFeeEM          uint64
@@ -180,7 +220,7 @@ func GetValidatorKeyFiles(rootDir, filePrefix string) ([]string, error) {
 
 // ReadValidatorsByPrefix reads validators secrets on a given root directory and with given folder prefix
 func ReadValidatorsByPrefix(dir, prefix string,
-	stakeInfos map[types.Address]*big.Int) ([]*validator.GenesisValidator, error) {
+	stakeInfos map[types.Address]*big.Int, isNativeTokenMintable bool) ([]*validator.GenesisValidator, error) {
 	validatorKeyFiles, err := GetValidatorKeyFiles(dir, prefix)
 	if err != nil {
 		return nil, err
@@ -196,9 +236,15 @@ func ReadValidatorsByPrefix(dir, prefix string,
 			return nil, err
 		}
 
-		stake, exists := stakeInfos[types.Address(account.Ecdsa.Address())]
-		if !exists {
-			stake = command.DefaultStake
+		stake := big.NewInt(0)
+
+		if isNativeTokenMintable {
+			s, exists := stakeInfos[types.Address(account.Ecdsa.Address())]
+			if !exists {
+				stake = command.DefaultStake
+			} else {
+				stake = s
+			}
 		}
 
 		validators[i] = &validator.GenesisValidator{

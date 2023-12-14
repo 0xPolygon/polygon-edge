@@ -16,7 +16,7 @@ import (
 
 const (
 	ConsensusName              = "polybft"
-	minNativeTokenParamsNumber = 3
+	minNativeTokenParamsNumber = 4
 
 	defaultNativeTokenName     = "Polygon"
 	defaultNativeTokenSymbol   = "MATIC"
@@ -25,9 +25,10 @@ const (
 
 var (
 	DefaultTokenConfig = &TokenConfig{
-		Name:     defaultNativeTokenName,
-		Symbol:   defaultNativeTokenSymbol,
-		Decimals: defaultNativeTokenDecimals,
+		Name:       defaultNativeTokenName,
+		Symbol:     defaultNativeTokenSymbol,
+		Decimals:   defaultNativeTokenDecimals,
+		IsMintable: true,
 	}
 
 	errInvalidTokenParams = errors.New("native token params were not submitted in proper format " +
@@ -136,6 +137,7 @@ type BridgeConfig struct {
 	ExitHelperAddr                    types.Address `json:"exitHelperAddress"`
 	RootERC20PredicateAddr            types.Address `json:"erc20PredicateAddress"`
 	ChildMintableERC20PredicateAddr   types.Address `json:"erc20ChildMintablePredicateAddress"`
+	RootNativeERC20Addr               types.Address `json:"nativeERC20Address"`
 	RootERC721PredicateAddr           types.Address `json:"erc721PredicateAddress"`
 	ChildMintableERC721PredicateAddr  types.Address `json:"erc721ChildMintablePredicateAddress"`
 	RootERC1155PredicateAddr          types.Address `json:"erc1155PredicateAddress"`
@@ -143,6 +145,7 @@ type BridgeConfig struct {
 	ChildERC20Addr                    types.Address `json:"childERC20Address"`
 	ChildERC721Addr                   types.Address `json:"childERC721Address"`
 	ChildERC1155Addr                  types.Address `json:"childERC1155Address"`
+	BladeManagerAddr                  types.Address `json:"bladeManagerAddress"`
 	// only populated if stake-manager-deploy command is executed, and used for e2e tests
 	BLSAddress     types.Address `json:"blsAddr"`
 	BN256G2Address types.Address `json:"bn256G2Addr"`
@@ -166,6 +169,7 @@ type RootchainConfig struct {
 	ExitHelperAddress                    types.Address
 	RootERC20PredicateAddress            types.Address
 	ChildMintableERC20PredicateAddress   types.Address
+	RootNativeERC20Address               types.Address
 	ChildERC20Address                    types.Address
 	RootERC721PredicateAddress           types.Address
 	ChildMintableERC721PredicateAddress  types.Address
@@ -173,6 +177,7 @@ type RootchainConfig struct {
 	RootERC1155PredicateAddress          types.Address
 	ChildMintableERC1155PredicateAddress types.Address
 	ChildERC1155Address                  types.Address
+	BladeManagerAddress                  types.Address
 }
 
 // ToBridgeConfig creates BridgeConfig instance
@@ -185,6 +190,7 @@ func (r *RootchainConfig) ToBridgeConfig() *BridgeConfig {
 		ExitHelperAddr:                    r.ExitHelperAddress,
 		RootERC20PredicateAddr:            r.RootERC20PredicateAddress,
 		ChildMintableERC20PredicateAddr:   r.ChildMintableERC20PredicateAddress,
+		RootNativeERC20Addr:               r.RootNativeERC20Address,
 		RootERC721PredicateAddr:           r.RootERC721PredicateAddress,
 		ChildMintableERC721PredicateAddr:  r.ChildMintableERC721PredicateAddress,
 		RootERC1155PredicateAddr:          r.RootERC1155PredicateAddress,
@@ -194,14 +200,16 @@ func (r *RootchainConfig) ToBridgeConfig() *BridgeConfig {
 		ChildERC1155Addr:                  r.ChildERC1155Address,
 		BLSAddress:                        r.BLSAddress,
 		BN256G2Address:                    r.BN256G2Address,
+		BladeManagerAddr:                  r.BladeManagerAddress,
 	}
 }
 
 // TokenConfig is the configuration of native token used by edge network
 type TokenConfig struct {
-	Name     string `json:"name"`
-	Symbol   string `json:"symbol"`
-	Decimals uint8  `json:"decimals"`
+	Name       string `json:"name"`
+	Symbol     string `json:"symbol"`
+	Decimals   uint8  `json:"decimals"`
+	IsMintable bool   `json:"isMintable"`
 }
 
 func ParseRawTokenConfig(rawConfig string) (*TokenConfig, error) {
@@ -232,10 +240,17 @@ func ParseRawTokenConfig(rawConfig string) (*TokenConfig, error) {
 		return nil, errInvalidTokenParams
 	}
 
+	// is mintable native token used
+	isMintable, err := strconv.ParseBool(strings.TrimSpace(params[3]))
+	if err != nil {
+		return nil, errInvalidTokenParams
+	}
+
 	return &TokenConfig{
-		Name:     name,
-		Symbol:   symbol,
-		Decimals: uint8(decimals),
+		Name:       name,
+		Symbol:     symbol,
+		Decimals:   uint8(decimals),
+		IsMintable: isMintable,
 	}, nil
 }
 
@@ -365,4 +380,10 @@ type rewardsConfigRaw struct {
 	TokenAddress  types.Address `json:"rewardTokenAddress"`
 	WalletAddress types.Address `json:"rewardWalletAddress"`
 	WalletAmount  *string       `json:"rewardWalletAmount"`
+}
+
+type BurnContractInfo struct {
+	BlockNumber        uint64
+	Address            types.Address
+	DestinationAddress types.Address
 }

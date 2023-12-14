@@ -47,6 +47,7 @@ func TestPreminedBalance(t *testing.T) {
 
 	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDev)
+		config.SetBurnContract(types.ZeroAddress)
 		for _, acc := range preminedAccounts {
 			config.Premine(acc.address, acc.balance)
 		}
@@ -124,7 +125,7 @@ func TestEthTransfer(t *testing.T) {
 		config.SetConsensus(framework.ConsensusDev)
 		for _, acc := range validAccounts {
 			config.Premine(acc.address, acc.balance)
-			config.SetBaseFeeConfig("")
+			config.SetBurnContract(types.StringToAddress("0xBurnContract"))
 		}
 	})
 	srv := srvs[0]

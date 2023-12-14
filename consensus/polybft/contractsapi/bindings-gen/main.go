@@ -145,6 +145,15 @@ func main() {
 			false,
 			[]string{
 				"initialize",
+			},
+			[]string{},
+		},
+		{
+			"NativeERC20Mintable",
+			gensc.NativeERC20Mintable,
+			false,
+			[]string{
+				"initialize",
 				"approve",
 			},
 			[]string{},
@@ -371,6 +380,25 @@ func main() {
 				"commitEpoch",
 				"initialize",
 				"distributeRewardFor",
+			},
+			[]string{},
+		},
+		{
+			"EIP1559Burn",
+			gensc.EIP1559Burn,
+			false,
+			[]string{
+				"initialize",
+			},
+			[]string{},
+		},
+		{
+			"BladeManager",
+			gensc.BladeManager,
+			false,
+			[]string{
+				"initialize",
+				"addGenesisBalance",
 			},
 			[]string{},
 		},

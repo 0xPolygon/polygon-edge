@@ -35,6 +35,7 @@ const (
 	exitHelperName                    = "ExitHelper"
 	rootERC20PredicateName            = "RootERC20Predicate"
 	childERC20MintablePredicateName   = "ChildERC20MintablePredicate"
+	rootERC20Name                     = "RootERC20"
 	erc20TemplateName                 = "ERC20Template"
 	rootERC721PredicateName           = "RootERC721Predicate"
 	childERC721MintablePredicateName  = "ChildERC721MintablePredicate"
@@ -42,6 +43,7 @@ const (
 	rootERC1155PredicateName          = "RootERC1155Predicate"
 	childERC1155MintablePredicateName = "ChildERC1155MintablePredicate"
 	erc1155TemplateName               = "ERC1155Template"
+	bladeManagerName                  = "BladeManager"
 )
 
 var (
@@ -56,6 +58,9 @@ var (
 	metadataPopulatorMap = map[string]func(*polybft.RootchainConfig, types.Address){
 		stateSenderName: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
 			rootchainConfig.StateSenderAddress = addr
+		},
+		getProxyNameForImpl(bladeManagerName): func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
+			rootchainConfig.BladeManagerAddress = addr
 		},
 		getProxyNameForImpl(checkpointManagerName): func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
 			rootchainConfig.CheckpointManagerAddress = addr
@@ -75,6 +80,9 @@ var (
 		getProxyNameForImpl(childERC20MintablePredicateName): func(
 			rootchainConfig *polybft.RootchainConfig, addr types.Address) {
 			rootchainConfig.ChildMintableERC20PredicateAddress = addr
+		},
+		rootERC20Name: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
+			rootchainConfig.RootNativeERC20Address = addr
 		},
 		erc20TemplateName: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
 			rootchainConfig.ChildERC20Address = addr
@@ -111,6 +119,14 @@ var (
 			config *polybft.RootchainConfig,
 			key ethgo.Key,
 			chainID int64) error {
+			if !consensusCfg.NativeTokenConfig.IsMintable {
+				// we can not initialize checkpoint manager at this moment if native token is not mintable
+				// we will do that on finalize command when validators do premine and stake on BladeManager
+				// this is done like this because checkpoint manager needs to have correct
+				// voting powers in order to correctly validate checkpoints
+				return nil
+			}
+
 			validatorSet, err := getValidatorSetForCheckpointManager(fmt, genesisValidators)
 			if err != nil {
 				return err
@@ -149,8 +165,8 @@ var (
 				NewExitHelper:          config.ExitHelperAddress,
 				NewChildERC20Predicate: contracts.ChildERC20PredicateContract,
 				NewChildTokenTemplate:  contracts.ChildERC20Contract,
-				// map root native token address should be non-zero only if native token is non-mintable on a childchain
-				NewNativeTokenRoot: types.ZeroAddress,
+				// root native token address should be non-zero only if native token is non-mintable on a childchain
+				NewNativeTokenRoot: config.RootNativeERC20Address,
 			}
 
 			return initContract(fmt, relayer, inputParams,
@@ -236,6 +252,31 @@ var (
 			return initContract(fmt, relayer, initParams,
 				config.ChildMintableERC1155PredicateAddress, childERC1155MintablePredicateName, key)
 		},
+		getProxyNameForImpl(bladeManagerName): func(fmt command.OutputFormatter,
+			relayer txrelayer.TxRelayer,
+			genesisValidators []*validator.GenesisValidator,
+			config *polybft.RootchainConfig,
+			key ethgo.Key,
+			chainID int64) error {
+			gvs := make([]*contractsapi.GenesisAccount, len(genesisValidators))
+			for i := 0; i < len(genesisValidators); i++ {
+				gvs[i] = &contractsapi.GenesisAccount{
+					Addr:        genesisValidators[i].Address,
+					IsValidator: true,
+					// this is set on purpose to 0, each account must premine enough tokens to itself if token is non-mintable
+					StakedTokens:   big.NewInt(0),
+					PreminedTokens: big.NewInt(0),
+				}
+			}
+
+			initParams := &contractsapi.InitializeBladeManagerFn{
+				NewRootERC20Predicate: config.RootERC20PredicateAddress,
+				GenesisAccounts:       gvs,
+			}
+
+			return initContract(fmt, relayer, initParams,
+				config.BladeManagerAddress, bladeManagerName, key)
+		},
 	}
 )
 
@@ -272,6 +313,13 @@ func GetCommand() *cobra.Command {
 		jsonRPCFlag,
 		txrelayer.DefaultRPCAddress,
 		"the JSON RPC rootchain IP address",
+	)
+
+	cmd.Flags().StringVar(
+		&params.rootERC20TokenAddr,
+		erc20AddrFlag,
+		"",
+		"existing root native erc20 token address, that originates from a rootchain",
 	)
 
 	cmd.Flags().BoolVar(
@@ -411,6 +459,23 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 
 	rootchainConfig := &polybft.RootchainConfig{JSONRPCAddr: params.jsonRPCAddress}
 
+	tokenContracts := []*contractInfo{}
+
+	// deploy root ERC20 token only if non-mintable native token flavor is used on a child chain
+	if !consensusCfg.NativeTokenConfig.IsMintable {
+		if params.rootERC20TokenAddr != "" {
+			// use existing root chain ERC20 token
+			if err := populateExistingTokenAddr(client.Eth(),
+				params.rootERC20TokenAddr, rootERC20Name, rootchainConfig); err != nil {
+				return deploymentResultInfo{RootchainCfg: nil, CommandResults: nil}, err
+			}
+		} else {
+			// deploy MockERC20 as a root chain root native token
+			tokenContracts = append(tokenContracts,
+				&contractInfo{name: rootERC20Name, artifact: contractsapi.RootERC20})
+		}
+	}
+
 	allContracts := []*contractInfo{
 		{
 			name:     stateSenderName,
@@ -491,6 +556,18 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 			artifact: contractsapi.ChildERC1155,
 		},
 	}
+
+	if !consensusCfg.NativeTokenConfig.IsMintable {
+		// if token is non-mintable we will deploy BladeManager
+		// if not, we don't need it
+		allContracts = append(allContracts, &contractInfo{
+			name:     bladeManagerName,
+			artifact: contractsapi.BladeManager,
+			hasProxy: true,
+		})
+	}
+
+	allContracts = append(tokenContracts, allContracts...)
 
 	g, ctx := errgroup.WithContext(cmdCtx)
 	results := make(map[string]*deployContractResult, len(allContracts))

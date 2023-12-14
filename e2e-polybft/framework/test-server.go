@@ -1,6 +1,7 @@
 package framework
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	polybftsecrets "github.com/0xPolygon/polygon-edge/command/secrets/init"
+	validatorHelper "github.com/0xPolygon/polygon-edge/command/validator/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
@@ -285,11 +287,21 @@ func (t *TestServer) WhitelistValidators(addresses []string) error {
 
 // MintNativeERC20Token mints given amounts of native erc20 token on blade to given addresses
 func (t *TestServer) MintNativeERC20Token(addresses []string, amounts []*big.Int) error {
+	acc, err := validatorHelper.GetAccountFromDir(t.DataDir())
+	if err != nil {
+		return err
+	}
+
+	rawKey, err := acc.Ecdsa.MarshallPrivateKey()
+	if err != nil {
+		return err
+	}
+
 	args := []string{
 		"mint-erc20",
-		"--" + polybftsecrets.AccountDirFlag, t.config.DataDir,
 		"--jsonrpc", t.JSONRPCAddr(),
 		"--erc20-token", contracts.NativeERC20TokenContract.String(),
+		"--private-key", hex.EncodeToString(rawKey),
 	}
 
 	for _, addr := range addresses {

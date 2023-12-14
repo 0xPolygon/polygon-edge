@@ -41,6 +41,10 @@ func main() {
 			"NativeERC20",
 		},
 		{
+			"blade/NativeERC20Mintable.sol",
+			"NativeERC20Mintable",
+		},
+		{
 			"blade/ChildERC20.sol",
 			"ChildERC20",
 		},
@@ -171,6 +175,14 @@ func main() {
 		{
 			"blade/validator/EpochManager.sol",
 			"EpochManager",
+		},
+		{
+			"blade/EIP1559Burn.sol",
+			"EIP1559Burn",
+		},
+		{
+			"bridge/BladeManager.sol",
+			"BladeManager",
 		},
 		{
 			"lib/GenesisProxy.sol",

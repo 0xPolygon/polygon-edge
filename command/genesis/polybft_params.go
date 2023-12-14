@@ -73,6 +73,10 @@ var (
 	errBladeAdminNotProvided    = errors.New("blade admin address must be set")
 	errBladeAdminIsZeroAddress  = errors.New("blade admin address must not be zero address")
 	errBladeAdminIsSystemCaller = errors.New("blade admin address must not be system caller address")
+	errNoPremineAllowed         = errors.New("native token is not mintable" +
+		"so no premine is allowed except for zero address")
+	errNoStakeAllowed = errors.New("native token is not mintable" +
+		"so staking is done through premine command on root, and can not be defined in genesis")
 )
 
 type contractInfo struct {
@@ -101,8 +105,9 @@ func (p *genesisParams) generateChainConfig(o command.OutputFormatter) error {
 
 	if p.rewardTokenCode == "" {
 		// native token is used as a reward token, and reward wallet is not a zero address
-		if p.epochReward > 0 {
-			// epoch reward is non zero so premine reward wallet
+		if p.epochReward > 0 && p.nativeTokenConfig.IsMintable {
+			// epoch reward is non zero so premine reward wallet if token is mintable
+			// if token is not mintable (L1 originated), tokens will be bridged to it
 			premineBalances[walletPremineInfo.Address] = walletPremineInfo
 		}
 	} else {
@@ -196,9 +201,9 @@ func (p *genesisParams) generateChainConfig(o command.OutputFormatter) error {
 		StakeTokenAddr: params.stakeTokenAddr,
 	}
 
+	// Disable london hardfork if burn contract address is not provided
 	enabledForks := chain.AllForksEnabled.Copy()
-
-	if p.parsedBaseFeeConfig == nil {
+	if !p.isBurnContractEnabled() {
 		enabledForks.RemoveFork(chain.London)
 	}
 
@@ -214,11 +219,29 @@ func (p *genesisParams) generateChainConfig(o command.OutputFormatter) error {
 		Bootnodes: p.bootnodes,
 	}
 
-	chainConfig.Params.BurnContract = make(map[uint64]types.Address, 1)
-	chainConfig.Params.BurnContract[0] = types.ZeroAddress
+	burnContractAddr := types.ZeroAddress
+
+	if p.isBurnContractEnabled() {
+		chainConfig.Params.BurnContract = make(map[uint64]types.Address, 1)
+
+		burnContractInfo, err := parseBurnContractInfo(p.burnContract)
+		if err != nil {
+			return err
+		}
+
+		if !p.nativeTokenConfig.IsMintable {
+			// burn contract can be specified on arbitrary address for non-mintable native tokens
+			burnContractAddr = burnContractInfo.Address
+			chainConfig.Params.BurnContract[burnContractInfo.BlockNumber] = burnContractAddr
+			chainConfig.Params.BurnContractDestinationAddress = burnContractInfo.DestinationAddress
+		} else {
+			// burnt funds are sent to zero address when dealing with mintable native tokens
+			chainConfig.Params.BurnContract[burnContractInfo.BlockNumber] = types.ZeroAddress
+		}
+	}
 
 	// deploy genesis contracts
-	allocs, err := p.deployContracts(rewardTokenByteCode, polyBftConfig, chainConfig)
+	allocs, err := p.deployContracts(rewardTokenByteCode, burnContractAddr)
 	if err != nil {
 		return err
 	}
@@ -239,11 +262,14 @@ func (p *genesisParams) generateChainConfig(o command.OutputFormatter) error {
 			chainConfig.Bootnodes = append(chainConfig.Bootnodes, validator.MultiAddr)
 		}
 
-		// add default premine for a validator if it is not specified in genesis command
-		if _, exists := premineBalances[validator.Address]; !exists {
-			premineBalances[validator.Address] = &helper.PremineInfo{
-				Address: validator.Address,
-				Amount:  command.DefaultPremineBalance,
+		if p.nativeTokenConfig.IsMintable {
+			// if native token is mintable we add default premine for a validator
+			// if it is not specified in genesis command
+			if _, exists := premineBalances[validator.Address]; !exists {
+				premineBalances[validator.Address] = &helper.PremineInfo{
+					Address: validator.Address,
+					Amount:  command.DefaultPremineBalance,
+				}
 			}
 		}
 	}
@@ -275,7 +301,9 @@ func (p *genesisParams) generateChainConfig(o command.OutputFormatter) error {
 		Mixhash:    polybft.PolyBFTMixDigest,
 	}
 
-	if p.parsedBaseFeeConfig != nil {
+	if p.isBurnContractEnabled() {
+		// only populate base fee and base fee multiplier values if burn contract(s)
+		// is provided
 		chainConfig.Genesis.BaseFee = p.parsedBaseFeeConfig.baseFee
 		chainConfig.Params.BaseFeeEM = p.parsedBaseFeeConfig.baseFeeEM
 		chainConfig.Params.BaseFeeChangeDenom = p.parsedBaseFeeConfig.baseFeeChangeDenom
@@ -338,10 +366,8 @@ func (p *genesisParams) generateChainConfig(o command.OutputFormatter) error {
 	return helper.WriteGenesisConfigToDisk(chainConfig, params.genesisPath)
 }
 
-func (p *genesisParams) deployContracts(
-	rewardTokenByteCode []byte,
-	polybftConfig *polybft.PolyBFTConfig,
-	chainConfig *chain.Chain) (map[types.Address]*chain.GenesisAccount, error) {
+func (p *genesisParams) deployContracts(rewardTokenByteCode []byte,
+	burnContractAddr types.Address) (map[types.Address]*chain.GenesisAccount, error) {
 	proxyToImplAddrMap := contracts.GetProxyImplementationMapping()
 	proxyAddresses := make([]types.Address, 0, len(proxyToImplAddrMap))
 
@@ -394,14 +420,6 @@ func (p *genesisParams) deployContracts(
 			address:  contracts.StakeManagerContractV1,
 		},
 		{
-			artifact: contractsapi.RootERC20,
-			address:  contracts.ERC20Contract,
-		},
-		{
-			artifact: contractsapi.NativeERC20,
-			address:  contracts.NativeERC20TokenContractV1,
-		},
-		{
 			artifact: contractsapi.NetworkParams,
 			address:  contracts.NetworkParamsContractV1,
 		},
@@ -417,6 +435,32 @@ func (p *genesisParams) deployContracts(
 			artifact: contractsapi.ChildTimelock,
 			address:  contracts.ChildTimelockContractV1,
 		},
+	}
+
+	if !params.nativeTokenConfig.IsMintable {
+		genesisContracts = append(genesisContracts,
+			&contractInfo{
+				artifact: contractsapi.NativeERC20,
+				address:  contracts.NativeERC20TokenContractV1,
+			})
+
+		// burn contract can be set only for non-mintable native token. If burn contract is set,
+		// default EIP1559 contract will be deployed.
+		if p.isBurnContractEnabled() {
+			genesisContracts = append(genesisContracts,
+				&contractInfo{
+					artifact: contractsapi.EIP1559Burn,
+					address:  burnContractAddr,
+				})
+
+			proxyAddresses = append(proxyAddresses, contracts.DefaultBurnContract)
+		}
+	} else {
+		genesisContracts = append(genesisContracts,
+			&contractInfo{
+				artifact: contractsapi.NativeERC20Mintable,
+				address:  contracts.NativeERC20TokenContractV1,
+			})
 	}
 
 	if len(params.bridgeAllowListAdmin) != 0 || len(params.bridgeBlockListAdmin) != 0 {
@@ -551,9 +595,15 @@ func (p *genesisParams) getValidatorAccounts() ([]*validator.GenesisValidator, e
 
 			addr := types.StringToAddress(trimmedAddress)
 
-			stake, exists := p.stakeInfos[addr]
-			if !exists {
-				stake = command.DefaultStake
+			stake := big.NewInt(0)
+
+			if p.nativeTokenConfig.IsMintable {
+				s, exists := p.stakeInfos[addr]
+				if !exists {
+					stake = command.DefaultStake
+				} else {
+					stake = s
+				}
 			}
 
 			validators[i] = &validator.GenesisValidator{
@@ -572,7 +622,8 @@ func (p *genesisParams) getValidatorAccounts() ([]*validator.GenesisValidator, e
 		validatorsPath = path.Dir(p.genesisPath)
 	}
 
-	validators, err := ReadValidatorsByPrefix(validatorsPath, p.validatorsPrefixPath, p.stakeInfos)
+	validators, err := ReadValidatorsByPrefix(validatorsPath, p.validatorsPrefixPath,
+		p.stakeInfos, p.nativeTokenConfig.IsMintable)
 	if err != nil {
 		return nil, err
 	}
@@ -643,6 +694,74 @@ func (p *genesisParams) validateBladeAdminFlag() error {
 	}
 
 	return nil
+}
+
+// validatePremineInfo validates whether reserve account (0x0 address) is premined
+func (p *genesisParams) validatePremineInfo() error {
+	isZeroAddressPremined := false
+
+	for _, premineInfo := range p.premineInfos {
+		if premineInfo.Address == types.ZeroAddress {
+			isZeroAddressPremined = true
+		} else if !p.nativeTokenConfig.IsMintable {
+			return errNoPremineAllowed
+		}
+	}
+
+	if !isZeroAddressPremined {
+		return errReserveAccMustBePremined
+	}
+
+	return nil
+}
+
+// validateBurnContract validates burn contract. If native token is mintable,
+// burn contract flag must not be set. If native token is non mintable only one burn contract
+// can be set and the specified address will be used to predeploy default EIP1559 burn contract.
+func (p *genesisParams) validateBurnContract() error {
+	if p.isBurnContractEnabled() {
+		burnContractInfo, err := parseBurnContractInfo(p.burnContract)
+		if err != nil {
+			return fmt.Errorf("invalid burn contract info provided: %w", err)
+		}
+
+		if p.nativeTokenConfig.IsMintable {
+			if burnContractInfo.Address != types.ZeroAddress {
+				return errors.New("only zero address is allowed as burn destination for mintable native token")
+			}
+		} else {
+			if burnContractInfo.Address == types.ZeroAddress {
+				return errors.New("it is not allowed to deploy burn contract to 0x0 address")
+			}
+		}
+	}
+
+	return nil
+}
+
+// validateStakeInfo validates and parses stake flag
+func (p *genesisParams) validateStakeInfo() error {
+	if !p.nativeTokenConfig.IsMintable && len(p.stake) > 0 {
+		return errNoStakeAllowed
+	}
+
+	p.stakeInfos = make(map[types.Address]*big.Int, len(p.stake))
+
+	for _, stake := range p.stake {
+		stakeInfo, err := helper.ParsePremineInfo(stake)
+		if err != nil {
+			return fmt.Errorf("invalid stake amount provided: %w", err)
+		}
+
+		p.stakeInfos[stakeInfo.Address] = stakeInfo.Amount
+	}
+
+	return nil
+}
+
+// isBurnContractEnabled returns true in case burn contract info is provided
+func (p *genesisParams) isBurnContractEnabled() bool {
+	return p.burnContract != ""
 }
 
 // extractNativeTokenMetadata parses provided native token metadata (such as name, symbol and decimals count)

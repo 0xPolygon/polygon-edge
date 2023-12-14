@@ -149,6 +149,11 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 
 		proxyAddrMapping := contracts.GetProxyImplementationMapping()
 
+		burnContractAddress, isBurnContractSet := getBurnContractAddress(config, polyBFTConfig)
+		if isBurnContractSet {
+			proxyAddrMapping[contracts.DefaultBurnContract] = burnContractAddress
+		}
+
 		if _, ok := config.Genesis.Alloc[contracts.RewardTokenContract]; ok {
 			proxyAddrMapping[contracts.RewardTokenContract] = contracts.RewardTokenContractV1
 		}
@@ -364,25 +369,66 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			}
 		}
 
-		// initialize NativeERC20 SC
-		params := &contractsapi.InitializeNativeERC20Fn{
-			Predicate_:   contracts.ChildERC20PredicateContract,
-			Owner_:       polyBFTConfig.BladeAdmin,
-			RootToken_:   types.ZeroAddress, // in case native mintable token is used, it is always root token
-			Name_:        polyBFTConfig.NativeTokenConfig.Name,
-			Symbol_:      polyBFTConfig.NativeTokenConfig.Symbol,
-			Decimals_:    polyBFTConfig.NativeTokenConfig.Decimals,
-			TokenSupply_: initialTotalSupply,
-		}
+		if polyBFTConfig.NativeTokenConfig.IsMintable {
+			// initialize NativeERC20Mintable SC
+			params := &contractsapi.InitializeNativeERC20MintableFn{
+				Predicate_:   contracts.ChildERC20PredicateContract,
+				Owner_:       polyBFTConfig.BladeAdmin,
+				RootToken_:   types.ZeroAddress, // in case native mintable token is used, it is always root token
+				Name_:        polyBFTConfig.NativeTokenConfig.Name,
+				Symbol_:      polyBFTConfig.NativeTokenConfig.Symbol,
+				Decimals_:    polyBFTConfig.NativeTokenConfig.Decimals,
+				TokenSupply_: initialTotalSupply,
+			}
 
-		input, err := params.EncodeAbi()
-		if err != nil {
-			return err
-		}
+			input, err := params.EncodeAbi()
+			if err != nil {
+				return err
+			}
 
-		if err = callContract(contracts.SystemCaller,
-			contracts.NativeERC20TokenContract, input, "NativeERC20", transition); err != nil {
-			return err
+			if err = callContract(contracts.SystemCaller,
+				contracts.NativeERC20TokenContract, input, "NativeERC20Mintable", transition); err != nil {
+				return err
+			}
+		} else {
+			// initialize NativeERC20 SC
+			params := &contractsapi.InitializeNativeERC20Fn{
+				Name_:        polyBFTConfig.NativeTokenConfig.Name,
+				Symbol_:      polyBFTConfig.NativeTokenConfig.Symbol,
+				Decimals_:    polyBFTConfig.NativeTokenConfig.Decimals,
+				RootToken_:   polyBFTConfig.Bridge.RootNativeERC20Addr,
+				Predicate_:   contracts.ChildERC20PredicateContract,
+				TokenSupply_: initialTotalSupply,
+			}
+
+			input, err := params.EncodeAbi()
+			if err != nil {
+				return err
+			}
+
+			if err = callContract(contracts.SystemCaller,
+				contracts.NativeERC20TokenContract, input, "NativeERC20", transition); err != nil {
+				return err
+			}
+
+			// initialize EIP1559Burn SC
+			if isBurnContractSet {
+				burnParams := &contractsapi.InitializeEIP1559BurnFn{
+					NewChildERC20Predicate: contracts.ChildERC20PredicateContract,
+					NewBurnDestination:     config.Params.BurnContractDestinationAddress,
+				}
+
+				input, err = burnParams.EncodeAbi()
+				if err != nil {
+					return err
+				}
+
+				if err = callContract(contracts.SystemCaller,
+					burnContractAddress,
+					input, "EIP1559Burn", transition); err != nil {
+					return err
+				}
+			}
 		}
 
 		return nil
@@ -814,4 +860,18 @@ func initProxies(transition *state.Transition, admin types.Address,
 	}
 
 	return nil
+}
+
+func getBurnContractAddress(config *chain.Chain, polyBFTConfig PolyBFTConfig) (types.Address, bool) {
+	if config.Params.BurnContract != nil &&
+		len(config.Params.BurnContract) == 1 &&
+		!polyBFTConfig.NativeTokenConfig.IsMintable {
+		for _, address := range config.Params.BurnContract {
+			if _, ok := config.Genesis.Alloc[address]; ok {
+				return address, true
+			}
+		}
+	}
+
+	return types.ZeroAddress, false
 }

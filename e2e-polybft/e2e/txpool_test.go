@@ -12,6 +12,7 @@ import (
 	"github.com/umbracle/ethgo/jsonrpc"
 	"github.com/umbracle/ethgo/wallet"
 
+	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
@@ -25,7 +26,7 @@ func TestE2E_TxPool_Transfer(t *testing.T) {
 
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithPremine(types.Address(sender.Address())),
-		framework.WithBaseFeeConfig(""),
+		framework.WithBurnContract(&polybft.BurnContractInfo{BlockNumber: 0, Address: types.ZeroAddress}),
 	)
 	defer cluster.Stop()
 
@@ -101,7 +102,7 @@ func TestE2E_TxPool_Transfer_Linear(t *testing.T) {
 	// first account should have some matics premined
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithPremine(types.Address(premine.Address())),
-		framework.WithBaseFeeConfig(""),
+		framework.WithBurnContract(&polybft.BurnContractInfo{BlockNumber: 0, Address: types.ZeroAddress}),
 	)
 	defer cluster.Stop()
 
@@ -234,7 +235,7 @@ func TestE2E_TxPool_BroadcastTransactions(t *testing.T) {
 	// First account should have some matics premined
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithPremine(types.Address(sender.Address())),
-		framework.WithBaseFeeConfig(""),
+		framework.WithBurnContract(&polybft.BurnContractInfo{BlockNumber: 0, Address: types.ZeroAddress}),
 	)
 	defer cluster.Stop()
 

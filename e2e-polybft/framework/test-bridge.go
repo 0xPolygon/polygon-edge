@@ -1,6 +1,7 @@
 package framework
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math/big"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/command"
 	bridgeCommon "github.com/0xPolygon/polygon-edge/command/bridge/common"
+	bridgeHelper "github.com/0xPolygon/polygon-edge/command/bridge/helper"
 	"github.com/0xPolygon/polygon-edge/command/bridge/server"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	cmdHelper "github.com/0xPolygon/polygon-edge/command/helper"
@@ -18,6 +20,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/types"
+	"golang.org/x/sync/errgroup"
 )
 
 type TestBridge struct {
@@ -337,8 +340,8 @@ func (t *TestBridge) fundAddressesOnRoot(polybftConfig polybft.PolyBFTConfig) er
 		return fmt.Errorf("failed to fund validators on the rootchain: %w", err)
 	}
 
-	// then fund all other addresses if token is non-mintable
-	// so that they can do premine on SupernetMAnager
+	// then fund all other addresses so that if token is non-mintable
+	// they can do premine on BladeManager
 	if len(t.clusterConfig.Premine) == 0 {
 		return nil
 	}
@@ -389,6 +392,169 @@ func (t *TestBridge) FundValidators(secretsPaths []string, amounts []*big.Int) e
 
 	if err := t.cmdRun(args...); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+// mintNativeRootToken mints native er20 token on root for provided validators and other accounts in premine flag
+func (t *TestBridge) mintNativeRootToken(validatorAddresses []types.Address, tokenConfig *polybft.TokenConfig,
+	polybftConfig polybft.PolyBFTConfig) error {
+	if tokenConfig.IsMintable {
+		// if token is mintable, it is premined in genesis command,
+		// so we just return here
+		return nil
+	}
+
+	// if token is non-mintable, then to do premine we first need to mint those tokens
+	// to validators and other provided addresses
+	args := []string{
+		"mint-erc20",
+		"--jsonrpc", t.JSONRPCAddr(),
+		"--erc20-token", polybftConfig.Bridge.RootNativeERC20Addr.String(),
+	}
+
+	// mint something for every validator
+	for _, addr := range validatorAddresses {
+		args = append(args, "--addresses", addr.String())
+		args = append(args, "--amounts", command.DefaultPremineBalance.String())
+	}
+
+	// mint something to others as well
+	for _, premineRaw := range t.clusterConfig.Premine {
+		premineInfo, err := cmdHelper.ParsePremineInfo(premineRaw)
+		if err != nil {
+			return err
+		}
+
+		if premineInfo.Address == types.ZeroAddress {
+			// we can not premine zero address on root
+			// so just continue
+			continue
+		}
+
+		args = append(args, "--addresses", premineInfo.Address.String())
+		args = append(args, "--amounts", premineInfo.Amount.String())
+	}
+
+	return t.cmdRun(args...)
+}
+
+// premineNativeRootToken will premine token on root for every validator and other addresses in premine flag
+func (t *TestBridge) premineNativeRootToken(tokenConfig *polybft.TokenConfig,
+	polybftConfig polybft.PolyBFTConfig) error {
+	if tokenConfig.IsMintable {
+		// if token is mintable, it is premined in genesis command,
+		// so we just return here
+		return nil
+	}
+
+	validatorSecrets, err := genesis.GetValidatorKeyFiles(t.clusterConfig.TmpDir, t.clusterConfig.ValidatorPrefix)
+	if err != nil {
+		return fmt.Errorf("could not get validator secrets on premining native root"+
+			" token for genesis validators: %w", err)
+	}
+
+	premineCmdArgs := func(secret, key string, premineAmount, stakedAmount *big.Int) error {
+		args := []string{
+			"bridge",
+			"premine",
+			"--jsonrpc", t.JSONRPCAddr(),
+			"--premine-amount", premineAmount.String(),
+			"--stake-amount", stakedAmount.String(),
+			"--erc20-token", polybftConfig.Bridge.RootNativeERC20Addr.String(),
+			"--root-erc20-predicate", polybftConfig.Bridge.RootERC20PredicateAddr.String(),
+			"--blade-manager", polybftConfig.Bridge.BladeManagerAddr.String(),
+		}
+
+		if secret != "" {
+			args = append(args, "--"+polybftsecrets.AccountDirFlag, path.Join(t.clusterConfig.TmpDir, secret))
+		} else {
+			args = append(args, "--private-key", key)
+		}
+
+		return t.cmdRun(args...)
+	}
+
+	g, ctx := errgroup.WithContext(context.Background())
+
+	// premine validators
+	for i, secret := range validatorSecrets {
+		i := i
+		secret := secret
+
+		g.Go(func() error {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
+				validatorStake := t.clusterConfig.getStakeAmount(i)
+				validatorNonStake := new(big.Int).Set(command.DefaultPremineBalance)
+				validatorNonStake = validatorNonStake.Sub(validatorNonStake, validatorStake)
+
+				if err := premineCmdArgs(secret, "", validatorNonStake, validatorStake); err != nil {
+					return fmt.Errorf("failed to do premine of native root token for genesis validator: %w",
+						err)
+				}
+
+				return nil
+			}
+		})
+	}
+
+	// now premine for other addresses
+	for _, premineRaw := range t.clusterConfig.Premine {
+		premineRaw := premineRaw
+
+		g.Go(func() error {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
+				premineInfo, err := cmdHelper.ParsePremineInfo(premineRaw)
+				if err != nil {
+					return fmt.Errorf("failed to do premine of native root token for non-validator"+
+						" account: %w. premine raw: %s", err, premineRaw)
+				}
+
+				// there is no premine on root for zero address, only on L2
+				if premineInfo.Address == types.ZeroAddress {
+					return nil
+				}
+
+				// non-validator addresses only premine non-staked amounts, no stake premine is allowed
+				if err := premineCmdArgs("", premineInfo.Key, premineInfo.Amount, big.NewInt(0)); err != nil {
+					return fmt.Errorf("failed to do premine of native root token for "+
+						"non-validator account: %w. premine raw: %s", err, premineRaw)
+				}
+
+				return nil
+			}
+		})
+	}
+
+	return g.Wait()
+}
+
+// finalizeGenesis finalizes genesis on BladeManager contract on root
+func (t *TestBridge) finalizeGenesis(genesisPath string,
+	tokenConfig *polybft.TokenConfig, polybftConfig polybft.PolyBFTConfig) error {
+	if tokenConfig.IsMintable {
+		// we don't need to finalize anything when we have mintable (child originated) token
+		return nil
+	}
+
+	args := []string{
+		"bridge",
+		"finalize-bridge",
+		"--jsonrpc", t.JSONRPCAddr(),
+		"--private-key", bridgeHelper.TestAccountPrivKey,
+		"--genesis", genesisPath,
+		"--blade-manager", polybftConfig.Bridge.BladeManagerAddr.String(),
+	}
+
+	if err := t.cmdRun(args...); err != nil {
+		return fmt.Errorf("failed to finalize genesis on blade manager: %w", err)
 	}
 
 	return nil

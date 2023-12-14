@@ -385,7 +385,7 @@ func TestE2E_Consensus_MintableERC20NativeToken(t *testing.T) {
 	cluster := framework.NewTestCluster(t,
 		validatorCount,
 		framework.WithNativeTokenConfig(
-			fmt.Sprintf("%s:%s:%d", tokenName, tokenSymbol, decimals)),
+			fmt.Sprintf("%s:%s:%d:true", tokenName, tokenSymbol, decimals)),
 		framework.WithBladeAdmin(minter.Address().String()),
 		framework.WithEpochSize(epochSize),
 		framework.WithBaseFeeConfig(""),
@@ -520,7 +520,7 @@ func TestE2E_Consensus_EIP1559Check(t *testing.T) {
 	// sender must have premined some native tokens
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithPremine(types.Address(sender.Address())),
-		framework.WithBaseFeeConfig(""),
+		framework.WithBurnContract(&polybft.BurnContractInfo{BlockNumber: 0, Address: types.ZeroAddress}),
 		framework.WithSecretsCallback(func(a []types.Address, config *framework.TestClusterConfig) {
 			for range a {
 				config.StakeAmounts = append(config.StakeAmounts, command.DefaultPremineBalance)

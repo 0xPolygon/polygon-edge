@@ -3,7 +3,6 @@ package framework
 import (
 	"math/big"
 
-	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -41,7 +40,7 @@ type TestServerConfig struct {
 	DevInterval             int             // Dev consensus update interval [s]
 	BlockGasLimit           uint64          // Block gas limit
 	BlockGasTarget          uint64          // Gas target for new blocks
-	BaseFeeConfig           string          // Base fee configuration
+	BurnContractAddr        types.Address   // Burn contract addr
 	ShowsLog                bool            // Flag specifying if logs are shown
 	Name                    string          // Name of the server
 	SaveLogs                bool            // Flag specifying if logs are saved
@@ -123,11 +122,7 @@ func (t *TestServerConfig) SetName(name string) {
 	t.Name = name
 }
 
-// SetBaseFeeConfig sets base fee configuration
-func (t *TestServerConfig) SetBaseFeeConfig(baseFeeConfig string) {
-	if baseFeeConfig == "" {
-		t.BaseFeeConfig = command.DefaultGenesisBaseFeeConfig
-	} else {
-		t.BaseFeeConfig = baseFeeConfig
-	}
+// SetBurnContract sets burn contract addr
+func (t *TestServerConfig) SetBurnContract(addr types.Address) {
+	t.BurnContractAddr = addr
 }

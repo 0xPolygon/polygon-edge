@@ -36,6 +36,8 @@ const (
 	AddressesFlag           = "addresses"
 	AmountsFlag             = "amounts"
 	Erc20TokenFlag          = "erc20-token" //nolint:gosec
+	BladeManagerFlag        = "blade-manager"
+	BladeManagerFlagDesc    = "address of blade manager contract on a rootchain"
 )
 
 var (
@@ -45,8 +47,6 @@ var (
 
 	ErrNoAddressesProvided = errors.New("no addresses provided")
 	ErrInconsistentLength  = errors.New("addresses and amounts must be equal length")
-
-	ErrMandatoryERC20Token = errors.New("erc20 token address is mandatory")
 
 	rootchainAccountKey *wallet.Key
 )

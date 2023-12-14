@@ -149,7 +149,7 @@ func TestTxPool_ErrorCodes(t *testing.T) {
 				config.SetConsensus(framework.ConsensusDev)
 				config.SetDevInterval(devInterval)
 				config.Premine(referenceAddr, testCase.defaultBalance)
-				config.SetBaseFeeConfig("")
+				config.SetBurnContract(types.StringToAddress("0xBurnContract"))
 			})
 			srv := srvs[0]
 
@@ -271,7 +271,7 @@ func TestTxPool_RecoverableError(t *testing.T) {
 		config.SetBlockLimit(2.5 * 21000)
 		config.SetDevInterval(2)
 		config.Premine(senderAddress, framework.EthToWei(100))
-		config.SetBaseFeeConfig("")
+		config.SetBurnContract(types.StringToAddress("0xBurnContract"))
 	})[0]
 
 	client := server.JSONRPC()
@@ -339,7 +339,7 @@ func TestTxPool_GetPendingTx(t *testing.T) {
 		config.SetDevInterval(3)
 		config.SetBlockLimit(20000000)
 		config.Premine(senderAddress, startingBalance)
-		config.SetBaseFeeConfig("")
+		config.SetBurnContract(types.StringToAddress("0xBurnContract"))
 	})[0]
 
 	operator := server.TxnPoolOperator()

@@ -104,6 +104,7 @@ type TestClusterConfig struct {
 	TmpDir               string
 	BlockGasLimit        uint64
 	BlockTime            time.Duration
+	BurnContract         *polybft.BurnContractInfo
 	ValidatorPrefix      string
 	Binary               string
 	ValidatorSetSize     uint64
@@ -113,6 +114,7 @@ type TestClusterConfig struct {
 	BaseFeeConfig        string
 	SecretsCallback      func([]types.Address, *TestClusterConfig)
 	BladeAdmin           string
+	RewardWallet         string
 
 	ContractDeployerAllowListAdmin   []types.Address
 	ContractDeployerAllowListEnabled []types.Address
@@ -213,6 +215,15 @@ func (c *TestClusterConfig) GetProxyContractsAdmin() string {
 	return proxyAdminAddr
 }
 
+func (c *TestClusterConfig) getStakeAmount(validatorIndex int) *big.Int {
+	l := len(c.StakeAmounts)
+	if l == 0 || l <= validatorIndex || validatorIndex < 0 {
+		return command.DefaultStake
+	}
+
+	return c.StakeAmounts[validatorIndex]
+}
+
 type TestCluster struct {
 	Config      *TestClusterConfig
 	Servers     []*TestServer
@@ -304,6 +315,12 @@ func WithBlockTime(blockTime time.Duration) ClusterOption {
 func WithBlockGasLimit(blockGasLimit uint64) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.BlockGasLimit = blockGasLimit
+	}
+}
+
+func WithBurnContract(burnContract *polybft.BurnContractInfo) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.BurnContract = burnContract
 	}
 }
 
@@ -433,6 +450,12 @@ func WithGovernanceVotingDelay(votingDelay uint64) ClusterOption {
 	}
 }
 
+func WithRewardWallet(rewardWallet string) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.RewardWallet = rewardWallet
+	}
+}
+
 func isTrueEnv(e string) bool {
 	return strings.ToLower(os.Getenv(e)) == "true"
 }
@@ -527,7 +550,6 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			"--epoch-size", strconv.Itoa(cluster.Config.EpochSize),
 			"--epoch-reward", strconv.Itoa(cluster.Config.EpochReward),
 			"--premine", "0x0000000000000000000000000000000000000000",
-			"--reward-wallet", testRewardWalletAddr.String(),
 			"--trieroot", cluster.Config.InitialStateRoot.String(),
 			"--vote-delay", fmt.Sprint(cluster.Config.VotingDelay),
 		}
@@ -538,6 +560,12 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		}
 
 		args = append(args, "--blade-admin", bladeAdmin)
+
+		if cluster.Config.RewardWallet != "" {
+			args = append(args, "--reward-wallet", cluster.Config.RewardWallet)
+		} else {
+			args = append(args, "--reward-wallet", testRewardWalletAddr.String())
+		}
 
 		if cluster.Config.VotingPeriod > 0 {
 			args = append(args, "--vote-period", fmt.Sprint(cluster.Config.VotingPeriod))
@@ -565,18 +593,31 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			args = append(args, "--native-token-config", cluster.Config.NativeTokenConfigRaw)
 		}
 
-		for _, premine := range cluster.Config.Premine {
-			args = append(args, "--premine", premine)
+		tokenConfig, err := polybft.ParseRawTokenConfig(cluster.Config.NativeTokenConfigRaw)
+		require.NoError(t, err)
+
+		if len(cluster.Config.Premine) != 0 && tokenConfig.IsMintable {
+			// only add premine flags in genesis if token is mintable
+			for _, premine := range cluster.Config.Premine {
+				args = append(args, "--premine", premine)
+			}
 		}
 
-		if len(cluster.Config.StakeAmounts) > 0 {
+		burnContract := cluster.Config.BurnContract
+		if burnContract != nil {
+			args = append(args, "--burn-contract",
+				fmt.Sprintf("%d:%s:%s",
+					burnContract.BlockNumber, burnContract.Address, burnContract.DestinationAddress))
+		}
+
+		if tokenConfig.IsMintable && len(cluster.Config.StakeAmounts) != 0 {
 			for i, addr := range addresses {
-				args = append(args, "--stake", fmt.Sprintf("%s:%s", addr.String(), cluster.getStakeAmount(i).String()))
+				args = append(args, "--stake", fmt.Sprintf("%s:%s", addr.String(), cluster.Config.getStakeAmount(i).String()))
 			}
 		}
 
 		validators, err := genesis.ReadValidatorsByPrefix(
-			cluster.Config.TmpDir, cluster.Config.ValidatorPrefix, nil)
+			cluster.Config.TmpDir, cluster.Config.ValidatorPrefix, nil, true)
 		require.NoError(t, err)
 
 		if cluster.Config.BootnodeCount > 0 {
@@ -663,20 +704,34 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		require.NoError(t, err)
 	}
 
-	polybftConfig, err := polybft.LoadPolyBFTConfig(genesisPath)
-	require.NoError(t, err)
-
 	if cluster.Config.HasBridge {
 		// start bridge
 		cluster.Bridge, err = NewTestBridge(t, cluster.Config)
+		require.NoError(t, err)
+
+		// deploy rootchain contracts
+		err = cluster.Bridge.deployRootchainContracts(genesisPath)
+		require.NoError(t, err)
+
+		polybftConfig, err := polybft.LoadPolyBFTConfig(genesisPath)
+		require.NoError(t, err)
+
+		tokenConfig, err := polybft.ParseRawTokenConfig(cluster.Config.NativeTokenConfigRaw)
 		require.NoError(t, err)
 
 		// fund addresses on the rootchain
 		err = cluster.Bridge.fundAddressesOnRoot(polybftConfig)
 		require.NoError(t, err)
 
-		// deploy rootchain contracts
-		err = cluster.Bridge.deployRootchainContracts(genesisPath)
+		// add premine if token is non-mintable
+		err = cluster.Bridge.mintNativeRootToken(addresses, tokenConfig, polybftConfig)
+		require.NoError(t, err)
+
+		err = cluster.Bridge.premineNativeRootToken(tokenConfig, polybftConfig)
+		require.NoError(t, err)
+
+		// finalize genesis validators on the rootchain
+		err = cluster.Bridge.finalizeGenesis(genesisPath, tokenConfig, polybftConfig)
 		require.NoError(t, err)
 	}
 
@@ -846,15 +901,6 @@ func (c *TestCluster) getOpenPort() int64 {
 	c.initialPort++
 
 	return c.initialPort
-}
-
-func (c *TestCluster) getStakeAmount(validatorIndex int) *big.Int {
-	l := len(c.Config.StakeAmounts)
-	if l == 0 || l <= validatorIndex || validatorIndex < 0 {
-		return command.DefaultStake
-	}
-
-	return c.Config.StakeAmounts[validatorIndex]
 }
 
 // runCommand executes command with given arguments

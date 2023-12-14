@@ -41,50 +41,34 @@ func preRunCommand(cmd *cobra.Command, _ []string) error {
 
 func setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(
-		&params.accountDir,
-		polybftsecrets.AccountDirFlag,
-		"",
-		polybftsecrets.AccountDirFlagDesc,
-	)
-
-	cmd.Flags().StringVar(
-		&params.accountConfig,
-		polybftsecrets.AccountConfigFlag,
-		"",
-		polybftsecrets.AccountConfigFlagDesc,
-	)
-
-	cmd.Flags().StringVar(
-		&params.deployerPrivateKey,
+		&params.minterPrivateKey,
 		polybftsecrets.PrivateKeyFlag,
 		"",
-		"private key of the token deployer (minter)",
+		"the minter private key",
 	)
 
 	cmd.Flags().StringSliceVar(
 		&params.addresses,
 		bridgeHelper.AddressesFlag,
 		nil,
-		"addresses to which tokens should be minted",
+		"receivers addresses",
 	)
 
 	cmd.Flags().StringSliceVar(
 		&params.amounts,
 		bridgeHelper.AmountsFlag,
 		nil,
-		"token amounts which should be minted to given addresses",
+		"erc20 token amounts",
 	)
 
 	cmd.Flags().StringVar(
 		&params.tokenAddr,
 		bridgeHelper.Erc20TokenFlag,
 		"",
-		"address of the erc20 token to be minted",
+		"erc20 token address",
 	)
 
-	cmd.MarkFlagsMutuallyExclusive(polybftsecrets.AccountDirFlag, polybftsecrets.AccountConfigFlag)
-	cmd.MarkFlagsMutuallyExclusive(polybftsecrets.PrivateKeyFlag, polybftsecrets.AccountConfigFlag)
-	cmd.MarkFlagsMutuallyExclusive(polybftsecrets.PrivateKeyFlag, polybftsecrets.AccountDirFlag)
+	_ = cmd.MarkFlagRequired(bridgeHelper.Erc20TokenFlag)
 }
 
 func runCommand(cmd *cobra.Command, _ []string) {
@@ -98,7 +82,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	deployerKey, err := bridgeHelper.GetECDSAKey(params.deployerPrivateKey, params.accountDir, params.accountConfig)
+	deployerKey, err := bridgeHelper.DecodePrivateKey(params.minterPrivateKey)
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to initialize deployer private key: %w", err))
 

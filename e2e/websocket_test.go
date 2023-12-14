@@ -9,6 +9,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/jsonrpc"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/umbracle/ethgo"
@@ -60,7 +61,7 @@ func TestWS_Response(t *testing.T) {
 
 	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDev)
-		config.SetBaseFeeConfig("")
+		config.SetBurnContract(types.StringToAddress("0xBurnContract"))
 
 		for _, account := range preminedAccounts {
 			config.Premine(account.address, account.balance)

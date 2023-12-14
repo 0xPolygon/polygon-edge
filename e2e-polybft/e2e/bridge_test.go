@@ -13,6 +13,7 @@ import (
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/wallet"
 
+	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/bridge/common"
 	bridgeHelper "github.com/0xPolygon/polygon-edge/command/bridge/helper"
 	validatorHelper "github.com/0xPolygon/polygon-edge/command/validator/helper"
@@ -1230,6 +1231,214 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 			balance := erc20BalanceOf(t, types.StringToAddress(receiver), rootERC20Token, rootchainTxRelayer)
 			require.Equal(t, oldBalances[types.StringToAddress(receiver)].Add(
 				oldBalances[types.StringToAddress(receiver)], withdrawAmount), balance)
+		}
+	})
+}
+
+func TestE2E_Bridge_NonMintableERC20Token_WithPremine(t *testing.T) {
+	var (
+		numBlockConfirmations = uint64(2)
+		epochSize             = 10
+		sprintSize            = uint64(5)
+		numberOfAttempts      = uint64(4)
+		stateSyncedLogsCount  = 2
+		exitEventsCount       = uint64(2)
+		tokensToTransfer      = ethgo.Gwei(10)
+		bigZero               = big.NewInt(0)
+	)
+
+	nonValidatorKey, err := wallet.GenerateKey()
+	require.NoError(t, err)
+
+	nonValidatorKeyRaw, err := nonValidatorKey.MarshallPrivateKey()
+	require.NoError(t, err)
+
+	rewardWalletKey, err := wallet.GenerateKey()
+	require.NoError(t, err)
+
+	rewardWalletKeyRaw, err := rewardWalletKey.MarshallPrivateKey()
+	require.NoError(t, err)
+
+	// start cluster with default, non-mintable native erc20 root token
+	// with london fork enabled
+	cluster := framework.NewTestCluster(t, 5,
+		framework.WithBridge(),
+		framework.WithEpochSize(epochSize),
+		framework.WithNumBlockConfirmations(numBlockConfirmations),
+		framework.WithNativeTokenConfig(nativeTokenNonMintableConfig),
+		// this enables London (EIP-1559) fork
+		framework.WithBurnContract(&polybft.BurnContractInfo{
+			BlockNumber: 0,
+			Address:     types.StringToAddress("0xBurnContractAddress")}),
+		framework.WithSecretsCallback(func(_ []types.Address, tcc *framework.TestClusterConfig) {
+			nonValidatorKeyString := hex.EncodeToString(nonValidatorKeyRaw)
+			rewardWalletKeyString := hex.EncodeToString(rewardWalletKeyRaw)
+
+			// do premine to a non validator address
+			tcc.Premine = append(tcc.Premine,
+				fmt.Sprintf("%s:%s:%s",
+					nonValidatorKey.Address(),
+					command.DefaultPremineBalance.String(),
+					nonValidatorKeyString))
+
+			// do premine to reward wallet address
+			tcc.Premine = append(tcc.Premine,
+				fmt.Sprintf("%s:%s:%s",
+					rewardWalletKey.Address(),
+					command.DefaultPremineBalance.String(),
+					rewardWalletKeyString))
+		}),
+	)
+
+	rootchainTxRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
+	require.NoError(t, err)
+
+	childEthEndpoint := cluster.Servers[0].JSONRPC().Eth()
+
+	defer cluster.Stop()
+
+	cluster.WaitForReady(t)
+
+	polybftCfg, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
+	require.NoError(t, err)
+
+	checkBalancesFn := func(address types.Address, rootExpected, childExpected *big.Int) {
+		t.Log("Checking balance of native ERC20 token on root and child", "Address", address,
+			"Root expected", rootExpected, "Child Expected", childExpected)
+
+		balance := erc20BalanceOf(t, address,
+			polybftCfg.Bridge.RootNativeERC20Addr, rootchainTxRelayer)
+		t.Log("Balance of native ERC20 token on root", balance, "Address", address)
+		require.Equal(t, rootExpected, balance)
+
+		balance, err = childEthEndpoint.GetBalance(ethgo.Address(address), ethgo.Latest)
+		require.NoError(t, err)
+		t.Log("Balance of native ERC20 token on child", balance, "Address", address)
+		require.True(t, balance.Cmp(childExpected) >= 0) // because of London fork
+	}
+
+	t.Run("check the balances at the beginning", func(t *testing.T) {
+		// check the balances on root and child at the beginning to see if they are as expected
+		checkBalancesFn(types.Address(nonValidatorKey.Address()), bigZero, command.DefaultPremineBalance)
+		checkBalancesFn(types.Address(rewardWalletKey.Address()), bigZero, command.DefaultPremineBalance)
+
+		validatorsExpectedBalance := new(big.Int).Sub(command.DefaultPremineBalance, command.DefaultStake)
+		for _, server := range cluster.Servers {
+			validatorAccount, err := validatorHelper.GetAccountFromDir(server.DataDir())
+			require.NoError(t, err)
+
+			checkBalancesFn(validatorAccount.Address(), bigZero, validatorsExpectedBalance)
+		}
+	})
+
+	// this test case will check first if they can withdraw some of the premined amount of non-mintable token
+	t.Run("Do a withdraw for premined validator address and premined non-validator address", func(t *testing.T) {
+		validatorSrv := cluster.Servers[1]
+		validatorAcc, err := validatorHelper.GetAccountFromDir(validatorSrv.DataDir())
+		require.NoError(t, err)
+
+		validatorRawKey, err := validatorAcc.Ecdsa.MarshallPrivateKey()
+		require.NoError(t, err)
+
+		err = cluster.Bridge.Withdraw(
+			common.ERC20,
+			hex.EncodeToString(validatorRawKey),
+			validatorAcc.Address().String(),
+			tokensToTransfer.String(),
+			"",
+			validatorSrv.JSONRPCAddr(),
+			contracts.ChildERC20PredicateContract,
+			contracts.NativeERC20TokenContract,
+			false)
+		require.NoError(t, err)
+
+		validatorBalanceAfterWithdraw, err := childEthEndpoint.GetBalance(
+			ethgo.Address(validatorAcc.Address()), ethgo.Latest)
+		require.NoError(t, err)
+
+		err = cluster.Bridge.Withdraw(
+			common.ERC20,
+			hex.EncodeToString(nonValidatorKeyRaw),
+			nonValidatorKey.Address().String(),
+			tokensToTransfer.String(),
+			"",
+			validatorSrv.JSONRPCAddr(),
+			contracts.ChildERC20PredicateContract,
+			contracts.NativeERC20TokenContract,
+			false)
+		require.NoError(t, err)
+
+		nonValidatorBalanceAfterWithdraw, err := childEthEndpoint.GetBalance(
+			nonValidatorKey.Address(), ethgo.Latest)
+		require.NoError(t, err)
+
+		currentBlock, err := childEthEndpoint.GetBlockByNumber(ethgo.Latest, false)
+		require.NoError(t, err)
+
+		currentExtra, err := polybft.GetIbftExtra(currentBlock.ExtraData)
+		require.NoError(t, err)
+
+		t.Logf("Latest block number: %d, epoch number: %d\n", currentBlock.Number, currentExtra.Checkpoint.EpochNumber)
+
+		currentEpoch := currentExtra.Checkpoint.EpochNumber
+
+		require.NoError(t, waitForRootchainEpoch(currentEpoch+1, 3*time.Minute,
+			rootchainTxRelayer, polybftCfg.Bridge.CheckpointManagerAddr))
+
+		require.NoError(t, cluster.WaitUntil(time.Minute*3, time.Second*2, func() bool {
+			for exitEventID := uint64(1); exitEventID <= exitEventsCount; exitEventID++ {
+				if !isExitEventProcessed(t, polybftCfg.Bridge.ExitHelperAddr, rootchainTxRelayer, exitEventID) {
+					return false
+				}
+			}
+
+			return true
+		}))
+
+		// assert that receiver's balances on RootERC20 smart contract are expected
+		checkBalancesFn(validatorAcc.Address(), tokensToTransfer, validatorBalanceAfterWithdraw)
+		checkBalancesFn(types.Address(nonValidatorKey.Address()), tokensToTransfer, nonValidatorBalanceAfterWithdraw)
+	})
+
+	t.Run("Do a deposit to some validator and non-validator address", func(t *testing.T) {
+		validatorSrv := cluster.Servers[4]
+		validatorAcc, err := validatorHelper.GetAccountFromDir(validatorSrv.DataDir())
+		require.NoError(t, err)
+
+		require.NoError(t, cluster.Bridge.Deposit(
+			common.ERC20,
+			polybftCfg.Bridge.RootNativeERC20Addr,
+			polybftCfg.Bridge.RootERC20PredicateAddr,
+			bridgeHelper.TestAccountPrivKey,
+			strings.Join([]string{validatorAcc.Address().String(), nonValidatorKey.Address().String()}, ","),
+			strings.Join([]string{tokensToTransfer.String(), tokensToTransfer.String()}, ","),
+			"",
+			cluster.Bridge.JSONRPCAddr(),
+			bridgeHelper.TestAccountPrivKey,
+			false),
+		)
+
+		currentBlock, err := childEthEndpoint.GetBlockByNumber(ethgo.Latest, false)
+		require.NoError(t, err)
+
+		// wait for a couple of sprints
+		finalBlockNum := currentBlock.Number + 5*sprintSize
+
+		// the transaction is processed and there should be a success event
+		var stateSyncedResult contractsapi.StateSyncResultEvent
+
+		for i := uint64(0); i < numberOfAttempts; i++ {
+			logs, err := getFilteredLogs(stateSyncedResult.Sig(), 0, finalBlockNum+i*sprintSize, childEthEndpoint)
+			require.NoError(t, err)
+
+			if len(logs) == stateSyncedLogsCount || i == numberOfAttempts-1 {
+				// assert that all deposits are executed successfully
+				checkStateSyncResultLogs(t, logs, stateSyncedLogsCount)
+
+				break
+			}
+
+			require.NoError(t, cluster.WaitForBlock(finalBlockNum+(i+1)*sprintSize, 2*time.Minute))
 		}
 	})
 }

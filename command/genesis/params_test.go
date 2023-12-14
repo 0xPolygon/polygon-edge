@@ -30,17 +30,17 @@ func Test_extractNativeTokenMetadata(t *testing.T) {
 		},
 		{
 			name:      "not enough params provided",
-			rawConfig: "Test:TST",
+			rawConfig: "Test:TST:4",
 			expectErr: true,
 		},
 		{
 			name:      "empty name provided",
-			rawConfig: ":TST:18",
+			rawConfig: ":TST:18:false",
 			expectErr: true,
 		},
 		{
 			name:      "empty symbol provided",
-			rawConfig: "Test::18",
+			rawConfig: "Test::18:true",
 			expectErr: true,
 		},
 		{
@@ -49,12 +49,24 @@ func Test_extractNativeTokenMetadata(t *testing.T) {
 			expectErr: true,
 		},
 		{
-			name:      "valid config",
-			rawConfig: "MyToken:MTK:9",
+			name:      "mintable valid config",
+			rawConfig: "MyToken:MTK:9:true",
 			expectedCfg: &polybft.TokenConfig{
-				Name:     "MyToken",
-				Symbol:   "MTK",
-				Decimals: 9,
+				Name:       "MyToken",
+				Symbol:     "MTK",
+				Decimals:   9,
+				IsMintable: true,
+			},
+			expectErr: false,
+		},
+		{
+			name:      "non-mintable valid config",
+			rawConfig: "MyToken:MTK:9:false",
+			expectedCfg: &polybft.TokenConfig{
+				Name:       "MyToken",
+				Symbol:     "MTK",
+				Decimals:   9,
+				IsMintable: false,
 			},
 			expectErr: false,
 		},
@@ -88,12 +100,14 @@ func Test_validatePremineInfo(t *testing.T) {
 		expectedPremines     []*helper.PremineInfo
 		expectValidateErrMsg string
 		expectedParseErrMsg  string
+		isTokenMintable      bool
 	}{
 		{
 			name:                "invalid premine balance",
 			premineRaw:          []string{"0x12345:loremIpsum"},
 			expectedPremines:    []*helper.PremineInfo{},
 			expectedParseErrMsg: "invalid premine balance amount provided",
+			isTokenMintable:     true,
 		},
 		{
 			name:       "missing zero address premine",
@@ -102,6 +116,7 @@ func Test_validatePremineInfo(t *testing.T) {
 				{Address: types.StringToAddress("12"), Amount: command.DefaultPremineBalance},
 			},
 			expectValidateErrMsg: errReserveAccMustBePremined.Error(),
+			isTokenMintable:      true,
 		},
 		{
 			name: "valid premine information",
@@ -114,6 +129,19 @@ func Test_validatePremineInfo(t *testing.T) {
 				{Address: types.ZeroAddress, Amount: ethgo.Ether(10000)},
 			},
 			expectValidateErrMsg: "",
+			isTokenMintable:      true,
+		},
+		{
+			name: "premine on non-mintable token",
+			premineRaw: []string{
+				fmt.Sprintf("%s:%d", types.StringToAddress("1"), ethgo.Ether(10)),
+				fmt.Sprintf("%s:%d", types.ZeroAddress, ethgo.Ether(10000)),
+			},
+			expectedPremines: []*helper.PremineInfo{
+				{Address: types.StringToAddress("1"), Amount: ethgo.Ether(10)},
+				{Address: types.ZeroAddress, Amount: ethgo.Ether(10000)},
+			},
+			expectValidateErrMsg: errNoPremineAllowed.Error(),
 		},
 	}
 
@@ -122,7 +150,7 @@ func Test_validatePremineInfo(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 
-			p := &genesisParams{premine: c.premineRaw}
+			p := &genesisParams{premine: c.premineRaw, nativeTokenConfig: &polybft.TokenConfig{IsMintable: c.isTokenMintable}}
 			err := p.parsePremineInfo()
 			if c.expectedParseErrMsg != "" {
 				require.ErrorContains(t, err, c.expectedParseErrMsg)

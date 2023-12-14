@@ -24,6 +24,7 @@ const (
 	epochSizeFlag                = "epoch-size"
 	epochRewardFlag              = "epoch-reward"
 	blockGasLimitFlag            = "block-gas-limit"
+	burnContractFlag             = "burn-contract"
 	genesisBaseFeeConfigFlag     = "base-fee-config"
 	nativeTokenConfigFlag        = "native-token-config"
 	rewardTokenCodeFlag          = "reward-token-code"
@@ -72,6 +73,7 @@ type genesisParams struct {
 
 	blockGasLimit uint64
 
+	burnContract        string
 	baseFeeConfig       string
 	parsedBaseFeeConfig *baseFeeInfo
 
@@ -180,7 +182,11 @@ func (p *genesisParams) validateFlags() error {
 			return err
 		}
 
-		if err := p.parseStakeInfo(); err != nil {
+		if err := p.validateBurnContract(); err != nil {
+			return err
+		}
+
+		if err := p.validateStakeInfo(); err != nil {
 			return err
 		}
 
@@ -235,7 +241,7 @@ func (p *genesisParams) generateGenesis() error {
 
 func (p *genesisParams) initGenesisConfig() error {
 	enabledForks := chain.AllForksEnabled.Copy()
-	if p.parsedBaseFeeConfig == nil {
+	if !p.isBurnContractEnabled() {
 		enabledForks.RemoveFork(chain.London)
 	}
 
@@ -258,14 +264,21 @@ func (p *genesisParams) initGenesisConfig() error {
 		Bootnodes: p.bootnodes,
 	}
 
-	if p.parsedBaseFeeConfig != nil {
+	// burn contract can be set only for non mintable native token
+	if p.isBurnContractEnabled() {
 		chainConfig.Genesis.BaseFee = p.parsedBaseFeeConfig.baseFee
 		chainConfig.Params.BaseFeeEM = p.parsedBaseFeeConfig.baseFeeEM
 		chainConfig.Params.BaseFeeChangeDenom = p.parsedBaseFeeConfig.baseFeeChangeDenom
-	}
+		chainConfig.Params.BurnContract = make(map[uint64]types.Address, 1)
 
-	chainConfig.Params.BurnContract = make(map[uint64]types.Address, 1)
-	chainConfig.Params.BurnContract[0] = types.ZeroAddress
+		burnContractInfo, err := parseBurnContractInfo(p.burnContract)
+		if err != nil {
+			return err
+		}
+
+		chainConfig.Params.BurnContract[burnContractInfo.BlockNumber] = burnContractInfo.Address
+		chainConfig.Params.BurnContractDestinationAddress = burnContractInfo.DestinationAddress
+	}
 
 	for _, premineInfo := range p.premineInfos {
 		chainConfig.Genesis.Alloc[premineInfo.Address] = &chain.GenesisAccount{
@@ -292,33 +305,6 @@ func (p *genesisParams) parsePremineInfo() error {
 	}
 
 	return nil
-}
-
-func (p *genesisParams) parseStakeInfo() error {
-	p.stakeInfos = make(map[types.Address]*big.Int, len(p.stake))
-
-	for _, stake := range p.stake {
-		stakeInfo, err := helper.ParsePremineInfo(stake)
-		if err != nil {
-			return fmt.Errorf("invalid stake amount provided: %w", err)
-		}
-
-		p.stakeInfos[stakeInfo.Address] = stakeInfo.Amount
-	}
-
-	return nil
-}
-
-// validatePremineInfo validates whether reserve account (0x0 address) is premined
-func (p *genesisParams) validatePremineInfo() error {
-	for _, premineInfo := range p.premineInfos {
-		if premineInfo.Address == types.ZeroAddress {
-			// we have premine of zero address, just return
-			return nil
-		}
-	}
-
-	return errReserveAccMustBePremined
 }
 
 // validateBlockTrackerPollInterval validates block tracker block interval

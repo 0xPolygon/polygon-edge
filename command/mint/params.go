@@ -2,6 +2,7 @@ package mint
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"math/big"
 
@@ -11,13 +12,11 @@ import (
 )
 
 type mintParams struct {
-	addresses          []string
-	amounts            []string
-	accountDir         string
-	accountConfig      string
-	tokenAddr          string
-	deployerPrivateKey string
-	jsonRPCAddress     string
+	addresses        []string
+	amounts          []string
+	tokenAddr        string
+	minterPrivateKey string
+	jsonRPCAddress   string
 
 	amountValues []*big.Int
 }
@@ -47,12 +46,12 @@ func (m *mintParams) validateFlags() error {
 		m.amountValues[i] = amountValue
 	}
 
-	if m.tokenAddr == "" {
-		return rootHelper.ErrMandatoryERC20Token
-	}
-
 	if err := types.IsValidAddress(m.tokenAddr); err != nil {
 		return fmt.Errorf("invalid erc20 token address is provided: %w", err)
+	}
+
+	if types.StringToAddress(m.tokenAddr) == types.ZeroAddress {
+		return errors.New("erc20 token address must be non-zero")
 	}
 
 	return nil

@@ -66,7 +66,8 @@ func setFlags(cmd *cobra.Command) {
 		stakeFlag,
 		[]string{},
 		fmt.Sprintf(
-			"the staked accounts and balances (format: <address>[:<stake>]). Default staked balance: %d",
+			"the staked accounts and balances (format: <address>[:<stake>]). "+
+				"Default staked balance if stake is minted on the local chain: %d",
 			command.DefaultStake,
 		),
 	)
@@ -79,9 +80,16 @@ func setFlags(cmd *cobra.Command) {
 	)
 
 	cmd.Flags().StringVar(
+		&params.burnContract,
+		burnContractFlag,
+		"",
+		"the burn contract block and address (format: <block>:<address>[:<burn destination>])",
+	)
+
+	cmd.Flags().StringVar(
 		&params.baseFeeConfig,
 		genesisBaseFeeConfigFlag,
-		"",
+		command.DefaultGenesisBaseFeeConfig,
 		`initial base fee (in wei), base fee elasticity multiplier, and base fee change denominator
 		(provided in the following format: [<baseFee>][:<baseFeeEM>][:<baseFeeChangeDenom>]). 
 		BaseFeeChangeDenom represents the value to bound the amount the base fee can change between blocks.
@@ -191,7 +199,7 @@ func setFlags(cmd *cobra.Command) {
 			nativeTokenConfigFlag,
 			"",
 			"native token configuration, provided in the following format: "+
-				"<name:symbol:decimals count>",
+				"<name:symbol:decimals count:is minted on local chain>",
 		)
 
 		cmd.Flags().StringVar(
@@ -370,7 +378,7 @@ func setFlags(cmd *cobra.Command) {
 	}
 }
 
-func preRunCommand(cmd *cobra.Command, _ []string) error {
+func preRunCommand(_ *cobra.Command, _ []string) error {
 	return params.validateFlags()
 }
 

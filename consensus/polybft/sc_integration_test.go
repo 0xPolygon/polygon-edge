@@ -304,7 +304,7 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 				Code: contractsapi.EpochManager.DeployedBytecode,
 			},
 			contracts.NativeERC20TokenContract: {
-				Code: contractsapi.NativeERC20.DeployedBytecode,
+				Code: contractsapi.NativeERC20Mintable.DeployedBytecode,
 			},
 			contracts.StakeManagerContract: {
 				Code: contractsapi.StakeManager.DeployedBytecode,

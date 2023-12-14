@@ -47,7 +47,7 @@ case "$1" in
 
               createGenesisConfig "$2" "$secrets" \
                 --reward-wallet 0xDEADBEEF:1000000 \
-                --native-token-config "Polygon:MATIC:18" \
+                --native-token-config "Blade:BLD:18:true" \
                 --blade-admin $(echo "$secrets" | jq -r '.[0] | .address') \
                 --proxy-contracts-admin ${proxyContractsAdmin}
 

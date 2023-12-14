@@ -578,7 +578,6 @@ func (i *InitializeRootMintableERC20PredicateACLFn) DecodeAbi(buf []byte) error 
 
 type InitializeNativeERC20Fn struct {
 	Predicate_   types.Address `abi:"predicate_"`
-	Owner_       types.Address `abi:"owner_"`
 	RootToken_   types.Address `abi:"rootToken_"`
 	Name_        string        `abi:"name_"`
 	Symbol_      string        `abi:"symbol_"`
@@ -598,21 +597,43 @@ func (i *InitializeNativeERC20Fn) DecodeAbi(buf []byte) error {
 	return decodeMethod(NativeERC20.Abi.Methods["initialize"], buf, i)
 }
 
-type ApproveNativeERC20Fn struct {
+type InitializeNativeERC20MintableFn struct {
+	Predicate_   types.Address `abi:"predicate_"`
+	Owner_       types.Address `abi:"owner_"`
+	RootToken_   types.Address `abi:"rootToken_"`
+	Name_        string        `abi:"name_"`
+	Symbol_      string        `abi:"symbol_"`
+	Decimals_    uint8         `abi:"decimals_"`
+	TokenSupply_ *big.Int      `abi:"tokenSupply_"`
+}
+
+func (i *InitializeNativeERC20MintableFn) Sig() []byte {
+	return NativeERC20Mintable.Abi.Methods["initialize"].ID()
+}
+
+func (i *InitializeNativeERC20MintableFn) EncodeAbi() ([]byte, error) {
+	return NativeERC20Mintable.Abi.Methods["initialize"].Encode(i)
+}
+
+func (i *InitializeNativeERC20MintableFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(NativeERC20Mintable.Abi.Methods["initialize"], buf, i)
+}
+
+type ApproveNativeERC20MintableFn struct {
 	Spender types.Address `abi:"spender"`
 	Amount  *big.Int      `abi:"amount"`
 }
 
-func (a *ApproveNativeERC20Fn) Sig() []byte {
-	return NativeERC20.Abi.Methods["approve"].ID()
+func (a *ApproveNativeERC20MintableFn) Sig() []byte {
+	return NativeERC20Mintable.Abi.Methods["approve"].ID()
 }
 
-func (a *ApproveNativeERC20Fn) EncodeAbi() ([]byte, error) {
-	return NativeERC20.Abi.Methods["approve"].Encode(a)
+func (a *ApproveNativeERC20MintableFn) EncodeAbi() ([]byte, error) {
+	return NativeERC20Mintable.Abi.Methods["approve"].Encode(a)
 }
 
-func (a *ApproveNativeERC20Fn) DecodeAbi(buf []byte) error {
-	return decodeMethod(NativeERC20.Abi.Methods["approve"], buf, a)
+func (a *ApproveNativeERC20MintableFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(NativeERC20Mintable.Abi.Methods["approve"], buf, a)
 }
 
 type InitializeRootERC20PredicateFn struct {
@@ -1688,6 +1709,74 @@ func (d *DistributeRewardForEpochManagerFn) EncodeAbi() ([]byte, error) {
 
 func (d *DistributeRewardForEpochManagerFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(EpochManager.Abi.Methods["distributeRewardFor"], buf, d)
+}
+
+type InitializeEIP1559BurnFn struct {
+	NewChildERC20Predicate types.Address `abi:"newChildERC20Predicate"`
+	NewBurnDestination     types.Address `abi:"newBurnDestination"`
+}
+
+func (i *InitializeEIP1559BurnFn) Sig() []byte {
+	return EIP1559Burn.Abi.Methods["initialize"].ID()
+}
+
+func (i *InitializeEIP1559BurnFn) EncodeAbi() ([]byte, error) {
+	return EIP1559Burn.Abi.Methods["initialize"].Encode(i)
+}
+
+func (i *InitializeEIP1559BurnFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(EIP1559Burn.Abi.Methods["initialize"], buf, i)
+}
+
+type GenesisAccount struct {
+	Addr           types.Address `abi:"addr"`
+	PreminedTokens *big.Int      `abi:"preminedTokens"`
+	StakedTokens   *big.Int      `abi:"stakedTokens"`
+	IsValidator    bool          `abi:"isValidator"`
+}
+
+var GenesisAccountABIType = abi.MustNewType("tuple(address addr,uint256 preminedTokens,uint256 stakedTokens,bool isValidator)")
+
+func (g *GenesisAccount) EncodeAbi() ([]byte, error) {
+	return GenesisAccountABIType.Encode(g)
+}
+
+func (g *GenesisAccount) DecodeAbi(buf []byte) error {
+	return decodeStruct(GenesisAccountABIType, buf, &g)
+}
+
+type InitializeBladeManagerFn struct {
+	NewRootERC20Predicate types.Address     `abi:"newRootERC20Predicate"`
+	GenesisAccounts       []*GenesisAccount `abi:"genesisAccounts"`
+}
+
+func (i *InitializeBladeManagerFn) Sig() []byte {
+	return BladeManager.Abi.Methods["initialize"].ID()
+}
+
+func (i *InitializeBladeManagerFn) EncodeAbi() ([]byte, error) {
+	return BladeManager.Abi.Methods["initialize"].Encode(i)
+}
+
+func (i *InitializeBladeManagerFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(BladeManager.Abi.Methods["initialize"], buf, i)
+}
+
+type AddGenesisBalanceBladeManagerFn struct {
+	NonStakeAmount *big.Int `abi:"nonStakeAmount"`
+	StakeAmount    *big.Int `abi:"stakeAmount"`
+}
+
+func (a *AddGenesisBalanceBladeManagerFn) Sig() []byte {
+	return BladeManager.Abi.Methods["addGenesisBalance"].ID()
+}
+
+func (a *AddGenesisBalanceBladeManagerFn) EncodeAbi() ([]byte, error) {
+	return BladeManager.Abi.Methods["addGenesisBalance"].Encode(a)
+}
+
+func (a *AddGenesisBalanceBladeManagerFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(BladeManager.Abi.Methods["addGenesisBalance"], buf, a)
 }
 
 type ProtectSetUpProxyGenesisProxyFn struct {

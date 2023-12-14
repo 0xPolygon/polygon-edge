@@ -38,7 +38,7 @@ func initStakeManager(polyBFTConfig PolyBFTConfig, transition *state.Transition)
 			BlsKey: key.ToBigInt(),
 		}
 
-		approveFn := &contractsapi.ApproveNativeERC20Fn{
+		approveFn := &contractsapi.ApproveNativeERC20MintableFn{
 			Spender: contracts.StakeManagerContract,
 			Amount:  validator.Stake,
 		}
@@ -107,7 +107,7 @@ func getInitERC20PredicateInput(config *BridgeConfig, childChainMintable bool) (
 			NewStateReceiver:          contracts.StateReceiverContract,
 			NewRootERC20Predicate:     config.RootERC20PredicateAddr,
 			NewChildTokenTemplate:     contracts.ChildERC20Contract,
-			NewNativeTokenRootAddress: types.ZeroAddress,
+			NewNativeTokenRootAddress: config.RootNativeERC20Addr,
 		}
 	}
 
@@ -134,7 +134,7 @@ func getInitERC20PredicateACLInput(config *BridgeConfig, owner types.Address,
 			NewStateReceiver:          contracts.StateReceiverContract,
 			NewRootERC20Predicate:     config.RootERC20PredicateAddr,
 			NewChildTokenTemplate:     contracts.ChildERC20Contract,
-			NewNativeTokenRootAddress: types.ZeroAddress,
+			NewNativeTokenRootAddress: config.RootNativeERC20Addr,
 			NewUseAllowList:           useAllowList,
 			NewUseBlockList:           useBlockList,
 			NewOwner:                  owner,
