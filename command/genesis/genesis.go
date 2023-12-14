@@ -7,6 +7,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/genesis/predeploy"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 )
 
@@ -240,6 +241,13 @@ func setFlags(cmd *cobra.Command) {
 			withdrawalWaitPeriodFlag,
 			defaultWithdrawalWaitPeriod,
 			"number of epochs after which withdrawal can be done from child chain",
+		)
+
+		cmd.Flags().StringVar(
+			&params.stakeToken,
+			stakeTokenFlag,
+			contracts.NativeERC20TokenContract.String(),
+			"stake token address",
 		)
 	}
 

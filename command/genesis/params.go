@@ -36,6 +36,7 @@ const (
 	votePeriodFlag               = "vote-period"
 	voteProposalThresholdFlag    = "vote-proposal-threshold"
 	proposalQuorumFlag           = "proposal-quorum"
+	stakeTokenFlag               = "stake-token"
 )
 
 var (
@@ -55,6 +56,7 @@ var (
 	errRewardWalletNotDefined   = errors.New("reward wallet address must be defined")
 	errRewardWalletZero         = errors.New("reward wallet address must not be zero address")
 	errInvalidVotingPeriod      = errors.New("voting period can not be zero")
+	errStakeTokenIsZeroAddress  = errors.New("stake token address must not be zero address")
 )
 
 type genesisParams struct {
@@ -128,6 +130,9 @@ type genesisParams struct {
 	votingPeriod      string
 	proposalThreshold string
 	proposalQuorum    uint64
+
+	stakeToken     string
+	stakeTokenAddr types.Address
 }
 
 func (p *genesisParams) validateFlags() error {
@@ -177,6 +182,16 @@ func (p *genesisParams) validateFlags() error {
 
 		if err := p.parseStakeInfo(); err != nil {
 			return err
+		}
+
+		if err := types.IsValidAddress(params.stakeToken); err != nil {
+			return fmt.Errorf("stake token address is not a valid address: %w", err)
+		}
+
+		params.stakeTokenAddr = types.StringToAddress(params.stakeToken)
+
+		if params.stakeTokenAddr == types.ZeroAddress {
+			return errStakeTokenIsZeroAddress
 		}
 	}
 

@@ -56,7 +56,7 @@ func initStakeManager(polyBFTConfig PolyBFTConfig, transition *state.Transition)
 
 	initFn := &contractsapi.InitializeStakeManagerFn{
 		GenesisValidators: startValidators,
-		NewStakingToken:   contracts.NativeERC20TokenContract,
+		NewStakingToken:   polyBFTConfig.StakeTokenAddr,
 		NewBls:            contracts.BLSContract,
 		EpochManager:      contracts.EpochManagerContract,
 		NewDomain:         signer.DomainValidatorSetString,

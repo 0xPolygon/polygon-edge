@@ -2,11 +2,13 @@ package staking
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	validatorHelper "github.com/0xPolygon/polygon-edge/command/validator/helper"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 var supernetIDFlag = "supernet-id"
@@ -16,9 +18,13 @@ type stakeParams struct {
 	accountConfig string
 	jsonRPC       string
 	amount        string
+	stakeToken    string
 
-	amountValue *big.Int
+	amountValue    *big.Int
+	stakeTokenAddr types.Address
 }
+
+var errStakeTokenIsZeroAddress = errors.New("stake token address must not be zero address")
 
 func (sp *stakeParams) validateFlags() (err error) {
 	if sp.amountValue, err = helper.ParseAmount(sp.amount); err != nil {
@@ -28,6 +34,16 @@ func (sp *stakeParams) validateFlags() (err error) {
 	// validate jsonrpc address
 	if _, err := helper.ParseJSONRPCAddress(sp.jsonRPC); err != nil {
 		return fmt.Errorf("failed to parse json rpc address. Error: %w", err)
+	}
+
+	if err := types.IsValidAddress(sp.stakeToken); err != nil {
+		return fmt.Errorf("stake token address is not a valid address: %w", err)
+	}
+
+	sp.stakeTokenAddr = types.StringToAddress(sp.stakeToken)
+
+	if sp.stakeTokenAddr == types.ZeroAddress {
+		return errStakeTokenIsZeroAddress
 	}
 
 	return validatorHelper.ValidateSecretFlags(sp.accountDir, sp.accountConfig)

@@ -357,6 +357,7 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 				NetworkParamsAddr:        contracts.NetworkParamsContract,
 				ForkParamsAddr:           contracts.ForkParamsContract,
 			},
+			StakeTokenAddr: contracts.NativeERC20TokenContract,
 		}
 
 		transition := newTestTransition(t, alloc)

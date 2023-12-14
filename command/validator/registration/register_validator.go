@@ -59,6 +59,13 @@ func setFlags(cmd *cobra.Command) {
 		polybftsecrets.AmountFlagDesc,
 	)
 
+	cmd.Flags().StringVar(
+		&params.stakeToken,
+		polybftsecrets.StakeTokenFlag,
+		contracts.NativeERC20TokenContract.String(),
+		polybftsecrets.StakeTokenFlagDesc,
+	)
+
 	helper.RegisterJSONRPCFlag(cmd)
 	cmd.MarkFlagsMutuallyExclusive(polybftsecrets.AccountConfigFlag, polybftsecrets.AccountDirFlag)
 }
@@ -90,7 +97,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 
 	if params.amountValue.Cmp(big.NewInt(0)) > 0 {
 		approveTxn, err := bridgeHelper.CreateApproveERC20Txn(params.amountValue,
-			contracts.StakeManagerContract, contracts.NativeERC20TokenContract, true)
+			contracts.StakeManagerContract, params.stakeTokenAddr, true)
 		if err != nil {
 			return err
 		}

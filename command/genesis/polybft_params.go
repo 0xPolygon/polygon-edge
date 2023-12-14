@@ -193,6 +193,7 @@ func (p *genesisParams) generateChainConfig(o command.OutputFormatter) error {
 			NetworkParamsAddr: contracts.NetworkParamsContract,
 			ForkParamsAddr:    contracts.ForkParamsContract,
 		},
+		StakeTokenAddr: params.stakeTokenAddr,
 	}
 
 	enabledForks := chain.AllForksEnabled.Copy()
