@@ -40,6 +40,8 @@ github.com/DataDog/sketches-go v1.4.2 h1:gppNudE9d19cQ98RYABOetxIhpTCl4m7CnbRZjv
 github.com/DataDog/sketches-go v1.4.2/go.mod h1:xJIXldczJyyjnbDop7ZZcLxJdV3+7Kra7H1KMgpgkLk=
 github.com/Ethernal-Tech/blockchain-event-tracker v0.0.0-20231202204931-b886edca635a h1:IujnjiVu6UcVYhUIAaCN1ZI122VZzTO80epIbF6pDbk=
 github.com/Ethernal-Tech/blockchain-event-tracker v0.0.0-20231202204931-b886edca635a/go.mod h1:IgWSrKhiPnqV6M68wQt8MyWNeWwA+3sYZQP6Y6STR2M=
+github.com/Ethernal-Tech/merkle-tree v0.0.0-20231213143318-4db9da419e04 h1:DGIOHe3qAeU+mrRLNJ83mJWyH1t5SqN8XvTrwBUAXK4=
+github.com/Ethernal-Tech/merkle-tree v0.0.0-20231213143318-4db9da419e04/go.mod h1:vwaNJ2xOVILZoOcD6CxswTg8XOCDvIhcRIp8xanmS3s=
 github.com/Microsoft/go-winio v0.5.0/go.mod h1:JPGBdM1cNvN/6ISo+n8V5iA4v8pBzdOpzfwIujj1a84=
 github.com/Microsoft/go-winio v0.6.1 h1:9/kr64B9VUZrLm5YYwbGtUJnMgqWVOdUAXu6Migciow=
 github.com/Microsoft/go-winio v0.6.1/go.mod h1:LRdKpFKfdobln8UmuiYcKPot9D2v6svN5+sAH+4kjUM=

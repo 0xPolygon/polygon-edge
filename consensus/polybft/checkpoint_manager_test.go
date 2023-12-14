@@ -14,7 +14,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/common"
-	"github.com/0xPolygon/polygon-edge/merkle-tree"
+	merkle "github.com/Ethernal-Tech/merkle-tree"
 	hclog "github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -342,7 +342,7 @@ func TestCheckpointManager_BuildEventRoot(t *testing.T) {
 
 		hash, err := checkpointManager.BuildEventRoot(1)
 		require.NoError(t, err)
-		require.Equal(t, tree.Hash(), hash)
+		require.Equal(t, tree.Hash(), merkle.Hash(hash))
 	})
 
 	t.Run("Get exit event root hash - no events", func(t *testing.T) {
@@ -409,7 +409,7 @@ func TestCheckpointManager_GenerateExitProof(t *testing.T) {
 	t.Run("Generate and validate exit proof", func(t *testing.T) {
 		t.Parallel()
 		// verify generated proof on desired tree
-		require.NoError(t, merkle.VerifyProof(correctBlockToGetExit, encodedEvents[1], proof.Data, tree.Hash()))
+		require.NoError(t, merkle.VerifyProof(correctBlockToGetExit, encodedEvents[1], types.FromTypesToMerkleHash(proof.Data), tree.Hash()))
 	})
 
 	t.Run("Generate and validate exit proof - invalid proof", func(t *testing.T) {
@@ -422,7 +422,7 @@ func TestCheckpointManager_GenerateExitProof(t *testing.T) {
 
 		// verify generated proof on desired tree
 		require.ErrorContains(t, merkle.VerifyProof(correctBlockToGetExit,
-			encodedEvents[1], invalidProof, tree.Hash()), "not a member of merkle tree")
+			encodedEvents[1], types.FromTypesToMerkleHash(invalidProof), tree.Hash()), "not a member of merkle tree")
 	})
 
 	t.Run("Generate exit proof - no event", func(t *testing.T) {

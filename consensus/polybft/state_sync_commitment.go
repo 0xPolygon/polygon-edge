@@ -7,9 +7,9 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/crypto"
-	"github.com/0xPolygon/polygon-edge/merkle-tree"
 	"github.com/0xPolygon/polygon-edge/state/runtime/precompiled"
 	"github.com/0xPolygon/polygon-edge/types"
+	merkle "github.com/Ethernal-Tech/merkle-tree"
 )
 
 const (
@@ -37,7 +37,7 @@ func NewPendingCommitment(epoch uint64, stateSyncEvents []*contractsapi.StateSyn
 		StateSyncCommitment: &contractsapi.StateSyncCommitment{
 			StartID: stateSyncEvents[0].ID,
 			EndID:   stateSyncEvents[len(stateSyncEvents)-1].ID,
-			Root:    tree.Hash(),
+			Root:    types.Hash(tree.Hash()),
 		},
 	}, nil
 }
@@ -90,7 +90,7 @@ func (cm *CommitmentMessageSigned) VerifyStateSyncProof(proof []types.Hash,
 	}
 
 	return merkle.VerifyProof(stateSync.ID.Uint64()-cm.Message.StartID.Uint64(),
-		hash, proof, cm.Message.Root)
+		hash, types.FromTypesToMerkleHash(proof), merkle.Hash(cm.Message.Root))
 }
 
 // ContainsStateSync checks if commitment contains given state sync event

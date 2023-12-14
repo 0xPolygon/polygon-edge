@@ -25,10 +25,10 @@ func TestCommitmentMessage_Hash(t *testing.T) {
 	trie2, err := createMerkleTree(stateSyncEvents[0 : len(stateSyncEvents)-1])
 	require.NoError(t, err)
 
-	commitmentMessage1 := newTestCommitmentSigned(t, trie1.Hash(), 2, 8)
-	commitmentMessage2 := newTestCommitmentSigned(t, trie1.Hash(), 2, 8)
-	commitmentMessage3 := newTestCommitmentSigned(t, trie1.Hash(), 6, 10)
-	commitmentMessage4 := newTestCommitmentSigned(t, trie2.Hash(), 2, 8)
+	commitmentMessage1 := newTestCommitmentSigned(t, types.Hash(trie1.Hash()), 2, 8)
+	commitmentMessage2 := newTestCommitmentSigned(t, types.Hash(trie1.Hash()), 2, 8)
+	commitmentMessage3 := newTestCommitmentSigned(t, types.Hash(trie1.Hash()), 6, 10)
+	commitmentMessage4 := newTestCommitmentSigned(t, types.Hash(trie2.Hash()), 2, 8)
 
 	hash1, err := commitmentMessage1.Hash()
 	require.NoError(t, err)
@@ -85,7 +85,7 @@ func TestCommitmentMessage_VerifyProof(t *testing.T) {
 		require.NoError(t, err)
 
 		execute := &contractsapi.ExecuteStateReceiverFn{
-			Proof: proof,
+			Proof: types.FromMerkleToTypesHash(proof),
 			Obj:   (*contractsapi.StateSync)(stateSync),
 		}
 
@@ -98,7 +98,7 @@ func TestCommitmentMessage_VerifyProof(t *testing.T) {
 		require.Equal(t, stateSync.Sender, executionStateSync.Obj.Sender)
 		require.Equal(t, stateSync.Receiver, executionStateSync.Obj.Receiver)
 		require.Equal(t, stateSync.Data, executionStateSync.Obj.Data)
-		require.Equal(t, proof, executionStateSync.Proof)
+		require.Equal(t, proof, types.FromTypesToMerkleHash(executionStateSync.Proof))
 
 		err = commitmentSigned.VerifyStateSyncProof(executionStateSync.Proof,
 			(*contractsapi.StateSyncedEvent)(executionStateSync.Obj))
@@ -136,11 +136,11 @@ func TestCommitmentMessage_VerifyProof_StateSyncHashNotEqualToProof(t *testing.T
 		Message: &contractsapi.StateSyncCommitment{
 			StartID: big.NewInt(fromIndex),
 			EndID:   big.NewInt(toIndex),
-			Root:    tree.Hash(),
+			Root:    types.Hash(tree.Hash()),
 		},
 	}
 
-	assert.ErrorContains(t, commitment.VerifyStateSyncProof(proof, stateSyncs[4]), "not a member of merkle tree")
+	assert.ErrorContains(t, commitment.VerifyStateSyncProof(types.FromMerkleToTypesHash(proof), stateSyncs[4]), "not a member of merkle tree")
 }
 
 func newTestCommitmentSigned(t *testing.T, root types.Hash, startID, endID int64) *CommitmentMessageSigned {

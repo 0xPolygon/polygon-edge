@@ -473,7 +473,7 @@ func (s *stateSyncManager) buildProofs(commitmentMsg *contractsapi.StateSyncComm
 		}
 
 		stateSyncProofs[i] = &StateSyncProof{
-			Proof:     p,
+			Proof:     types.FromMerkleToTypesHash(p),
 			StateSync: event,
 		}
 	}

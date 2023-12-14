@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	"github.com/0xPolygon/polygon-edge/merkle-tree"
 	"github.com/0xPolygon/polygon-edge/types"
+	merkle "github.com/Ethernal-Tech/merkle-tree"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.etcd.io/bbolt"
@@ -253,7 +253,7 @@ func createTestCommitmentMessage(t *testing.T, fromIndex uint64) *CommitmentMess
 	require.NoError(t, err)
 
 	msg := &contractsapi.StateSyncCommitment{
-		Root:    tree.Hash(),
+		Root:    types.Hash(tree.Hash()),
 		StartID: big.NewInt(int64(fromIndex)),
 		EndID:   big.NewInt(int64(fromIndex + maxCommitmentSize - 1)),
 	}

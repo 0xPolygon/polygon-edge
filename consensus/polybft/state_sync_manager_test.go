@@ -6,6 +6,7 @@ import (
 	"os"
 	"testing"
 
+	merkle "github.com/Ethernal-Tech/merkle-tree"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
@@ -18,7 +19,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/common"
-	"github.com/0xPolygon/polygon-edge/merkle-tree"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -237,7 +237,7 @@ func TestStateSyncManager_BuildCommitment(t *testing.T) {
 		{
 			MerkleTree: tree,
 			StateSyncCommitment: &contractsapi.StateSyncCommitment{
-				Root:    tree.Hash(),
+				Root:    types.Hash(tree.Hash()),
 				StartID: big.NewInt(0),
 				EndID:   big.NewInt(1),
 			},
@@ -540,7 +540,7 @@ func TestStateSyncManager_GetProofs_NoProof_BuildProofs(t *testing.T) {
 		Message: &contractsapi.StateSyncCommitment{
 			StartID: big.NewInt(fromIndex),
 			EndID:   big.NewInt(maxCommitmentSize),
-			Root:    tree.Hash(),
+			Root:    types.Hash(tree.Hash()),
 		},
 	}
 

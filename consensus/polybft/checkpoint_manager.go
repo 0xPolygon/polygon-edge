@@ -11,9 +11,9 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
-	"github.com/0xPolygon/polygon-edge/merkle-tree"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
+	merkle "github.com/Ethernal-Tech/merkle-tree"
 	hclog "github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
 	bolt "go.etcd.io/bbolt"
@@ -310,7 +310,7 @@ func (c *checkpointManager) BuildEventRoot(epoch uint64) (types.Hash, error) {
 		return types.ZeroHash, err
 	}
 
-	return tree.Hash(), nil
+	return types.Hash(tree.Hash()), nil
 }
 
 // GenerateExitProof generates proof of exit event
@@ -404,7 +404,7 @@ func (c *checkpointManager) GenerateExitProof(exitID uint64) (types.Proof, error
 	exitEventHex := hex.EncodeToString(exitEventEncoded)
 
 	return types.Proof{
-		Data: proof,
+		Data: types.FromMerkleToTypesHash(proof),
 		Metadata: map[string]interface{}{
 			"LeafIndex":       leafIndex,
 			"ExitEvent":       exitEventHex,
