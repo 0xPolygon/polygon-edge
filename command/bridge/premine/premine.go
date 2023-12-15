@@ -65,13 +65,6 @@ func setFlags(cmd *cobra.Command) {
 	)
 
 	cmd.Flags().StringVar(
-		&params.rootERC20Predicate,
-		rootERC20PredicateFlag,
-		"",
-		"address of root erc20 predicate",
-	)
-
-	cmd.Flags().StringVar(
 		&params.bladeManager,
 		bridgeHelper.BladeManagerFlag,
 		"",
@@ -82,21 +75,20 @@ func setFlags(cmd *cobra.Command) {
 		&params.premineAmount,
 		premineAmountFlag,
 		"",
-		"amount to premine as non staked balance",
+		"amount to premine as a non-staked balance",
 	)
 
 	cmd.Flags().StringVar(
 		&params.stakedAmount,
 		stakedAmountFlag,
 		"",
-		"amount to premine as staked balance",
+		"amount to premine as a staked balance",
 	)
 
 	cmd.MarkFlagsMutuallyExclusive(polybftsecrets.AccountDirFlag, polybftsecrets.AccountConfigFlag)
 	cmd.MarkFlagsMutuallyExclusive(polybftsecrets.PrivateKeyFlag, polybftsecrets.AccountConfigFlag)
 	cmd.MarkFlagsMutuallyExclusive(polybftsecrets.PrivateKeyFlag, polybftsecrets.AccountDirFlag)
 	_ = cmd.MarkFlagRequired(bridgeHelper.BladeManagerFlag)
-	_ = cmd.MarkFlagRequired(rootERC20PredicateFlag)
 	_ = cmd.MarkFlagRequired(bridgeHelper.Erc20TokenFlag)
 }
 
@@ -122,9 +114,9 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	}
 
 	approveTxn, err := bridgeHelper.CreateApproveERC20Txn(
-		new(big.Int).Add(params.nonStakedValue, params.stakedValue),
-		types.StringToAddress(params.bladeManager),
-		types.StringToAddress(params.nativeTokenRoot), true)
+		new(big.Int).Add(params.premineAmountValue, params.stakedValue),
+		params.bladeManagerAddr,
+		params.nativeTokenRootAddr, true)
 	if err != nil {
 		return err
 	}
@@ -139,7 +131,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	}
 
 	premineFn := &contractsapi.AddGenesisBalanceBladeManagerFn{
-		NonStakeAmount: params.nonStakedValue,
+		NonStakeAmount: params.premineAmountValue,
 		StakeAmount:    params.stakedValue,
 	}
 
@@ -149,9 +141,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	}
 
 	bladeManagerAddr := ethgo.Address(types.StringToAddress(params.bladeManager))
-	txn := bridgeHelper.CreateTransaction(ownerKey.Address(), &bladeManagerAddr, premineInput, nil, true)
-	txn.Gas = types.StateTransactionGasLimit * 2
-	txn.Type = ethgo.TransactionLegacy
+	txn := bridgeHelper.CreateTransaction(ownerKey.Address(), &bladeManagerAddr, premineInput, nil, false)
 
 	receipt, err = txRelayer.SendTransaction(txn, ownerKey)
 	if err != nil {
@@ -164,7 +154,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 
 	outputter.WriteCommandResult(&premineResult{
 		Address:         ownerKey.Address().String(),
-		NonStakedAmount: params.nonStakedValue,
+		NonStakedAmount: params.premineAmountValue,
 		StakedAmount:    params.stakedValue,
 	})
 

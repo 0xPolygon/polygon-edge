@@ -2,7 +2,6 @@ package mint
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"math/big"
 
@@ -31,7 +30,7 @@ func (m *mintParams) validateFlags() error {
 	}
 
 	for _, addr := range m.addresses {
-		if err := types.IsValidAddress(addr); err != nil {
+		if _, err := types.IsValidAddress(addr, true); err != nil {
 			return err
 		}
 	}
@@ -46,12 +45,8 @@ func (m *mintParams) validateFlags() error {
 		m.amountValues[i] = amountValue
 	}
 
-	if err := types.IsValidAddress(m.tokenAddr); err != nil {
+	if _, err := types.IsValidAddress(m.tokenAddr, false); err != nil {
 		return fmt.Errorf("invalid erc20 token address is provided: %w", err)
-	}
-
-	if types.StringToAddress(m.tokenAddr) == types.ZeroAddress {
-		return errors.New("erc20 token address must be non-zero")
 	}
 
 	return nil

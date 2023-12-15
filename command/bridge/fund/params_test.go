@@ -27,8 +27,8 @@ func Test_validateFlags(t *testing.T) {
 			// inconsistent length (addresses vs amounts)
 			buildParamsFn: func() *fundParams {
 				return &fundParams{
-					addresses: []string{"0x1", "0x2"},
-					amounts:   []string{"10"},
+					rawAddresses: []string{"0x1", "0x2"},
+					amounts:      []string{"10"},
 				}
 			},
 			err: errInconsistentLength.Error(),
@@ -37,8 +37,8 @@ func Test_validateFlags(t *testing.T) {
 			// address contains invalid characters
 			buildParamsFn: func() *fundParams {
 				return &fundParams{
-					addresses: []string{"0x10", "0x20"},
-					amounts:   []string{"10", "20"},
+					rawAddresses: []string{"0x10", "0x20"},
+					amounts:      []string{"10", "20"},
 				}
 			},
 			err: "address \x10 has invalid length",
@@ -47,7 +47,7 @@ func Test_validateFlags(t *testing.T) {
 			// valid scenario
 			buildParamsFn: func() *fundParams {
 				return &fundParams{
-					addresses: []string{
+					rawAddresses: []string{
 						types.StringToAddress("0x10").String(),
 						types.StringToAddress("0x20").String()},
 					amounts: []string{"10", "20"},

@@ -105,7 +105,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("enlist validator failed: %w", err)
 	}
 
-	bladeManagerAddr := ethgo.Address(types.StringToAddress(params.bladeManager))
+	bladeManagerAddr := ethgo.Address(params.bladeManagerAddr)
 
 	// finalize genesis accounts on BladeManager so that no one can stake and premine no more
 	encoded, err := finalizeGenesisABIFn.Encode([]interface{}{})
@@ -215,12 +215,12 @@ func decodeGenesisAccounts(genesisSetRaw string) (map[types.Address]*contractsap
 
 		preminedTokens, ok := rawAccount["preminedTokens"].(*big.Int)
 		if !ok {
-			return nil, errors.New("failed to retrieve genesis account non staked tokens")
+			return nil, errors.New("failed to retrieve genesis account non-staked balance")
 		}
 
 		stakedTokens, ok := rawAccount["stakedTokens"].(*big.Int)
 		if !ok {
-			return nil, errors.New("failed to retrieve genesis account staked tokens")
+			return nil, errors.New("failed to retrieve genesis account staked balance")
 		}
 
 		isValidator, ok := rawAccount["isValidator"].(bool)

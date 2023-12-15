@@ -34,7 +34,7 @@ func GetCommand() *cobra.Command {
 
 func setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringSliceVar(
-		&params.addresses,
+		&params.rawAddresses,
 		helper.AddressesFlag,
 		nil,
 		"validator addresses",
@@ -96,8 +96,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 				return ctx.Err()
 
 			default:
-				validatorAddr := types.StringToAddress(params.addresses[i])
-				fundAddr := ethgo.Address(validatorAddr)
+				fundAddr := ethgo.Address(params.addresses[i])
 				txn := helper.CreateTransaction(ethgo.ZeroAddress, &fundAddr, nil, params.amountValues[i], true)
 
 				var (
@@ -112,15 +111,15 @@ func runCommand(cmd *cobra.Command, _ []string) {
 				}
 
 				if err != nil {
-					return fmt.Errorf("failed to send fund validator '%s' transaction: %w", validatorAddr, err)
+					return fmt.Errorf("failed to send fund validator '%s' transaction: %w", fundAddr, err)
 				}
 
 				if receipt.Status == uint64(types.ReceiptFailed) {
-					return fmt.Errorf("failed to fund validator '%s'", validatorAddr)
+					return fmt.Errorf("failed to fund validator '%s'", fundAddr)
 				}
 
 				results[i] = &result{
-					ValidatorAddr: validatorAddr,
+					ValidatorAddr: types.Address(fundAddr),
 					TxHash:        types.Hash(receipt.TransactionHash),
 				}
 			}

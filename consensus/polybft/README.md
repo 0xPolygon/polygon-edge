@@ -117,8 +117,7 @@ It has a native support for running bridge, which enables running cross-chain tr
 
      ```bash
     $ polygon-edge rootchain premine \ 
-    --erc20-token <address_of_native_root_erc20_token> \
-       --root-erc20-predicate <address_of_root_erc20_predicate_on_root> \
+       --erc20-token <address_of_native_root_erc20_token> \
        --supernet-manager <address_of_CustomSupernetManager_contract_on_root> \
        --private-key <hex_encoded_private_key_of_relayer_node> \
        --amount <ammount_of_tokens_to_premine>

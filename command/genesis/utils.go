@@ -107,28 +107,32 @@ func parseBurnContractInfo(burnContractInfoRaw string) (*polybft.BurnContractInf
 		return nil, fmt.Errorf("failed to parse block number %s: %w", blockRaw, err)
 	}
 
-	contractAddress := burnContractParts[1]
-	if err = types.IsValidAddress(contractAddress); err != nil {
-		return nil, fmt.Errorf("failed to parse contract address %s: %w", contractAddress, err)
+	contractAddrRaw := burnContractParts[1]
+
+	contractAddr, err := types.IsValidAddress(contractAddrRaw, true)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse contract address %s: %w", contractAddrRaw, err)
 	}
 
 	if len(burnContractParts) == 2 {
 		return &polybft.BurnContractInfo{
 			BlockNumber:        blockNum,
-			Address:            types.StringToAddress(contractAddress),
+			Address:            contractAddr,
 			DestinationAddress: types.ZeroAddress,
 		}, nil
 	}
 
-	destinationAddress := burnContractParts[2]
-	if err = types.IsValidAddress(destinationAddress); err != nil {
-		return nil, fmt.Errorf("failed to parse burn destination address %s: %w", destinationAddress, err)
+	destinationAddrRaw := burnContractParts[2]
+
+	destinationAddr, err := types.IsValidAddress(destinationAddrRaw, true)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse burn destination address %s: %w", destinationAddrRaw, err)
 	}
 
 	return &polybft.BurnContractInfo{
 		BlockNumber:        blockNum,
-		Address:            types.StringToAddress(contractAddress),
-		DestinationAddress: types.StringToAddress(destinationAddress),
+		Address:            contractAddr,
+		DestinationAddress: destinationAddr,
 	}, nil
 }
 

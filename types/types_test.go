@@ -92,23 +92,47 @@ func TestIsValidAddress(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		address string
-		isValid bool
+		address      string
+		isValid      bool
+		expectedAddr Address
 	}{
-		{address: "0x123", isValid: false},
-		{address: "FooBar", isValid: false},
-		{address: "123FooBar", isValid: false},
-		{address: "0x1234567890987654321012345678909876543210", isValid: true},
-		{address: "0x0000000000000000000000000000000000000000", isValid: true},
-		{address: "0x1000000000000000000000000000000000000000", isValid: true},
+		{
+			address: "0x123",
+			isValid: false,
+		},
+		{
+			address: "FooBar",
+			isValid: false,
+		},
+		{
+			address: "123FooBar",
+			isValid: false,
+		},
+		{
+			address:      "0x1234567890987654321012345678909876543210",
+			isValid:      true,
+			expectedAddr: StringToAddress("0x1234567890987654321012345678909876543210"),
+		},
+		{
+			address:      "0x0000000000000000000000000000000000000000",
+			isValid:      true,
+			expectedAddr: StringToAddress("0x0000000000000000000000000000000000000000"),
+		},
+		{
+			address:      "0x1000000000000000000000000000000000000000",
+			isValid:      true,
+			expectedAddr: StringToAddress("0x0000000000000000000000000000000000000000"),
+		},
 	}
 
 	for _, c := range cases {
-		err := IsValidAddress(c.address)
+		addr, err := IsValidAddress(c.address, true)
 		if c.isValid {
 			require.NoError(t, err)
+			require.Equal(t, StringToAddress(c.address), addr)
 		} else {
 			require.Error(t, err)
+			require.Equal(t, addr, ZeroAddress)
 		}
 	}
 }

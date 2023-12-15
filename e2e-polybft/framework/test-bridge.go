@@ -463,7 +463,6 @@ func (t *TestBridge) premineNativeRootToken(tokenConfig *polybft.TokenConfig,
 			"--premine-amount", premineAmount.String(),
 			"--stake-amount", stakedAmount.String(),
 			"--erc20-token", polybftConfig.Bridge.RootNativeERC20Addr.String(),
-			"--root-erc20-predicate", polybftConfig.Bridge.RootERC20PredicateAddr.String(),
 			"--blade-manager", polybftConfig.Bridge.BladeManagerAddr.String(),
 		}
 

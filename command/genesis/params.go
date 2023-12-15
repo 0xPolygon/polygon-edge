@@ -190,14 +190,11 @@ func (p *genesisParams) validateFlags() error {
 			return err
 		}
 
-		if err := types.IsValidAddress(params.stakeToken); err != nil {
+		var err error
+
+		p.stakeTokenAddr, err = types.IsValidAddress(params.stakeToken, false)
+		if err != nil {
 			return fmt.Errorf("stake token address is not a valid address: %w", err)
-		}
-
-		params.stakeTokenAddr = types.StringToAddress(params.stakeToken)
-
-		if params.stakeTokenAddr == types.ZeroAddress {
-			return errStakeTokenIsZeroAddress
 		}
 	}
 

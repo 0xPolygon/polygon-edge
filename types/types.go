@@ -169,24 +169,27 @@ func FromMerkleToTypesHash(merkleHashes []merkle.Hash) []Hash {
 }
 
 // IsValidAddress checks if provided string is a valid Ethereum address
-func IsValidAddress(address string) error {
+func IsValidAddress(address string, zeroAddressAllowed bool) (Address, error) {
 	// remove 0x prefix if it exists
-	if strings.HasPrefix(address, "0x") {
-		address = address[2:]
-	}
+	address = strings.TrimPrefix(address, "0x")
 
 	// decode the address
 	decodedAddress, err := hex.DecodeString(address)
 	if err != nil {
-		return fmt.Errorf("address %s contains invalid characters", address)
+		return ZeroAddress, fmt.Errorf("address %s contains invalid characters", address)
 	}
 
 	// check if the address has the correct length
 	if len(decodedAddress) != AddressLength {
-		return fmt.Errorf("address %s has invalid length", string(decodedAddress))
+		return ZeroAddress, fmt.Errorf("address %s has invalid length", string(decodedAddress))
 	}
 
-	return nil
+	addr := StringToAddress(address)
+	if !zeroAddressAllowed && addr == ZeroAddress {
+		return ZeroAddress, errors.New("zero address is not allowed")
+	}
+
+	return addr, nil
 }
 
 // UnmarshalText parses a hash in hex syntax.

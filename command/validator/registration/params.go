@@ -34,14 +34,9 @@ func (rp *registerParams) validateFlags() (err error) {
 		return fmt.Errorf("provided value (%d) is less than zero", rp.amountValue)
 	}
 
-	if err := types.IsValidAddress(params.stakeToken); err != nil {
+	rp.stakeTokenAddr, err = types.IsValidAddress(params.stakeToken, false)
+	if err != nil {
 		return fmt.Errorf("stake token address is not a valid address: %w", err)
-	}
-
-	params.stakeTokenAddr = types.StringToAddress(params.stakeToken)
-
-	if params.stakeTokenAddr == types.ZeroAddress {
-		return errStakeTokenIsZeroAddress
 	}
 
 	// validate jsonrpc address

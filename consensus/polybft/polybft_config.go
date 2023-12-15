@@ -32,7 +32,7 @@ var (
 	}
 
 	errInvalidTokenParams = errors.New("native token params were not submitted in proper format " +
-		"(<name:symbol:decimals count>)")
+		"(<name:symbol:decimals count:is minted on the local chain>)")
 )
 
 // PolyBFTConfig is the configuration file for the Polybft consensus protocol.
@@ -61,6 +61,7 @@ type PolyBFTConfig struct {
 	// NativeTokenConfig defines name, symbol and decimal count of the native token
 	NativeTokenConfig *TokenConfig `json:"nativeTokenConfig"`
 
+	// InitialTrieRoot corresponds to pre-existing state root in case data gets migrated from a legacy system
 	InitialTrieRoot types.Hash `json:"initialTrieRoot"`
 
 	// MinValidatorSetSize indicates the minimum size of validator set

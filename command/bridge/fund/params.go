@@ -20,27 +20,32 @@ var (
 )
 
 type fundParams struct {
-	addresses          []string
+	rawAddresses       []string
 	amounts            []string
 	deployerPrivateKey string
 	jsonRPCAddress     string
 
 	amountValues []*big.Int
+	addresses    []types.Address
 }
 
 func (fp *fundParams) validateFlags() error {
-	if len(fp.addresses) == 0 {
+	if len(fp.rawAddresses) == 0 {
 		return bridgeHelper.ErrNoAddressesProvided
 	}
 
-	if len(fp.amounts) != len(fp.addresses) {
+	if len(fp.amounts) != len(fp.rawAddresses) {
 		return bridgeHelper.ErrInconsistentLength
 	}
 
-	for _, addr := range fp.addresses {
-		if err := types.IsValidAddress(addr); err != nil {
+	fp.addresses = make([]types.Address, 0, len(fp.rawAddresses))
+	for _, rawAddr := range fp.rawAddresses {
+		addr, err := types.IsValidAddress(rawAddr, true)
+		if err != nil {
 			return err
 		}
+
+		fp.addresses = append(fp.addresses, addr)
 	}
 
 	fp.amountValues = make([]*big.Int, len(fp.amounts))
