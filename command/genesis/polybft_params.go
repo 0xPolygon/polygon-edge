@@ -606,6 +606,15 @@ func (p *genesisParams) getValidatorAccounts() ([]*validator.GenesisValidator, e
 				}
 			}
 
+			if p.stakeTokenAddr != contracts.NativeERC20TokenContract {
+				s, exists := p.stakeInfos[addr]
+				if !exists {
+					stake = command.DefaultStake
+				} else {
+					stake = s
+				}
+			}
+
 			validators[i] = &validator.GenesisValidator{
 				MultiAddr: parts[0],
 				Address:   addr,

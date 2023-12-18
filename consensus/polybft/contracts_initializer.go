@@ -48,7 +48,7 @@ func initStakeManager(polyBFTConfig PolyBFTConfig, transition *state.Transition)
 			return fmt.Errorf("NativeERC20.approve params encoding failed: %w", err)
 		}
 
-		err = callContract(validator.Address, contracts.NativeERC20TokenContract, input, "NativeERC20.approve", transition)
+		err = callContract(validator.Address, polyBFTConfig.StakeTokenAddr, input, "NativeERC20.approve", transition)
 		if err != nil {
 			return fmt.Errorf("Error while calling contract %w", err)
 		}
@@ -367,6 +367,31 @@ func mintRewardTokensToWallet(polyBFTConfig PolyBFTConfig, transition *state.Tra
 		"RewardToken.mint", transition)
 }
 
+func mintStakeToken(polyBFTConfig PolyBFTConfig, transition *state.Transition) error {
+	if isNativeStakeToken(polyBFTConfig) {
+
+		return nil
+	}
+
+	for _, validator := range polyBFTConfig.InitialValidatorSet {
+		mintFn := contractsapi.MintRootERC20Fn{
+			To:     validator.Address,
+			Amount: validator.Stake,
+		}
+
+		input, err := mintFn.EncodeAbi()
+		if err != nil {
+			return fmt.Errorf("StakeToken.mint params encoding failed: %w", err)
+		}
+
+		if err := callContract(contracts.SystemCaller, polyBFTConfig.StakeTokenAddr, input, "StakeToken.mint", transition); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // approveEpochManagerAsSpender approves EpochManager contract as reward token spender
 // since EpochManager distributes rewards
 func approveEpochManagerAsSpender(polyBFTConfig PolyBFTConfig, transition *state.Transition) error {
@@ -403,4 +428,9 @@ func callContract(from, to types.Address, input []byte, contractName string, tra
 // isNativeRewardToken returns true in case a native token is used as a reward token as well
 func isNativeRewardToken(cfg PolyBFTConfig) bool {
 	return cfg.RewardConfig.TokenAddress == contracts.NativeERC20TokenContract
+}
+
+// isNativeStakeToken return true in case a native token is used for staking
+func isNativeStakeToken(cfg PolyBFTConfig) bool {
+	return cfg.StakeTokenAddr != contracts.NativeERC20TokenContract
 }
