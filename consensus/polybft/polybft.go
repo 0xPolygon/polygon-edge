@@ -204,9 +204,10 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 
 		bridgeCfg := polyBFTConfig.Bridge
 		if bridgeCfg != nil {
-
 			if polyBFTConfig.StakeTokenAddr != contracts.NativeERC20TokenContract {
-				mintStakeToken(polyBFTConfig, transition)
+				if err := mintStakeToken(polyBFTConfig, transition); err != nil {
+					return err
+				}
 			}
 
 			// check if there are Bridge Allow List Admins and Bridge Block List Admins

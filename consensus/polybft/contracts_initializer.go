@@ -369,7 +369,6 @@ func mintRewardTokensToWallet(polyBFTConfig PolyBFTConfig, transition *state.Tra
 
 func mintStakeToken(polyBFTConfig PolyBFTConfig, transition *state.Transition) error {
 	if isNativeStakeToken(polyBFTConfig) {
-
 		return nil
 	}
 
@@ -384,7 +383,8 @@ func mintStakeToken(polyBFTConfig PolyBFTConfig, transition *state.Transition) e
 			return fmt.Errorf("StakeToken.mint params encoding failed: %w", err)
 		}
 
-		if err := callContract(contracts.SystemCaller, polyBFTConfig.StakeTokenAddr, input, "StakeToken.mint", transition); err != nil {
+		if err := callContract(contracts.SystemCaller, polyBFTConfig.StakeTokenAddr,
+			input, "StakeToken.mint", transition); err != nil {
 			return err
 		}
 	}
@@ -432,5 +432,5 @@ func isNativeRewardToken(cfg PolyBFTConfig) bool {
 
 // isNativeStakeToken return true in case a native token is used for staking
 func isNativeStakeToken(cfg PolyBFTConfig) bool {
-	return cfg.StakeTokenAddr != contracts.NativeERC20TokenContract
+	return cfg.StakeTokenAddr == contracts.NativeERC20TokenContract
 }
