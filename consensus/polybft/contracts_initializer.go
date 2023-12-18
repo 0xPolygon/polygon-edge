@@ -48,7 +48,7 @@ func initStakeManager(polyBFTConfig PolyBFTConfig, transition *state.Transition)
 			return fmt.Errorf("NativeERC20.approve params encoding failed: %w", err)
 		}
 
-		err = callContract(validator.Address, polyBFTConfig.StakeTokenAddr, input, "NativeERC20.approve", transition)
+		err = callContract(validator.Address, polyBFTConfig.StakeTokenAddr, input, "StakeToken.approve", transition)
 		if err != nil {
 			return fmt.Errorf("Error while calling contract %w", err)
 		}
@@ -367,8 +367,9 @@ func mintRewardTokensToWallet(polyBFTConfig PolyBFTConfig, transition *state.Tra
 		"RewardToken.mint", transition)
 }
 
+// mintStakeToken mints configured amount of stake token to stake token address
 func mintStakeToken(polyBFTConfig PolyBFTConfig, transition *state.Transition) error {
-	if isNativeStakeToken(polyBFTConfig) {
+	if IsNativeStakeToken(polyBFTConfig.StakeTokenAddr) {
 		return nil
 	}
 
@@ -431,6 +432,6 @@ func isNativeRewardToken(cfg PolyBFTConfig) bool {
 }
 
 // isNativeStakeToken return true in case a native token is used for staking
-func isNativeStakeToken(cfg PolyBFTConfig) bool {
-	return cfg.StakeTokenAddr == contracts.NativeERC20TokenContract
+func IsNativeStakeToken(stakeTokenAddr types.Address) bool {
+	return stakeTokenAddr == contracts.NativeERC20TokenContract
 }

@@ -597,16 +597,7 @@ func (p *genesisParams) getValidatorAccounts() ([]*validator.GenesisValidator, e
 
 			stake := big.NewInt(0)
 
-			if p.nativeTokenConfig.IsMintable {
-				s, exists := p.stakeInfos[addr]
-				if !exists {
-					stake = command.DefaultStake
-				} else {
-					stake = s
-				}
-			}
-
-			if p.stakeTokenAddr != contracts.NativeERC20TokenContract {
+			if p.stakeTokenAddr != contracts.NativeERC20TokenContract || p.nativeTokenConfig.IsMintable {
 				s, exists := p.stakeInfos[addr]
 				if !exists {
 					stake = command.DefaultStake

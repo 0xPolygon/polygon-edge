@@ -204,7 +204,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 
 		bridgeCfg := polyBFTConfig.Bridge
 		if bridgeCfg != nil {
-			if polyBFTConfig.StakeTokenAddr != contracts.NativeERC20TokenContract {
+			if !IsNativeStakeToken(polyBFTConfig.StakeTokenAddr) {
 				if err := mintStakeToken(polyBFTConfig, transition); err != nil {
 					return err
 				}
