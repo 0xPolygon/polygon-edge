@@ -10,6 +10,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -18,47 +19,47 @@ var (
 	allEnabledForks = chain.AllForksEnabled.At(0)
 )
 
-type cases2To1 []struct {
-	a *big.Int
-	b *big.Int
-	c *big.Int
+type twoOperandsArithmetic []struct {
+	a              *big.Int
+	b              *big.Int
+	expectedResult *big.Int
 }
 
-func test2to1(t *testing.T, f instruction, tests cases2To1) {
+func testArithmeticOperation(t *testing.T, f instruction, tests twoOperandsArithmetic) {
 	t.Helper()
 
 	s, closeFn := getState()
 	defer closeFn()
 
 	for _, i := range tests {
-		s.push(i.a)
 		s.push(i.b)
+		s.push(i.a)
 
 		f(s)
 
-		assert.Equal(t, i.c, s.pop())
+		assert.EqualValues(t, i.expectedResult, s.pop())
 	}
 }
 
-type cases2ToBool []struct {
-	a *big.Int
-	b *big.Int
-	c bool
+type twoOperandsLogical []struct {
+	a              *big.Int
+	b              *big.Int
+	expectedResult bool
 }
 
-func test2toBool(t *testing.T, f instruction, tests cases2ToBool) {
+func testLogicalOperation(t *testing.T, f instruction, tests twoOperandsLogical) {
 	t.Helper()
 
 	s, closeFn := getState()
 	defer closeFn()
 
 	for _, i := range tests {
-		s.push(i.a)
 		s.push(i.b)
+		s.push(i.a)
 
 		f(s)
 
-		if i.c {
+		if i.expectedResult {
 			assert.Equal(t, uint64(1), s.pop().Uint64())
 		} else {
 			assert.Equal(t, uint64(0), s.pop().Uint64())
@@ -67,22 +68,80 @@ func test2toBool(t *testing.T, f instruction, tests cases2ToBool) {
 }
 
 func TestAdd(t *testing.T) {
-	test2to1(t, opAdd, cases2To1{
+	testArithmeticOperation(t, opAdd, twoOperandsArithmetic{
 		{one, one, two},
 		{zero, one, one},
 	})
 }
 
+func TestMul(t *testing.T) {
+	testArithmeticOperation(t, opMul, twoOperandsArithmetic{
+		{two, two, big.NewInt(4)},
+		{big.NewInt(3), two, big.NewInt(6)},
+	})
+}
+
+func TestSub(t *testing.T) {
+	testArithmeticOperation(t, opSub, twoOperandsArithmetic{
+		{two, one, one},
+		{two, zero, two},
+	})
+}
+
+func TestPush0(t *testing.T) {
+	t.Run("single push0 success", func(t *testing.T) {
+		s, closeFn := getState()
+		s.config = &allEnabledForks
+		defer closeFn()
+
+		opPush0(s)
+		assert.Equal(t, zero, s.pop())
+	})
+
+	t.Run("single push0 (EIP-3855 disabled)", func(t *testing.T) {
+		s, closeFn := getState()
+		disabledEIP3855Fork := chain.AllForksEnabled.Copy().RemoveFork(chain.EIP3855).At(0)
+		s.config = &disabledEIP3855Fork
+		defer closeFn()
+
+		opPush0(s)
+		assert.Error(t, errOpCodeNotFound, s.err)
+	})
+
+	t.Run("within stack size push0", func(t *testing.T) {
+		s, closeFn := getState()
+		s.config = &allEnabledForks
+		defer closeFn()
+
+		for i := 0; i < stackSize; i++ {
+			opPush0(s)
+			require.NoError(t, s.err)
+		}
+
+		for i := 0; i < stackSize; i++ {
+			require.Equal(t, zero, s.pop())
+		}
+	})
+}
+
 func TestGt(t *testing.T) {
-	test2toBool(t, opGt, cases2ToBool{
+	testLogicalOperation(t, opGt, twoOperandsLogical{
 		{one, one, false},
-		{two, one, false},
+		{one, two, false},
+		{two, one, true},
+	})
+}
+
+func TestLt(t *testing.T) {
+	testLogicalOperation(t, opLt, twoOperandsLogical{
+		{one, one, false},
 		{one, two, true},
+		{two, one, false},
 	})
 }
 
 func TestIsZero(t *testing.T) {
-	test2toBool(t, opIsZero, cases2ToBool{
+	testLogicalOperation(t, opIsZero, twoOperandsLogical{
 		{one, one, false},
 		{zero, zero, true},
 		{two, two, false},
