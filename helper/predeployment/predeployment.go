@@ -11,6 +11,7 @@ import (
 	"github.com/umbracle/ethgo/abi"
 
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state"
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
@@ -171,25 +172,14 @@ func getPredeployAccount(address types.Address, input []byte, chainID int64) (*c
 // GenerateGenesisAccountFromFile generates an account that is going to be directly
 // inserted into state
 func GenerateGenesisAccountFromFile(
-	filepath string,
+	contractArtifact *artifact.Artifact,
 	constructorArgs []string,
 	predeployAddress types.Address,
 	chainID int64,
 ) (*chain.GenesisAccount, error) {
-	// Create the artifact from JSON
-	artifact, err := loadContractArtifact(filepath)
-	if err != nil {
-		return nil, err
-	}
 
-	// Generate the contract ABI object
-	contractABI, err := abi.NewABI(string(artifact.ABI))
-	if err != nil {
-		return nil, fmt.Errorf("unable to create contract ABI, %w", err)
-	}
-
-	finalBytecode := artifact.Bytecode
-	constructorInfo := contractABI.Constructor
+	finalBytecode := contractArtifact.Bytecode
+	constructorInfo := contractArtifact.Abi.Constructor
 
 	if constructorInfo != nil {
 		// Constructor arguments are passed in as an array of values.
@@ -203,13 +193,13 @@ func GenerateGenesisAccountFromFile(
 		// Encode the constructor params
 		constructor, err := abi.Encode(
 			parsedArguments,
-			contractABI.Constructor.Inputs,
+			contractArtifact.Abi.Constructor.Inputs,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("unable to encode constructor arguments, %w", err)
 		}
 
-		finalBytecode = append(artifact.Bytecode, constructor...)
+		finalBytecode = append(contractArtifact.Bytecode, constructor...)
 	}
 
 	return getPredeployAccount(predeployAddress, finalBytecode, chainID)

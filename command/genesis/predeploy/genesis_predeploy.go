@@ -39,8 +39,8 @@ func setFlags(cmd *cobra.Command) {
 	)
 
 	cmd.Flags().StringVar(
-		&params.artifactsPath,
-		artifactsPathFlag,
+		&params.artifactsName,
+		artifactsNameFlag,
 		"",
 		"the path to the contract artifacts JSON",
 	)

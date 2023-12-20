@@ -8,6 +8,8 @@ import (
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/helper/predeployment"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -16,7 +18,7 @@ import (
 const (
 	chainFlag            = "chain"
 	predeployAddressFlag = "predeploy-address"
-	artifactsPathFlag    = "artifacts-path"
+	artifactsNameFlag    = "artifacts-name"
 	constructorArgsPath  = "constructor-args"
 )
 
@@ -36,20 +38,22 @@ type predeployParams struct {
 	genesisPath string
 
 	address         types.Address
-	artifactsPath   string
+	artifactsName   string
 	constructorArgs []string
 
 	genesisConfig *chain.Chain
+
+	contractArtifact *artifact.Artifact
 }
 
 func (p *predeployParams) getRequiredFlags() []string {
 	return []string{
 		predeployAddressFlag,
-		artifactsPathFlag,
+		artifactsNameFlag,
 	}
 }
 
-func (p *predeployParams) initRawParams() error {
+func (p *predeployParams) initRawParams() (err error) {
 	if err := p.initPredeployAddress(); err != nil {
 		return err
 	}
@@ -59,6 +63,10 @@ func (p *predeployParams) initRawParams() error {
 	}
 
 	if err := p.initChain(); err != nil {
+		return err
+	}
+
+	if p.contractArtifact, err = contractsapi.GetArtifactFromArtifactName(p.artifactsName); err != nil {
 		return err
 	}
 
@@ -114,7 +122,7 @@ func (p *predeployParams) updateGenesisConfig() error {
 	}
 
 	predeployAccount, err := predeployment.GenerateGenesisAccountFromFile(
-		p.artifactsPath,
+		p.contractArtifact,
 		p.constructorArgs,
 		p.address,
 		p.genesisConfig.Params.ChainID,

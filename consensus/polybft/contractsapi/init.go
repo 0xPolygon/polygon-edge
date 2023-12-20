@@ -2,6 +2,7 @@ package contractsapi
 
 import (
 	"embed"
+	"fmt"
 	"log"
 	"path"
 
@@ -70,6 +71,59 @@ var (
 	RootERC20              *artifact.Artifact
 	TestSimple             *artifact.Artifact
 	TestRewardToken        *artifact.Artifact
+
+	contractArtifacts = map[string]*artifact.Artifact{
+		"CheckpointManager":               CheckpointManager,
+		"ExitHelper":                      ExitHelper,
+		"StateSender":                     StateSender,
+		"RootERC20Predicate":              RootERC20Predicate,
+		"RootERC721Predicate":             RootERC721Predicate,
+		"RootERC1155Predicate":            RootERC1155Predicate,
+		"ChildMintableERC20Predicate":     ChildMintableERC20Predicate,
+		"ChildMintableERC721Predicate":    ChildMintableERC721Predicate,
+		"ChildMintableERC1155Predicate":   ChildMintableERC1155Predicate,
+		"BLS":                             BLS,
+		"BLS256":                          BLS256,
+		"System":                          System,
+		"Merkle":                          Merkle,
+		"ChildValidatorSet":               ChildValidatorSet,
+		"NativeERC20":                     NativeERC20,
+		"NativeERC20Mintable":             NativeERC20Mintable,
+		"StateReceiver":                   StateReceiver,
+		"ChildERC20":                      ChildERC20,
+		"ChildERC20Predicate":             ChildERC20Predicate,
+		"ChildERC20PredicateACL":          ChildERC20PredicateACL,
+		"RootMintableERC20Predicate":      RootMintableERC20Predicate,
+		"RootMintableERC20PredicateACL":   RootMintableERC20PredicateACL,
+		"ChildERC721":                     ChildERC721,
+		"ChildERC721Predicate":            ChildERC721Predicate,
+		"ChildERC721PredicateACL":         ChildERC721PredicateACL,
+		"RootMintableERC721Predicate":     RootMintableERC721Predicate,
+		"RootMintableERC721PredicateACL":  RootMintableERC721PredicateACL,
+		"ChildERC1155":                    ChildERC1155,
+		"ChildERC1155Predicate":           ChildERC1155Predicate,
+		"ChildERC1155PredicateACL":        ChildERC1155PredicateACL,
+		"RootMintableERC1155Predicate":    RootMintableERC1155Predicate,
+		"RootMintableERC1155PredicateACL": RootMintableERC1155PredicateACL,
+		"L2StateSender":                   L2StateSender,
+		"CustomSupernetManager":           CustomSupernetManager,
+		"StakeManager":                    StakeManager,
+		"EpochManager":                    EpochManager,
+		"RootERC721":                      RootERC721,
+		"RootERC1155":                     RootERC1155,
+		"EIP1559Burn":                     EIP1559Burn,
+		"BladeManager":                    BladeManager,
+		"GenesisProxy":                    GenesisProxy,
+		"TransparentUpgradeableProxy":     TransparentUpgradeableProxy,
+		"NetworkParams":                   NetworkParams,
+		"ForkParams":                      ForkParams,
+		"ChildGovernor":                   ChildGovernor,
+		"ChildTimelock":                   ChildTimelock,
+		"TestWriteBlockMetadata":          TestWriteBlockMetadata,
+		"RootERC20":                       RootERC20,
+		"TestSimple":                      TestSimple,
+		"TestRewardToken":                 TestRewardToken,
+	}
 )
 
 func init() {
@@ -323,4 +377,12 @@ func readTestContractContent(contractFileName string) []byte {
 	}
 
 	return contractRaw
+}
+
+func GetArtifactFromArtifactName(artifactName string) (*artifact.Artifact, error) {
+	if contractArtifact, ok := contractArtifacts[artifactName]; ok {
+		return contractArtifact, nil
+	}
+
+	return nil, fmt.Errorf("")
 }

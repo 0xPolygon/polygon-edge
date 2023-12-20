@@ -115,6 +115,7 @@ type TestClusterConfig struct {
 	SecretsCallback      func([]types.Address, *TestClusterConfig)
 	BladeAdmin           string
 	RewardWallet         string
+	Predeploy            bool
 
 	ContractDeployerAllowListAdmin   []types.Address
 	ContractDeployerAllowListEnabled []types.Address
@@ -456,6 +457,12 @@ func WithRewardWallet(rewardWallet string) ClusterOption {
 	}
 }
 
+func WithPredeploy() ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.Predeploy = true
+	}
+}
+
 func isTrueEnv(e string) bool {
 	return strings.ToLower(os.Getenv(e)) == "true"
 }
@@ -700,6 +707,17 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		args = append(args, "--proxy-contracts-admin", proxyAdminAddr)
 
 		// run genesis command with all the arguments
+		err = cluster.cmdRun(args...)
+		require.NoError(t, err)
+	}
+
+	if config.Predeploy {
+		// run predeploy genesis population
+		args := []string{
+			"predeploy",
+			"--predeploy-address", "0x1046",
+			"--artifacts-name", "RootERC20",
+		}
 		err = cluster.cmdRun(args...)
 		require.NoError(t, err)
 	}
