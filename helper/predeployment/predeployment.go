@@ -177,7 +177,6 @@ func GenerateGenesisAccountFromFile(
 	predeployAddress types.Address,
 	chainID int64,
 ) (*chain.GenesisAccount, error) {
-
 	finalBytecode := contractArtifact.Bytecode
 	constructorInfo := contractArtifact.Abi.Constructor
 
