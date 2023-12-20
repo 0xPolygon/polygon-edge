@@ -3,14 +3,8 @@ name: Load Test
 on:  # yamllint disable-line rule:truthy
   workflow_dispatch:
     inputs:
-      runner:
-        description: The runner to execute on
-        default: 'ubuntu-latest'
-        type: choice
-        options:
-          - ubuntu-latest
-          - loadtester
       environment:
+        default: devnet
         description: The environment to run against
         required: false
         type: environment
@@ -26,14 +20,12 @@ on:  # yamllint disable-line rule:truthy
   workflow_call:
     inputs:
       environment:
+        default: devnet
         description: The environment to run against
         type: string
         required: true
-      runner:
-        required: true
-        type: string
-        description: The runner label to use
       scenario:
+        default: 'simple'
         required: true
         description: The mode for the stress test
         type: string
@@ -47,43 +39,63 @@ on:  # yamllint disable-line rule:truthy
         description: "Loadtest output"
         value: ${{ jobs.run_k6.outputs.loadtest_output_success }}
     secrets:
-      SLACK_PERFORMANCE_WEBHOOK_URL:
+      AWS_REGION:
         required: true
-      DD_API_KEY:
+      AWS_ROLE_ARN:
+        required: true
+      LOADTESTER_AWS_SUBNET_ID:
+        required: true
+      LOADTESTER_AWS_SG_ID:
+        required: true
+      LOADTESTER_INSTANCE_TYPE:
+        required: true
+      LOADTESTER_AMI:
         required: true
       LOADTEST_RPC_URL:
         required: true
       LOADTEST_MNEMONIC:
         required: true
+      SLACK_PERFORMANCE_WEBHOOK_URL:
+        required: true
+      PTA:
+        required: true
 
 jobs:
+  build:
+    environment: ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    outputs:
+      label: ${{ steps.start-loadtester.outputs.label }}
+      ec2-instance-id: ${{ steps.start-loadtester.outputs.ec2-instance-id }}
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Start loadtester
+        id: start-loadtester
+        uses: machulav/ec2-github-runner@v2
+        with:
+          mode: start
+          github-token: ${{ secrets.PTA }}
+          ec2-image-id: ${{ secrets.LOADTESTER_AMI }}
+          ec2-instance-type: ${{ secrets.LOADTESTER_INSTANCE_TYPE }}
+          subnet-id: ${{ secrets.LOADTESTER_AWS_SUBNET_ID }}
+          security-group-id: ${{ secrets.LOADTESTER_AWS_SG_ID }}
   run_k6:
     environment: ${{ inputs.environment }}
-    runs-on: "${{ inputs.runner }}"
+    needs: build
+    runs-on: "${{ needs.build.outputs.label }}"
     outputs:
       loadtest_output_success: ${{ steps.run_k6_success.outputs.test_output }}
     steps:
-      - name: Install Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: 1.20.x
-
       - name: Checkout code
         uses: actions/checkout@v3
 
       - id: random-number-generator
         run: echo "random-number=$(echo $RANDOM)" >> $GITHUB_OUTPUT
         shell: bash
-      
-      - uses: datadog/agent-github-action@v1.3
-        with:
-          api_key: ${{ secrets.DD_API_KEY }}
-          container_name: "datadog-agent-${{ steps.random-number-generator.outputs.random-number }}"
-      
-      - name: Install xk6
-        run: |
-          go install go.k6.io/xk6/cmd/xk6@latest
-          xk6 build --with github.com/distribworks/xk6-ethereum@v1.0.3
       
       - name: Install JQ
         run: |
@@ -111,7 +123,7 @@ jobs:
       - id: k6
         name: Run scenario
         run: |
-          ./k6 run --out statsd loadtest/scenarios/${{ inputs.scenario }}.js
+          /home/ubuntu/k6 run --out statsd loadtest/scenarios/${{ inputs.scenario }}.js
           echo "tps_avg=$(cat summary.json | jq -r '.metrics.ethereum_tps.values.avg')" >> $GITHUB_OUTPUT
           echo "tps_max=$(cat summary.json | jq -r '.metrics.ethereum_tps.values.max')" >> $GITHUB_OUTPUT
           echo "iterations=$(cat summary.json | jq -r '.metrics.iterations.values.count')" >> $GITHUB_OUTPUT
@@ -139,40 +151,74 @@ jobs:
         with:
           payload: |
             {
-              "blocks": [
+              "attachments": [
                 {
-                  "type": "header",
-                  "text": {
-                    "type": "plain_text",
-                    "text": "K6 Loadtest Results"
-                  }
-                },
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "*Scenario*: `${{ inputs.scenario }}`\n *Average TPS*: `${{ steps.k6.outputs.tps_avg }}`\n*Max TPS*: `${{ steps.k6.outputs.tps_max }}`\n*Transactions*: `${{ steps.k6.outputs.iterations }}`\n*Block Number*: `${{ steps.k6.outputs.block }}`\n*Time to Mine*: `${{ steps.k6.outputs.ttm }}`\n*Average Gas Used*: `${{ steps.k6.outputs.gas_avg }}`\n*Max Gas Used*: `${{ steps.k6.outputs.gas_max }}`"
-                  }
-                },
-                {
-                  "type": "divider"
-                },
-                {
-                  "type": "context",
-                  "elements": [
-                      {
-                        "type": "mrkdwn",
-                        "text": "Environment: `${{ inputs.environment }}`"
-                      },
-                      {
-                        "type": "mrkdwn",
-                        "text": "JSON-RPC Endpoint: ${{ steps.set_rpc_url.outputs.rpc_url }}"
-                      },
-                      {
-                        "type": "mrkdwn",
-                        "text": "Workflow: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Results>"
+                  "color": "#03C03C",
+                  "blocks": [
+                    {
+                      "type": "header",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "K6 Loadtest ${{ inputs.scenario }} :zap:"
                       }
-                    ]
-                  }
-                ]
-              }
+                    },
+                    {
+                      "type": "context",
+                      "elements": [
+                        {
+                          "type": "mrkdwn",
+                          "text": "Environment: *${{ inputs.environment }}*"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "context",
+                      "elements": [
+                        {
+                          "type": "mrkdwn",
+                          "text": "JSON-RPC: *<${{ steps.set_rpc_url.outputs.rpc_url }}|Open URL>*"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "actions",
+                      "elements": [
+                        {
+                          "type": "button",
+                          "text": {
+                            "type": "plain_text",
+                            "text": "View workflow run"
+                          },
+                          "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "section",
+                      "text": {
+                        "type": "mrkdwn",
+                        "text": "Average TPS: *${{ steps.k6.outputs.tps_avg }}*\nMax TPS: *${{ steps.k6.outputs.tps_max }}*\nTransactions: *${{ steps.k6.outputs.iterations }}*\nBlock Number: *${{ steps.k6.outputs.block }}*\nTime to Mine: *${{ steps.k6.outputs.ttm }}*\nAverage Gas Used: *${{ steps.k6.outputs.gas_avg }}*\nMax Gas Used: *${{ steps.k6.outputs.gas_max }}*"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+  destroy:
+    environment: ${{ inputs.environment }}
+    needs: [build, run_k6]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Stop loadtester
+        uses: machulav/ec2-github-runner@v2
+        with:
+          mode: stop
+          github-token: ${{ secrets.PTA }}
+          label: ${{ needs.build.outputs.label }}
+          ec2-instance-id: ${{ needs.build.outputs.ec2-instance-id }}

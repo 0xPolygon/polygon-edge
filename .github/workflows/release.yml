@@ -59,4 +59,4 @@ jobs:
           GOLANG_CROSS_VERSION: v1.20.5
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.prepare.outputs.tag_name }}
-          SLACK_WEBHOOK: ${{ secrets.SLACK_EDGE_GITHUB_URL }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_BLADE_GITHUB_URL }}

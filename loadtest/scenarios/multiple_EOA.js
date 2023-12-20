@@ -23,7 +23,7 @@ export const options = {
 };
 
 // You can use an existing premined account
-const root_address = "0x1AB8C3df809b85012a009c0264eb92dB04eD6EFa";
+const root_address = "0x85da99c8a7c2c95964c8efd687e95e632fc533d6";
 const mnemonic = __ENV.LOADTEST_MNEMONIC;
 let rpc_url = __ENV.RPC_URL;
 if (rpc_url == undefined) {
