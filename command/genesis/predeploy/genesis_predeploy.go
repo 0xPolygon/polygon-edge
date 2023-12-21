@@ -45,12 +45,21 @@ func setFlags(cmd *cobra.Command) {
 		"the path to the contract artifacts JSON",
 	)
 
+	cmd.Flags().StringVar(
+		&params.artifactsPath,
+		artifactsPathFlag,
+		"",
+		"the path to the contract artifacts JSON",
+	)
+
 	cmd.Flags().StringArrayVar(
 		&params.constructorArgs,
 		constructorArgsPath,
 		[]string{},
 		"the constructor arguments, if any",
 	)
+
+	cmd.MarkFlagsMutuallyExclusive(artifactsNameFlag, artifactsPathFlag)
 }
 
 func runPreRun(_ *cobra.Command, _ []string) error {

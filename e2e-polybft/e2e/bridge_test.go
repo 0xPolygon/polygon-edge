@@ -1452,6 +1452,11 @@ func TestE2E_Bridge_NonNative(t *testing.T) {
 		stateSyncedLogsCount = 2
 	)
 
+	var (
+		premineBalance = ethgo.Ether(2e6) // 2M native tokens (so that we have enough balance to fund new validator)
+		stakeAmount    = ethgo.Ether(500)
+	)
+
 	receiverKeys := make([]string, transfersCount)
 	receivers := make([]string, transfersCount)
 	receiversAddrs := make([]types.Address, transfersCount)
@@ -1480,8 +1485,9 @@ func TestE2E_Bridge_NonNative(t *testing.T) {
 		framework.WithPremine(receiversAddrs...),
 		framework.WithBridge(),
 		framework.WithSecretsCallback(func(addrs []types.Address, tcc *framework.TestClusterConfig) {
-			for i := 0; i < len(addrs); i++ {
-				tcc.StakeAmounts = append(tcc.StakeAmounts, ethgo.Ether(10))
+			for _, addr := range addrs {
+				tcc.Premine = append(tcc.Premine, fmt.Sprintf("%s:%s", addr, premineBalance))
+				tcc.StakeAmounts = append(tcc.StakeAmounts, stakeAmount)
 			}
 		}),
 		framework.WithPredeploy(),
@@ -1490,7 +1496,39 @@ func TestE2E_Bridge_NonNative(t *testing.T) {
 
 	cluster.WaitForReady(t)
 
+	firstValidator := cluster.Servers[0]
+
+	validatorAcc, err := validatorHelper.GetAccountFromDir(firstValidator.DataDir())
+	require.NoError(t, err)
+
+	relayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(firstValidator.JSONRPCAddr()))
+	require.NoError(t, err)
+
 	polybftCfg, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
 	require.NoError(t, err)
-	
+
+	firstValidatorInfo, err := validatorHelper.GetValidatorInfo(validatorAcc.Ecdsa.Address(), relayer)
+	require.NoError(t, err)
+	require.True(t, firstValidatorInfo.Stake.Cmp(stakeAmount) == 0)
+
+	cluster.WaitForBlock(epochSize*1, 1*time.Minute)
+
+	require.NoError(t, firstValidator.Stake(polybftCfg, big.NewInt(1000), types.ZeroAddress))
+
+	cluster.WaitForBlock(epochSize*3, 90*time.Second)
+
+	updatedStakeAmount := big.NewInt(0)
+
+	firstValidatorInfo, err = validatorHelper.GetValidatorInfo(validatorAcc.Ecdsa.Address(), relayer)
+	require.NoError(t, err)
+	require.True(t, firstValidatorInfo.Stake.Cmp(updatedStakeAmount.Add(stakeAmount, big.NewInt(1000))) == 0)
+
+	require.NoError(t, firstValidator.Unstake(big.NewInt(1000)))
+
+	cluster.WaitForBlock(epochSize*4, 30*time.Second)
+
+	firstValidatorInfo, err = validatorHelper.GetValidatorInfo(validatorAcc.Ecdsa.Address(), relayer)
+	require.NoError(t, err)
+	require.True(t, firstValidatorInfo.Stake.Cmp(stakeAmount) == 0)
+
 }

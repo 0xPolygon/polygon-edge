@@ -695,7 +695,7 @@ func TestE2E_Consensus_ChangeVotingPowerByStakingPendingRewards(t *testing.T) {
 		require.NoError(t, validatorSrv.WithdrawRewards())
 
 		// stake withdrawable rewards (since rewards are in native erc20 token in this test)
-		require.NoError(t, validatorSrv.Stake(polybftCfg, validator.WithdrawableRewards))
+		require.NoError(t, validatorSrv.Stake(polybftCfg, validator.WithdrawableRewards, types.ZeroAddress))
 	})
 
 	queryValidators(func(idx int, validator *polybft.ValidatorInfo) {

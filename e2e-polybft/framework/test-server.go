@@ -232,13 +232,17 @@ func (t *TestServer) RootchainFundFor(accounts []types.Address, amounts []*big.I
 }
 
 // Stake stakes given amount to validator account encapsulated by given server instance
-func (t *TestServer) Stake(polybftConfig polybft.PolyBFTConfig, amount *big.Int) error {
+func (t *TestServer) Stake(polybftConfig polybft.PolyBFTConfig, amount *big.Int, stakeTokenAddr types.Address) error {
 	args := []string{
 		"validator",
 		"stake",
 		"--jsonrpc", t.JSONRPCAddr(),
 		"--" + polybftsecrets.AccountDirFlag, t.config.DataDir,
 		"--amount", amount.String(),
+	}
+
+	if stakeTokenAddr != types.ZeroAddress {
+		args = append(args, "--stake-token", types.AddressToString(stakeTokenAddr))
 	}
 
 	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("stake"))

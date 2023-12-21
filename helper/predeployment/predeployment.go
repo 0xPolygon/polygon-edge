@@ -172,13 +172,36 @@ func getPredeployAccount(address types.Address, input []byte, chainID int64) (*c
 // GenerateGenesisAccountFromFile generates an account that is going to be directly
 // inserted into state
 func GenerateGenesisAccountFromFile(
-	contractArtifact *artifact.Artifact,
+	filepath string,
+	conArtifact *artifact.Artifact,
 	constructorArgs []string,
 	predeployAddress types.Address,
 	chainID int64,
 ) (*chain.GenesisAccount, error) {
-	finalBytecode := contractArtifact.Bytecode
-	constructorInfo := contractArtifact.Abi.Constructor
+	var finalBytecode []byte
+	var constructorInfo *abi.Method
+	var contractABI *abi.ABI
+
+	if filepath == "" {
+		finalBytecode = conArtifact.Bytecode
+		constructorInfo = conArtifact.Abi.Constructor
+		contractABI = conArtifact.Abi
+	} else {
+		// Create the artifact from JSON
+		artifact, err := loadContractArtifact(filepath)
+		if err != nil {
+			return nil, err
+		}
+
+		// Generate the contract ABI object
+		contractABI, err = abi.NewABI(string(artifact.ABI))
+		if err != nil {
+			return nil, fmt.Errorf("unable to create contract ABI, %w", err)
+		}
+
+		finalBytecode = artifact.Bytecode
+		constructorInfo = contractABI.Constructor
+	}
 
 	if constructorInfo != nil {
 		// Constructor arguments are passed in as an array of values.
@@ -192,13 +215,13 @@ func GenerateGenesisAccountFromFile(
 		// Encode the constructor params
 		constructor, err := abi.Encode(
 			parsedArguments,
-			contractArtifact.Abi.Constructor.Inputs,
+			contractABI.Constructor.Inputs,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("unable to encode constructor arguments, %w", err)
 		}
 
-		finalBytecode = append(contractArtifact.Bytecode, constructor...)
+		finalBytecode = append(conArtifact.Bytecode, constructor...)
 	}
 
 	return getPredeployAccount(predeployAddress, finalBytecode, chainID)

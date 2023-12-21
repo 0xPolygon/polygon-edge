@@ -19,6 +19,7 @@ const (
 	chainFlag            = "chain"
 	predeployAddressFlag = "predeploy-address"
 	artifactsNameFlag    = "artifacts-name"
+	artifactsPathFlag    = "artifacts-path"
 	constructorArgsPath  = "constructor-args"
 )
 
@@ -39,6 +40,7 @@ type predeployParams struct {
 
 	address         types.Address
 	artifactsName   string
+	artifactsPath   string
 	constructorArgs []string
 
 	genesisConfig *chain.Chain
@@ -122,6 +124,7 @@ func (p *predeployParams) updateGenesisConfig() error {
 	}
 
 	predeployAccount, err := predeployment.GenerateGenesisAccountFromFile(
+		p.artifactsPath,
 		p.contractArtifact,
 		p.constructorArgs,
 		p.address,

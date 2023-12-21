@@ -17,10 +17,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
+	cmdHelper "github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -115,7 +118,7 @@ type TestClusterConfig struct {
 	SecretsCallback      func([]types.Address, *TestClusterConfig)
 	BladeAdmin           string
 	RewardWallet         string
-	Predeploy            bool
+	PredeployNonNative   bool
 
 	ContractDeployerAllowListAdmin   []types.Address
 	ContractDeployerAllowListEnabled []types.Address
@@ -459,7 +462,7 @@ func WithRewardWallet(rewardWallet string) ClusterOption {
 
 func WithPredeploy() ClusterOption {
 	return func(h *TestClusterConfig) {
-		h.Predeploy = true
+		h.PredeployNonNative = true
 	}
 }
 
@@ -711,15 +714,26 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		require.NoError(t, err)
 	}
 
-	if config.Predeploy {
+	if config.PredeployNonNative {
 		// run predeploy genesis population
 		args := []string{
-			"predeploy",
-			"--predeploy-address", "0x1046",
+			"genesis", "predeploy",
+			"--predeploy-address", contracts.ERC20Contract.String(),
 			"--artifacts-name", "RootERC20",
+			"--chain", genesisPath,
 		}
 		err = cluster.cmdRun(args...)
 		require.NoError(t, err)
+
+		chainConfig, err := chain.ImportFromFile(genesisPath)
+		if err != nil {
+			require.NoError(t, err)
+		}
+		chainConfig.Genesis.StakeTokenAddr = contracts.ERC20Contract
+
+		if err := cmdHelper.WriteGenesisConfigToDisk(chainConfig, genesisPath); err != nil {
+			require.NoError(t, err)
+		}
 	}
 
 	if cluster.Config.HasBridge {

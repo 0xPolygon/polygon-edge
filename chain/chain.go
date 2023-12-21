@@ -61,6 +61,8 @@ type Genesis struct {
 	Number     uint64     `json:"number"`
 	GasUsed    uint64     `json:"gasUsed"`
 	ParentHash types.Hash `json:"parentHash"`
+
+	StakeTokenAddr types.Address `json:"stakeTokenAddr"`
 }
 
 // GenesisHeader converts the initially defined genesis struct to a header
