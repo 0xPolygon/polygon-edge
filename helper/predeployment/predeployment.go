@@ -118,7 +118,8 @@ func getModifiedStorageMap(radix *state.Txn, address types.Address) map[types.Ha
 	return storageMap
 }
 
-func getPredeployAccount(address types.Address, input []byte, chainID int64, deployer types.Address) (*chain.GenesisAccount, error) {
+func getPredeployAccount(address types.Address, input []byte,
+	chainID int64, deployer types.Address) (*chain.GenesisAccount, error) {
 	// Create an instance of the state
 	st := itrie.NewState(itrie.NewMemoryStorage())
 
@@ -179,6 +180,7 @@ func GenerateGenesisAccountFromFile(
 	chainID int64,
 	deployer types.Address,
 ) (*chain.GenesisAccount, error) {
+
 	var finalBytecode []byte
 	var constructorInfo *abi.Method
 	var contractABI *abi.ABI

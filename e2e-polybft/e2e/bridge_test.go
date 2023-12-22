@@ -1531,11 +1531,11 @@ func TestE2E_Bridge_NonNative(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, firstValidatorInfo.Stake.Cmp(stakeAmount) == 0)
 
-	cluster.WaitForBlock(epochSize*1, 1*time.Minute)
+	require.NoError(t, cluster.WaitForBlock(epochSize*1, 1*time.Minute))
 
 	require.NoError(t, firstValidator.Stake(polybftCfg, big.NewInt(1000), contracts.ERC20Contract))
 
-	cluster.WaitForBlock(epochSize*3, 90*time.Second)
+	require.NoError(t, cluster.WaitForBlock(epochSize*3, 90*time.Second))
 
 	updatedStakeAmount := big.NewInt(0)
 
@@ -1545,10 +1545,9 @@ func TestE2E_Bridge_NonNative(t *testing.T) {
 
 	require.NoError(t, firstValidator.Unstake(big.NewInt(1000)))
 
-	cluster.WaitForBlock(epochSize*4, 30*time.Second)
+	require.NoError(t, cluster.WaitForBlock(epochSize*4, 30*time.Second))
 
 	firstValidatorInfo, err = validatorHelper.GetValidatorInfo(validatorAcc.Ecdsa.Address(), relayer)
 	require.NoError(t, err)
 	require.True(t, firstValidatorInfo.Stake.Cmp(stakeAmount) == 0)
-
 }

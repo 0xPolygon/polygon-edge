@@ -386,5 +386,5 @@ func GetArtifactFromArtifactName(artifactName string) (*artifact.Artifact, error
 		return contractArtifact, nil
 	}
 
-	return nil, fmt.Errorf("Can't find artifact")
+	return nil, fmt.Errorf("can't find artifact")
 }
