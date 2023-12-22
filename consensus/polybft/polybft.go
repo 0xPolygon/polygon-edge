@@ -182,11 +182,6 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			return err
 		}
 
-		// initialize StakeManager SC
-		if err = initStakeManager(polyBFTConfig, transition); err != nil {
-			return err
-		}
-
 		// approve EpochManager
 		if err = approveEpochManagerAsSpender(polyBFTConfig, transition); err != nil {
 			return err
@@ -202,14 +197,19 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			return err
 		}
 
+		if !IsNativeStakeToken(polyBFTConfig.StakeTokenAddr) && polyBFTConfig.Bridge != nil {
+			if err := mintStakeToken(polyBFTConfig, transition); err != nil {
+				return err
+			}
+		}
+
+		// initialize StakeManager SC
+		if err = initStakeManager(polyBFTConfig, transition); err != nil {
+			return err
+		}
+
 		bridgeCfg := polyBFTConfig.Bridge
 		if bridgeCfg != nil {
-			if !IsNativeStakeToken(polyBFTConfig.StakeTokenAddr) {
-				if err := mintStakeToken(polyBFTConfig, transition); err != nil {
-					return err
-				}
-			}
-
 			// check if there are Bridge Allow List Admins and Bridge Block List Admins
 			// and if there are, get the first address as the Admin
 			bridgeAllowListAdmin := types.ZeroAddress

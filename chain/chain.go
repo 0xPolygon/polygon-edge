@@ -114,18 +114,19 @@ func (g *Genesis) Hash() types.Hash {
 // MarshalJSON implements the json interface
 func (g *Genesis) MarshalJSON() ([]byte, error) {
 	type Genesis struct {
-		Nonce      string                      `json:"nonce"`
-		Timestamp  *string                     `json:"timestamp,omitempty"`
-		ExtraData  *string                     `json:"extraData,omitempty"`
-		GasLimit   *string                     `json:"gasLimit,omitempty"`
-		Difficulty *string                     `json:"difficulty,omitempty"`
-		Mixhash    types.Hash                  `json:"mixHash"`
-		Coinbase   types.Address               `json:"coinbase"`
-		Alloc      *map[string]*GenesisAccount `json:"alloc,omitempty"`
-		Number     *string                     `json:"number,omitempty"`
-		GasUsed    *string                     `json:"gasUsed,omitempty"`
-		ParentHash types.Hash                  `json:"parentHash"`
-		BaseFee    *string                     `json:"baseFee"`
+		Nonce          string                      `json:"nonce"`
+		Timestamp      *string                     `json:"timestamp,omitempty"`
+		ExtraData      *string                     `json:"extraData,omitempty"`
+		GasLimit       *string                     `json:"gasLimit,omitempty"`
+		Difficulty     *string                     `json:"difficulty,omitempty"`
+		Mixhash        types.Hash                  `json:"mixHash"`
+		Coinbase       types.Address               `json:"coinbase"`
+		Alloc          *map[string]*GenesisAccount `json:"alloc,omitempty"`
+		Number         *string                     `json:"number,omitempty"`
+		GasUsed        *string                     `json:"gasUsed,omitempty"`
+		ParentHash     types.Hash                  `json:"parentHash"`
+		BaseFee        *string                     `json:"baseFee"`
+		StakeTokenAddr types.Address               `json:"stakeTokenAddr"`
 	}
 
 	var enc Genesis
@@ -140,6 +141,7 @@ func (g *Genesis) MarshalJSON() ([]byte, error) {
 
 	enc.Mixhash = g.Mixhash
 	enc.Coinbase = g.Coinbase
+	enc.StakeTokenAddr = g.StakeTokenAddr
 
 	if g.Alloc != nil {
 		alloc := make(map[string]*GenesisAccount, len(g.Alloc))
@@ -160,18 +162,19 @@ func (g *Genesis) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON implements the json interface
 func (g *Genesis) UnmarshalJSON(data []byte) error {
 	type Genesis struct {
-		Nonce      *string                    `json:"nonce"`
-		Timestamp  *string                    `json:"timestamp"`
-		ExtraData  *string                    `json:"extraData"`
-		GasLimit   *string                    `json:"gasLimit"`
-		Difficulty *string                    `json:"difficulty"`
-		Mixhash    *types.Hash                `json:"mixHash"`
-		Coinbase   *types.Address             `json:"coinbase"`
-		Alloc      map[string]*GenesisAccount `json:"alloc"`
-		Number     *string                    `json:"number"`
-		GasUsed    *string                    `json:"gasUsed"`
-		ParentHash *types.Hash                `json:"parentHash"`
-		BaseFee    *string                    `json:"baseFee"`
+		Nonce          *string                    `json:"nonce"`
+		Timestamp      *string                    `json:"timestamp"`
+		ExtraData      *string                    `json:"extraData"`
+		GasLimit       *string                    `json:"gasLimit"`
+		Difficulty     *string                    `json:"difficulty"`
+		Mixhash        *types.Hash                `json:"mixHash"`
+		Coinbase       *types.Address             `json:"coinbase"`
+		Alloc          map[string]*GenesisAccount `json:"alloc"`
+		Number         *string                    `json:"number"`
+		GasUsed        *string                    `json:"gasUsed"`
+		ParentHash     *types.Hash                `json:"parentHash"`
+		BaseFee        *string                    `json:"baseFee"`
+		StakeTokenAddr *types.Address             `json:"stakeTokenAddr"`
 	}
 
 	var dec Genesis
@@ -229,6 +232,10 @@ func (g *Genesis) UnmarshalJSON(data []byte) error {
 
 	if dec.Coinbase != nil {
 		g.Coinbase = *dec.Coinbase
+	}
+
+	if dec.StakeTokenAddr != nil {
+		g.StakeTokenAddr = *dec.StakeTokenAddr
 	}
 
 	if dec.Alloc != nil {

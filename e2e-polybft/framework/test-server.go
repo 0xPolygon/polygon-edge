@@ -242,7 +242,7 @@ func (t *TestServer) Stake(polybftConfig polybft.PolyBFTConfig, amount *big.Int,
 	}
 
 	if stakeTokenAddr != types.ZeroAddress {
-		args = append(args, "--stake-token", types.AddressToString(stakeTokenAddr))
+		args = append(args, "--stake-token", stakeTokenAddr.String())
 	}
 
 	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("stake"))

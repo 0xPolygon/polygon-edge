@@ -17,10 +17,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
-	cmdHelper "github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
@@ -709,6 +707,10 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		}
 		args = append(args, "--proxy-contracts-admin", proxyAdminAddr)
 
+		if config.PredeployNonNative {
+			args = append(args, "--stake-token", contracts.ERC20Contract.String())
+		}
+
 		// run genesis command with all the arguments
 		err = cluster.cmdRun(args...)
 		require.NoError(t, err)
@@ -725,15 +727,15 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		err = cluster.cmdRun(args...)
 		require.NoError(t, err)
 
-		chainConfig, err := chain.ImportFromFile(genesisPath)
-		if err != nil {
-			require.NoError(t, err)
-		}
-		chainConfig.Genesis.StakeTokenAddr = contracts.ERC20Contract
+		/* 		chainConfig, err := chain.ImportFromFile(genesisPath)
+		   		if err != nil {
+		   			require.NoError(t, err)
+		   		}
+		   		chainConfig.Genesis.StakeTokenAddr = contracts.ERC20Contract
 
-		if err := cmdHelper.WriteGenesisConfigToDisk(chainConfig, genesisPath); err != nil {
-			require.NoError(t, err)
-		}
+		   		if err := cmdHelper.WriteGenesisConfigToDisk(chainConfig, genesisPath); err != nil {
+		   			require.NoError(t, err)
+		   		} */
 	}
 
 	if cluster.Config.HasBridge {

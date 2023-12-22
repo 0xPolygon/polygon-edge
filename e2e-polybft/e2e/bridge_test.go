@@ -1457,6 +1457,9 @@ func TestE2E_Bridge_NonNative(t *testing.T) {
 		stakeAmount    = ethgo.Ether(500)
 	)
 
+	minter, err := wallet.GenerateKey()
+	require.NoError(t, err)
+
 	receiverKeys := make([]string, transfersCount)
 	receivers := make([]string, transfersCount)
 	receiversAddrs := make([]types.Address, transfersCount)
@@ -1482,8 +1485,8 @@ func TestE2E_Bridge_NonNative(t *testing.T) {
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithNumBlockConfirmations(0),
 		framework.WithEpochSize(epochSize),
-		framework.WithPremine(receiversAddrs...),
 		framework.WithBridge(),
+		framework.WithBladeAdmin(minter.Address().String()),
 		framework.WithSecretsCallback(func(addrs []types.Address, tcc *framework.TestClusterConfig) {
 			for _, addr := range addrs {
 				tcc.Premine = append(tcc.Premine, fmt.Sprintf("%s:%s", addr, premineBalance))
@@ -1513,7 +1516,7 @@ func TestE2E_Bridge_NonNative(t *testing.T) {
 
 	cluster.WaitForBlock(epochSize*1, 1*time.Minute)
 
-	require.NoError(t, firstValidator.Stake(polybftCfg, big.NewInt(1000), types.ZeroAddress))
+	require.NoError(t, firstValidator.Stake(polybftCfg, big.NewInt(1000), contracts.ERC20Contract))
 
 	cluster.WaitForBlock(epochSize*3, 90*time.Second)
 
