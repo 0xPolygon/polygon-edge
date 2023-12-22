@@ -727,16 +727,6 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 
 		err = cluster.cmdRun(args...)
 		require.NoError(t, err)
-
-		/* 		chainConfig, err := chain.ImportFromFile(genesisPath)
-		   		if err != nil {
-		   			require.NoError(t, err)
-		   		}
-		   		chainConfig.Genesis.StakeTokenAddr = contracts.ERC20Contract
-
-		   		if err := cmdHelper.WriteGenesisConfigToDisk(chainConfig, genesisPath); err != nil {
-		   			require.NoError(t, err)
-		   		} */
 	}
 
 	if cluster.Config.HasBridge {

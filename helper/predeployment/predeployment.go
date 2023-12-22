@@ -180,9 +180,10 @@ func GenerateGenesisAccountFromFile(
 	chainID int64,
 	deployer types.Address,
 ) (*chain.GenesisAccount, error) {
-
 	var finalBytecode []byte
+
 	var constructorInfo *abi.Method
+
 	var contractABI *abi.ABI
 
 	if filepath == "" {
