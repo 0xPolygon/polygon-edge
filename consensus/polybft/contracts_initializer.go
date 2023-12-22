@@ -384,7 +384,7 @@ func mintStakeToken(polyBFTConfig PolyBFTConfig, transition *state.Transition) e
 			return fmt.Errorf("StakeToken.mint params encoding failed: %w", err)
 		}
 
-		if err := callContract(types.ZeroAddress, polyBFTConfig.StakeTokenAddr,
+		if err := callContract(polyBFTConfig.BladeAdmin, polyBFTConfig.StakeTokenAddr,
 			input, "StakeToken.mint", transition); err != nil {
 			return err
 		}

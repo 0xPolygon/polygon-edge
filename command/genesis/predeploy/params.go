@@ -16,11 +16,12 @@ import (
 )
 
 const (
-	chainFlag            = "chain"
-	predeployAddressFlag = "predeploy-address"
-	artifactsNameFlag    = "artifacts-name"
-	artifactsPathFlag    = "artifacts-path"
-	constructorArgsPath  = "constructor-args"
+	chainFlag               = "chain"
+	predeployAddressFlag    = "predeploy-address"
+	artifactsNameFlag       = "artifacts-name"
+	artifactsPathFlag       = "artifacts-path"
+	constructorArgsPathFlag = "constructor-args"
+	deployerAddrFlag        = "deployer-address"
 )
 
 var (
@@ -35,16 +36,18 @@ var (
 )
 
 type predeployParams struct {
-	addressRaw  string
-	genesisPath string
+	addressRaw      string
+	genesisPath     string
+	deployerAddrRaw string
 
-	address         types.Address
-	artifactsName   string
-	artifactsPath   string
+	address       types.Address
+	deployerAddr  types.Address
+	artifactsName string
+	artifactsPath string
+
 	constructorArgs []string
 
-	genesisConfig *chain.Chain
-
+	genesisConfig    *chain.Chain
 	contractArtifact *artifact.Artifact
 }
 
@@ -57,6 +60,10 @@ func (p *predeployParams) getRequiredFlags() []string {
 
 func (p *predeployParams) initRawParams() (err error) {
 	if err := p.initPredeployAddress(); err != nil {
+		return err
+	}
+
+	if err := p.initDeployerAddress(); err != nil {
 		return err
 	}
 
@@ -81,6 +88,12 @@ func (p *predeployParams) initPredeployAddress() error {
 	}
 
 	p.address = types.StringToAddress(p.addressRaw)
+
+	return nil
+}
+
+func (p *predeployParams) initDeployerAddress() error {
+	p.deployerAddr = types.StringToAddress(p.deployerAddrRaw)
 
 	return nil
 }
@@ -129,6 +142,7 @@ func (p *predeployParams) updateGenesisConfig() error {
 		p.constructorArgs,
 		p.address,
 		p.genesisConfig.Params.ChainID,
+		p.deployerAddr,
 	)
 	if err != nil {
 		return err

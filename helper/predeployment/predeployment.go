@@ -118,7 +118,7 @@ func getModifiedStorageMap(radix *state.Txn, address types.Address) map[types.Ha
 	return storageMap
 }
 
-func getPredeployAccount(address types.Address, input []byte, chainID int64) (*chain.GenesisAccount, error) {
+func getPredeployAccount(address types.Address, input []byte, chainID int64, deployer types.Address) (*chain.GenesisAccount, error) {
 	// Create an instance of the state
 	st := itrie.NewState(itrie.NewMemoryStorage())
 
@@ -132,7 +132,7 @@ func getPredeployAccount(address types.Address, input []byte, chainID int64) (*c
 	contract := runtime.NewContractCreation(
 		1,
 		types.ZeroAddress,
-		types.ZeroAddress,
+		deployer,
 		address,
 		big.NewInt(0),
 		math.MaxInt64,
@@ -177,6 +177,7 @@ func GenerateGenesisAccountFromFile(
 	constructorArgs []string,
 	predeployAddress types.Address,
 	chainID int64,
+	deployer types.Address,
 ) (*chain.GenesisAccount, error) {
 	var finalBytecode []byte
 	var constructorInfo *abi.Method
@@ -224,5 +225,5 @@ func GenerateGenesisAccountFromFile(
 		finalBytecode = append(conArtifact.Bytecode, constructor...)
 	}
 
-	return getPredeployAccount(predeployAddress, finalBytecode, chainID)
+	return getPredeployAccount(predeployAddress, finalBytecode, chainID, deployer)
 }

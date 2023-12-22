@@ -54,9 +54,16 @@ func setFlags(cmd *cobra.Command) {
 
 	cmd.Flags().StringArrayVar(
 		&params.constructorArgs,
-		constructorArgsPath,
+		constructorArgsPathFlag,
 		[]string{},
 		"the constructor arguments, if any",
+	)
+
+	cmd.Flags().StringVar(
+		&params.deployerAddrRaw,
+		deployerAddrFlag,
+		"0x0",
+		"address of contract deployer",
 	)
 
 	cmd.MarkFlagsMutuallyExclusive(artifactsNameFlag, artifactsPathFlag)

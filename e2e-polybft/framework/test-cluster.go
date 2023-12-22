@@ -723,7 +723,8 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			"--predeploy-address", contracts.ERC20Contract.String(),
 			"--artifacts-name", "RootERC20",
 			"--chain", genesisPath,
-		}
+			"--deployer-address", config.BladeAdmin}
+
 		err = cluster.cmdRun(args...)
 		require.NoError(t, err)
 

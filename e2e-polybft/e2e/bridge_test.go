@@ -1453,8 +1453,7 @@ func TestE2E_Bridge_NonNative(t *testing.T) {
 	)
 
 	var (
-		premineBalance = ethgo.Ether(2e6) // 2M native tokens (so that we have enough balance to fund new validator)
-		stakeAmount    = ethgo.Ether(500)
+		stakeAmount = ethgo.Ether(500)
 	)
 
 	minter, err := wallet.GenerateKey()
@@ -1488,8 +1487,7 @@ func TestE2E_Bridge_NonNative(t *testing.T) {
 		framework.WithBridge(),
 		framework.WithBladeAdmin(minter.Address().String()),
 		framework.WithSecretsCallback(func(addrs []types.Address, tcc *framework.TestClusterConfig) {
-			for _, addr := range addrs {
-				tcc.Premine = append(tcc.Premine, fmt.Sprintf("%s:%s", addr, premineBalance))
+			for i := 0; i < len(addrs); i++ {
 				tcc.StakeAmounts = append(tcc.StakeAmounts, stakeAmount)
 			}
 		}),
@@ -1506,6 +1504,25 @@ func TestE2E_Bridge_NonNative(t *testing.T) {
 
 	relayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(firstValidator.JSONRPCAddr()))
 	require.NoError(t, err)
+
+	mintFn := &contractsapi.MintRootERC20Fn{
+		To:     validatorAcc.Address(),
+		Amount: big.NewInt(100000),
+	}
+
+	mintInput, err := mintFn.EncodeAbi()
+	require.NoError(t, err)
+
+	nonNativeErc20 := ethgo.Address(contracts.ERC20Contract)
+
+	receipt, err := relayer.SendTransaction(
+		&ethgo.Transaction{
+			To:    &nonNativeErc20,
+			Input: mintInput,
+			Type:  ethgo.TransactionDynamicFee,
+		}, minter)
+	require.NoError(t, err)
+	require.Equal(t, uint64(types.ReceiptSuccess), receipt.Status)
 
 	polybftCfg, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
 	require.NoError(t, err)
