@@ -1459,28 +1459,6 @@ func TestE2E_Bridge_NonNative(t *testing.T) {
 	minter, err := wallet.GenerateKey()
 	require.NoError(t, err)
 
-	receiverKeys := make([]string, transfersCount)
-	receivers := make([]string, transfersCount)
-	receiversAddrs := make([]types.Address, transfersCount)
-	amounts := make([]string, transfersCount)
-	tokenIDs := make([]string, transfersCount)
-
-	for i := 0; i < transfersCount; i++ {
-		key, err := wallet.GenerateKey()
-		require.NoError(t, err)
-
-		rawKey, err := key.MarshallPrivateKey()
-		require.NoError(t, err)
-
-		receiverKeys[i] = hex.EncodeToString(rawKey)
-		receivers[i] = types.Address(key.Address()).String()
-		receiversAddrs[i] = types.Address(key.Address())
-		amounts[i] = fmt.Sprintf("%d", amount)
-		tokenIDs[i] = fmt.Sprintf("%d", i+1)
-
-		t.Logf("Receiver#%d=%s\n", i+1, receivers[i])
-	}
-
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithNumBlockConfirmations(0),
 		framework.WithEpochSize(epochSize),

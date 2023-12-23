@@ -369,7 +369,7 @@ func mintRewardTokensToWallet(polyBFTConfig PolyBFTConfig, transition *state.Tra
 
 // mintStakeToken mints configured amount of stake token to stake token address
 func mintStakeToken(polyBFTConfig PolyBFTConfig, transition *state.Transition) error {
-	if IsNativeStakeToken(polyBFTConfig.StakeTokenAddr) {
+	if isNativeStakeToken(polyBFTConfig.StakeTokenAddr) {
 		return nil
 	}
 
@@ -432,6 +432,6 @@ func isNativeRewardToken(cfg PolyBFTConfig) bool {
 }
 
 // isNativeStakeToken return true in case a native token is used for staking
-func IsNativeStakeToken(stakeTokenAddr types.Address) bool {
+func isNativeStakeToken(stakeTokenAddr types.Address) bool {
 	return stakeTokenAddr == contracts.NativeERC20TokenContract
 }

@@ -186,7 +186,7 @@ func GenerateGenesisAccountFromFile(
 
 	var contractABI *abi.ABI
 
-	if filepath == "" {
+	if conArtifact != nil {
 		finalBytecode = conArtifact.Bytecode
 		constructorInfo = conArtifact.Abi.Constructor
 		contractABI = conArtifact.Abi
