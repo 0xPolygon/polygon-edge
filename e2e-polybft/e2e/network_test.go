@@ -2,9 +2,6 @@ package e2e
 
 import (
 	"context"
-	"os"
-	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -13,26 +10,6 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-func init() {
-	wd, err := os.Getwd()
-	if err != nil {
-		return
-	}
-	wdByzantine, err := os.Getwd()
-	if err != nil {
-		return
-	}
-
-	parent := filepath.Dir(wd)
-	parent = strings.Trim(parent, "e2e-polybft")
-	wd = filepath.Join(parent, "/artifacts/blade")
-	wdByzantine = filepath.Join(parent, "/artifacts/polygon-edge-byzantine")
-	os.Setenv("EDGE_BINARY", wd)
-	os.Setenv("BYZANTINE_BINARY", wdByzantine)
-	os.Setenv("E2E_TESTS", "true")
-	os.Setenv("E2E_LOGS", "true")
-	os.Setenv("E2E_LOG_LEVEL", "debug")
-}
 func TestE2E_NetworkDiscoveryProtocol(t *testing.T) {
 	const (
 		validatorCount    = 5
