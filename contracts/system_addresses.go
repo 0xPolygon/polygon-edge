@@ -111,8 +111,6 @@ var (
 	AllowListBridgeAddr = types.StringToAddress("0x0200000000000000000000000000000000000004")
 	// BlockListBridgeAddr is the address of the bridge block list
 	BlockListBridgeAddr = types.StringToAddress("0x0300000000000000000000000000000000000004")
-
-	ERC20Contract = types.StringToAddress("0x2040")
 )
 
 // GetProxyImplementationMapping retrieves the addresses of proxy contracts that should be deployed unconditionally

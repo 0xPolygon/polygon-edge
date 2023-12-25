@@ -1456,6 +1456,7 @@ func TestE2E_Bridge_NonNativeStakingToken(t *testing.T) {
 		stakeAmount      = ethgo.Ether(500)
 		addedStakeAmount = ethgo.Gwei(1)
 		mintAmount       = ethgo.Gwei(10)
+		stakeTokenAddr   = types.StringToAddress("0x2040")
 	)
 
 	minter, err := wallet.GenerateKey()
@@ -1471,7 +1472,7 @@ func TestE2E_Bridge_NonNativeStakingToken(t *testing.T) {
 				tcc.StakeAmounts = append(tcc.StakeAmounts, stakeAmount)
 			}
 		}),
-		framework.WithPredeploy(fmt.Sprintf("%s:%s", contracts.ERC20Contract, "RootERC20")),
+		framework.WithPredeploy(fmt.Sprintf("%s:%s", stakeTokenAddr, "RootERC20")),
 	)
 	defer cluster.Stop()
 
@@ -1500,7 +1501,7 @@ func TestE2E_Bridge_NonNativeStakingToken(t *testing.T) {
 	mintInput, err := mintFn.EncodeAbi()
 	require.NoError(t, err)
 
-	nonNativeErc20 := ethgo.Address(contracts.ERC20Contract)
+	nonNativeErc20 := ethgo.Address(polybftCfg.StakeTokenAddr)
 
 	receipt, err := relayer.SendTransaction(
 		&ethgo.Transaction{
