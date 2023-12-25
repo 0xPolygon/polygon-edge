@@ -16,12 +16,12 @@ import (
 )
 
 const (
-	chainFlag               = "chain"
-	predeployAddressFlag    = "predeploy-address"
-	artifactsNameFlag       = "artifacts-name"
-	artifactsPathFlag       = "artifacts-path"
-	constructorArgsPathFlag = "constructor-args"
-	deployerAddrFlag        = "deployer-address"
+	chainFlag            = "chain"
+	predeployAddressFlag = "predeploy-address"
+	artifactsNameFlag    = "artifacts-name"
+	artifactsPathFlag    = "artifacts-path"
+	constructorArgsFlag  = "constructor-args"
+	deployerAddrFlag     = "deployer-address"
 )
 
 var (
@@ -55,7 +55,6 @@ type predeployParams struct {
 func (p *predeployParams) getRequiredFlags() []string {
 	return []string{
 		predeployAddressFlag,
-		artifactsNameFlag,
 	}
 }
 
@@ -64,11 +63,13 @@ func (p *predeployParams) initRawParams() (err error) {
 		return errArtifactPathAndNameMissing
 	}
 
-	if err := p.initPredeployAddress(); err != nil {
+	p.address, err = types.IsValidAddress(p.addressRaw, false)
+	if err != nil {
 		return err
 	}
 
-	if err := p.initDeployerAddress(); err != nil {
+	p.deployerAddr, err = types.IsValidAddress(p.deployerAddrRaw, false)
+	if err != nil {
 		return err
 	}
 
@@ -83,22 +84,6 @@ func (p *predeployParams) initRawParams() (err error) {
 	if p.scArtifact, err = contractsapi.GetArtifactFromArtifactName(p.artifactsName); err != nil {
 		return err
 	}
-
-	return nil
-}
-
-func (p *predeployParams) initPredeployAddress() error {
-	if p.addressRaw == "" {
-		return errInvalidPredeployAddress
-	}
-
-	p.address = types.StringToAddress(p.addressRaw)
-
-	return nil
-}
-
-func (p *predeployParams) initDeployerAddress() error {
-	p.deployerAddr = types.StringToAddress(p.deployerAddrRaw)
 
 	return nil
 }

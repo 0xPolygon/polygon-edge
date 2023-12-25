@@ -1443,7 +1443,7 @@ func TestE2E_Bridge_NonMintableERC20Token_WithPremine(t *testing.T) {
 	})
 }
 
-func TestE2E_Bridge_NonNative(t *testing.T) {
+func TestE2E_Bridge_NonNativeStakingToken(t *testing.T) {
 	const (
 		transfersCount       = 5
 		amount               = 100
@@ -1453,7 +1453,9 @@ func TestE2E_Bridge_NonNative(t *testing.T) {
 	)
 
 	var (
-		stakeAmount = ethgo.Ether(500)
+		stakeAmount      = ethgo.Ether(500)
+		addedStakeAmount = ethgo.Gwei(1)
+		mintAmount       = ethgo.Gwei(10)
 	)
 
 	minter, err := wallet.GenerateKey()
@@ -1469,23 +1471,30 @@ func TestE2E_Bridge_NonNative(t *testing.T) {
 				tcc.StakeAmounts = append(tcc.StakeAmounts, stakeAmount)
 			}
 		}),
-		framework.WithPredeploy(),
+		framework.WithPredeploy(fmt.Sprintf("%s:%s", contracts.ERC20Contract, "RootERC20")),
 	)
 	defer cluster.Stop()
 
 	cluster.WaitForReady(t)
 
-	firstValidator := cluster.Servers[0]
+	polybftCfg, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
+	require.NoError(t, err)
 
-	validatorAcc, err := validatorHelper.GetAccountFromDir(firstValidator.DataDir())
+	//first validator server(minter)
+	firstValidator := cluster.Servers[0]
+	//second validator server
+	secondValidator := cluster.Servers[1]
+
+	//validator account from second validator
+	validatorAccTwo, err := validatorHelper.GetAccountFromDir(secondValidator.DataDir())
 	require.NoError(t, err)
 
 	relayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(firstValidator.JSONRPCAddr()))
 	require.NoError(t, err)
 
 	mintFn := &contractsapi.MintRootERC20Fn{
-		To:     validatorAcc.Address(),
-		Amount: big.NewInt(100000),
+		To:     validatorAccTwo.Address(),
+		Amount: mintAmount,
 	}
 
 	mintInput, err := mintFn.EncodeAbi()
@@ -1502,30 +1511,27 @@ func TestE2E_Bridge_NonNative(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, uint64(types.ReceiptSuccess), receipt.Status)
 
-	polybftCfg, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
+	secondValidatorInfo, err := validatorHelper.GetValidatorInfo(validatorAccTwo.Ecdsa.Address(), relayer)
 	require.NoError(t, err)
-
-	firstValidatorInfo, err := validatorHelper.GetValidatorInfo(validatorAcc.Ecdsa.Address(), relayer)
-	require.NoError(t, err)
-	require.True(t, firstValidatorInfo.Stake.Cmp(stakeAmount) == 0)
+	require.True(t, secondValidatorInfo.Stake.Cmp(stakeAmount) == 0)
 
 	require.NoError(t, cluster.WaitForBlock(epochSize*1, 1*time.Minute))
 
-	require.NoError(t, firstValidator.Stake(polybftCfg.StakeTokenAddr, big.NewInt(1000)))
+	require.NoError(t, firstValidator.Stake(polybftCfg.StakeTokenAddr, addedStakeAmount))
 
 	require.NoError(t, cluster.WaitForBlock(epochSize*3, 90*time.Second))
 
 	updatedStakeAmount := big.NewInt(0)
 
-	firstValidatorInfo, err = validatorHelper.GetValidatorInfo(validatorAcc.Ecdsa.Address(), relayer)
+	secondValidatorInfo, err = validatorHelper.GetValidatorInfo(validatorAccTwo.Ecdsa.Address(), relayer)
 	require.NoError(t, err)
-	require.True(t, firstValidatorInfo.Stake.Cmp(updatedStakeAmount.Add(stakeAmount, big.NewInt(1000))) == 0)
+	require.True(t, secondValidatorInfo.Stake.Cmp(updatedStakeAmount.Add(stakeAmount, addedStakeAmount)) == 0)
 
-	require.NoError(t, firstValidator.Unstake(big.NewInt(1000)))
+	require.NoError(t, secondValidator.Unstake(addedStakeAmount))
 
 	require.NoError(t, cluster.WaitForBlock(epochSize*4, 30*time.Second))
 
-	firstValidatorInfo, err = validatorHelper.GetValidatorInfo(validatorAcc.Ecdsa.Address(), relayer)
+	secondValidatorInfo, err = validatorHelper.GetValidatorInfo(validatorAccTwo.Ecdsa.Address(), relayer)
 	require.NoError(t, err)
-	require.True(t, firstValidatorInfo.Stake.Cmp(stakeAmount) == 0)
+	require.True(t, secondValidatorInfo.Stake.Cmp(stakeAmount) == 0)
 }

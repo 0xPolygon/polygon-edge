@@ -17,7 +17,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
-	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/server/proto"
 	txpoolProto "github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -289,8 +288,8 @@ func (t *TestServer) WhitelistValidators(addresses []string) error {
 	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("validator"))
 }
 
-// MintNativeERC20Token mints given amounts of native erc20 token on blade to given addresses
-func (t *TestServer) MintNativeERC20Token(addresses []string, amounts []*big.Int) error {
+// MintERC20Token mints given amounts of native erc20 token on blade to given addresses
+func (t *TestServer) MintERC20Token(addresses []string, amounts []*big.Int, stakeToken types.Address) error {
 	acc, err := validatorHelper.GetAccountFromDir(t.DataDir())
 	if err != nil {
 		return err
@@ -304,7 +303,7 @@ func (t *TestServer) MintNativeERC20Token(addresses []string, amounts []*big.Int
 	args := []string{
 		"mint-erc20",
 		"--jsonrpc", t.JSONRPCAddr(),
-		"--erc20-token", contracts.NativeERC20TokenContract.String(),
+		"--erc20-token", stakeToken.String(),
 		"--private-key", hex.EncodeToString(rawKey),
 	}
 

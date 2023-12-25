@@ -42,7 +42,7 @@ func setFlags(cmd *cobra.Command) {
 		&params.artifactsName,
 		artifactsNameFlag,
 		"",
-		"the path to the contract artifacts JSON",
+		"the built-in contract artifact name",
 	)
 
 	cmd.Flags().StringVar(
@@ -54,7 +54,7 @@ func setFlags(cmd *cobra.Command) {
 
 	cmd.Flags().StringArrayVar(
 		&params.constructorArgs,
-		constructorArgsPathFlag,
+		constructorArgsFlag,
 		[]string{},
 		"the constructor arguments, if any",
 	)

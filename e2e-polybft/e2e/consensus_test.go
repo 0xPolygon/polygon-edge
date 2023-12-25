@@ -207,8 +207,8 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	initialBalance := ethgo.Ether(1000)
 
 	// mint tokens to new validators
-	require.NoError(t, owner.MintNativeERC20Token([]string{firstValidatorAddr.String(), secondValidatorAddr.String()},
-		[]*big.Int{initialBalance, initialBalance}))
+	require.NoError(t, owner.MintERC20Token([]string{firstValidatorAddr.String(), secondValidatorAddr.String()},
+		[]*big.Int{initialBalance, initialBalance}, polybftConfig.StakeTokenAddr))
 
 	// first validator's balance to be received
 	firstBalance, err := relayer.Client().Eth().GetBalance(firstValidatorAddr, ethgo.Latest)

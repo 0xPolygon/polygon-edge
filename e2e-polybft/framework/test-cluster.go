@@ -21,7 +21,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -116,7 +115,7 @@ type TestClusterConfig struct {
 	SecretsCallback      func([]types.Address, *TestClusterConfig)
 	BladeAdmin           string
 	RewardWallet         string
-	PredeployNonNative   bool
+	PredeployContract    string
 
 	ContractDeployerAllowListAdmin   []types.Address
 	ContractDeployerAllowListEnabled []types.Address
@@ -458,9 +457,9 @@ func WithRewardWallet(rewardWallet string) ClusterOption {
 	}
 }
 
-func WithPredeploy() ClusterOption {
+func WithPredeploy(predeployString string) ClusterOption {
 	return func(h *TestClusterConfig) {
-		h.PredeployNonNative = true
+		h.PredeployContract = predeployString
 	}
 }
 
@@ -707,8 +706,10 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		}
 		args = append(args, "--proxy-contracts-admin", proxyAdminAddr)
 
-		if config.PredeployNonNative {
-			args = append(args, "--stake-token", contracts.ERC20Contract.String())
+		if config.PredeployContract != "" {
+			parts := strings.Split(config.PredeployContract, ":")
+			require.Equal(t, 2, len(parts))
+			args = append(args, "--stake-token", parts[0])
 		}
 
 		// run genesis command with all the arguments
@@ -716,12 +717,15 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		require.NoError(t, err)
 	}
 
-	if config.PredeployNonNative {
+	if config.PredeployContract != "" {
+
+		parts := strings.Split(config.PredeployContract, ":")
+		require.Equal(t, 2, len(parts))
 		// run predeploy genesis population
 		args := []string{
 			"genesis", "predeploy",
-			"--predeploy-address", contracts.ERC20Contract.String(),
-			"--artifacts-name", "RootERC20",
+			"--predeploy-address", parts[0],
+			"--artifacts-name", parts[1],
 			"--chain", genesisPath,
 			"--deployer-address", config.BladeAdmin}
 
