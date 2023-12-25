@@ -718,7 +718,6 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 	}
 
 	if config.PredeployContract != "" {
-
 		parts := strings.Split(config.PredeployContract, ":")
 		require.Equal(t, 2, len(parts))
 		// run predeploy genesis population
