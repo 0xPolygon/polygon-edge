@@ -1511,7 +1511,7 @@ func TestE2E_Bridge_NonNative(t *testing.T) {
 
 	require.NoError(t, cluster.WaitForBlock(epochSize*1, 1*time.Minute))
 
-	require.NoError(t, firstValidator.Stake(polybftCfg, big.NewInt(1000), contracts.ERC20Contract))
+	require.NoError(t, firstValidator.Stake(polybftCfg.StakeTokenAddr, big.NewInt(1000)))
 
 	require.NoError(t, cluster.WaitForBlock(epochSize*3, 90*time.Second))
 

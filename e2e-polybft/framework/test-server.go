@@ -232,7 +232,7 @@ func (t *TestServer) RootchainFundFor(accounts []types.Address, amounts []*big.I
 }
 
 // Stake stakes given amount to validator account encapsulated by given server instance
-func (t *TestServer) Stake(polybftConfig polybft.PolyBFTConfig, amount *big.Int, stakeTokenAddr types.Address) error {
+func (t *TestServer) Stake(stakeTokenAddr types.Address, amount *big.Int) error {
 	args := []string{
 		"validator",
 		"stake",

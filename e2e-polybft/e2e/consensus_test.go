@@ -639,10 +639,6 @@ func TestE2E_Consensus_ChangeVotingPowerByStakingPendingRewards(t *testing.T) {
 	)
 	defer cluster.Stop()
 
-	// load polybft config
-	polybftCfg, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
-	require.NoError(t, err)
-
 	validatorSecretFiles, err := genesis.GetValidatorKeyFiles(cluster.Config.TmpDir, cluster.Config.ValidatorPrefix)
 	require.NoError(t, err)
 
@@ -695,7 +691,7 @@ func TestE2E_Consensus_ChangeVotingPowerByStakingPendingRewards(t *testing.T) {
 		require.NoError(t, validatorSrv.WithdrawRewards())
 
 		// stake withdrawable rewards (since rewards are in native erc20 token in this test)
-		require.NoError(t, validatorSrv.Stake(polybftCfg, validator.WithdrawableRewards, types.ZeroAddress))
+		require.NoError(t, validatorSrv.Stake(types.ZeroAddress, validator.WithdrawableRewards))
 	})
 
 	queryValidators(func(idx int, validator *polybft.ValidatorInfo) {
