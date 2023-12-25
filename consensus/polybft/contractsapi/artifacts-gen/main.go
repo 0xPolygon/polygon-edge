@@ -208,6 +208,10 @@ func main() {
 			"blade/governance/ChildTimelock.sol",
 			"ChildTimelock",
 		},
+		{
+			"blade/accountAbstraction/EntryPoint.sol",
+			"EntryPoint",
+		},
 	}
 
 	str := `// This is auto-generated file. DO NOT EDIT.

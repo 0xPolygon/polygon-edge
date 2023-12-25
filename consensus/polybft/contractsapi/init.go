@@ -63,6 +63,9 @@ var (
 	ChildGovernor *artifact.Artifact
 	ChildTimelock *artifact.Artifact
 
+	// Account Abstraction
+	EntryPoint *artifact.Artifact
+
 	// test smart contracts
 	//go:embed test-contracts/*
 	testContracts          embed.FS
@@ -311,6 +314,11 @@ func init() {
 	}
 
 	ChildTimelock, err = artifact.DecodeArtifact([]byte(ChildTimelockArtifact))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	EntryPoint, err = artifact.DecodeArtifact([]byte(EntryPointArtifact))
 	if err != nil {
 		log.Fatal(err)
 	}
