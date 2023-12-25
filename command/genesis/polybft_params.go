@@ -435,6 +435,10 @@ func (p *genesisParams) deployContracts(rewardTokenByteCode []byte,
 			artifact: contractsapi.ChildTimelock,
 			address:  contracts.ChildTimelockContractV1,
 		},
+		{
+			artifact: contractsapi.EntryPoint,
+			address:  contracts.EntryPointContractV1,
+		},
 	}
 
 	if !params.nativeTokenConfig.IsMintable {

@@ -87,7 +87,7 @@ var (
 	NetworkParamsContractV1 = types.StringToAddress("0x100e1")
 	// ForkParamsContract is an address of ForkParams contract which holds data of enabled forks
 	ForkParamsContract = types.StringToAddress("0x100f")
-	// ForkParamsContract is the proxy address of ForkParams contract which holds data of enabled forks
+	// ForkParamsContract is an address of ForkParams contract which holds data of enabled forks
 	ForkParamsContractV1 = types.StringToAddress("0x100f1")
 
 	// SystemCaller is address of account, used for system calls to smart contracts
@@ -113,6 +113,11 @@ var (
 	BlockListBridgeAddr = types.StringToAddress("0x0300000000000000000000000000000000000004")
 
 	ERC20Contract = types.StringToAddress("0x2040")
+
+	// EntryPointContract is the proxy address of EntryPoint contract which is a center point of account abstraction
+	EntryPointContract = types.StringToAddress("0x2001")
+	// EntryPointContract is an address of EntryPoint contract which is a center point of account abstraction
+	EntryPointContractV1 = types.StringToAddress("0x20011")
 )
 
 // GetProxyImplementationMapping retrieves the addresses of proxy contracts that should be deployed unconditionally
@@ -135,5 +140,6 @@ func GetProxyImplementationMapping() map[types.Address]types.Address {
 		ForkParamsContract:                   ForkParamsContractV1,
 		ChildTimelockContract:                ChildTimelockContractV1,
 		ChildGovernorContract:                ChildGovernorContractV1,
+		EntryPointContract:                   EntryPointContractV1,
 	}
 }
