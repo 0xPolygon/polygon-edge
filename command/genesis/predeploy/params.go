@@ -9,7 +9,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/helper/predeployment"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -30,6 +30,7 @@ var (
 	errInvalidAddress          = fmt.Errorf(
 		"the provided predeploy address must be >= %s", predeployAddressMin.String(),
 	)
+	errArtifactPathAndNameMissing = errors.New("neither artifact path nor artifact name was provided")
 
 	predeployAddressMin = types.StringToAddress("01100")
 	params              = &predeployParams{}
@@ -47,8 +48,8 @@ type predeployParams struct {
 
 	constructorArgs []string
 
-	genesisConfig    *chain.Chain
-	contractArtifact *artifact.Artifact
+	genesisConfig *chain.Chain
+	scArtifact    *contracts.Artifact
 }
 
 func (p *predeployParams) getRequiredFlags() []string {
@@ -59,6 +60,10 @@ func (p *predeployParams) getRequiredFlags() []string {
 }
 
 func (p *predeployParams) initRawParams() (err error) {
+	if p.artifactsName == "" && p.artifactsPath == "" {
+		return errArtifactPathAndNameMissing
+	}
+
 	if err := p.initPredeployAddress(); err != nil {
 		return err
 	}
@@ -75,7 +80,7 @@ func (p *predeployParams) initRawParams() (err error) {
 		return err
 	}
 
-	if p.contractArtifact, err = contractsapi.GetArtifactFromArtifactName(p.artifactsName); err != nil {
+	if p.scArtifact, err = contractsapi.GetArtifactFromArtifactName(p.artifactsName); err != nil {
 		return err
 	}
 
@@ -136,9 +141,22 @@ func (p *predeployParams) updateGenesisConfig() error {
 		return errAddressTaken
 	}
 
+	var (
+		artifact *contracts.Artifact
+		err      error
+	)
+
+	if p.artifactsPath != "" {
+		artifact, err = contracts.LoadArtifactFromFile(p.artifactsPath)
+		if err != nil {
+			return err
+		}
+	} else if p.scArtifact != nil {
+		artifact = p.scArtifact
+	}
+
 	predeployAccount, err := predeployment.GenerateGenesisAccountFromFile(
-		p.artifactsPath,
-		p.contractArtifact,
+		artifact,
 		p.constructorArgs,
 		p.address,
 		p.genesisConfig.Params.ChainID,

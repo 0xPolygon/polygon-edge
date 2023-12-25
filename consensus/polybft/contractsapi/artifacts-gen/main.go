@@ -11,7 +11,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 )
 
@@ -216,7 +216,7 @@ package contractsapi
 `
 
 	for _, v := range readContracts {
-		artifactBytes, err := artifact.ReadArtifactData(scpath, v.Path, getContractName(v.Path))
+		artifactBytes, err := contracts.ReadRawArtifact(scpath, v.Path, getContractName(v.Path))
 		if err != nil {
 			log.Fatal(err)
 		}
