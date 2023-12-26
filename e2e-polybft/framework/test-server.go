@@ -289,7 +289,7 @@ func (t *TestServer) WhitelistValidators(addresses []string) error {
 }
 
 // MintERC20Token mints given amounts of native erc20 token on blade to given addresses
-func (t *TestServer) MintERC20Token(addresses []string, amounts []*big.Int, stakeToken types.Address) error {
+func (t *TestServer) MintERC20Token(addresses []string, amounts []*big.Int, erc20Token types.Address) error {
 	acc, err := validatorHelper.GetAccountFromDir(t.DataDir())
 	if err != nil {
 		return err
@@ -303,7 +303,7 @@ func (t *TestServer) MintERC20Token(addresses []string, amounts []*big.Int, stak
 	args := []string{
 		"mint-erc20",
 		"--jsonrpc", t.JSONRPCAddr(),
-		"--erc20-token", stakeToken.String(),
+		"--erc20-token", erc20Token.String(),
 		"--private-key", hex.EncodeToString(rawKey),
 	}
 
