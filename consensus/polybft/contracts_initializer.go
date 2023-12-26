@@ -45,12 +45,12 @@ func initStakeManager(polyBFTConfig PolyBFTConfig, transition *state.Transition)
 
 		input, err := approveFn.EncodeAbi()
 		if err != nil {
-			return fmt.Errorf("staking ERC20.approve params encoding failed: %w", err)
+			return fmt.Errorf("StakingERC20.approve params encoding failed: %w", err)
 		}
 
-		err = callContract(validator.Address, polyBFTConfig.StakeTokenAddr, input, "Staking ERC20.approve", transition)
+		err = callContract(validator.Address, polyBFTConfig.StakeTokenAddr, input, "StakingERC20.approve", transition)
 		if err != nil {
-			return fmt.Errorf("Error while calling contract %w", err)
+			return fmt.Errorf("error while calling contract %w", err)
 		}
 	}
 
@@ -360,11 +360,11 @@ func mintRewardTokensToWallet(polyBFTConfig PolyBFTConfig, transition *state.Tra
 
 	input, err := mintFn.EncodeAbi()
 	if err != nil {
-		return fmt.Errorf("RewardToken.mint params encoding failed: %w", err)
+		return fmt.Errorf("RewardERC20Token.mint params encoding failed: %w", err)
 	}
 
 	return callContract(contracts.SystemCaller, polyBFTConfig.RewardConfig.TokenAddress, input,
-		"RewardToken.mint", transition)
+		"RewardERC20Token.mint", transition)
 }
 
 // mintStakeToken mints configured amount of stake token to stake token address
@@ -381,11 +381,11 @@ func mintStakeToken(polyBFTConfig PolyBFTConfig, transition *state.Transition) e
 
 		input, err := mintFn.EncodeAbi()
 		if err != nil {
-			return fmt.Errorf("staking ERC20.mint params encoding failed: %w", err)
+			return fmt.Errorf("StakingERC20.mint params encoding failed: %w", err)
 		}
 
 		if err := callContract(polyBFTConfig.BladeAdmin, polyBFTConfig.StakeTokenAddr,
-			input, "Staking ERC20.mint", transition); err != nil {
+			input, "StakingERC20.mint", transition); err != nil {
 			return err
 		}
 	}

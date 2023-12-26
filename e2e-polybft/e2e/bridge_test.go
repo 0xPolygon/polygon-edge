@@ -1443,20 +1443,16 @@ func TestE2E_Bridge_NonMintableERC20Token_WithPremine(t *testing.T) {
 	})
 }
 
-func TestE2E_Bridge_NonNativeStakingToken(t *testing.T) {
+func TestE2E_Bridge_L1OriginatedNativeToken_ERC20StakingToken(t *testing.T) {
 	const (
-		transfersCount       = 5
-		amount               = 100
-		epochSize            = 5
-		numberOfAttempts     = 4
-		stateSyncedLogsCount = 2
+		epochSize    = 5
+		blockTimeout = 30 * time.Second
 	)
 
 	var (
-		stakeAmount      = ethgo.Ether(500)
-		addedStakeAmount = ethgo.Gwei(1)
-		mintAmount       = ethgo.Gwei(10)
-		stakeTokenAddr   = types.StringToAddress("0x2040")
+		initialStake   = ethgo.Ether(10)
+		addedStake     = ethgo.Ether(1)
+		stakeTokenAddr = types.StringToAddress("0x2040")
 	)
 
 	minter, err := wallet.GenerateKey()
@@ -1469,10 +1465,11 @@ func TestE2E_Bridge_NonNativeStakingToken(t *testing.T) {
 		framework.WithBladeAdmin(minter.Address().String()),
 		framework.WithSecretsCallback(func(addrs []types.Address, tcc *framework.TestClusterConfig) {
 			for i := 0; i < len(addrs); i++ {
-				tcc.StakeAmounts = append(tcc.StakeAmounts, stakeAmount)
+				tcc.StakeAmounts = append(tcc.StakeAmounts, initialStake)
 			}
 		}),
-		framework.WithPredeploy(fmt.Sprintf("%s:%s", stakeTokenAddr, "RootERC20")),
+		framework.WithNativeTokenConfig(nativeTokenNonMintableConfig),
+		framework.WithPredeploy(fmt.Sprintf("%s:RootERC20", stakeTokenAddr)),
 	)
 	defer cluster.Stop()
 
@@ -1481,12 +1478,12 @@ func TestE2E_Bridge_NonNativeStakingToken(t *testing.T) {
 	polybftCfg, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
 	require.NoError(t, err)
 
-	//first validator server(minter)
+	// first validator server(minter)
 	firstValidator := cluster.Servers[0]
-	//second validator server
+	// second validator server
 	secondValidator := cluster.Servers[1]
 
-	//validator account from second validator
+	// validator account from second validator
 	validatorAccTwo, err := validatorHelper.GetAccountFromDir(secondValidator.DataDir())
 	require.NoError(t, err)
 
@@ -1495,7 +1492,7 @@ func TestE2E_Bridge_NonNativeStakingToken(t *testing.T) {
 
 	mintFn := &contractsapi.MintRootERC20Fn{
 		To:     validatorAccTwo.Address(),
-		Amount: mintAmount,
+		Amount: addedStake,
 	}
 
 	mintInput, err := mintFn.EncodeAbi()
@@ -1514,25 +1511,25 @@ func TestE2E_Bridge_NonNativeStakingToken(t *testing.T) {
 
 	secondValidatorInfo, err := validatorHelper.GetValidatorInfo(validatorAccTwo.Ecdsa.Address(), relayer)
 	require.NoError(t, err)
-	require.True(t, secondValidatorInfo.Stake.Cmp(stakeAmount) == 0)
+	require.True(t, secondValidatorInfo.Stake.Cmp(initialStake) == 0)
 
-	require.NoError(t, cluster.WaitForBlock(epochSize*1, 1*time.Minute))
+	require.NoError(t, cluster.WaitForBlock(epochSize*1, blockTimeout))
 
-	require.NoError(t, secondValidator.Stake(polybftCfg.StakeTokenAddr, addedStakeAmount))
+	require.NoError(t, secondValidator.Stake(polybftCfg.StakeTokenAddr, addedStake))
 
-	require.NoError(t, cluster.WaitForBlock(epochSize*3, 90*time.Second))
-
-	updatedStakeAmount := big.NewInt(0)
+	require.NoError(t, cluster.WaitForBlock(epochSize*3, blockTimeout))
 
 	secondValidatorInfo, err = validatorHelper.GetValidatorInfo(validatorAccTwo.Ecdsa.Address(), relayer)
 	require.NoError(t, err)
-	require.True(t, secondValidatorInfo.Stake.Cmp(updatedStakeAmount.Add(stakeAmount, addedStakeAmount)) == 0)
 
-	require.NoError(t, secondValidator.Unstake(addedStakeAmount))
+	expectedStakeAmount := new(big.Int).Add(initialStake, addedStake)
+	require.Equal(t, expectedStakeAmount, secondValidatorInfo.Stake)
 
-	require.NoError(t, cluster.WaitForBlock(epochSize*4, 30*time.Second))
+	require.NoError(t, secondValidator.Unstake(addedStake))
+
+	require.NoError(t, cluster.WaitForBlock(epochSize*4, blockTimeout))
 
 	secondValidatorInfo, err = validatorHelper.GetValidatorInfo(validatorAccTwo.Ecdsa.Address(), relayer)
 	require.NoError(t, err)
-	require.True(t, secondValidatorInfo.Stake.Cmp(stakeAmount) == 0)
+	require.True(t, secondValidatorInfo.Stake.Cmp(initialStake) == 0)
 }
