@@ -197,7 +197,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			return err
 		}
 
-		if !isNativeStakeToken(polyBFTConfig.StakeTokenAddr) {
+		if !IsNativeStakeToken(polyBFTConfig.StakeTokenAddr) {
 			if err := mintStakeToken(polyBFTConfig, transition); err != nil {
 				return err
 			}

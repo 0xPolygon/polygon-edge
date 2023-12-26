@@ -593,10 +593,9 @@ func (p *genesisParams) getValidatorAccounts() ([]*validator.GenesisValidator, e
 			}
 
 			addr := types.StringToAddress(trimmedAddress)
-
 			stake := big.NewInt(0)
 
-			if p.stakeTokenAddr != contracts.NativeERC20TokenContract || p.nativeTokenConfig.IsMintable {
+			if !polybft.IsNativeStakeToken(p.stakeTokenAddr) || p.nativeTokenConfig.IsMintable {
 				s, exists := p.stakeInfos[addr]
 				if !exists {
 					stake = command.DefaultStake
