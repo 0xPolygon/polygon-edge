@@ -182,11 +182,6 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			return err
 		}
 
-		// initialize StakeManager SC
-		if err = initStakeManager(polyBFTConfig, transition); err != nil {
-			return err
-		}
-
 		// approve EpochManager
 		if err = approveEpochManagerAsSpender(polyBFTConfig, transition); err != nil {
 			return err
@@ -199,6 +194,15 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 
 		// initialize EpochManager SC
 		if err = initEpochManager(polyBFTConfig, transition); err != nil {
+			return err
+		}
+
+		if err := mintStakeToken(polyBFTConfig, transition); err != nil {
+			return err
+		}
+
+		// initialize StakeManager SC
+		if err = initStakeManager(polyBFTConfig, transition); err != nil {
 			return err
 		}
 

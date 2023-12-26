@@ -16,7 +16,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/common"
@@ -80,7 +79,7 @@ var (
 )
 
 type contractInfo struct {
-	artifact *artifact.Artifact
+	artifact *contracts.Artifact
 	address  types.Address
 }
 
@@ -198,7 +197,7 @@ func (p *genesisParams) generateChainConfig(o command.OutputFormatter) error {
 			NetworkParamsAddr: contracts.NetworkParamsContract,
 			ForkParamsAddr:    contracts.ForkParamsContract,
 		},
-		StakeTokenAddr: params.stakeTokenAddr,
+		StakeTokenAddr: p.stakeTokenAddr,
 	}
 
 	// Disable london hardfork if burn contract address is not provided
@@ -594,10 +593,9 @@ func (p *genesisParams) getValidatorAccounts() ([]*validator.GenesisValidator, e
 			}
 
 			addr := types.StringToAddress(trimmedAddress)
-
 			stake := big.NewInt(0)
 
-			if p.nativeTokenConfig.IsMintable {
+			if !polybft.IsNativeStakeToken(p.stakeTokenAddr) || p.nativeTokenConfig.IsMintable {
 				s, exists := p.stakeInfos[addr]
 				if !exists {
 					stake = command.DefaultStake

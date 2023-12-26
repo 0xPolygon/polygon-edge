@@ -115,6 +115,7 @@ type TestClusterConfig struct {
 	SecretsCallback      func([]types.Address, *TestClusterConfig)
 	BladeAdmin           string
 	RewardWallet         string
+	PredeployContract    string
 
 	ContractDeployerAllowListAdmin   []types.Address
 	ContractDeployerAllowListEnabled []types.Address
@@ -456,6 +457,12 @@ func WithRewardWallet(rewardWallet string) ClusterOption {
 	}
 }
 
+func WithPredeploy(predeployString string) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.PredeployContract = predeployString
+	}
+}
+
 func isTrueEnv(e string) bool {
 	return strings.ToLower(os.Getenv(e)) == "true"
 }
@@ -699,7 +706,28 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		}
 		args = append(args, "--proxy-contracts-admin", proxyAdminAddr)
 
+		if config.PredeployContract != "" {
+			parts := strings.Split(config.PredeployContract, ":")
+			require.Equal(t, 2, len(parts))
+			args = append(args, "--stake-token", parts[0])
+		}
+
 		// run genesis command with all the arguments
+		err = cluster.cmdRun(args...)
+		require.NoError(t, err)
+	}
+
+	if config.PredeployContract != "" {
+		parts := strings.Split(config.PredeployContract, ":")
+		require.Equal(t, 2, len(parts))
+		// run predeploy genesis population
+		args := []string{
+			"genesis", "predeploy",
+			"--predeploy-address", parts[0],
+			"--artifacts-name", parts[1],
+			"--chain", genesisPath,
+			"--deployer-address", config.BladeAdmin}
+
 		err = cluster.cmdRun(args...)
 		require.NoError(t, err)
 	}

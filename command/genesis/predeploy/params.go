@@ -8,6 +8,8 @@ import (
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/helper/predeployment"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -16,8 +18,10 @@ import (
 const (
 	chainFlag            = "chain"
 	predeployAddressFlag = "predeploy-address"
+	artifactsNameFlag    = "artifacts-name"
 	artifactsPathFlag    = "artifacts-path"
-	constructorArgsPath  = "constructor-args"
+	constructorArgsFlag  = "constructor-args"
+	deployerAddrFlag     = "deployer-address"
 )
 
 var (
@@ -26,31 +30,46 @@ var (
 	errInvalidAddress          = fmt.Errorf(
 		"the provided predeploy address must be >= %s", predeployAddressMin.String(),
 	)
+	errArtifactPathAndNameMissing = errors.New("neither artifact path nor artifact name was provided")
 
 	predeployAddressMin = types.StringToAddress("01100")
 	params              = &predeployParams{}
 )
 
 type predeployParams struct {
-	addressRaw  string
-	genesisPath string
+	addressRaw      string
+	genesisPath     string
+	deployerAddrRaw string
 
-	address         types.Address
-	artifactsPath   string
+	address       types.Address
+	deployerAddr  types.Address
+	artifactsName string
+	artifactsPath string
+
 	constructorArgs []string
 
 	genesisConfig *chain.Chain
+	scArtifact    *contracts.Artifact
 }
 
 func (p *predeployParams) getRequiredFlags() []string {
 	return []string{
 		predeployAddressFlag,
-		artifactsPathFlag,
 	}
 }
 
-func (p *predeployParams) initRawParams() error {
-	if err := p.initPredeployAddress(); err != nil {
+func (p *predeployParams) initRawParams() (err error) {
+	if p.artifactsName == "" && p.artifactsPath == "" {
+		return errArtifactPathAndNameMissing
+	}
+
+	p.address, err = types.IsValidAddress(p.addressRaw, false)
+	if err != nil {
+		return err
+	}
+
+	p.deployerAddr, err = types.IsValidAddress(p.deployerAddrRaw, false)
+	if err != nil {
 		return err
 	}
 
@@ -62,15 +81,9 @@ func (p *predeployParams) initRawParams() error {
 		return err
 	}
 
-	return nil
-}
-
-func (p *predeployParams) initPredeployAddress() error {
-	if p.addressRaw == "" {
-		return errInvalidPredeployAddress
+	if p.scArtifact, err = contractsapi.GetArtifactFromArtifactName(p.artifactsName); err != nil {
+		return err
 	}
-
-	p.address = types.StringToAddress(p.addressRaw)
 
 	return nil
 }
@@ -113,11 +126,26 @@ func (p *predeployParams) updateGenesisConfig() error {
 		return errAddressTaken
 	}
 
+	var (
+		artifact *contracts.Artifact
+		err      error
+	)
+
+	if p.artifactsPath != "" {
+		artifact, err = contracts.LoadArtifactFromFile(p.artifactsPath)
+		if err != nil {
+			return err
+		}
+	} else if p.scArtifact != nil {
+		artifact = p.scArtifact
+	}
+
 	predeployAccount, err := predeployment.GenerateGenesisAccountFromFile(
-		p.artifactsPath,
+		artifact,
 		p.constructorArgs,
 		p.address,
 		p.genesisConfig.Params.ChainID,
+		p.deployerAddr,
 	)
 	if err != nil {
 		return err

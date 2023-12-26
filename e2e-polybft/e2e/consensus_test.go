@@ -207,8 +207,8 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	initialBalance := ethgo.Ether(1000)
 
 	// mint tokens to new validators
-	require.NoError(t, owner.MintNativeERC20Token([]string{firstValidatorAddr.String(), secondValidatorAddr.String()},
-		[]*big.Int{initialBalance, initialBalance}))
+	require.NoError(t, owner.MintERC20Token([]string{firstValidatorAddr.String(), secondValidatorAddr.String()},
+		[]*big.Int{initialBalance, initialBalance}, polybftConfig.StakeTokenAddr))
 
 	// first validator's balance to be received
 	firstBalance, err := relayer.Client().Eth().GetBalance(firstValidatorAddr, ethgo.Latest)
@@ -639,10 +639,6 @@ func TestE2E_Consensus_ChangeVotingPowerByStakingPendingRewards(t *testing.T) {
 	)
 	defer cluster.Stop()
 
-	// load polybft config
-	polybftCfg, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
-	require.NoError(t, err)
-
 	validatorSecretFiles, err := genesis.GetValidatorKeyFiles(cluster.Config.TmpDir, cluster.Config.ValidatorPrefix)
 	require.NoError(t, err)
 
@@ -695,7 +691,7 @@ func TestE2E_Consensus_ChangeVotingPowerByStakingPendingRewards(t *testing.T) {
 		require.NoError(t, validatorSrv.WithdrawRewards())
 
 		// stake withdrawable rewards (since rewards are in native erc20 token in this test)
-		require.NoError(t, validatorSrv.Stake(polybftCfg, validator.WithdrawableRewards))
+		require.NoError(t, validatorSrv.Stake(types.ZeroAddress, validator.WithdrawableRewards))
 	})
 
 	queryValidators(func(idx int, validator *polybft.ValidatorInfo) {

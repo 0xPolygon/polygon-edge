@@ -14,7 +14,7 @@ import (
 	"github.com/umbracle/ethgo/abi"
 
 	gensc "github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 )
 
@@ -36,7 +36,7 @@ type generatedData struct {
 func main() {
 	contractsMetadata := []struct {
 		contractName        string
-		artifact            *artifact.Artifact
+		artifact            *contracts.Artifact
 		generateConstructor bool
 		functions           []string
 		events              []string

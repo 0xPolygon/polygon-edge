@@ -1,4 +1,4 @@
-package artifact
+package contracts
 
 import (
 	"encoding/json"
@@ -6,11 +6,14 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/umbracle/ethgo/abi"
+
+	"github.com/0xPolygon/polygon-edge/helper/hex"
 )
 
-func ReadArtifactData(rootFolder, contractPath, contractName string) ([]byte, error) {
+// ReadRawArtifact loads raw SC artifact data from the provided root folder,
+// relative path and a file name containing artifact (without extension)
+func ReadRawArtifact(rootFolder, contractPath, contractName string) ([]byte, error) {
 	fileName := filepath.Join(rootFolder, contractPath, fmt.Sprintf("%s.json", contractName))
 
 	absolutePath, err := filepath.Abs(fileName)
@@ -21,6 +24,7 @@ func ReadArtifactData(rootFolder, contractPath, contractName string) ([]byte, er
 	return os.ReadFile(filepath.Clean(absolutePath))
 }
 
+// DecodeArtifact unmarshals provided raw json content into an Artifact instance
 func DecodeArtifact(data []byte) (*Artifact, error) {
 	var hexRes HexArtifact
 	if err := json.Unmarshal(data, &hexRes); err != nil {
@@ -32,6 +36,16 @@ func DecodeArtifact(data []byte) (*Artifact, error) {
 		Bytecode:         hex.MustDecodeHex(hexRes.ByteCode),
 		DeployedBytecode: hex.MustDecodeHex(hexRes.DeployedBytecode),
 	}, nil
+}
+
+// LoadArtifactFromFile reads SC artifact file content and decodes it into an Artifact instance
+func LoadArtifactFromFile(fileName string) (*Artifact, error) {
+	jsonRaw, err := os.ReadFile(filepath.Clean(fileName))
+	if err != nil {
+		return nil, fmt.Errorf("failed to load artifact from file '%s': %w", fileName, err)
+	}
+
+	return DecodeArtifact(jsonRaw)
 }
 
 type HexArtifact struct {

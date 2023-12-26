@@ -17,7 +17,6 @@ import (
 	cmdHelper "github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
@@ -452,7 +451,7 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 
 	type contractInfo struct {
 		name            string
-		artifact        *artifact.Artifact
+		artifact        *contracts.Artifact
 		hasProxy        bool
 		byteCodeBuilder func() ([]byte, error)
 	}

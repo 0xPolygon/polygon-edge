@@ -45,12 +45,12 @@ func initStakeManager(polyBFTConfig PolyBFTConfig, transition *state.Transition)
 
 		input, err := approveFn.EncodeAbi()
 		if err != nil {
-			return fmt.Errorf("NativeERC20.approve params encoding failed: %w", err)
+			return fmt.Errorf("StakingERC20.approve params encoding failed: %w", err)
 		}
 
-		err = callContract(validator.Address, contracts.NativeERC20TokenContract, input, "NativeERC20.approve", transition)
+		err = callContract(validator.Address, polyBFTConfig.StakeTokenAddr, input, "StakingERC20.approve", transition)
 		if err != nil {
-			return fmt.Errorf("Error while calling contract %w", err)
+			return fmt.Errorf("error while calling contract %w", err)
 		}
 	}
 
@@ -360,11 +360,37 @@ func mintRewardTokensToWallet(polyBFTConfig PolyBFTConfig, transition *state.Tra
 
 	input, err := mintFn.EncodeAbi()
 	if err != nil {
-		return fmt.Errorf("RewardToken.mint params encoding failed: %w", err)
+		return fmt.Errorf("RewardERC20Token.mint params encoding failed: %w", err)
 	}
 
 	return callContract(contracts.SystemCaller, polyBFTConfig.RewardConfig.TokenAddress, input,
-		"RewardToken.mint", transition)
+		"RewardERC20Token.mint", transition)
+}
+
+// mintStakeToken mints configured amount of stake token to stake token address
+func mintStakeToken(polyBFTConfig PolyBFTConfig, transition *state.Transition) error {
+	if IsNativeStakeToken(polyBFTConfig.StakeTokenAddr) {
+		return nil
+	}
+
+	for _, validator := range polyBFTConfig.InitialValidatorSet {
+		mintFn := contractsapi.MintRootERC20Fn{
+			To:     validator.Address,
+			Amount: validator.Stake,
+		}
+
+		input, err := mintFn.EncodeAbi()
+		if err != nil {
+			return fmt.Errorf("StakingERC20.mint params encoding failed: %w", err)
+		}
+
+		if err := callContract(polyBFTConfig.BladeAdmin, polyBFTConfig.StakeTokenAddr,
+			input, "StakingERC20.mint", transition); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // approveEpochManagerAsSpender approves EpochManager contract as reward token spender
@@ -403,4 +429,9 @@ func callContract(from, to types.Address, input []byte, contractName string, tra
 // isNativeRewardToken returns true in case a native token is used as a reward token as well
 func isNativeRewardToken(cfg PolyBFTConfig) bool {
 	return cfg.RewardConfig.TokenAddress == contracts.NativeERC20TokenContract
+}
+
+// IsNativeStakeToken return true in case a native token is used for staking
+func IsNativeStakeToken(stakeTokenAddr types.Address) bool {
+	return stakeTokenAddr == contracts.NativeERC20TokenContract
 }

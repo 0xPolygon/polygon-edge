@@ -39,6 +39,13 @@ func setFlags(cmd *cobra.Command) {
 	)
 
 	cmd.Flags().StringVar(
+		&params.artifactsName,
+		artifactsNameFlag,
+		"",
+		"the built-in contract artifact name",
+	)
+
+	cmd.Flags().StringVar(
 		&params.artifactsPath,
 		artifactsPathFlag,
 		"",
@@ -47,10 +54,19 @@ func setFlags(cmd *cobra.Command) {
 
 	cmd.Flags().StringArrayVar(
 		&params.constructorArgs,
-		constructorArgsPath,
+		constructorArgsFlag,
 		[]string{},
 		"the constructor arguments, if any",
 	)
+
+	cmd.Flags().StringVar(
+		&params.deployerAddrRaw,
+		deployerAddrFlag,
+		"0x0",
+		"address of contract deployer",
+	)
+
+	cmd.MarkFlagsMutuallyExclusive(artifactsNameFlag, artifactsPathFlag)
 }
 
 func runPreRun(_ *cobra.Command, _ []string) error {
