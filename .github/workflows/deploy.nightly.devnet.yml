@@ -62,6 +62,8 @@ on:  # yamllint disable-line rule:truthy
         required: true
       BLADE_TAG:
         required: true
+      LOG_LEVEL:
+        required: true
 
 jobs:
   build:
@@ -72,7 +74,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: Ethernal-Tech/blade-deployment
-          ref: refactoring
+          ref: main
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
@@ -119,6 +121,7 @@ jobs:
           sed 's/devnet13/${{ secrets.TF_VAR_DEPLOYMENT_NAME }}/g' group_vars/all.yml > group_vars/all.yml.tmp && mv group_vars/all.yml.tmp group_vars/all.yml
           sed 's/blade_tag: .*/blade_tag: ${{ secrets.BLADE_TAG }}/g' group_vars/all.yml > group_vars/all.yml.tmp && mv group_vars/all.yml.tmp group_vars/all.yml
           sed 's/is_bridge_active: .*/is_bridge_active: ${{ secrets.IS_BRIDGE_ACTIVE }}/g' group_vars/all.yml > group_vars/all.yml.tmp && mv group_vars/all.yml.tmp group_vars/all.yml
+          sed 's/INFO/${{ secrets.LOG_LEVEL }}/g' roles/blade/templates/blade.service > roles/blade/templates/blade.service.tmp && mv roles/blade/templates/blade.service.tmp roles/blade/templates/blade.service
       - name: Run Ansible
         working-directory: ansible
         run: |
@@ -185,7 +188,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: Ethernal-Tech/blade-deployment
-          ref: refactoring
+          ref: main
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
@@ -203,6 +206,25 @@ jobs:
         run: terraform init -backend-config="bucket=blade-terraform-states" -backend-config="key=state/${{ secrets.TF_VAR_DEPLOYMENT_NAME }}" -backend-config="region=${{ secrets.AWS_REGION }}"
       - name: Retrieve state file from s3
         run: aws s3 cp s3://blade-terraform-states/state/${{ secrets.TF_VAR_DEPLOYMENT_NAME }} state.json
+      - name: Configure private keys
+        run: |
+          terraform output pk_ansible > ~/devnet_private.key
+          chmod 600 ~/devnet_private.key 
+          eval "$(ssh-agent)"
+          ssh-add ~/devnet_private.key
+      - name: Install ansible / botocore / boto3
+        run: |
+          python3 -m pip install --user ansible
+          python3 -m pip install boto3 botocore
+      - name: Configure ansible for nightly logs
+        working-directory: ansible
+        run: |
+          echo "${{ secrets.VAULT_PASSWORD_FILE }}" > password.txt
+          sed 's/{{ current_datetime\.stdout }}/${{ github.run_id }}/g' roles/upload-logs/tasks/logs.yml > roles/upload-logs/tasks/logs.yml.tmp && mv roles/upload-logs/tasks/logs.yml.tmp roles/upload-logs/tasks/logs.yml
+      - name: Upload Logs
+        working-directory: ansible
+        run: |
+          ansible-playbook upload-logs.yml
       - name: Terraform Destroy
         id: destroy
         run: terraform destroy -auto-approve -state=state.json

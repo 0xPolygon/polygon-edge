@@ -60,6 +60,7 @@ jobs:
       IS_BRIDGE_ACTIVE: ${{ secrets.IS_BRIDGE_ACTIVE }}
       PTA: ${{ secrets.PTA }}
       BLADE_TAG: ${{ secrets.BLADE_TAG }}
+      LOG_LEVEL: ${{ secrets.LOG_LEVEL }}
     with:
       environment: devnet
  
@@ -87,6 +88,15 @@ jobs:
                         "type": "plain_text",
                         "text": "Nightly Build ${{ needs.build.outputs.workflow_output == '' && needs.test.outputs.workflow_output == '' && needs.e2e-polybft.outputs.workflow_output == '' && needs.e2e-legacy.outputs.workflow_output == '' && needs.property.outputs.workflow_output == '' && needs.fuzz.outputs.workflow_output == '' && needs.loadtest.outputs.workflow_output == '' && ':rocket:' || ':rotating_light:' }}"
                       }
+                    },
+                    {
+                      "type": "context",
+                      "elements": [
+                        {
+                          "type": "mrkdwn",
+                          "text": "Logs: *<https://s3.console.aws.amazon.com/s3/buckets/blade-terraform-states?region=us-west-2&prefix=logs/${{ github.run_id }}/|Open URL>*"
+                        }
+                      ]
                     },
                     {
                       "type": "actions",
