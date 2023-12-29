@@ -8,7 +8,7 @@ Welcome to the Polygon Edge documentation, built with [the Material theme for Mk
 
 ```sh
 https://github.com/0xPolygon/polygon-edge.git
-cd polygon-edge/wiki-docs
+cd polygon-edge/docs
 ```
 
 ### Run with Python
