@@ -8,7 +8,7 @@ release:
 builds:
   - id: darwin-amd64
     main: ./main.go
-    binary: polygon-edge
+    binary: blade
     goos:
       - darwin
     goarch:
@@ -21,7 +21,7 @@ builds:
 
   - id: darwin-arm64
     main: ./main.go
-    binary: polygon-edge
+    binary: blade
     goos:
       - darwin
     goarch:
@@ -34,7 +34,7 @@ builds:
 
   - id: linux-amd64
     main: ./main.go
-    binary: polygon-edge
+    binary: blade
     goos:
       - linux
     goarch:
@@ -51,7 +51,7 @@ builds:
 
   - id: linux-arm64
     main: ./main.go
-    binary: polygon-edge
+    binary: blade
     goos:
       - linux
     goarch:
