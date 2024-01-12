@@ -25,7 +25,7 @@ require (
 	github.com/multiformats/go-multihash v0.2.3 // indirect
 	github.com/prometheus/client_golang v1.17.0
 	github.com/ryanuber/columnize v2.1.2+incompatible
-	github.com/spf13/cobra v1.7.0
+	github.com/spf13/cobra v1.8.0
 	github.com/stretchr/testify v1.8.4
 	github.com/syndtr/goleveldb v1.0.1-0.20220721030215-126854af5e6d
 	github.com/umbracle/fastrlp v0.1.1-0.20230504065717-58a1b8a9929d
