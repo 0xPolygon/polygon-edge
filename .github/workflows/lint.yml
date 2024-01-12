@@ -3,16 +3,10 @@ name: Lint
 on: # yamllint disable-line rule:truthy
   push:
     branches:
-      - "*"
-    tags-ignore:
-      - "v*"
-    paths:
-      - "**.go"
+      - main
+      - develop
+
   pull_request:
-    types:
-      - opened
-      - synchronize
-      - reopened
 
   workflow_call: {}
   workflow_dispatch: {}

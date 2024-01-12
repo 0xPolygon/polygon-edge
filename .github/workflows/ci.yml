@@ -1,8 +1,12 @@
 ---
 name: CI
 on:  # yamllint disable-line rule:truthy
-  workflow_dispatch: {}
+  push:
+    branches:
+      - main
+      - develop
   pull_request:
+  workflow_dispatch: {}
 
 jobs:
   build:
