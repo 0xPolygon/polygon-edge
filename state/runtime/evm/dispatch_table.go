@@ -79,7 +79,7 @@ func init() {
 	register(RETURN, handler{inst: opHalt(RETURN), stack: 2, gas: 0})
 
 	// memory
-	register(MLOAD, handler{inst: opMload, stack: 1, gas: 3})
+	register(MLOAD, handler{inst: opMLoad, stack: 1, gas: 3})
 	register(MSTORE, handler{inst: opMStore, stack: 2, gas: 3})
 	register(MSTORE8, handler{inst: opMStore8, stack: 2, gas: 3})
 

@@ -9,6 +9,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/state/runtime/tracer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 func newMockContract(value *big.Int, gas uint64, code []byte) *runtime.Contract {
@@ -26,6 +27,8 @@ func newMockContract(value *big.Int, gas uint64, code []byte) *runtime.Contract 
 // mockHost is a struct which meets the requirements of runtime.Host interface but throws panic in each methods
 // we don't test all opcodes in this test
 type mockHost struct {
+	mock.Mock
+
 	tracer runtime.VMTracer
 }
 
@@ -34,7 +37,9 @@ func (m *mockHost) AccountExists(addr types.Address) bool {
 }
 
 func (m *mockHost) GetStorage(addr types.Address, key types.Hash) types.Hash {
-	panic("Not implemented in tests") //nolint:gocritic
+	args := m.Called()
+
+	return args.Get(0).(types.Hash) //nolint:forcetypeassert
 }
 
 func (m *mockHost) SetState(
@@ -51,7 +56,9 @@ func (m *mockHost) SetStorage(
 	value types.Hash,
 	config *chain.ForksInTime,
 ) runtime.StorageStatus {
-	panic("Not implemented in tests") //nolint:gocritic
+	args := m.Called()
+
+	return args.Get(0).(runtime.StorageStatus) //nolint:forcetypeassert
 }
 
 func (m *mockHost) SetNonPayable(bool) {
@@ -59,35 +66,47 @@ func (m *mockHost) SetNonPayable(bool) {
 }
 
 func (m *mockHost) GetBalance(addr types.Address) *big.Int {
-	panic("Not implemented in tests") //nolint:gocritic
+	args := m.Called(addr)
+
+	return args.Get(0).(*big.Int) //nolint:forcetypeassert
 }
 
 func (m *mockHost) GetCodeSize(addr types.Address) int {
-	panic("Not implemented in tests") //nolint:gocritic
+	args := m.Called(addr)
+
+	return args.Int(0)
 }
 
 func (m *mockHost) GetCodeHash(addr types.Address) types.Hash {
-	panic("Not implemented in tests") //nolint:gocritic
+	args := m.Called(addr)
+
+	return types.StringToHash(args.String(0))
 }
 
 func (m *mockHost) GetCode(addr types.Address) []byte {
-	panic("Not implemented in tests") //nolint:gocritic
+	args := m.Called(addr)
+
+	return types.StringToBytes(args.String(0))
 }
 
 func (m *mockHost) Selfdestruct(addr types.Address, beneficiary types.Address) {
-	panic("Not implemented in tests") //nolint:gocritic
+	m.Called()
 }
 
 func (m *mockHost) GetTxContext() runtime.TxContext {
-	panic("Not implemented in tests") //nolint:gocritic
+	args := m.Called()
+
+	return args.Get(0).(runtime.TxContext) //nolint:forcetypeassert
 }
 
 func (m *mockHost) GetBlockHash(number int64) types.Hash {
-	panic("Not implemented in tests") //nolint:gocritic
+	args := m.Called(number)
+
+	return args.Get(0).(types.Hash) //nolint:forcetypeassert
 }
 
 func (m *mockHost) EmitLog(addr types.Address, topics []types.Hash, data []byte) {
-	panic("Not implemented in tests") //nolint:gocritic
+	m.Called()
 }
 
 func (m *mockHost) Callx(*runtime.Contract, runtime.Host) *runtime.ExecutionResult {
@@ -95,7 +114,9 @@ func (m *mockHost) Callx(*runtime.Contract, runtime.Host) *runtime.ExecutionResu
 }
 
 func (m *mockHost) Empty(addr types.Address) bool {
-	panic("Not implemented in tests") //nolint:gocritic
+	args := m.Called(addr)
+
+	return args.Bool(0)
 }
 
 func (m *mockHost) GetNonce(addr types.Address) uint64 {

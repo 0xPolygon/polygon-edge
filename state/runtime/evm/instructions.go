@@ -397,7 +397,7 @@ var bufPool = sync.Pool{
 	},
 }
 
-func opMload(c *state) {
+func opMLoad(c *state) {
 	offset := c.pop()
 
 	var ok bool

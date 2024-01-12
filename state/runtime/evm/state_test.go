@@ -3,9 +3,14 @@ package evm
 import (
 	"testing"
 
+	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 
 	"github.com/stretchr/testify/assert"
+)
+
+const (
+	defaultInitialGas = uint64(1000)
 )
 
 type codeHelper struct {
@@ -25,8 +30,12 @@ func (c *codeHelper) pop() {
 	c.buf = append(c.buf, POP)
 }
 
-func getState() (*state, func()) {
+func getState(forks *chain.ForksInTime) (*state, func()) {
 	c := statePool.Get().(*state) //nolint:forcetypeassert
+
+	c.config = forks
+	c.gas = defaultInitialGas
+	c.msg = &runtime.Contract{}
 
 	return c, func() {
 		c.reset()
@@ -35,7 +44,7 @@ func getState() (*state, func()) {
 }
 
 func TestStackTop(t *testing.T) {
-	s, closeFn := getState()
+	s, closeFn := getState(&chain.ForksInTime{})
 	defer closeFn()
 
 	s.push(one)
@@ -51,7 +60,7 @@ func TestStackOverflow(t *testing.T) {
 		code.push1()
 	}
 
-	s, closeFn := getState()
+	s, closeFn := getState(&chain.ForksInTime{})
 	defer closeFn()
 
 	s.code = code.buf
@@ -74,7 +83,7 @@ func TestStackOverflow(t *testing.T) {
 }
 
 func TestStackUnderflow(t *testing.T) {
-	s, closeFn := getState()
+	s, closeFn := getState(&chain.ForksInTime{})
 	defer closeFn()
 
 	code := codeHelper{}
@@ -106,7 +115,7 @@ func TestStackUnderflow(t *testing.T) {
 }
 
 func TestOpcodeNotFound(t *testing.T) {
-	s, closeFn := getState()
+	s, closeFn := getState(&chain.ForksInTime{})
 	defer closeFn()
 
 	s.code = []byte{0xA5}

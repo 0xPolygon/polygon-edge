@@ -35,7 +35,6 @@ func (e *EVM) Run(c *runtime.Contract, host runtime.Host, config *chain.ForksInT
 
 	contract.msg = c
 	contract.code = c.Code
-	contract.evm = e
 	contract.gas = c.Gas
 	contract.host = host
 	contract.config = config
