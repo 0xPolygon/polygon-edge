@@ -599,11 +599,23 @@ func (p *Polybft) startConsensusProtocol() {
 				if ev.Source == "syncer" && ev.NewChain[0].Number >= p.blockchain.CurrentHeader().Number {
 					p.logger.Info("sync block notification received", "block height", ev.NewChain[0].Number,
 						"current height", p.blockchain.CurrentHeader().Number)
-					syncerBlockCh <- struct{}{}
+
+					select {
+					case syncerBlockCh <- struct{}{}:
+					default:
+					}
 				}
 			}
 		}
 	}()
+
+	// wait until he stops syncing
+	p.logger.Info("waiting to stop syncing so that we can try to join consensus if node is a validator")
+
+	for p.syncer.IsSyncing() {
+	}
+
+	p.logger.Info("node synced up on start. Trying to join consensus if validator")
 
 	var (
 		sequenceCh   <-chan struct{}

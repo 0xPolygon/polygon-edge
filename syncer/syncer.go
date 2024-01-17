@@ -272,6 +272,11 @@ func (s *syncer) bulkSyncWithPeer(peerID peer.ID, peerLatestBlock uint64,
 	}
 }
 
+// IsSyncing indicates if node is syncing with peer
+func (s *syncer) IsSyncing() bool {
+	return s.GetSyncProgression() != nil
+}
+
 func updateMetrics(fullBlock *types.FullBlock) {
 	metrics.SetGauge([]string{syncerMetrics, "tx_num"}, float32(len(fullBlock.Block.Transactions)))
 	metrics.SetGauge([]string{syncerMetrics, "receipts_num"}, float32(len(fullBlock.Receipts)))
