@@ -586,7 +586,7 @@ func TestSelfConnection_WithBootNodes(t *testing.T) {
 
 		{
 			name:         "Should return an non empty bootnodes list",
-			bootNodes:    []string{"/ip4/127.0.0.1/tcp/10001/p2p/" + peerID.Pretty(), testMultiAddr},
+			bootNodes:    []string{"/ip4/127.0.0.1/tcp/10001/p2p/" + peerID.String(), testMultiAddr},
 			expectedList: []*peer.AddrInfo{peerAddressInfo},
 		},
 	}
