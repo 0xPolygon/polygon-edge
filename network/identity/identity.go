@@ -207,7 +207,7 @@ func (i *IdentityService) Hello(_ context.Context, req *proto.Status) (*proto.St
 func (i *IdentityService) constructStatus(peerID peer.ID) *proto.Status {
 	return &proto.Status{
 		Metadata: map[string]string{
-			PeerID: i.hostID.Pretty(),
+			PeerID: i.hostID.String(),
 		},
 		Chain:         i.chainID,
 		TemporaryDial: i.baseServer.IsTemporaryDial(peerID),
