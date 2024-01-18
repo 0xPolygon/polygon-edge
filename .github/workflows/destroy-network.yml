@@ -73,12 +73,13 @@ jobs:
         working-directory: ansible
         run: |
           echo "${{ secrets.VAULT_PASSWORD }}" > password.txt
+          sed 's/devnet/${{ inputs.environment }}/g' inventory/aws_ec2.yml > inventory/aws_ec2.yml.tmp && mv inventory/aws_ec2.yml.tmp inventory/aws_ec2.yml
           sed 's/devnet/${{ inputs.environment }}/g' roles/upload-logs/tasks/logs.yml > roles/upload-logs/tasks/logs.yml.tmp && mv roles/upload-logs/tasks/logs.yml.tmp roles/upload-logs/tasks/logs.yml
           sed 's/{{ current_datetime\.stdout }}/${{ github.run_id }}/g' roles/upload-logs/tasks/logs.yml > roles/upload-logs/tasks/logs.yml.tmp && mv roles/upload-logs/tasks/logs.yml.tmp roles/upload-logs/tasks/logs.yml
       - name: Upload logs
         working-directory: ansible
         run: |
-          ansible-playbook upload-logs.yml
+          ansible-playbook upload-logs.yml --extra-vars "clean_deploy_title=${{ inputs.environment }}"
 
   destroy_network:
     name: Destroy ${{ inputs.environment }} Network
