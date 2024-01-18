@@ -9,11 +9,38 @@ on:  # yamllint disable-line rule:truthy
         type: choice
         options: [dev, test]
         required: true
+      block_gas_limit:
+        description: Set block gas limit
+        type: string
+        default: "200000000"
+        required: true
+      block_time:
+        description: Set block time
+        type: string
+        default: "2"
+        required: true
+      is_bridge_active:
+        description: Activate Bridge
+        type: boolean
+        default: true
+        required: true
   workflow_call:
     inputs:
       environment:
         description: The environment to run against
         type: string
+        required: true
+      block_gas_limit:
+        description: Set block gas limit
+        type: string
+        required: true
+      block_time:
+        description: Set block time
+        type: string
+        required: true
+      is_bridge_active:
+        description: Activate Bridge
+        type: boolean
         required: true
 
 permissions:
@@ -77,16 +104,14 @@ jobs:
         run: |
           echo "${{ secrets.VAULT_PASSWORD }}" > password.txt
           sed 's/devnet/${{ inputs.environment }}/g' inventory/aws_ec2.yml > inventory/aws_ec2.yml.tmp && mv inventory/aws_ec2.yml.tmp inventory/aws_ec2.yml
-          sed 's/devnet/${{ inputs.environment }}/g' group_vars/all.yml > group_vars/all.yml.tmp && mv group_vars/all.yml.tmp group_vars/all.yml
-          sed 's/blade_tag: .*/blade_tag: ${{ vars.BLADE_TAG }}/g' group_vars/all.yml > group_vars/all.yml.tmp && mv group_vars/all.yml.tmp group_vars/all.yml
-          sed 's/is_bridge_active: .*/is_bridge_active: ${{ vars.IS_BRIDGE_ACTIVE }}/g' group_vars/all.yml > group_vars/all.yml.tmp && mv group_vars/all.yml.tmp group_vars/all.yml
+          sed 's/blade_tag: .*/blade_tag: ${GITHUB_SHA}/g' group_vars/all.yml > group_vars/all.yml.tmp && mv group_vars/all.yml.tmp group_vars/all.yml
           sed 's/INFO/${{ secrets.LOG_LEVEL }}/g' roles/blade/templates/blade.service > roles/blade/templates/blade.service.tmp && mv roles/blade/templates/blade.service.tmp roles/blade/templates/blade.service
       - name: Run Ansible
         working-directory: ansible
         run: |
           ansible-inventory --graph
           ansible-galaxy install -r requirements.yml
-          ansible-playbook site.yml --extra-vars "block_gas_limit=200000000 block_time=2"
+          ansible-playbook site.yml --extra-vars "clean_deploy_title=${{ inputs.environment }} block_gas_limit=${{ inputs.block_gas_limit }} block_time=${{ inputs.block_time }} is_bridge_active=${{ inputs.is_bridge_active }}"
       - name: Set RPC URL value
         id: url
         run: |
