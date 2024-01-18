@@ -6,7 +6,10 @@ on:  # yamllint disable-line rule:truthy
     inputs:
       environment:
         description: The environment to run against
-        type: environment
+        type: choice
+        options: 
+        - dev
+        - test
         required: true
   workflow_call:
     inputs:
@@ -74,8 +77,8 @@ jobs:
         working-directory: ansible
         run: |
           echo "${{ secrets.VAULT_PASSWORD }}" > password.txt
-          sed 's/devnet13/${{ inputs.environment }}/g' inventory/aws_ec2.yml > inventory/aws_ec2.yml.tmp && mv inventory/aws_ec2.yml.tmp inventory/aws_ec2.yml
-          sed 's/devnet13/${{ inputs.environment }}/g' group_vars/all.yml > group_vars/all.yml.tmp && mv group_vars/all.yml.tmp group_vars/all.yml
+          sed 's/devnet/${{ inputs.environment }}/g' inventory/aws_ec2.yml > inventory/aws_ec2.yml.tmp && mv inventory/aws_ec2.yml.tmp inventory/aws_ec2.yml
+          sed 's/devnet/${{ inputs.environment }}/g' group_vars/all.yml > group_vars/all.yml.tmp && mv group_vars/all.yml.tmp group_vars/all.yml
           sed 's/blade_tag: .*/blade_tag: ${{ vars.BLADE_TAG }}/g' group_vars/all.yml > group_vars/all.yml.tmp && mv group_vars/all.yml.tmp group_vars/all.yml
           sed 's/is_bridge_active: .*/is_bridge_active: ${{ vars.IS_BRIDGE_ACTIVE }}/g' group_vars/all.yml > group_vars/all.yml.tmp && mv group_vars/all.yml.tmp group_vars/all.yml
           sed 's/INFO/${{ secrets.LOG_LEVEL }}/g' roles/blade/templates/blade.service > roles/blade/templates/blade.service.tmp && mv roles/blade/templates/blade.service.tmp roles/blade/templates/blade.service
