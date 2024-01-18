@@ -1,5 +1,5 @@
 ---
-
+concurrency: ci-$
 name: Deploy Network
 on:  # yamllint disable-line rule:truthy
   workflow_dispatch:
@@ -7,9 +7,7 @@ on:  # yamllint disable-line rule:truthy
       environment:
         description: The environment to run against
         type: choice
-        options: 
-        - dev
-        - test
+        options: [dev, test]
         required: true
   workflow_call:
     inputs:
@@ -24,7 +22,7 @@ permissions:
   security-events: write
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     steps:
@@ -42,7 +40,7 @@ jobs:
         uses: hashicorp/setup-terraform@v2.0.3
         with:
           terraform_version: 1.4.5
-      - name: "Configure terraform for ${{ inputs.environment }} build"
+      - name: "Configure Terraform for ${{ inputs.environment }} build"
         run: |
           sed 's/# backend "s3" {}/backend "s3" {}/' main.tf > main.tf.tmp && mv main.tf.tmp main.tf
       - name: Terraform Init
@@ -69,11 +67,11 @@ jobs:
           chmod 600 ~/private.key 
           eval "$(ssh-agent)"
           ssh-add ~/private.key
-      - name: Install ansible / botocore / boto3
+      - name: Install Ansible / botocore / boto3
         run: |
           python3 -m pip install --user ansible
           python3 -m pip install boto3 botocore
-      - name: Configure ansible for nightly build
+      - name: Configure Ansible for ${{ inputs.environment }} build
         working-directory: ansible
         run: |
           echo "${{ secrets.VAULT_PASSWORD }}" > password.txt
@@ -88,7 +86,7 @@ jobs:
           ansible-inventory --graph
           ansible-galaxy install -r requirements.yml
           ansible-playbook site.yml --extra-vars "block_gas_limit=200000000 block_time=2"
-      - name: Set rpc url value
+      - name: Set RPC URL value
         id: url
         run: |
           terraform output -raw aws_lb_ext_domain | grep -o -E '^ext[^:]*' > rpc_url.txt
