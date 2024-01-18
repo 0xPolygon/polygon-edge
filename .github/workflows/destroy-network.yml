@@ -1,0 +1,99 @@
+---
+concurrency: ci-$
+name: Destroy Network
+on:  # yamllint disable-line rule:truthy
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: The environment to run against
+        type: choice
+        options: [dev, test]
+        required: true
+      logs:
+        description: Do you want to upload logs from hosts?
+        type: boolean
+        default: false
+        required: true
+  workflow_call:
+    inputs:
+      environment:
+        description: The environment to run against
+        type: string
+        required: true
+      logs:
+        description: Do you want to upload logs from hosts?
+        type: boolean
+        required: true
+
+permissions:
+  id-token: write
+  contents: read
+  security-events: write
+
+jobs:
+  upload_logs:
+    name: Upload logs from hosts
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    if: ${{ inputs.logs == 'true' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          repository: Ethernal-Tech/blade-deployment
+          ref: changes
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-region: ${{ secrets.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+      - name: Retrieve state file from s3
+        run: aws s3 cp s3://blade-github/states/${{ inputs.environment }} state.json
+      - name: Configure private keys
+        run: |
+          terraform output pk_ansible > ~/private.key
+          chmod 600 ~/private.key 
+          eval "$(ssh-agent)"
+          ssh-add ~/private.key
+      - name: Install Ansible / botocore / boto3
+        run: |
+          python3 -m pip install --user ansible
+          python3 -m pip install boto3 botocore
+      - name: Configure Ansible for ${{ inputs.environment }}
+        working-directory: ansible
+        run: |
+          echo "${{ secrets.VAULT_PASSWORD }}" > password.txt
+          sed 's/devnet/${{ inputs.environment }}/g' roles/upload-logs/tasks/logs.yml > roles/upload-logs/tasks/logs.yml.tmp && mv roles/upload-logs/tasks/logs.yml.tmp roles/upload-logs/tasks/logs.yml
+          sed 's/{{ current_datetime\.stdout }}/${{ github.run_id }}/g' roles/upload-logs/tasks/logs.yml > roles/upload-logs/tasks/logs.yml.tmp && mv roles/upload-logs/tasks/logs.yml.tmp roles/upload-logs/tasks/logs.yml
+      - name: Upload logs
+        working-directory: ansible
+        run: |
+          ansible-playbook upload-logs.yml
+
+  destroy_network:
+    name: Destroy ${{ inputs.environment }} Network
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    needs: [upload_logs]
+    if: always()
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-region: ${{ secrets.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v2.0.3
+        with:
+          terraform_version: 1.4.5
+      - name: Configure Terraform for ${{ inputs.environment }}
+        run: |
+          sed 's/# backend "s3" {}/backend "s3" {}/' main.tf > main.tf.tmp && mv main.tf.tmp main.tf
+      - name: Terraform Init
+        id: init
+        run: terraform init -backend-config="bucket=blade-github" -backend-config="key=states/${{ inputs.environment }}" -backend-config="region=${{ secrets.AWS_REGION }}"
+      - name: Retrieve state file from s3
+        run: aws s3 cp s3://blade-github/states/${{ inputs.environment }} state.json
+      - name: Terraform Destroy
+        id: destroy
+        run: terraform destroy -auto-approve -state=state.json

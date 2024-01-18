@@ -22,7 +22,8 @@ permissions:
   security-events: write
 
 jobs:
-  deploy:
+  deploy_network:
+    name: Deploy ${{ inputs.environment }} Network
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     steps:
@@ -32,7 +33,7 @@ jobs:
           repository: Ethernal-Tech/blade-deployment
           ref: changes
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v2
+        uses: aws-actions/configure-aws-credentials@v3
         with:
           aws-region: ${{ secrets.AWS_REGION }}
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
@@ -40,7 +41,7 @@ jobs:
         uses: hashicorp/setup-terraform@v2.0.3
         with:
           terraform_version: 1.4.5
-      - name: "Configure Terraform for ${{ inputs.environment }} build"
+      - name: Configure Terraform for ${{ inputs.environment }}
         run: |
           sed 's/# backend "s3" {}/backend "s3" {}/' main.tf > main.tf.tmp && mv main.tf.tmp main.tf
       - name: Terraform Init
@@ -71,7 +72,7 @@ jobs:
         run: |
           python3 -m pip install --user ansible
           python3 -m pip install boto3 botocore
-      - name: Configure Ansible for ${{ inputs.environment }} build
+      - name: Configure Ansible for ${{ inputs.environment }}
         working-directory: ansible
         run: |
           echo "${{ secrets.VAULT_PASSWORD }}" > password.txt
