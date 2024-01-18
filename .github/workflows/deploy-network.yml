@@ -1,0 +1,90 @@
+---
+
+name: Deploy Network
+on:  # yamllint disable-line rule:truthy
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: The environment to run against
+        type: environment
+        required: true
+  workflow_call:
+    inputs:
+      environment:
+        description: The environment to run against
+        type: string
+        required: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          repository: Ethernal-Tech/blade-deployment
+          ref: changes
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-region: ${{ secrets.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v2.0.3
+        with:
+          terraform_version: 1.4.5
+      - name: "Configure terraform for ${{ inputs.environment }} build"
+        run: |
+          sed 's/# backend "s3" {}/backend "s3" {}/' main.tf > main.tf.tmp && mv main.tf.tmp main.tf
+      - name: Terraform Init
+        id: init
+        run: terraform init -backend-config="bucket=blade-github" -backend-config="key=states/${{ inputs.environment }}" -backend-config="region=${{ secrets.AWS_REGION }}"
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate -no-color
+        continue-on-error: true
+      - name: Terraform Apply
+        id: apply
+        run: terraform apply -auto-approve
+        env:
+          TF_VAR_deployment_name: ${{ inputs.environment }}
+          TF_VAR_base_instance_type: ${{ vars.AWS_BASE_INSTANCE_TYPE }}
+          TF_VAR_geth_count: ${{ vars.GETH_COUNT }}
+          TF_VAR_fullnode_count: ${{ vars.FULLNODE_COUNT }}
+          TF_VAR_validator_count: ${{ vars.VALIDATOR_COUNT }}
+      - name: Retrieve state file from s3
+        run: aws s3 cp s3://blade-github/states/${{ inputs.environment }} state.json
+      - name: Configure private keys
+        run: |
+          terraform output pk_ansible > ~/private.key
+          chmod 600 ~/private.key 
+          eval "$(ssh-agent)"
+          ssh-add ~/private.key
+      - name: Install ansible / botocore / boto3
+        run: |
+          python3 -m pip install --user ansible
+          python3 -m pip install boto3 botocore
+      - name: Configure ansible for nightly build
+        working-directory: ansible
+        run: |
+          echo "${{ secrets.VAULT_PASSWORD }}" > password.txt
+          sed 's/devnet13/${{ inputs.environment }}/g' inventory/aws_ec2.yml > inventory/aws_ec2.yml.tmp && mv inventory/aws_ec2.yml.tmp inventory/aws_ec2.yml
+          sed 's/devnet13/${{ inputs.environment }}/g' group_vars/all.yml > group_vars/all.yml.tmp && mv group_vars/all.yml.tmp group_vars/all.yml
+          sed 's/blade_tag: .*/blade_tag: ${{ vars.BLADE_TAG }}/g' group_vars/all.yml > group_vars/all.yml.tmp && mv group_vars/all.yml.tmp group_vars/all.yml
+          sed 's/is_bridge_active: .*/is_bridge_active: ${{ vars.IS_BRIDGE_ACTIVE }}/g' group_vars/all.yml > group_vars/all.yml.tmp && mv group_vars/all.yml.tmp group_vars/all.yml
+          sed 's/INFO/${{ secrets.LOG_LEVEL }}/g' roles/blade/templates/blade.service > roles/blade/templates/blade.service.tmp && mv roles/blade/templates/blade.service.tmp roles/blade/templates/blade.service
+      - name: Run Ansible
+        working-directory: ansible
+        run: |
+          ansible-inventory --graph
+          ansible-galaxy install -r requirements.yml
+          ansible-playbook site.yml --extra-vars "block_gas_limit=200000000 block_time=2"
+      - name: Set rpc url value
+        id: url
+        run: |
+          terraform output -raw aws_lb_ext_domain | grep -o -E '^ext[^:]*' > rpc_url.txt
+      - uses: actions/upload-artifact@v3
+        with:
+          name: rpc_url
+          path: rpc_url.txt
