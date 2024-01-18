@@ -10,7 +10,7 @@ on:  # yamllint disable-line rule:truthy
         options: [dev, test]
         required: true
       logs:
-        description: Do you want to upload logs from hosts?
+        description: Upload logs
         type: boolean
         default: false
         required: true
@@ -21,7 +21,7 @@ on:  # yamllint disable-line rule:truthy
         type: string
         required: true
       logs:
-        description: Do you want to upload logs from hosts?
+        description: Upload logs
         type: boolean
         required: true
 
@@ -35,7 +35,7 @@ jobs:
     name: Upload logs from hosts
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
-    if: ${{ inputs.logs == 'true' }}
+    if: ${{ inputs.logs == true }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -77,6 +77,11 @@ jobs:
     needs: [upload_logs]
     if: always()
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          repository: Ethernal-Tech/blade-deployment
+          ref: changes
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v3
         with:
