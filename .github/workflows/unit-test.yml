@@ -10,7 +10,7 @@ on:  # yamllint disable-line rule:truthy
 
 jobs:
   unit_test:
-    name: Blade
+    name: Run
     runs-on: ubuntu-latest
     outputs:
       test_output_failure: ${{ steps.run_tests_failure.outputs.test_output }}

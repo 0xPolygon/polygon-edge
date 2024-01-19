@@ -1,213 +1,28 @@
 ---
 name: Nightly Build
-on:  #yamllint disable-line rule:truthy
+on:  # yamllint disable-line rule:truthy
   workflow_dispatch:
-  schedule:
-    # * is a special character in YAML so you have to quote this string
-    - cron: '0 0 * * *'
-
-permissions:
-  id-token: write
-  contents: read
-  security-events: write
 
 jobs:
   build:
-    name: Build
+    name: Build Blade
     uses: ./.github/workflows/build.yml
-
-  test:
-    name: Test
-    uses: ./.github/workflows/test.yml
+  tests:
+    name: Run Tests
+    uses: ./.github/workflows/tests.yml
     needs: build
-
-  e2e-polybft:
-    name: PolyBFT E2E Tests
-    uses: ./.github/workflows/e2e-polybft.yml
-    needs: build
-
-  e2e-legacy:
-    name: Legacy E2E Tests
-    uses: ./.github/workflows/e2e-legacy.yaml
-    needs: build
-
-  property:
-    name: Polybft Property Tests
-    uses: ./.github/workflows/property-polybft.yml
-    needs: build
-
-  fuzz:
-    name: Fuzz Tests
-    uses: ./.github/workflows/fuzz-test.yml
-    needs: build
-
-  loadtest:
-    name: Build Devnet
-    uses: ./.github/workflows/deploy.nightly.devnet.yml
-    secrets:
-      AWS_REGION: ${{ secrets.AWS_REGION }}
-      AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
-      TF_VAR_DEPLOYMENT_NAME: ${{ secrets.TF_VAR_DEPLOYMENT_NAME }}
-      TF_VAR_OWNER: ${{ secrets.TF_VAR_OWNER }}
-      TF_VAR_BASE_INSTANCE_TYPE: ${{ secrets.TF_VAR_BASE_INSTANCE_TYPE }}
-      SLACK_PERFORMANCE_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
-      LOADTESTER_AWS_SUBNET_ID: ${{ secrets.LOADTESTER_AWS_SUBNET_ID }}
-      LOADTESTER_AWS_SG_ID: ${{ secrets.LOADTESTER_AWS_SG_ID }}
-      LOADTESTER_INSTANCE_TYPE: ${{ secrets.LOADTESTER_INSTANCE_TYPE }}
-      LOADTEST_MNEMONIC: ${{ secrets.LOADTEST_MNEMONIC }}
-      VAULT_PASSWORD_FILE: ${{ secrets.VAULT_PASSWORD_FILE }}
-      LOADTESTER_AMI: ${{ secrets.LOADTESTER_AMI }}
-      IS_BRIDGE_ACTIVE: ${{ secrets.IS_BRIDGE_ACTIVE }}
-      PTA: ${{ secrets.PTA }}
-      BLADE_TAG: ${{ secrets.BLADE_TAG }}
-      LOG_LEVEL: ${{ secrets.LOG_LEVEL }}
     with:
-      environment: devnet
- 
-  notification:
-    name: Nightly Notifications
-    runs-on: ubuntu-latest
-    needs: [build, test, e2e-polybft, e2e-legacy, property, fuzz, loadtest]
-    if: success() || failure()
-    steps:
-      - name: Notify Slack
-        uses: slackapi/slack-github-action@v1.23.0
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_BLADE_GITHUB_URL }}
-          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
-        with:
-          payload: |
-            {
-              "attachments": [
-                {
-                  "color": "${{ needs.build.outputs.workflow_output == '' && needs.test.outputs.workflow_output == '' && needs.e2e-polybft.outputs.workflow_output == '' && needs.e2e-legacy.outputs.workflow_output == '' && needs.property.outputs.workflow_output == '' && needs.fuzz.outputs.workflow_output == '' && needs.loadtest.outputs.workflow_output == '' && '#03C03C' || '#E60012' }}",
-                  "blocks": [
-                    {
-                      "type": "header",
-                      "text": {
-                        "type": "plain_text",
-                        "text": "Nightly Build ${{ needs.build.outputs.workflow_output == '' && needs.test.outputs.workflow_output == '' && needs.e2e-polybft.outputs.workflow_output == '' && needs.e2e-legacy.outputs.workflow_output == '' && needs.property.outputs.workflow_output == '' && needs.fuzz.outputs.workflow_output == '' && needs.loadtest.outputs.workflow_output == '' && ':rocket:' || ':rotating_light:' }}"
-                      }
-                    },
-                    {
-                      "type": "context",
-                      "elements": [
-                        {
-                          "type": "mrkdwn",
-                          "text": "Logs: *<https://s3.console.aws.amazon.com/s3/buckets/blade-terraform-states?region=us-west-2&prefix=logs/${{ github.run_id }}/|Open URL>*"
-                        }
-                      ]
-                    },
-                    {
-                      "type": "actions",
-                      "elements": [
-                        {
-                          "type": "button",
-                          "text": {
-                            "type": "plain_text",
-                            "text": "View workflow run"
-                          },
-                          "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-                        }
-                      ]
-                    }
-                  ]
-                },
-                {
-                  "color": "${{ needs.build.outputs.workflow_output == '' && '#03C03C' || '#E60012' }}",
-                  "blocks": [
-                    {
-                      "type": "section",
-                      "text": {
-                        "type": "mrkdwn",
-                        "text": "*Build*"
-                      }
-                    }
-                  ]
-                },
-                {
-                  "color": "${{ needs.test.outputs.workflow_output == '' && '#03C03C' || '#E60012' }}",
-                  "blocks": [
-                    {
-                      "type": "section",
-                      "text": {
-                        "type": "mrkdwn",
-                        "text": "*Unit Tests*"
-                      }
-                    }
-                  ]
-                },
-                {
-                  "color": "${{ needs.property.outputs.workflow_output == '' && '#03C03C' || '#E60012' }}",
-                  "blocks": [
-                    {
-                      "type": "section",
-                      "text": {
-                        "type": "mrkdwn",
-                        "text": "*Property Tests*"
-                      }
-                    }
-                  ]
-                },
-                {
-                  "color": "${{ needs.e2e-legacy.outputs.workflow_output == '' && '#03C03C' || '#E60012' }}",
-                  "blocks": [
-                    {
-                      "type": "section",
-                      "text": {
-                        "type": "mrkdwn",
-                        "text": "*Legacy E2E Tests*"
-                      }
-                    }
-                  ]
-                },
-                {
-                  "color": "${{ needs.e2e-polybft.outputs.workflow_output == '' && '#03C03C' || '#E60012' }}",
-                  "blocks": [
-                    {
-                      "type": "section",
-                      "text": {
-                        "type": "mrkdwn",
-                        "text": "*PolyBFT E2E Tests*"
-                      }
-                    }
-                  ]
-                },
-                {
-                  "color": "${{ needs.fuzz.outputs.workflow_output == '' && '#03C03C' || '#E60012' }}",
-                  "blocks": [
-                    {
-                      "type": "section",
-                      "text": {
-                        "type": "mrkdwn",
-                        "text": "*Fuzz Tests*"
-                      }
-                    }
-                  ]
-                },
-                {
-                  "color": "${{ needs.loadtest.outputs.workflow_output_loadtest1 == 'true' && '#03C03C' || '#E60012' }}",
-                  "blocks": [
-                    {
-                      "type": "section",
-                      "text": {
-                        "type": "mrkdwn",
-                        "text": "*Load Tests multiple_EOA*"
-                      }
-                    }
-                  ]
-                },
-                {
-                  "color": "${{ needs.loadtest.outputs.workflow_output_loadtest2 == 'true' && '#03C03C' || '#E60012' }}",
-                  "blocks": [
-                    {
-                      "type": "section",
-                      "text": {
-                        "type": "mrkdwn",
-                        "text": "*Load Tests multiple_ERC20*"
-                      }
-                    }
-                  ]
-                }
-              ]
-            }
+      unit-test: true
+      e2e-polybft-test: true
+      e2e-legacy-test: true
+      property-polybft-test: true
+      fuzz-test: true
+  deploy_network:
+    name: Deploy nightly Network
+    uses: ./.github/workflows/deploy-network.yml
+    needs: build
+    with:
+      environment: nightly
+      block_gas_limit: "200000000"
+      block_time: "2"
+      is_bridge_active: true

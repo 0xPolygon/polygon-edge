@@ -14,7 +14,7 @@ on:  # yamllint disable-line rule:truthy
 
 jobs:
   polybft_property:
-    name: PolyBFT Property Tests
+    name: Run
     runs-on: ubuntu-latest
     env:
       E2E_TESTS: true

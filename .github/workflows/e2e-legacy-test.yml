@@ -15,7 +15,7 @@ on:  # yamllint disable-line rule:truthy
 
 jobs:
   e2e_legacy:
-    name: Legacy E2E Tests
+    name: Run
     runs-on: ubuntu-latest
     env:
       E2E_TESTS: true
