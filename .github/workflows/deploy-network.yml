@@ -40,6 +40,13 @@ on:  # yamllint disable-line rule:truthy
         description: Activate Bridge
         type: boolean
         required: true
+    secrets:
+      AWS_REGION:
+        required: true
+      AWS_ROLE_ARN:
+        required: true
+      VAULT_PASSWORD:
+        required: true
 
 permissions:
   id-token: write

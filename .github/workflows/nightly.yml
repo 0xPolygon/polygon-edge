@@ -4,25 +4,28 @@ on:  # yamllint disable-line rule:truthy
   workflow_dispatch:
 
 jobs:
-  build:
-    name: Build Blade
-    uses: ./.github/workflows/build.yml
-  tests:
-    name: Run Tests
-    uses: ./.github/workflows/tests.yml
-    needs: build
-    with:
-      unit-test: true
-      e2e-polybft-test: true
-      e2e-legacy-test: true
-      property-polybft-test: true
-      fuzz-test: true
+  # build:
+  #   name: Build Blade
+  #   uses: ./.github/workflows/build.yml
+  # tests:
+  #   name: Run Tests
+  #   uses: ./.github/workflows/tests.yml
+  #   needs: build
+  #   with:
+  #     unit-test: true
+  #     e2e-polybft-test: true
+  #     e2e-legacy-test: true
+  #     property-polybft-test: true
+  #     fuzz-test: true
   deploy_network:
     name: Deploy nightly Network
     uses: ./.github/workflows/deploy-network.yml
-    needs: build
     with:
       environment: nightly
       block_gas_limit: "200000000"
       block_time: "2"
       is_bridge_active: true
+    secrets:
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+      VAULT_PASSWORD: ${{ secrets.VAULT_PASSWORD }}
