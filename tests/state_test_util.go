@@ -1,10 +1,9 @@
 package tests
 
 import (
-	"embed"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"io/fs"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -31,6 +30,23 @@ type testCase struct {
 	Transaction *stTransaction                          `json:"transaction"`
 }
 
+func (t *testCase) checkError(fork string, index int, err error) error {
+	expectedError := t.Post[fork][index].ExpectException
+	if err == nil && expectedError == "" {
+		return nil
+	}
+
+	if err == nil && expectedError != "" {
+		return fmt.Errorf("expected error %q, got no error", expectedError)
+	}
+
+	if err != nil && expectedError == "" {
+		return fmt.Errorf("unexpected error: %w", err)
+	}
+
+	return nil
+}
+
 type env struct {
 	BaseFee    string `json:"currentBaseFee"`
 	Coinbase   string `json:"currentCoinbase"`
@@ -40,12 +56,40 @@ type env struct {
 	Timestamp  string `json:"currentTimestamp"`
 }
 
-func remove0xPrefix(str string) string {
-	if strings.HasPrefix(str, "0x") {
-		return strings.Replace(str, "0x", "", -1)
+func (e *env) ToHeader(t *testing.T) *types.Header {
+	t.Helper()
+
+	baseFee := uint64(0)
+	if e.BaseFee != "" {
+		baseFee = stringToUint64T(t, e.BaseFee)
 	}
 
-	return str
+	return &types.Header{
+		Miner:      stringToAddressT(t, e.Coinbase).Bytes(),
+		BaseFee:    baseFee,
+		Difficulty: stringToUint64T(t, e.Difficulty),
+		GasLimit:   stringToUint64T(t, e.GasLimit),
+		Number:     stringToUint64T(t, e.Number),
+		Timestamp:  stringToUint64T(t, e.Timestamp),
+	}
+}
+
+func (e *env) ToEnv(t *testing.T) runtime.TxContext {
+	t.Helper()
+
+	baseFee := new(big.Int)
+	if e.BaseFee != "" {
+		baseFee = stringToBigIntT(t, e.BaseFee)
+	}
+
+	return runtime.TxContext{
+		Coinbase:   stringToAddressT(t, e.Coinbase),
+		BaseFee:    baseFee,
+		Difficulty: stringToHashT(t, e.Difficulty),
+		GasLimit:   stringToInt64T(t, e.GasLimit),
+		Number:     stringToInt64T(t, e.Number),
+		Timestamp:  stringToInt64T(t, e.Timestamp),
+	}
 }
 
 func stringToAddress(str string) (types.Address, error) {
@@ -72,11 +116,11 @@ func stringToBigInt(str string) (*big.Int, error) {
 	base := 10
 
 	if strings.HasPrefix(str, "0x") {
-		str, base = remove0xPrefix(str), 16
+		str = strings.TrimPrefix(str, "0x")
+		base = 16
 	}
 
-	n, ok := big.NewInt(1).SetString(str, base)
-
+	n, ok := new(big.Int).SetString(str, base)
 	if !ok {
 		return nil, fmt.Errorf("failed to convert %s to big.Int with base %d", str, base)
 	}
@@ -148,45 +192,7 @@ func stringToInt64T(t *testing.T, str string) int64 {
 	return int64(n)
 }
 
-func (e *env) ToHeader(t *testing.T) *types.Header {
-	t.Helper()
-
-	baseFee := uint64(0)
-	if e.BaseFee != "" {
-		baseFee = stringToUint64T(t, e.BaseFee)
-	}
-
-	return &types.Header{
-		Miner:      stringToAddressT(t, e.Coinbase).Bytes(),
-		BaseFee:    baseFee,
-		Difficulty: stringToUint64T(t, e.Difficulty),
-		GasLimit:   stringToUint64T(t, e.GasLimit),
-		Number:     stringToUint64T(t, e.Number),
-		Timestamp:  stringToUint64T(t, e.Timestamp),
-	}
-}
-
-func (e *env) ToEnv(t *testing.T) runtime.TxContext {
-	t.Helper()
-
-	baseFee := new(big.Int)
-	if e.BaseFee != "" {
-		baseFee = stringToBigIntT(t, e.BaseFee)
-	}
-
-	return runtime.TxContext{
-		Coinbase:   stringToAddressT(t, e.Coinbase),
-		BaseFee:    baseFee,
-		Difficulty: stringToHashT(t, e.Difficulty),
-		GasLimit:   stringToInt64T(t, e.GasLimit),
-		Number:     stringToInt64T(t, e.Number),
-		Timestamp:  stringToInt64T(t, e.Timestamp),
-	}
-}
-
-func buildState(
-	allocs map[types.Address]*chain.GenesisAccount,
-) (state.State, state.Snapshot, types.Hash, error) {
+func buildState(allocs map[types.Address]*chain.GenesisAccount) (state.State, state.Snapshot, types.Hash, error) {
 	s := itrie.NewState(itrie.NewMemoryStorage())
 	snap := s.NewSnapshot()
 
@@ -223,20 +229,20 @@ type indexes struct {
 }
 
 type postEntry struct {
-	Root    types.Hash
-	Logs    types.Hash
-	Indexes indexes
-	TxBytes []byte
+	Root            types.Hash
+	Logs            types.Hash
+	Indexes         indexes
+	ExpectException string
+	TxBytes         []byte
 }
-
-type postState []postEntry
 
 func (p *postEntry) UnmarshalJSON(input []byte) error {
 	type stateUnmarshall struct {
-		Root    string  `json:"hash"`
-		Logs    string  `json:"logs"`
-		Indexes indexes `json:"indexes"`
-		TxBytes string  `json:"txbytes"`
+		Root            string  `json:"hash"`
+		Logs            string  `json:"logs"`
+		Indexes         indexes `json:"indexes"`
+		ExpectException string  `json:"expectException"`
+		TxBytes         string  `json:"txbytes"`
 	}
 
 	var dec stateUnmarshall
@@ -247,21 +253,28 @@ func (p *postEntry) UnmarshalJSON(input []byte) error {
 	p.Root = types.StringToHash(dec.Root)
 	p.Logs = types.StringToHash(dec.Logs)
 	p.Indexes = dec.Indexes
+	p.ExpectException = dec.ExpectException
 	p.TxBytes = types.StringToBytes(dec.TxBytes)
 
 	return nil
 }
 
+type postState []postEntry
+
+// TODO: Check do we need access lists in the stTransaction
+// (we do not have them in the types.Transaction either)
+//
+//nolint:godox
 type stTransaction struct {
 	Data                 []string       `json:"data"`
+	Value                []string       `json:"value"`
+	Nonce                uint64         `json:"nonce"`
+	To                   *types.Address `json:"to"`
 	GasLimit             []uint64       `json:"gasLimit"`
-	Value                []*big.Int     `json:"value"`
 	GasPrice             *big.Int       `json:"gasPrice"`
 	MaxFeePerGas         *big.Int       `json:"maxFeePerGas"`
 	MaxPriorityFeePerGas *big.Int       `json:"maxPriorityFeePerGas"`
-	Nonce                uint64         `json:"nonce"`
-	From                 types.Address  `json:"secretKey"`
-	To                   *types.Address `json:"to"`
+	From                 types.Address  // derived field
 }
 
 func (t *stTransaction) At(i indexes, baseFee *big.Int) (*types.Transaction, error) {
@@ -296,13 +309,29 @@ func (t *stTransaction) At(i indexes, baseFee *big.Int) (*types.Transaction, err
 		gasPrice = common.BigMin(new(big.Int).Add(t.MaxPriorityFeePerGas, baseFee), t.MaxFeePerGas)
 	}
 
+	if gasPrice == nil {
+		return nil, errors.New("no gas price provided")
+	}
+
+	valueHex := t.Value[i.Value]
+	value := new(big.Int)
+
+	if valueHex != "0x" {
+		v, err := common.ParseUint256orHex(&valueHex)
+		if err != nil {
+			return nil, err
+		}
+
+		value = v
+	}
+
 	return &types.Transaction{
 		From:      t.From,
 		To:        t.To,
 		Nonce:     t.Nonce,
-		Value:     new(big.Int).Set(t.Value[i.Value]),
+		Value:     value,
 		Gas:       t.GasLimit[i.Gas],
-		GasPrice:  new(big.Int).Set(gasPrice),
+		GasPrice:  gasPrice,
 		GasFeeCap: t.MaxFeePerGas,
 		GasTipCap: t.MaxPriorityFeePerGas,
 		Input:     hex.MustDecodeHex(t.Data[i.Data]),
@@ -318,7 +347,8 @@ func (t *stTransaction) UnmarshalJSON(input []byte) error {
 		MaxFeePerGas         string   `json:"maxFeePerGas,omitempty"`
 		MaxPriorityFeePerGas string   `json:"maxPriorityFeePerGas,omitempty"`
 		Nonce                string   `json:"nonce,omitempty"`
-		SecretKey            string   `json:"secretKey,omitempty"`
+		PrivateKey           string   `json:"secretKey,omitempty"`
+		Sender               string   `json:"sender"`
 		To                   string   `json:"to,omitempty"`
 	}
 
@@ -328,6 +358,7 @@ func (t *stTransaction) UnmarshalJSON(input []byte) error {
 	}
 
 	t.Data = dec.Data
+	t.Value = dec.Value
 
 	for _, i := range dec.GasLimit {
 		j, err := stringToUint64(i)
@@ -336,22 +367,6 @@ func (t *stTransaction) UnmarshalJSON(input []byte) error {
 		}
 
 		t.GasLimit = append(t.GasLimit, j)
-	}
-
-	for _, i := range dec.Value {
-		value := new(big.Int)
-		loopVal := i
-
-		if loopVal != "0x" {
-			v, err := common.ParseUint256orHex(&loopVal)
-			if err != nil {
-				return err
-			}
-
-			value = v
-		}
-
-		t.Value = append(t.Value, value)
 	}
 
 	var err error
@@ -380,15 +395,15 @@ func (t *stTransaction) UnmarshalJSON(input []byte) error {
 		}
 	}
 
-	t.From = types.Address{}
-
-	if len(dec.SecretKey) > 0 {
-		secretKey, err := common.ParseBytes(&dec.SecretKey)
+	if dec.Sender != "" {
+		t.From = types.StringToAddress(dec.Sender)
+	} else if len(dec.PrivateKey) > 0 {
+		senderPrivKey, err := common.ParseBytes(&dec.PrivateKey)
 		if err != nil {
 			return fmt.Errorf("failed to parse secret key: %w", err)
 		}
 
-		key, err := crypto.ParseECDSAPrivateKey(secretKey)
+		key, err := crypto.ParseECDSAPrivateKey(senderPrivKey)
 		if err != nil {
 			return fmt.Errorf("invalid private key: %w", err)
 		}
@@ -405,7 +420,6 @@ func (t *stTransaction) UnmarshalJSON(input []byte) error {
 }
 
 // forks
-
 var Forks = map[string]*chain.Forks{
 	"Frontier": {},
 	"Homestead": {
@@ -436,7 +450,16 @@ var Forks = map[string]*chain.Forks{
 		chain.Byzantium:      chain.NewFork(0),
 		chain.Constantinople: chain.NewFork(0),
 	},
-	"Istchain.anbul": {
+	"ConstantinopleFix": {
+		chain.Homestead:      chain.NewFork(0),
+		chain.EIP150:         chain.NewFork(0),
+		chain.EIP155:         chain.NewFork(0),
+		chain.EIP158:         chain.NewFork(0),
+		chain.Byzantium:      chain.NewFork(0),
+		chain.Constantinople: chain.NewFork(0),
+		chain.Petersburg:     chain.NewFork(0),
+	},
+	"Istanbul": {
 		chain.Homestead:      chain.NewFork(0),
 		chain.EIP150:         chain.NewFork(0),
 		chain.EIP155:         chain.NewFork(0),
@@ -464,10 +487,23 @@ var Forks = map[string]*chain.Forks{
 		chain.Byzantium: chain.NewFork(5),
 	},
 	"ByzantiumToConstantinopleAt5": {
+		chain.Homestead:      chain.NewFork(0),
+		chain.EIP150:         chain.NewFork(0),
+		chain.EIP155:         chain.NewFork(0),
+		chain.EIP158:         chain.NewFork(0),
 		chain.Byzantium:      chain.NewFork(0),
 		chain.Constantinople: chain.NewFork(5),
 	},
-	"ConstantinopleFix": {
+	"ByzantiumToConstantinopleFixAt5": {
+		chain.Homestead:      chain.NewFork(0),
+		chain.EIP150:         chain.NewFork(0),
+		chain.EIP155:         chain.NewFork(0),
+		chain.EIP158:         chain.NewFork(0),
+		chain.Byzantium:      chain.NewFork(0),
+		chain.Constantinople: chain.NewFork(5),
+		chain.Petersburg:     chain.NewFork(5),
+	},
+	"ConstantinopleFixToIstanbulAt5": {
 		chain.Homestead:      chain.NewFork(0),
 		chain.EIP150:         chain.NewFork(0),
 		chain.EIP155:         chain.NewFork(0),
@@ -475,7 +511,19 @@ var Forks = map[string]*chain.Forks{
 		chain.Byzantium:      chain.NewFork(0),
 		chain.Constantinople: chain.NewFork(0),
 		chain.Petersburg:     chain.NewFork(0),
+		chain.Istanbul:       chain.NewFork(5),
 	},
+	// "London": {
+	// 	chain.Homestead:      chain.NewFork(0),
+	// 	chain.EIP150:         chain.NewFork(0),
+	// 	chain.EIP155:         chain.NewFork(0),
+	// 	chain.EIP158:         chain.NewFork(0),
+	// 	chain.Byzantium:      chain.NewFork(0),
+	// 	chain.Constantinople: chain.NewFork(0),
+	// 	chain.Petersburg:     chain.NewFork(0),
+	// 	chain.Istanbul:       chain.NewFork(0),
+	// 	chain.London:         chain.NewFork(0),
+	// },
 }
 
 func contains(l []string, name string) bool {
@@ -488,29 +536,26 @@ func contains(l []string, name string) bool {
 	return false
 }
 
-//go:embed tests
-var testsFS embed.FS
-
 func listFolders(tests ...string) ([]string, error) {
 	var folders []string
 
 	for _, t := range tests {
-		if err := fs.WalkDir(testsFS, t, func(path string, d fs.DirEntry, err error) error {
-			if err != nil {
-				return err
-			}
+		dir, err := os.Open(t)
+		if err != nil {
+			return nil, err
+		}
+		defer dir.Close()
 
-			if d.IsDir() && t != "path" {
-				folders = append(folders, path)
-			}
-
-			return nil
-		}); err != nil {
+		fileInfos, err := dir.Readdir(-1)
+		if err != nil {
 			return nil, err
 		}
 
-		// Excluding root dir
-		folders = folders[1:]
+		for _, fileInfo := range fileInfos {
+			if fileInfo.IsDir() && t != "path" {
+				folders = append(folders, filepath.Join(t, fileInfo.Name()))
+			}
+		}
 	}
 
 	return folders, nil

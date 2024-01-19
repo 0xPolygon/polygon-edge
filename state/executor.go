@@ -821,7 +821,10 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 
 	// Increment the nonce of the caller
 	if err := t.state.IncrNonce(c.Caller); err != nil {
-		return &runtime.ExecutionResult{Err: err}
+		return &runtime.ExecutionResult{
+			GasLeft: gasLimit,
+			Err:     err,
+		}
 	}
 
 	// Check if there is a collision and the address already exists
