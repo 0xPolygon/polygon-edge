@@ -8,12 +8,10 @@ on:  # yamllint disable-line rule:truthy
         description: The environment to run against
         type: choice
         options: [dev, test]
-        required: true
       logs:
-        description: Upload logs
+        description: Upload Logs
         type: boolean
         default: false
-        required: true
   workflow_call:
     inputs:
       environment:
@@ -21,7 +19,7 @@ on:  # yamllint disable-line rule:truthy
         type: string
         required: true
       logs:
-        description: Upload logs
+        description: Upload Logs
         type: boolean
         required: true
 
@@ -32,7 +30,7 @@ permissions:
 
 jobs:
   upload_logs:
-    name: Upload ${{ inputs.environment }} Logs
+    name: Upload Logs
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     if: ${{ inputs.logs == true }}
@@ -76,11 +74,10 @@ jobs:
           sed 's/devnet/${{ inputs.environment }}/g' inventory/aws_ec2.yml > inventory/aws_ec2.yml.tmp && mv inventory/aws_ec2.yml.tmp inventory/aws_ec2.yml
           sed 's/devnet/${{ inputs.environment }}/g' roles/upload-logs/tasks/logs.yml > roles/upload-logs/tasks/logs.yml.tmp && mv roles/upload-logs/tasks/logs.yml.tmp roles/upload-logs/tasks/logs.yml
           sed 's/{{ current_datetime\.stdout }}/${{ github.run_id }}/g' roles/upload-logs/tasks/logs.yml > roles/upload-logs/tasks/logs.yml.tmp && mv roles/upload-logs/tasks/logs.yml.tmp roles/upload-logs/tasks/logs.yml
-      - name: Upload logs
+      - name: Upload Logs
         working-directory: ansible
         run: |
           ansible-playbook upload-logs.yml --extra-vars "clean_deploy_title=${{ inputs.environment }}"
-
   destroy_network:
     name: Destroy ${{ inputs.environment }} Network
     runs-on: ubuntu-latest

@@ -1,5 +1,5 @@
 ---
-name: Build
+name: Build Blade
 on: # yamllint disable-line rule:truthy
   workflow_dispatch:
   workflow_call:
@@ -11,37 +11,32 @@ on: # yamllint disable-line rule:truthy
 
 jobs:
   go_build:
-    name: Blade
+    name: Build Blade
     runs-on: ubuntu-latest
     outputs:
       build_output_failure: ${{ steps.blade_build_failure.outputs.build_output }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-
       - name: Setup Go environment
         uses: actions/setup-go@v3
         with:
           go-version: 1.20.x
-
       - name: Build Blade
-        run: go build -o blade -tags netgo -ldflags="-s -w -X \"github.com/Ethernal-Tech/blade/versioning.Version=${GITHUB_REF_NAME}\" -X \"github.com/Ethernal-Tech/blade/versioning.Commit=${GITHUB_SHA}\"" && tar -czvf blade.tar.gz blade
+        run: go build -o blade -tags netgo -ldflags="-s -w -X \"github.com/bane/blade/versioning.Version=${GITHUB_REF_NAME}\" -X \"github.com/bane/blade/versioning.Commit=${GITHUB_SHA}\"" && tar -czvf blade.tar.gz blade
         env:
           GOARC: amd64
           GOOS: linux
-
       - name: Build Blade Failed
         if: failure()
         id: blade_build_failure
         run: echo "build_output=false" >> $GITHUB_OUTPUT
-
       - name: "Upload Artifact"
         uses: actions/upload-artifact@v3
         with:
           name: blade
           path: blade.tar.gz
           retention-days: 3
-
   go_build_reproducibility:
     name: Verify Build Reproducibility
     runs-on: ubuntu-latest
@@ -49,12 +44,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-
       - name: Setup Go environment
         uses: actions/setup-go@v3
         with:
           go-version: 1.20.x
-
       - name: Reproduce builds
         continue-on-error: true
         run: |

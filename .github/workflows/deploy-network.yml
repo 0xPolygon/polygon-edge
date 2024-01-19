@@ -8,7 +8,6 @@ on:  # yamllint disable-line rule:truthy
         description: The environment to run against
         type: choice
         options: [dev, test]
-        required: true
       block_gas_limit:
         description: Set block gas limit
         type: string
@@ -23,7 +22,6 @@ on:  # yamllint disable-line rule:truthy
         description: Activate Bridge
         type: boolean
         default: true
-        required: true
   workflow_call:
     inputs:
       environment:
@@ -83,7 +81,7 @@ jobs:
         run: terraform apply -auto-approve
         env:
           TF_VAR_deployment_name: ${{ inputs.environment }}
-          TF_VAR_base_instance_type: ${{ vars.AWS_BASE_INSTANCE_TYPE }}
+          TF_VAR_base_instance_type: ${{ vars.AWS_INSTANCE_TYPE }}
           TF_VAR_geth_count: ${{ vars.GETH_COUNT }}
           TF_VAR_fullnode_count: ${{ vars.FULLNODE_COUNT }}
           TF_VAR_validator_count: ${{ vars.VALIDATOR_COUNT }}

@@ -1,0 +1,69 @@
+---
+name: Tests
+on:  #yamllint disable-line rule:truthy
+  workflow_dispatch:
+    inputs:
+      unit-test:
+        description: Unit Tests
+        type: boolean
+        default: true
+      e2e-polybft-test:
+        description: PolyBFT E2E Tests
+        type: boolean
+        default: true
+      e2e-legacy-test:
+        description: Legacy E2E Tests
+        type: boolean
+        default: true
+      property-polybft-test:
+        description: Polybft Property Tests
+        type: boolean
+        default: true
+      fuzz-test:
+        description: Fuzz Tests
+        type: boolean
+        default: true
+  workflow_call:
+    inputs:
+      unit-test:
+        description: Unit Tests
+        type: boolean
+        required: true
+      e2e-polybft-test:
+        description: PolyBFT E2E Tests
+        type: boolean
+        required: true
+      e2e-legacy-test:
+        description: Legacy E2E Tests
+        type: boolean
+        required: true
+      property-polybft-test:
+        description: Polybft Property Tests
+        type: boolean
+        required: true
+      fuzz-test:
+        description: Fuzz Tests
+        type: boolean
+        required: true
+
+jobs:
+  unit-test:
+    name: Unit Tests
+    if: ${{ inputs.unit-test == true }}
+    uses: ./.github/workflows/unit-test.yml
+  e2e-polybft-test:
+    name: PolyBFT E2E Tests
+    if: ${{ inputs.e2e-polybft-test == true }}
+    uses: ./.github/workflows/e2e-polybft-test.yml
+  e2e-legacy-test:
+    name: Legacy E2E Tests
+    if: ${{ inputs.e2e-legacy-test == true }}
+    uses: ./.github/workflows/e2e-legacy-test.yml
+  property-polybft-test:
+    name: Polybft Property Tests
+    if: ${{ inputs.property-polybft-test == true }}
+    uses: ./.github/workflows/property-polybft-test.yml
+  fuzz-test:
+    name: Fuzz Tests
+    if: ${{ inputs.fuzz-test == true }}
+    uses: ./.github/workflows/fuzz-test.yml
