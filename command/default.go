@@ -18,6 +18,7 @@ const (
 	DefaultGenesisGasLimit           = 5242880 // 0x500000
 	DefaultGenesisBaseFeeEM          = chain.GenesisBaseFeeEM
 	DefaultGenesisBaseFeeChangeDenom = chain.BaseFeeChangeDenom
+	DefaultEpochSize                 = 10
 )
 
 var (

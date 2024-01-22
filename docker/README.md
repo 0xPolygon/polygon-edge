@@ -20,19 +20,13 @@ or by running `docker-compose` manually.
 
 ***All commands need to be run from the repo root / root folder.***
 
-* `scripts/cluster ibft --docker` - deploy environment with `ibft` consensus
 * `scripts/cluster polybft --docker` - deploy environment with `polybft` consensus
-* `scripts/cluster {ibft or polybft} --docker stop` - stop containers
-* `scripts/cluster {ibft or polybft}--docker destroy` - destroy environment (delete containers and volumes)
+* `scripts/cluster polybft --docker stop` - stop containers
+* `scripts/cluster polybft --docker destroy` - destroy environment (delete containers and volumes)
 
 ### Using `docker-compose`
 
 ***All commands need to be run from the repo root / root folder.***
-
-#### use `ibft` PoA consensus
-
-* `export EDGE_CONSENSUS=ibft` - set `ibft` consensus
-* `docker-compose -f ./docker/local/docker-compose.yml up -d --build` - deploy environment
 
 #### use `polybft` consensus
 

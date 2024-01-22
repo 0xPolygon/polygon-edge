@@ -7,7 +7,7 @@ This document outlines step necessary to perform a regenesis data migration.
 1. Create cluster
 
     ```bash
-    scripts/cluster ibft
+    scripts/cluster polybft
     ```
 
 2. Check balance
@@ -45,7 +45,7 @@ This document outlines step necessary to perform a regenesis data migration.
 6. Create new validators
 
     ```bash
-    ./polygon-edge polybft-secrets --insecure --data-dir test-chain- --num 4
+    ./polygon-edge secrets init --insecure --data-dir test-chain- --num 4
 
     [WARNING: INSECURE LOCAL SECRETS - SHOULD NOT BE RUN IN PRODUCTION]
 

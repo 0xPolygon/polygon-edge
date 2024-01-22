@@ -249,23 +249,7 @@ func setFlags(cmd *cobra.Command) {
 		"the interval (in seconds) at which special metrics are generated. a value of zero means the metrics are disabled",
 	)
 
-	setLegacyFlags(cmd)
-
 	setDevFlags(cmd)
-}
-
-// setLegacyFlags sets the legacy flags to preserve backwards compatibility
-// with running partners
-func setLegacyFlags(cmd *cobra.Command) {
-	// Legacy IBFT base timeout flag
-	cmd.Flags().Uint64Var(
-		&params.ibftBaseTimeoutLegacy,
-		ibftBaseTimeoutFlagLEGACY,
-		0,
-		"",
-	)
-
-	_ = cmd.Flags().MarkHidden(ibftBaseTimeoutFlagLEGACY)
 }
 
 func setDevFlags(cmd *cobra.Command) {

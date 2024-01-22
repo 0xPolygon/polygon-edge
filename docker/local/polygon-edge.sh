@@ -36,23 +36,10 @@ createGenesisConfig() {
 
 case "$1" in
    "init")
-      case "$2" in 
-          "ibft")
-              if [ -f "$GENESIS_PATH" ]; then
-                  echo "Secrets have already been generated."
-              else
-                  echo "Generating IBFT secrets..."
-                  secrets=$("$POLYGON_EDGE_BIN" secrets init --insecure --num 4 --data-dir /data/data- --json)
-                  echo "Secrets have been successfully generated"
-
-                  rm -f /data/genesis.json
-
-                  createGenesisConfig "$2" "$secrets"
-              fi
-              ;;
+      case "$2" in
           "polybft")
               echo "Generating PolyBFT secrets..."
-              secrets=$("$POLYGON_EDGE_BIN" polybft-secrets init --insecure --num 4 --data-dir /data/data- --json)
+              secrets=$("$POLYGON_EDGE_BIN" secrets init --insecure --num 4 --data-dir /data/data- --json)
               echo "Secrets have been successfully generated"
 
               rm -f /data/genesis.json

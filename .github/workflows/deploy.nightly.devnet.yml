@@ -118,7 +118,7 @@ jobs:
 
           {% for item in hostvars %}
           {% if (hostvars[item].tags.Role == "fullnode" or hostvars[item].tags.Role == "validator") %}
-              polygon-edge polybft-secrets --data-dir {{ hostvars[item].tags["Name"] }} --json --insecure > {{ hostvars[item].tags["Name"] }}.json
+              polygon-edge secrets init --data-dir {{ hostvars[item].tags["Name"] }} --json --insecure > {{ hostvars[item].tags["Name"] }}.json
           {% endif %}
           {% endfor %}
 

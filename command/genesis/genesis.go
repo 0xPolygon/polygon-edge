@@ -7,10 +7,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/genesis/predeploy"
-	"github.com/0xPolygon/polygon-edge/command/helper"
-	"github.com/0xPolygon/polygon-edge/consensus/ibft"
 	"github.com/0xPolygon/polygon-edge/helper/common"
-	"github.com/0xPolygon/polygon-edge/validators"
 )
 
 func GetCommand() *cobra.Command {
@@ -22,7 +19,6 @@ func GetCommand() *cobra.Command {
 	}
 
 	setFlags(genesisCmd)
-	setLegacyFlags(genesisCmd)
 
 	genesisCmd.AddCommand(
 		// genesis predeploy
@@ -106,7 +102,7 @@ func setFlags(cmd *cobra.Command) {
 	cmd.Flags().Uint64Var(
 		&params.epochSize,
 		epochSizeFlag,
-		ibft.DefaultEpochSize,
+		command.DefaultEpochSize,
 		"the epoch size for the chain",
 	)
 
@@ -117,64 +113,43 @@ func setFlags(cmd *cobra.Command) {
 		"admin for proxy contracts",
 	)
 
-	// PoS
-	{
-		cmd.Flags().BoolVar(
-			&params.isPos,
-			posFlag,
-			false,
-			"the flag indicating that the client should use Proof of Stake IBFT. Defaults to "+
-				"Proof of Authority if flag is not provided or false",
-		)
+	cmd.Flags().Uint64Var(
+		&params.minNumValidators,
+		command.MinValidatorCountFlag,
+		1,
+		"the minimum number of validators in the validator set for PoS",
+	)
 
-		cmd.Flags().Uint64Var(
-			&params.minNumValidators,
-			command.MinValidatorCountFlag,
-			1,
-			"the minimum number of validators in the validator set for PoS",
-		)
+	cmd.Flags().Uint64Var(
+		&params.maxNumValidators,
+		command.MaxValidatorCountFlag,
+		common.MaxSafeJSInt,
+		"the maximum number of validators in the validator set for PoS",
+	)
 
-		cmd.Flags().Uint64Var(
-			&params.maxNumValidators,
-			command.MaxValidatorCountFlag,
-			common.MaxSafeJSInt,
-			"the maximum number of validators in the validator set for PoS",
-		)
+	cmd.Flags().StringVar(
+		&params.validatorsPath,
+		command.ValidatorRootFlag,
+		command.DefaultValidatorRoot,
+		"root path containing validators secrets",
+	)
 
-		cmd.Flags().StringVar(
-			&params.validatorsPath,
-			command.ValidatorRootFlag,
-			command.DefaultValidatorRoot,
-			"root path containing validators secrets",
-		)
+	cmd.Flags().StringVar(
+		&params.validatorsPrefixPath,
+		command.ValidatorPrefixFlag,
+		command.DefaultValidatorPrefix,
+		"folder prefix names for validators secrets",
+	)
 
-		cmd.Flags().StringVar(
-			&params.validatorsPrefixPath,
-			command.ValidatorPrefixFlag,
-			command.DefaultValidatorPrefix,
-			"folder prefix names for validators secrets",
-		)
+	cmd.Flags().StringArrayVar(
+		&params.validators,
+		command.ValidatorFlag,
+		[]string{},
+		"validators defined by user (polybft format: <P2P multi address>:<ECDSA address>:<public BLS key>)",
+	)
 
-		cmd.Flags().StringArrayVar(
-			&params.validators,
-			command.ValidatorFlag,
-			[]string{},
-			"validators defined by user (polybft format: <P2P multi address>:<ECDSA address>:<public BLS key>)",
-		)
-
-		cmd.MarkFlagsMutuallyExclusive(command.ValidatorFlag, command.ValidatorRootFlag)
-		cmd.MarkFlagsMutuallyExclusive(command.ValidatorFlag, command.ValidatorPrefixFlag)
-	}
-
-	// IBFT Validators
-	{
-		cmd.Flags().StringVar(
-			&params.rawIBFTValidatorType,
-			command.IBFTValidatorTypeFlag,
-			string(validators.BLSValidatorType),
-			"the type of validators in IBFT",
-		)
-	}
+	cmd.MarkFlagsMutuallyExclusive(command.ValidatorFlag, command.ValidatorRootFlag)
+	cmd.MarkFlagsMutuallyExclusive(command.ValidatorFlag, command.ValidatorPrefixFlag)
 
 	// PolyBFT
 	{
@@ -332,28 +307,8 @@ func setFlags(cmd *cobra.Command) {
 	}
 }
 
-// setLegacyFlags sets the legacy flags to preserve backwards compatibility
-// with running partners
-func setLegacyFlags(cmd *cobra.Command) {
-	// Legacy chainid flag
-	cmd.Flags().Uint64Var(
-		&params.chainID,
-		chainIDFlagLEGACY,
-		command.DefaultChainID,
-		"the ID of the chain",
-	)
-
-	_ = cmd.Flags().MarkHidden(chainIDFlagLEGACY)
-}
-
 func preRunCommand(cmd *cobra.Command, _ []string) error {
-	if err := params.validateFlags(); err != nil {
-		return err
-	}
-
-	helper.SetRequiredFlags(cmd, params.getRequiredFlags())
-
-	return params.initRawParams()
+	return params.validateFlags()
 }
 
 func runCommand(cmd *cobra.Command, _ []string) {
@@ -363,9 +318,8 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	var err error
 
 	if params.isPolyBFTConsensus() {
-		err = params.generatePolyBftChainConfig(outputter)
+		err = params.generateChainConfig(outputter)
 	} else {
-		_, _ = outputter.Write([]byte(fmt.Sprintf("%s\n", common.IBFTImportantNotice)))
 		err = params.generateGenesis()
 	}
 

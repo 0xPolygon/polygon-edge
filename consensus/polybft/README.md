@@ -16,7 +16,7 @@ It has a native support for running bridge, which enables running cross-chain tr
 2. Init secrets - this command is used to generate account secrets (ECDSA, BLS as well as P2P networking node id). `--data-dir` denotes folder prefix names and `--num` how many accounts need to be created. **This command is for testing purposes only.**
 
     ```bash
-    $ polygon-edge polybft-secrets --data-dir test-chain- --num 4
+    $ polygon-edge secrets init --data-dir test-chain- --num 4
     ```
 
 3. Create chain configuration - this command creates chain configuration, which is needed to run a blockchain.

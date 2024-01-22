@@ -31,9 +31,7 @@ const (
 
 	blockTimeDriftFlag = "block-time-drift"
 
-	defaultEpochSize                = uint64(10)
 	defaultSprintSize               = uint64(5)
-	defaultValidatorSetSize         = 100
 	defaultBlockTime                = 2 * time.Second
 	defaultEpochReward              = 1
 	defaultBlockTimeDrift           = uint64(10)
@@ -69,8 +67,8 @@ type contractInfo struct {
 	address  types.Address
 }
 
-// generatePolyBftChainConfig creates and persists polybft chain configuration to the provided file path
-func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) error {
+// generateChainConfig creates and persists polybft chain configuration to the provided file path
+func (p *genesisParams) generateChainConfig(o command.OutputFormatter) error {
 	// populate premine balance map
 	premineBalances := make(map[types.Address]*helper.PremineInfo, len(p.premine))
 
@@ -546,6 +544,135 @@ func (p *genesisParams) getValidatorAccounts() ([]*validator.GenesisValidator, e
 	}
 
 	return validators, nil
+}
+
+func (p *genesisParams) validatePolyBFT() error {
+	if err := p.extractNativeTokenMetadata(); err != nil {
+		return err
+	}
+
+	if err := p.validateBurnContract(); err != nil {
+		return err
+	}
+
+	if err := p.validateRewardWalletAndToken(); err != nil {
+		return err
+	}
+
+	if err := p.validatePremineInfo(); err != nil {
+		return err
+	}
+
+	if p.epochSize < 2 {
+		// Epoch size must be greater than 1, so new transactions have a chance to be added to a block.
+		// Otherwise, every block would be an endblock (meaning it will not have any transactions).
+		// Check is placed here to avoid additional parsing if epochSize < 2
+		return errInvalidEpochSize
+	}
+
+	return p.validateProxyContractsAdmin()
+}
+
+// validateRewardWalletAndToken validates reward wallet flag
+func (p *genesisParams) validateRewardWalletAndToken() error {
+	if p.rewardWallet == "" {
+		return errRewardWalletNotDefined
+	}
+
+	if !p.nativeTokenConfig.IsMintable && p.rewardTokenCode == "" {
+		return errRewardTokenOnNonMintable
+	}
+
+	premineInfo, err := helper.ParsePremineInfo(p.rewardWallet)
+	if err != nil {
+		return err
+	}
+
+	if premineInfo.Address == types.ZeroAddress {
+		return errRewardWalletZero
+	}
+
+	// If epoch rewards are enabled, reward wallet must have some amount of premine
+	if p.epochReward > 0 && premineInfo.Amount.Cmp(big.NewInt(0)) < 1 {
+		return errRewardWalletAmountZero
+	}
+
+	return nil
+}
+
+// validatePremineInfo validates whether reserve account (0x0 address) is premined
+func (p *genesisParams) validatePremineInfo() error {
+	for _, premineInfo := range p.premineInfos {
+		if premineInfo.Address == types.ZeroAddress {
+			// we have premine of zero address, just return
+			return nil
+		}
+	}
+
+	return errReserveAccMustBePremined
+}
+
+// validateBlockTrackerPollInterval validates block tracker block interval
+// which can not be 0
+func (p *genesisParams) validateBlockTrackerPollInterval() error {
+	if p.blockTrackerPollInterval == 0 {
+		return helper.ErrBlockTrackerPollInterval
+	}
+
+	return nil
+}
+
+// validateBurnContract validates burn contract. If native token is mintable,
+// burn contract flag must not be set. If native token is non mintable only one burn contract
+// can be set and the specified address will be used to predeploy default EIP1559 burn contract.
+func (p *genesisParams) validateBurnContract() error {
+	if p.isBurnContractEnabled() {
+		burnContractInfo, err := parseBurnContractInfo(p.burnContract)
+		if err != nil {
+			return fmt.Errorf("invalid burn contract info provided: %w", err)
+		}
+
+		if p.nativeTokenConfig.IsMintable {
+			if burnContractInfo.Address != types.ZeroAddress {
+				return errors.New("only zero address is allowed as burn destination for mintable native token")
+			}
+		} else {
+			if burnContractInfo.Address == types.ZeroAddress {
+				return errors.New("it is not allowed to deploy burn contract to 0x0 address")
+			}
+		}
+	}
+
+	return nil
+}
+
+func (p *genesisParams) validateProxyContractsAdmin() error {
+	if strings.TrimSpace(p.proxyContractsAdmin) == "" {
+		return errors.New("proxy contracts admin address must be set")
+	}
+
+	proxyContractsAdminAddr := types.StringToAddress(p.proxyContractsAdmin)
+	if proxyContractsAdminAddr == types.ZeroAddress {
+		return errors.New("proxy contracts admin address must not be zero address")
+	}
+
+	if proxyContractsAdminAddr == contracts.SystemCaller {
+		return errors.New("proxy contracts admin address must not be system caller address")
+	}
+
+	return nil
+}
+
+// extractNativeTokenMetadata parses provided native token metadata (such as name, symbol and decimals count)
+func (p *genesisParams) extractNativeTokenMetadata() error {
+	tokenConfig, err := polybft.ParseRawTokenConfig(p.nativeTokenConfigRaw)
+	if err != nil {
+		return err
+	}
+
+	p.nativeTokenConfig = tokenConfig
+
+	return nil
 }
 
 func stringSliceToAddressSlice(addrs []string) []types.Address {
