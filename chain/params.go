@@ -91,6 +91,7 @@ const (
 	TxHashWithType      = "txHashWithType"
 	LondonFix           = "londonfix"
 	EIP2565             = "EIP2565"
+	EIP2929             = "EIP2929"
 )
 
 // Forks is map which contains all forks and their starting blocks from genesis
@@ -130,6 +131,7 @@ func (f *Forks) At(block uint64) ForksInTime {
 		TxHashWithType:      f.IsActive(TxHashWithType, block),
 		LondonFix:           f.IsActive(LondonFix, block),
 		EIP2565:             f.IsActive(EIP2565, block),
+		EIP2929:             f.IsActive(EIP2929, block),
 	}
 }
 
@@ -183,7 +185,8 @@ type ForksInTime struct {
 	QuorumCalcAlignment,
 	TxHashWithType,
 	LondonFix,
-	EIP2565 bool
+	EIP2565,
+	EIP2929 bool
 }
 
 // AllForksEnabled should contain all supported forks by current edge version
@@ -201,4 +204,5 @@ var AllForksEnabled = &Forks{
 	TxHashWithType:      NewFork(0),
 	LondonFix:           NewFork(0),
 	EIP2565:             NewFork(0),
+	EIP2929:             NewFork(0),
 }
