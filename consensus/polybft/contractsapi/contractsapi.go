@@ -2459,3 +2459,49 @@ func (i *InitializeChildTimelockFn) EncodeAbi() ([]byte, error) {
 func (i *InitializeChildTimelockFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(ChildTimelock.Abi.Methods["initialize"], buf, i)
 }
+
+type GetAddressWrapperFn struct {
+}
+
+func (g *GetAddressWrapperFn) Sig() []byte {
+	return Wrapper.Abi.Methods["getAddress"].ID()
+}
+
+func (g *GetAddressWrapperFn) EncodeAbi() ([]byte, error) {
+	return Wrapper.Abi.Methods["getAddress"].Encode(g)
+}
+
+func (g *GetAddressWrapperFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(Wrapper.Abi.Methods["getAddress"], buf, g)
+}
+
+type GetNumberWrapperFn struct {
+}
+
+func (g *GetNumberWrapperFn) Sig() []byte {
+	return Wrapper.Abi.Methods["getNumber"].ID()
+}
+
+func (g *GetNumberWrapperFn) EncodeAbi() ([]byte, error) {
+	return Wrapper.Abi.Methods["getNumber"].Encode(g)
+}
+
+func (g *GetNumberWrapperFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(Wrapper.Abi.Methods["getNumber"], buf, g)
+}
+
+type SetValueNumberPersisterFn struct {
+	Value *big.Int `abi:"_value"`
+}
+
+func (s *SetValueNumberPersisterFn) Sig() []byte {
+	return NumberPersister.Abi.Methods["setValue"].ID()
+}
+
+func (s *SetValueNumberPersisterFn) EncodeAbi() ([]byte, error) {
+	return NumberPersister.Abi.Methods["setValue"].Encode(s)
+}
+
+func (s *SetValueNumberPersisterFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(NumberPersister.Abi.Methods["setValue"], buf, s)
+}

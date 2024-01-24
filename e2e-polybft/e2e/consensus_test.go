@@ -22,6 +22,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -747,4 +748,78 @@ func TestE2E_Consensus_ChangeVotingPowerByStakingPendingRewards(t *testing.T) {
 	if !didVotingPowerChangeInConsensus {
 		t.Errorf("voting power did not change in consensus for %d epochs", numOfEpochsToCheckChange)
 	}
+}
+
+func TestE2E_Deploy_Dummy_Contracts(t *testing.T) {
+	var newValue = big.NewInt(234586)
+	admin, err := wallet.GenerateKey()
+	require.NoError(t, err)
+
+	adminAddr := types.Address(admin.Address())
+
+	cluster := framework.NewTestCluster(t, 5, framework.WithBladeAdmin(adminAddr.String()))
+	defer cluster.Stop()
+
+	cluster.WaitForReady(t)
+
+	srv := cluster.Servers[0]
+	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(srv.JSONRPCAddr()))
+
+	//deploy wrapper contract
+	receipt, err := txRelayer.SendTransaction(
+		&ethgo.Transaction{
+			To:    nil,
+			Input: contractsapi.Wrapper.Bytecode,
+		},
+		admin)
+
+	//address of wrapper contract
+	wrapperAddress := receipt.ContractAddress
+
+	cluster.WaitForBlock(10, time.Minute)
+
+	//getAddress returns address of nested contract
+	getAddress := contractsapi.Wrapper.Abi.GetMethod("getAddress")
+
+	encode, err := getAddress.Encode([]interface{}{})
+	require.NoError(t, err)
+
+	response, err := txRelayer.Call(admin.Address(), wrapperAddress, encode)
+	require.NoError(t, err)
+
+	//address of nested contract
+	numberPersisterAddress := types.StringToAddress(response)
+
+	numberPersisterAddressEthGo := ethgo.Address(numberPersisterAddress)
+
+	setValueFn := contractsapi.SetValueNumberPersisterFn{
+		Value: newValue,
+	}
+
+	//setting new value in nested contract
+	encoded, err := setValueFn.EncodeAbi()
+	require.NoError(t, err)
+
+	txn := &ethgo.Transaction{
+		From:  admin.Address(),
+		To:    &numberPersisterAddressEthGo,
+		Input: encoded,
+	}
+
+	receipt, err = txRelayer.SendTransaction(txn, admin)
+	require.NoError(t, err)
+
+	//getting new value from wrapper contract
+	getNumber := contractsapi.Wrapper.Abi.GetMethod("getNumber")
+
+	encode, err = getNumber.Encode([]interface{}{})
+	require.NoError(t, err)
+
+	response, err = txRelayer.Call(admin.Address(), wrapperAddress, encode)
+	require.NoError(t, err)
+
+	parsedResponse, err := common.ParseUint256orHex(&response)
+	require.NoError(t, err)
+
+	require.Equal(t, newValue, parsedResponse)
 }
