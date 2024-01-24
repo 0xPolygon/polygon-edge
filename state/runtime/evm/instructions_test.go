@@ -901,7 +901,6 @@ func Test_opCall(t *testing.T) {
 				memory: []byte{0x01},
 				stop:   false,
 				err:    nil,
-				gas:    300,
 			},
 			mockHost: &mockHostForInstructions{
 				callxResult: &runtime.ExecutionResult{
@@ -928,7 +927,8 @@ func Test_opCall(t *testing.T) {
 					big.NewInt(0x03),                        // address
 					big.NewInt(0).SetUint64(math.MaxUint64), // initialGas
 				},
-				memory: []byte{0x01},
+				memory:     []byte{0x01},
+				accessList: runtime.NewAccessList(),
 			},
 			resultState: &state{
 				memory: []byte{0x01},
@@ -961,7 +961,8 @@ func Test_opCall(t *testing.T) {
 					big.NewInt(0x03),                        // address
 					big.NewInt(0).SetUint64(math.MaxUint64), // initialGas
 				},
-				memory: []byte{0x01},
+				memory:     []byte{0x01},
+				accessList: runtime.NewAccessList(),
 			},
 			resultState: &state{
 				memory: []byte{0x01},
