@@ -1,13 +1,13 @@
 ---
-concurrency: ci-$
+concurrency: ci-$ # Only a single workflow can be executed concurrently
 name: Destroy Network
-on:  # yamllint disable-line rule:truthy
+on: # yamllint disable-line rule:truthy
   workflow_dispatch:
     inputs:
       environment:
         description: The environment to run against
         type: choice
-        options: [dev, test]
+        options: [dev, test] # nightly should not be initiated manually
       logs:
         description: Upload Logs
         type: boolean
@@ -22,6 +22,20 @@ on:  # yamllint disable-line rule:truthy
         description: Upload Logs
         type: boolean
         required: true
+    outputs:
+      logs_output:
+        description: Upload Logs output
+        value: ${{ jobs.upload_logs.outputs.logs_output }}
+      terraform_output:
+        description: Terraform output
+        value: ${{ jobs.destroy_network.outputs.terraform_output }}
+    secrets:
+      AWS_ROLE_ARN:
+        required: true
+      AWS_S3_BLADE_BUCKET:
+        required: true
+      VAULT_PASSWORD:
+        required: true
 
 permissions:
   id-token: write
@@ -34,29 +48,28 @@ jobs:
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     if: ${{ inputs.logs == true }}
+    outputs:
+      logs_output: ${{ steps.logs_failure.outputs.logs_output }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: Ethernal-Tech/blade-deployment
           ref: changes
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v3
         with:
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: ${{ vars.AWS_REGION }}
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
       - name: Install Terraform
         uses: hashicorp/setup-terraform@v2.0.3
         with:
           terraform_version: 1.4.5
       - name: Configure Terraform for ${{ inputs.environment }}
-        run: |
-          sed 's/# backend "s3" {}/backend "s3" {}/' main.tf > main.tf.tmp && mv main.tf.tmp main.tf
+        run: sed 's/# backend "s3" {}/backend "s3" {}/' main.tf > main.tf.tmp && mv main.tf.tmp main.tf
       - name: Terraform Init
         id: init
-        run: terraform init -backend-config="bucket=blade-github" -backend-config="key=states/${{ inputs.environment }}" -backend-config="region=${{ secrets.AWS_REGION }}"
-      - name: Retrieve state file from s3
-        run: aws s3 cp s3://blade-github/states/${{ inputs.environment }} state.json
+        run: terraform init -backend-config="bucket=${{ secrets.AWS_S3_BLADE_BUCKET }}" -backend-config="key=states/${{ inputs.environment }}" -backend-config="region=${{ vars.AWS_REGION }}"
       - name: Configure private keys
         run: |
           terraform output pk_ansible > ~/private.key
@@ -76,24 +89,29 @@ jobs:
           sed 's/{{ current_datetime\.stdout }}/${{ github.run_id }}/g' roles/upload-logs/tasks/logs.yml > roles/upload-logs/tasks/logs.yml.tmp && mv roles/upload-logs/tasks/logs.yml.tmp roles/upload-logs/tasks/logs.yml
       - name: Upload Logs
         working-directory: ansible
-        run: |
-          ansible-playbook upload-logs.yml --extra-vars "clean_deploy_title=${{ inputs.environment }}"
+        run: ansible-playbook upload-logs.yml --extra-vars "clean_deploy_title=${{ inputs.environment }}"
+      - name: Logs Failed
+        if: failure()
+        id: logs_failure
+        run: echo "logs_output=false" >> $GITHUB_OUTPUT
   destroy_network:
     name: Destroy ${{ inputs.environment }} Network
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
-    needs: [upload_logs]
+    needs: upload_logs
     if: always()
+    outputs:
+      terraform_output: ${{ steps.terraform_failure.outputs.terraform_output }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: Ethernal-Tech/blade-deployment
           ref: changes
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v3
         with:
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: ${{ vars.AWS_REGION }}
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
       - name: Install Terraform
         uses: hashicorp/setup-terraform@v2.0.3
@@ -104,9 +122,23 @@ jobs:
           sed 's/# backend "s3" {}/backend "s3" {}/' main.tf > main.tf.tmp && mv main.tf.tmp main.tf
       - name: Terraform Init
         id: init
-        run: terraform init -backend-config="bucket=blade-github" -backend-config="key=states/${{ inputs.environment }}" -backend-config="region=${{ secrets.AWS_REGION }}"
-      - name: Retrieve state file from s3
-        run: aws s3 cp s3://blade-github/states/${{ inputs.environment }} state.json
+        run: terraform init -backend-config="bucket=${{ secrets.AWS_S3_BLADE_BUCKET }}" -backend-config="key=states/${{ inputs.environment }}" -backend-config="region=${{ vars.AWS_REGION }}"
       - name: Terraform Destroy
         id: destroy
-        run: terraform destroy -auto-approve -state=state.json
+        run: terraform destroy -auto-approve
+      - name: Terraform Failed
+        if: failure()
+        id: terraform_failure
+        run: echo "terraform_output=false" >> $GITHUB_OUTPUT
+  notification:
+    name: Network Notifications
+    uses: ./.github/workflows/notification-destroy-network.yml
+    needs: [upload_logs, destroy_network]
+    if: always() && ${{ github.event_name == 'workflow_dispatch' }}
+    with:
+      environment: ${{ inputs.environment }}
+      destroy_network_upload_logs: ${{ needs.upload_logs.outputs.logs_output }}
+      destroy_network_terraform_logs: ${{ needs.destroy_network.outputs.terraform_output }}
+    secrets:
+      AWS_S3_BLADE_BUCKET: ${{ secrets.AWS_S3_BLADE_BUCKET }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

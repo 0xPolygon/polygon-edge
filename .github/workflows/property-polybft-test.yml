@@ -1,20 +1,21 @@
 ---
-name: PolyBFT Property Tests
-on:  # yamllint disable-line rule:truthy
+name: Property PolyBFT Tests
+on: # yamllint disable-line rule:truthy
   # push:
   #   branches:
   #     - main
   #     - develop
   workflow_dispatch:
   workflow_call:
+    # Map the workflow outputs to job outputs
     outputs:
       workflow_output:
-        description: "PolyBFT Property Tests output"
+        description: "Property PolyBFT Tests output"
         value: ${{ jobs.polybft_property.outputs.property_output_failure }} 
 
 jobs:
   polybft_property:
-    name: Run
+    name: Run Property PolyBFT Tests
     runs-on: ubuntu-latest
     env:
       E2E_TESTS: true
@@ -24,7 +25,7 @@ jobs:
       property_output_failure: ${{ steps.run_property_failure.outputs.test_output }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install Go
         uses: actions/setup-go@v3
         with:
@@ -37,7 +38,7 @@ jobs:
         run: echo "test_output=false" >> $GITHUB_OUTPUT
       - name: Archive test logs
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: e2e-logs
           path: e2e-logs-*/

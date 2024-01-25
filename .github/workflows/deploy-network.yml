@@ -1,25 +1,25 @@
 ---
-concurrency: ci-$
+concurrency: ci-$ # Only a single workflow can be executed concurrently
 name: Deploy Network
-on:  # yamllint disable-line rule:truthy
+on: # yamllint disable-line rule:truthy
   workflow_dispatch:
     inputs:
       environment:
         description: The environment to run against
         type: choice
-        options: [dev, test]
+        options: [dev, test] # nightly should not be initiated manually
       block_gas_limit:
-        description: Set block gas limit
+        description: Block Gas Limit
         type: string
         default: "200000000"
         required: true
       block_time:
-        description: Set block time
+        description: Block Time
         type: string
         default: "2"
         required: true
       is_bridge_active:
-        description: Activate Bridge
+        description: With Bridge
         type: boolean
         default: true
   workflow_call:
@@ -29,21 +29,28 @@ on:  # yamllint disable-line rule:truthy
         type: string
         required: true
       block_gas_limit:
-        description: Set block gas limit
+        description: Block Gas Limit
         type: string
         required: true
       block_time:
-        description: Set block time
+        description: Block Time
         type: string
         required: true
       is_bridge_active:
-        description: Activate Bridge
+        description: With Bridge
         type: boolean
         required: true
+    outputs:
+      terraform_output:
+        description: "Terraform output"
+        value: ${{ jobs.deploy_network.outputs.terraform_output }}
+      ansible_output:
+        description: "Ansible output"
+        value: ${{ jobs.deploy_network.outputs.ansible_output }}
     secrets:
-      AWS_REGION:
-        required: true
       AWS_ROLE_ARN:
+        required: true
+      AWS_S3_BLADE_BUCKET:
         required: true
       VAULT_PASSWORD:
         required: true
@@ -55,36 +62,38 @@ permissions:
 
 jobs:
   deploy_network:
-    name: Deploy ${{ inputs.environment }} Network
+    name: Deploy ${{ inputs.environment }}
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
+    environment: 
+      name: ${{ inputs.environment }}
+      url: ${{ steps.rpc_url.outputs.url }}
+    outputs:
+      terraform_output: ${{ steps.terraform_failure.outputs.terraform_output }}
+      ansible_output: ${{ steps.ansible_failure.outputs.ansible_output }}
+      rpc_url: ${{ steps.rpc_url.outputs.url }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: Ethernal-Tech/blade-deployment
           ref: changes
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v3
         with:
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: ${{ vars.AWS_REGION }}
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
       - name: Install Terraform
         uses: hashicorp/setup-terraform@v2.0.3
         with:
           terraform_version: 1.4.5
       - name: Configure Terraform for ${{ inputs.environment }}
-        run: |
-          sed 's/# backend "s3" {}/backend "s3" {}/' main.tf > main.tf.tmp && mv main.tf.tmp main.tf
+        run: sed 's/# backend "s3" {}/backend "s3" {}/' main.tf > main.tf.tmp && mv main.tf.tmp main.tf
       - name: Terraform Init
-        id: init
-        run: terraform init -backend-config="bucket=blade-github" -backend-config="key=states/${{ inputs.environment }}" -backend-config="region=${{ secrets.AWS_REGION }}"
+        run: terraform init -backend-config="bucket=${{ secrets.AWS_S3_BLADE_BUCKET }}" -backend-config="key=states/${{ inputs.environment }}" -backend-config="region=${{ vars.AWS_REGION }}"
       - name: Terraform Validate
-        id: validate
         run: terraform validate -no-color
         continue-on-error: true
       - name: Terraform Apply
-        id: apply
         run: terraform apply -auto-approve
         env:
           TF_VAR_deployment_name: ${{ inputs.environment }}
@@ -92,8 +101,10 @@ jobs:
           TF_VAR_geth_count: ${{ vars.GETH_COUNT }}
           TF_VAR_fullnode_count: ${{ vars.FULLNODE_COUNT }}
           TF_VAR_validator_count: ${{ vars.VALIDATOR_COUNT }}
-      - name: Retrieve state file from s3
-        run: aws s3 cp s3://blade-github/states/${{ inputs.environment }} state.json
+      - name: Terraform Failed
+        if: failure()
+        id: terraform_failure
+        run: echo "terraform_output=false" >> $GITHUB_OUTPUT
       - name: Configure private keys
         run: |
           terraform output pk_ansible > ~/private.key
@@ -110,18 +121,29 @@ jobs:
           echo "${{ secrets.VAULT_PASSWORD }}" > password.txt
           sed 's/devnet/${{ inputs.environment }}/g' inventory/aws_ec2.yml > inventory/aws_ec2.yml.tmp && mv inventory/aws_ec2.yml.tmp inventory/aws_ec2.yml
           sed 's/blade_tag: .*/blade_tag: ${{ github.sha }}/g' group_vars/all.yml > group_vars/all.yml.tmp && mv group_vars/all.yml.tmp group_vars/all.yml
-          sed 's/INFO/${{ secrets.LOG_LEVEL }}/g' roles/blade/templates/blade.service > roles/blade/templates/blade.service.tmp && mv roles/blade/templates/blade.service.tmp roles/blade/templates/blade.service
+          sed 's/INFO/${{ vars.LOG_LEVEL }}/g' roles/blade/templates/blade.service > roles/blade/templates/blade.service.tmp && mv roles/blade/templates/blade.service.tmp roles/blade/templates/blade.service
       - name: Run Ansible
         working-directory: ansible
         run: |
           ansible-inventory --graph
           ansible-galaxy install -r requirements.yml
           ansible-playbook site.yml --extra-vars "clean_deploy_title=${{ inputs.environment }} block_gas_limit=${{ inputs.block_gas_limit }} block_time=${{ inputs.block_time }} is_bridge_active=${{ inputs.is_bridge_active }}"
-      - name: Set RPC URL value
-        id: url
-        run: |
-          terraform output -raw aws_lb_ext_domain | grep -o -E '^ext[^:]*' > rpc_url.txt
-      - uses: actions/upload-artifact@v3
-        with:
-          name: rpc_url
-          path: rpc_url.txt
+      - name: Ansible Failed
+        if: failure()
+        id: ansible_failure
+        run: echo "ansible_output=false" >> $GITHUB_OUTPUT
+      - name: Set RPC URL
+        id: rpc_url
+        run: echo "url=http://$(terraform output -raw aws_lb_ext_domain | grep -o -E '^ext[^:]*')" >> $GITHUB_OUTPUT
+  notification:
+    name: Deploy Notification
+    needs: deploy_network
+    uses: ./.github/workflows/notification-deploy-network.yml
+    if: always() && ${{ github.event_name == 'workflow_dispatch' }}
+    with:
+      environment: nightly
+      deploy_network_terraform_output: ${{ needs.deploy_network.outputs.terraform_output }}
+      deploy_network_ansible_output: ${{ needs.deploy_network.outputs.ansible_output }}
+      rpc_url: ${{ needs.deploy_network.outputs.rpc_url }}
+    secrets:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

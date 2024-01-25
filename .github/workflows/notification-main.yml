@@ -1,0 +1,195 @@
+---
+name: Notification - Main
+on: # yamllint disable-line rule:truthy
+  workflow_call:
+    inputs:
+      environment:
+        description: The environment to run against
+        type: string
+        required: true
+      build_output:
+        description: Build output
+        type: string
+        required: true
+      unit_test_output:
+        description: Unit Tests output
+        type: string
+        required: true
+      e2e_polybft_test_output:
+        description: E2E PolyBFT Tests output
+        type: string
+        required: true
+      e2e_legacy_test_output:
+        description: E2E Legacy Tests output
+        type: string
+        required: true
+      property_polybft_test_output:
+        description: Property PolyBFT Tests output
+        type: string
+        required: true
+      fuzz_test_output:
+        description: Fuzz Tests output
+        type: string
+        required: true
+      deploy_network_terraform_output:
+        description: Deploy Network - Terraform output
+        type: string
+        required: true
+      deploy_network_ansible_output:
+        description: Deploy Network - Ansible output
+        type: string
+        required: true
+      load_test_multiple_eoa_output:
+        description: Load Test multiple_EOA output
+        type: string
+        required: true
+      load_test_multiple_erc20_output:
+        description: Load Test multiple_ERC20 output
+        type: string
+        required: true
+      destroy_network_logs_output:
+        description: Deploy Network - Logs output
+        type: string
+        required: true
+      destroy_network_terraform_output:
+        description: Destroy Network - Terraform output
+        type: string
+        required: true
+    secrets:
+      AWS_S3_BLADE_BUCKET:
+        required: true
+      SLACK_WEBHOOK_URL:
+        required: true
+
+jobs:
+  notification:
+    name: Notification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Slack
+        uses: slackapi/slack-github-action@v1.24.0
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+          green_color: '#03C03C'
+          red_color: '#E60012'
+          succeed_bnt: 'primary'
+          failed_bnt: 'danger'
+        with:
+          payload: |
+            {
+              "attachments": [
+                {
+                  "color": "${{ inputs.build_output == '' && inputs.unit_test_output == '' && inputs.e2e_polybft_test_output == '' && inputs.e2e_legacy_test_output == '' && inputs.property_polybft_test_output == '' && inputs.fuzz_test_output == '' && inputs.deploy_network_terraform_output == '' && inputs.deploy_network_ansible_output == '' && inputs.load_test_multiple_eoa_output == 'true' && inputs.load_test_multiple_erc20_output == 'true' && inputs.destroy_network_logs_output == '' && inputs.destroy_network_terraform_output == '' && env.green_color || env.red_color }}",
+                  "blocks": [
+                    {
+                      "type": "header",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "Build: ${{ inputs.environment }}"
+                      }
+                    },
+                    {
+                      "type": "context",
+                      "elements": [
+                        {
+                          "type": "mrkdwn",
+                          "text": "Environment: *${{ inputs.environment }}*"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "context",
+                      "elements": [
+                        {
+                          "type": "mrkdwn",
+                          "text": "Triggered by: *${{ github.triggering_actor }}*"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "actions",
+                      "elements": [
+                        {
+                          "type": "button",
+                          "text": {
+                            "type": "plain_text",
+                            "text": "Workflow Run"
+                          },
+                          "style": "${{ inputs.build_output == '' && inputs.unit_test_output == '' && inputs.e2e_polybft_test_output == '' && inputs.e2e_legacy_test_output == '' && inputs.property_polybft_test_output == '' && inputs.fuzz_test_output == '' && inputs.deploy_network_terraform_output == '' && inputs.deploy_network_ansible_output == '' && inputs.load_test_multiple_eoa_output == 'true' && inputs.load_test_multiple_erc20_output == 'true' && inputs.destroy_network_logs_output == '' && inputs.destroy_network_terraform_output == '' && env.succeed_bnt || env.failed_bnt }}",
+                          "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                        },
+                        {
+                          "type": "button",
+                          "text": {
+                            "type": "plain_text",
+                            "text": "Logs"
+                          },
+                          "url": "https://s3.console.aws.amazon.com/s3/buckets/${{ secrets.AWS_S3_BLADE_BUCKET }}?region=${{ vars.AWS_REGION }}&prefix=logs/${{ github.run_id }}/"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "color": "${{ inputs.build_output == '' && env.green_color || env.red_color }}",
+                  "blocks": [
+                    {
+                      "type": "section",
+                      "text": {
+                        "type": "mrkdwn",
+                        "text": "*Build Blade*"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "color": "${{ inputs.unit_test_output == '' && inputs.fuzz_test_output == '' && inputs.e2e_legacy_test_output == '' && inputs.e2e_polybft_test_output && inputs.property_polybft_test_output == '' && env.green_color || env.red_color }}",
+                  "blocks": [
+                    {
+                      "type": "section",
+                      "text": {
+                        "type": "mrkdwn",
+                        "text": "*Tests*\n${{ inputs.unit_test_output == '' && 'Unit' || '~Unit~' }}, ${{ inputs.fuzz_test_output == '' && 'Fuzz' || '~Fuzz~' }},\n${{ inputs.e2e_legacy_test_output == '' && 'E2E Legacy' || '~E2E Legacy~' }}, ${{ inputs.e2e_polybft_test_output == '' && 'E2E PolyBFT' || '~E2E PolyBFT~' }},\n${{ inputs.property_polybft_test_output == '' && 'Property PolyBFT' || '~Property PolyBFT~' }}"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "color": "${{ inputs.deploy_network_terraform_output == '' && inputs.deploy_network_ansible_output == '' && env.green_color || env.red_color }}",
+                  "blocks": [
+                    {
+                      "type": "section",
+                      "text": {
+                        "type": "mrkdwn",
+                        "text": "*Deploy Network*"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "color": "${{ inputs.load_test_multiple_eoa_output == 'true' && inputs.load_test_multiple_erc20_output == 'true' && env.green_color || env.red_color }}",
+                  "blocks": [
+                    {
+                      "type": "section",
+                      "text": {
+                        "type": "mrkdwn",
+                        "text": "*Load Tests*\n${{ inputs.load_test_multiple_eoa_output == 'true' && 'EOA' || '~EOA~' }},\n${{ inputs.load_test_multiple_erc20_output == 'true' && 'ERC20' || '~ERC20~' }}"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "color": "${{ inputs.destroy_network_logs_output == '' && inputs.destroy_network_terraform_output == '' && env.green_color || env.red_color }}",
+                  "blocks": [
+                    {
+                      "type": "section",
+                      "text": {
+                        "type": "mrkdwn",
+                        "text": "*Destroy Network*"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }

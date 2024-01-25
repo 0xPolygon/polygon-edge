@@ -1,8 +1,9 @@
 ---
 name: Unit Tests
-on:  # yamllint disable-line rule:truthy
+on: # yamllint disable-line rule:truthy
   workflow_dispatch:
   workflow_call:
+    # Map the workflow outputs to job outputs
     outputs:
       workflow_output:
         description: "Unit Tests output"
@@ -10,7 +11,7 @@ on:  # yamllint disable-line rule:truthy
 
 jobs:
   unit_test:
-    name: Run
+    name: Run Unit Tests
     runs-on: ubuntu-latest
     outputs:
       test_output_failure: ${{ steps.run_tests_failure.outputs.test_output }}
@@ -20,7 +21,7 @@ jobs:
         with:
           go-version: 1.20.x
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           submodules: recursive
           fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis

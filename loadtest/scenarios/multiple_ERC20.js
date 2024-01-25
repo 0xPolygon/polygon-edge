@@ -3,9 +3,34 @@ import exec from 'k6/execution';
 import { fundTestAccounts } from '../helpers/init.js';
 import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.2/index.js';
 
-let duration = __ENV.LOADTEST_DURATION;
+let setupTimeOut = __ENV.SETUP_TIMEOUT;
+if (setupTimeOut == undefined) {
+  setupTimeOut = "220s"
+}
+
+let rate = __ENV.RATE;
+if (rate == undefined) {
+  rate = "1500"
+}
+
+let timeUnit = __ENV.TIME_UNIT;
+if (timeUnit == undefined) {
+  timeUnit = "1s"
+}
+
+let duration = __ENV.DURATION;
 if (duration == undefined) {
     duration = "2m";
+}
+
+let preAllocatedVUs = __ENV.PREALLOCATED_VUS;
+if (preAllocatedVUs == undefined) {
+  preAllocatedVUs = "60";
+}
+
+let maxVUs = __ENV.MAX_VUS;
+if (maxVUs == undefined) {
+  maxVUs = "60";
 }
 
 export const options = {

@@ -4,7 +4,7 @@ The implemented E2E tests start a local instance of polygon-edge.
 
 ## Step 1: Run the tests
 
-Use the make file to launch the tests `make test-e2e`
+Use the make file to launch the tests `make test-e2e-legacy`
 
 ## Manual checks if things are acting funny
 

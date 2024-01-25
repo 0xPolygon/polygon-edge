@@ -1,6 +1,6 @@
 ---
-name: Legacy E2E Tests
-on:  # yamllint disable-line rule:truthy
+name: E2E Legacy Tests
+on: # yamllint disable-line rule:truthy
   # push:
   #   branches:
   #     - main
@@ -8,14 +8,15 @@ on:  # yamllint disable-line rule:truthy
   # pull_request:
   workflow_dispatch:
   workflow_call:
+    # Map the workflow outputs to job outputs
     outputs:
       workflow_output:
-        description: "Legacy E2E Tests output"
+        description: "E2E Legacy Tests output"
         value: ${{ jobs.e2e_legacy.outputs.e2e_legacy_output_failure }}
 
 jobs:
   e2e_legacy:
-    name: Run
+    name: Run E2E Legacy Tests
     runs-on: ubuntu-latest
     env:
       E2E_TESTS: true
@@ -25,7 +26,7 @@ jobs:
       e2e_legacy_output_failure: ${{ steps.run_e2e_legacy_failure.outputs.test_output }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           submodules: recursive
       - name: Install Go
@@ -40,7 +41,7 @@ jobs:
         run: echo "test_output=false" >> $GITHUB_OUTPUT
       - name: Archive test logs
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: e2e-logs
           path: e2e-logs-*/

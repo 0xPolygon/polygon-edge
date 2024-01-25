@@ -1,12 +1,13 @@
 ---
 name: Fuzz Tests
-on:  # yamllint disable-line rule:truthy
+on: # yamllint disable-line rule:truthy
   # push:
   #   branches:
   #     - main
   #     - develop  
   workflow_dispatch:
   workflow_call:
+    # Map the workflow outputs to job outputs
     outputs:
       workflow_output:
         description: "Fuzz Tests output"
@@ -14,7 +15,7 @@ on:  # yamllint disable-line rule:truthy
 
 jobs:
   fuzz_test:
-    name: Run
+    name: Run Fuzz Tests
     runs-on: ubuntu-latest
     outputs:
       fuzz_output_failure: ${{ steps.run_fuzz_failure.outputs.test_output }}
@@ -24,7 +25,7 @@ jobs:
         with:
           go-version: 1.20.x
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Run Fuzz Test
         run: make fuzz-test
       - name: Run fuzz tests failed

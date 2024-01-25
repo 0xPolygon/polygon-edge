@@ -1,31 +1,159 @@
 ---
 name: Nightly Build
-on:  # yamllint disable-line rule:truthy
+on: # yamllint disable-line rule:truthy
   workflow_dispatch:
+  schedule:
+    # * is a special character in YAML so you have to quote this string
+    - cron: '0 0 * * *'
 
 jobs:
-  # build:
-  #   name: Build Blade
-  #   uses: ./.github/workflows/build.yml
-  # tests:
-  #   name: Run Tests
-  #   uses: ./.github/workflows/tests.yml
-  #   needs: build
-  #   with:
-  #     unit-test: true
-  #     e2e-polybft-test: true
-  #     e2e-legacy-test: true
-  #     property-polybft-test: true
-  #     fuzz-test: true
+  check:
+    name: Check new commits
+    runs-on: ubuntu-latest
+    outputs:
+      new_commit_count: ${{ steps.get_new_commits.outputs.commit_count }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Get new commits
+        id: get_new_commits
+        run: echo "commit_count=$(git log --oneline --since '24 hours ago' | wc -l | tr -d ' ')" >> $GITHUB_OUTPUT
+  build:
+    name: Build Blade
+    uses: ./.github/workflows/build.yml
+    needs: check
+    if: ${{ needs.check.outputs.new_commit_count > 0 }}
+  tests:
+    name: Tests
+    uses: ./.github/workflows/tests.yml
+    needs: build
+    with:
+      unit-test: true
+      e2e-polybft-test: true
+      e2e-legacy-test: true
+      property-polybft-test: true
+      fuzz-test: true
   deploy_network:
-    name: Deploy nightly Network
+    name: Deploy Network
     uses: ./.github/workflows/deploy-network.yml
+    needs: check
+    if: ${{ needs.check.outputs.new_commit_count > 0 }}
     with:
       environment: nightly
       block_gas_limit: "200000000"
       block_time: "2"
       is_bridge_active: true
     secrets:
-      AWS_REGION: ${{ secrets.AWS_REGION }}
       AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+      AWS_S3_BLADE_BUCKET: ${{ secrets.AWS_S3_BLADE_BUCKET }}
       VAULT_PASSWORD: ${{ secrets.VAULT_PASSWORD }}
+  load_test_multiple_eoa:
+    name: Load Test EOA
+    uses: ./.github/workflows/load-test.yml
+    needs: deploy_network
+    with:
+      environment: nightly
+      scenario: EOA
+      setupTimeOut: "220s"
+      rate: "3000"
+      timeUnit: "1s"
+      duration: "10m"
+      preAllocatedVUs: "60"
+      maxVUs: "60"
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+      AWS_S3_BLADE_BUCKET: ${{ secrets.AWS_S3_BLADE_BUCKET }}
+      AWS_LOADTESTRUNNER_AMI_ID: ${{ secrets.AWS_LOADTESTRUNNER_AMI_ID }}
+      AWS_LOADTESTRUNNER_SUBNET_ID: ${{ secrets.AWS_LOADTESTRUNNER_SUBNET_ID }}
+      AWS_LOADTESTRUNNER_SG_ID: ${{ secrets.AWS_LOADTESTRUNNER_SG_ID }}
+      AWS_LOADTESTRUNNER_MNEMONIC: ${{ secrets.AWS_LOADTESTRUNNER_MNEMONIC }}
+      PERSONAL_ACCESS_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+  load_test_multiple_erc20:
+    name: Load Test ERC20
+    uses: ./.github/workflows/load-test.yml
+    needs: [deploy_network, load_test_multiple_eoa]
+    with:
+      environment: nightly
+      scenario: ERC20
+      setupTimeOut: "220s"
+      rate: "1500"
+      timeUnit: "1s"
+      duration: "10m"
+      preAllocatedVUs: "60"
+      maxVUs: "60"
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+      AWS_S3_BLADE_BUCKET: ${{ secrets.AWS_S3_BLADE_BUCKET }}
+      AWS_LOADTESTRUNNER_AMI_ID: ${{ secrets.AWS_LOADTESTRUNNER_AMI_ID }}
+      AWS_LOADTESTRUNNER_SUBNET_ID: ${{ secrets.AWS_LOADTESTRUNNER_SUBNET_ID }}
+      AWS_LOADTESTRUNNER_SG_ID: ${{ secrets.AWS_LOADTESTRUNNER_SG_ID }}
+      AWS_LOADTESTRUNNER_MNEMONIC: ${{ secrets.AWS_LOADTESTRUNNER_MNEMONIC }}
+      PERSONAL_ACCESS_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+  destroy_network:
+    name: Destroy Network
+    uses: ./.github/workflows/destroy-network.yml
+    needs: [deploy_network, load_test_multiple_eoa, load_test_multiple_erc20]
+    if: always()
+    with:
+      environment: nightly
+      logs: true
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+      AWS_S3_BLADE_BUCKET: ${{ secrets.AWS_S3_BLADE_BUCKET }}
+      VAULT_PASSWORD: ${{ secrets.VAULT_PASSWORD }}
+  notification_main:
+    name: Nightly Notification
+    uses: ./.github/workflows/notification-main.yml
+    needs: [build, tests, deploy_network, load_test_multiple_eoa, load_test_multiple_erc20, destroy_network]
+    if: success() || failure()
+    with:
+      environment: nightly
+      build_output: ${{ needs.build.outputs.workflow_output }}
+      unit_test_output: ${{ needs.tests.outputs.unit-test }}
+      e2e_polybft_test_output: ${{ needs.tests.outputs.e2e-polybft-test }}
+      e2e_legacy_test_output: ${{ needs.tests.outputs.e2e-legacy-test }}
+      property_polybft_test_output: ${{ needs.tests.outputs.property-polybft-test }}
+      fuzz_test_output: ${{ needs.tests.outputs.fuzz-test }}
+      deploy_network_terraform_output: ${{ needs.deploy_network.outputs.terraform_output }}
+      deploy_network_ansible_output: ${{ needs.deploy_network.outputs.ansible_output }}
+      load_test_multiple_eoa_output: ${{ needs.load_test_multiple_eoa.outputs.load_test_output }}
+      load_test_multiple_erc20_output: ${{ needs.load_test_multiple_erc20.outputs.load_test_output }}
+      destroy_network_logs_output: ${{ needs.destroy_network.outputs.logs_output }}
+      destroy_network_terraform_output: ${{ needs.destroy_network.outputs.terraform_output }}
+    secrets:
+      AWS_S3_BLADE_BUCKET: ${{ secrets.AWS_S3_BLADE_BUCKET }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+  notification_load_test_multiple_eoa:
+    name: Load Test multiple_EOA Notification
+    uses: ./.github/workflows/notification-load-test.yml
+    needs: [load_test_multiple_eoa, notification_main]
+    with:
+      environment: nightly
+      scenario: multiple_EOA
+      tps_avg: ${{ needs.load_test_multiple_eoa.outputs.tps_avg }}
+      tps_max: ${{ needs.load_test_multiple_eoa.outputs.tps_max }}
+      iterations: ${{ needs.load_test_multiple_eoa.outputs.iterations }}
+      block: ${{ needs.load_test_multiple_eoa.outputs.block }}
+      ttm: ${{ needs.load_test_multiple_eoa.outputs.ttm }}
+      gas_avg: ${{ needs.load_test_multiple_eoa.outputs.gas_avg }}
+      gas_max: ${{ needs.load_test_multiple_eoa.outputs.gas_max }}
+    secrets:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+  notification_load_test_multiple_erc20:
+    name: Load Test multiple_ERC20 Notification
+    uses: ./.github/workflows/notification-load-test.yml
+    needs: [load_test_multiple_erc20, notification_main]
+    with:
+      environment: nightly
+      scenario: multiple_ERC20
+      tps_avg: ${{ needs.load_test_multiple_erc20.outputs.tps_avg }}
+      tps_max: ${{ needs.load_test_multiple_erc20.outputs.tps_max }}
+      iterations: ${{ needs.load_test_multiple_erc20.outputs.iterations }}
+      block: ${{ needs.load_test_multiple_erc20.outputs.block }}
+      ttm: ${{ needs.load_test_multiple_erc20.outputs.ttm }}
+      gas_avg: ${{ needs.load_test_multiple_erc20.outputs.gas_avg }}
+      gas_max: ${{ needs.load_test_multiple_erc20.outputs.gas_max }}
+    secrets:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

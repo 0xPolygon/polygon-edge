@@ -11,13 +11,13 @@ on: # yamllint disable-line rule:truthy
 
 jobs:
   go_build:
-    name: Build Blade
+    name: Build
     runs-on: ubuntu-latest
     outputs:
       build_output_failure: ${{ steps.blade_build_failure.outputs.build_output }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Setup Go environment
         uses: actions/setup-go@v3
         with:
@@ -32,7 +32,7 @@ jobs:
         id: blade_build_failure
         run: echo "build_output=false" >> $GITHUB_OUTPUT
       - name: "Upload Artifact"
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: blade
           path: blade.tar.gz
@@ -43,7 +43,7 @@ jobs:
     continue-on-error: true
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Setup Go environment
         uses: actions/setup-go@v3
         with:
