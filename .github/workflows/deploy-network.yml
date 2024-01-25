@@ -139,7 +139,7 @@ jobs:
     name: Deploy Notification
     needs: deploy_network
     uses: ./.github/workflows/notification-deploy-network.yml
-    if: always() && ${{ github.event_name == 'workflow_dispatch' }}
+    if: always() && github.event_name == 'workflow_dispatch'
     with:
       environment: nightly
       deploy_network_terraform_output: ${{ needs.deploy_network.outputs.terraform_output }}

@@ -126,12 +126,12 @@ jobs:
       AWS_S3_BLADE_BUCKET: ${{ secrets.AWS_S3_BLADE_BUCKET }}
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
   notification_load_test_multiple_eoa:
-    name: Load Test multiple_EOA Notification
+    name: Load Test EOA Notification
     uses: ./.github/workflows/notification-load-test.yml
     needs: [load_test_multiple_eoa, notification_main]
     with:
       environment: nightly
-      scenario: multiple_EOA
+      scenario: EOA
       tps_avg: ${{ needs.load_test_multiple_eoa.outputs.tps_avg }}
       tps_max: ${{ needs.load_test_multiple_eoa.outputs.tps_max }}
       iterations: ${{ needs.load_test_multiple_eoa.outputs.iterations }}
@@ -142,12 +142,12 @@ jobs:
     secrets:
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
   notification_load_test_multiple_erc20:
-    name: Load Test multiple_ERC20 Notification
+    name: Load Test ERC20 Notification
     uses: ./.github/workflows/notification-load-test.yml
     needs: [load_test_multiple_erc20, notification_main]
     with:
       environment: nightly
-      scenario: multiple_ERC20
+      scenario: ERC20
       tps_avg: ${{ needs.load_test_multiple_erc20.outputs.tps_avg }}
       tps_max: ${{ needs.load_test_multiple_erc20.outputs.tps_max }}
       iterations: ${{ needs.load_test_multiple_erc20.outputs.iterations }}

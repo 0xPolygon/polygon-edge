@@ -48,7 +48,7 @@ jobs:
                       "type": "header",
                       "text": {
                         "type": "plain_text",
-                        "text": "Deploy ${{ inputs.environment }} network"
+                        "text": "Deploy ${{ inputs.environment }}"
                       }
                     },
                     {
