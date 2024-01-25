@@ -119,6 +119,11 @@ on: # yamllint disable-line rule:truthy
       SLACK_WEBHOOK_URL:
         required: true
 
+permissions:
+  id-token: write
+  contents: read
+  security-events: write
+
 jobs:
   load_test_runner:
     name: Deploy Load Test Runner
