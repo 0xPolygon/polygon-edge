@@ -35,6 +35,7 @@ jobs:
           red_color: '#E60012'
           succeed_bnt: 'primary'
           failed_bnt: 'danger'
+          url: https://s3.console.aws.amazon.com/s3/buckets/${{ secrets.AWS_S3_BLADE_BUCKET }}?region=${{ vars.AWS_REGION }}&prefix=logs/${{ github.run_id }}/
         with:
           payload: |
             {
@@ -78,17 +79,16 @@ jobs:
                           },
                           "style": "${{ inputs.destroy_network_upload_logs == '' && inputs.destroy_network_terraform_logs == '' && env.succeed_bnt || env.failed_bnt }}",
                           "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                        },
+                        {
+                          "type": "button",
+                          "text": {
+                            "type": "plain_text",
+                            "text": "Logs"
+                          },
+                          "style": "${{ inputs.destroy_network_upload_logs && env.succeed_bnt || env.failed_bnt }}",
+                          "url": "${{ inputs.destroy_network_upload_logs && env.url || '' }}"
                         }
-                        {%- if inputs.logs == true %}
-                          ,{
-                            "type": "button",
-                            "text": {
-                              "type": "plain_text",
-                              "text": "Logs"
-                            },
-                            "url": "https://s3.console.aws.amazon.com/s3/buckets/${{ secrets.AWS_S3_BLADE_BUCKET }}?region=${{ vars.AWS_REGION }}&prefix=logs/${{ github.run_id }}/"
-                          }
-                        {%- endif %}
                       ]
                     }
                   ]
