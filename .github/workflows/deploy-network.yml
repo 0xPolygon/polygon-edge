@@ -141,7 +141,7 @@ jobs:
     uses: ./.github/workflows/notification-deploy-network.yml
     if: always() && github.event_name == 'workflow_dispatch'
     with:
-      environment: nightly
+      environment: ${{ inputs.environment }}
       deploy_network_terraform_output: ${{ needs.deploy_network.outputs.terraform_output }}
       deploy_network_ansible_output: ${{ needs.deploy_network.outputs.ansible_output }}
       rpc_url: ${{ needs.deploy_network.outputs.rpc_url }}
