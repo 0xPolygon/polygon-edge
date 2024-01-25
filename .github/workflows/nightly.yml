@@ -14,7 +14,7 @@ jobs:
       new_commit_count: ${{ steps.get_new_commits.outputs.commit_count }}
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
       - name: Get new commits
         id: get_new_commits
         run: echo "commit_count=$(git log --oneline --since '24 hours ago' | wc -l | tr -d ' ')" >> $GITHUB_OUTPUT

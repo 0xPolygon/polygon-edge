@@ -73,7 +73,7 @@ jobs:
       rpc_url: ${{ steps.rpc_url.outputs.url }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
         with:
           repository: Ethernal-Tech/blade-deployment
           ref: changes

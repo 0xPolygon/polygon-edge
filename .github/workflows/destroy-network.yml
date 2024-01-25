@@ -52,7 +52,7 @@ jobs:
       logs_output: ${{ steps.logs_failure.outputs.logs_output }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
         with:
           repository: Ethernal-Tech/blade-deployment
           ref: changes
@@ -104,7 +104,7 @@ jobs:
       terraform_output: ${{ steps.terraform_failure.outputs.terraform_output }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
         with:
           repository: Ethernal-Tech/blade-deployment
           ref: changes
@@ -134,7 +134,7 @@ jobs:
     name: Network Notifications
     uses: ./.github/workflows/notification-destroy-network.yml
     needs: [upload_logs, destroy_network]
-    if: ${{ github.event_name == 'workflow_dispatch' }}
+    if: github.event_name == 'workflow_dispatch'
     with:
       environment: ${{ inputs.environment }}
       destroy_network_upload_logs: ${{ needs.upload_logs.outputs.logs_output }}
