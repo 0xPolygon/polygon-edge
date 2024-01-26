@@ -7,6 +7,10 @@ on: # yamllint disable-line rule:truthy
         description: The environment to run against
         type: string
         required: true
+      logs:
+        description: Upload Logs
+        type: boolean
+        required: true
       build_output:
         description: Build output
         type: string
@@ -135,9 +139,9 @@ jobs:
                           "type": "button",
                           "text": {
                             "type": "plain_text",
-                            "text": "${{ inputs.destroy_network_logs_output == '' && 'Logs' || 'No Logs' }}"
+                            "text": "${{ inputs.logs == true && inputs.destroy_network_logs_output == '' && 'Logs' || 'No Logs' }}"
                           },
-                          "style": "${{ inputs.destroy_network_logs_output == '' && env.succeed_bnt || env.failed_bnt }}",
+                          "style": "${{ inputs.logs == true && inputs.destroy_network_logs_output == '' && env.succeed_bnt || env.failed_bnt }}",
                           "url": "https://s3.console.aws.amazon.com/s3/buckets/${{ secrets.AWS_S3_BLADE_BUCKET }}?region=${{ vars.AWS_REGION }}&prefix=logs/${{ github.run_id }}/"
                         }
                       ]

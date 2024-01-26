@@ -110,6 +110,7 @@ jobs:
     if: success() || failure()
     with:
       environment: nightly
+      logs: false
       build_output: ${{ needs.build.outputs.workflow_output }}
       unit_test_output: ${{ needs.tests.outputs.unit-test }}
       e2e_polybft_test_output: ${{ needs.tests.outputs.e2e-polybft-test }}
