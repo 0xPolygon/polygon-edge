@@ -123,8 +123,9 @@ jobs:
                           "type": "button",
                           "text": {
                             "type": "plain_text",
-                            "text": "Logs"
+                            "text": "${{ inputs.destroy_network_logs_output == '' && 'Logs' || 'No Logs' }}"
                           },
+                          "style": "${{ inputs.destroy_network_logs_output == '' && env.succeed_bnt || env.failed_bnt }}",
                           "url": "https://s3.console.aws.amazon.com/s3/buckets/${{ secrets.AWS_S3_BLADE_BUCKET }}?region=${{ vars.AWS_REGION }}&prefix=logs/${{ github.run_id }}/"
                         }
                       ]
@@ -144,7 +145,7 @@ jobs:
                   ]
                 },
                 {
-                  "color": "${{ inputs.unit_test_output == '' && inputs.fuzz_test_output == '' && inputs.e2e_legacy_test_output == '' && inputs.e2e_polybft_test_output && inputs.property_polybft_test_output == '' && env.green_color || env.red_color }}",
+                  "color": "${{ inputs.unit_test_output == '' && inputs.fuzz_test_output == '' && inputs.e2e_legacy_test_output == '' && inputs.e2e_polybft_test_output == '' && inputs.property_polybft_test_output == '' && env.green_color || env.red_color }}",
                   "blocks": [
                     {
                       "type": "section",
@@ -180,7 +181,7 @@ jobs:
                   ]
                 },
                 {
-                  "color": "${{ inputs.destroy_network_logs_output == '' && inputs.destroy_network_terraform_output == '' && env.green_color || env.red_color }}",
+                  "color": "${{ inputs.destroy_network_terraform_output == '' && env.green_color || env.red_color }}",
                   "blocks": [
                     {
                       "type": "section",
