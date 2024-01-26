@@ -28,6 +28,9 @@ jobs:
     name: Notification
     runs-on: ubuntu-latest
     steps:
+      - name: Short SHA
+        id: short_sha
+        run: echo "value=`echo ${{ github.sha }} | cut -c1-8`" >> $GITHUB_OUTPUT
       - name: Notify Slack
         uses: slackapi/slack-github-action@v1.23.0
         env:
@@ -57,6 +60,15 @@ jobs:
                         {
                           "type": "mrkdwn",
                           "text": "Environment: *${{ inputs.environment }}*"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "context",
+                      "elements": [
+                        {
+                          "type": "mrkdwn",
+                          "text": "Commit: *<https://github.com/${{ github.repository }}/tree/${{ github.sha }}|${{ steps.short_sha.outputs.value }}>*"
                         }
                       ]
                     },
