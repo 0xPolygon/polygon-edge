@@ -60,7 +60,7 @@ jobs:
             {
               "attachments": [
                 {
-                  "color": ${{ env.green_color }},
+                  "color": "${{ env.green_color }}",
                   "blocks": [
                     {
                       "type": "header",
@@ -96,7 +96,7 @@ jobs:
                             "type": "plain_text",
                             "text": "Workflow Run"
                           },
-                          "style": ${{ env.succeed_bnt }},
+                          "style": "${{ env.succeed_bnt }}",
                           "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
                         }
                       ]
@@ -104,7 +104,7 @@ jobs:
                   ]
                 },
                 {
-                  "color": ${{ env.green_color }},
+                  "color": "${{ env.green_color }}",
                   "blocks": [
                     {
                       "type": "section",
