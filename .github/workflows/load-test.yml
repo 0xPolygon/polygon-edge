@@ -43,7 +43,7 @@ on: # yamllint disable-line rule:truthy
         default: "60"
         required: true
       notification:
-        description: Send Notification
+        description: Notification
         type: boolean
         default: true
   workflow_call:
@@ -81,7 +81,7 @@ on: # yamllint disable-line rule:truthy
         type: string
         required: true
       notification:
-        description: Send Notification
+        description: Notification
         type: boolean
         required: true
     outputs:

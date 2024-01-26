@@ -100,12 +100,7 @@ jobs:
                           "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
                         }
                       ]
-                    }
-                  ]
-                },
-                {
-                  "color": "${{ env.green_color }}",
-                  "blocks": [
+                    },
                     {
                       "type": "section",
                       "fields": [
