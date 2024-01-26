@@ -137,6 +137,7 @@ jobs:
     if: always() && github.event_name == 'workflow_dispatch'
     with:
       environment: ${{ inputs.environment }}
+      logs: ${{ inputs.logs }}
       destroy_network_upload_logs: ${{ needs.upload_logs.outputs.logs_output }}
       destroy_network_terraform_logs: ${{ needs.destroy_network.outputs.terraform_output }}
     secrets:
