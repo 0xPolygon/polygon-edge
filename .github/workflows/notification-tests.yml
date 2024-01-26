@@ -34,7 +34,7 @@ jobs:
     steps:
       - name: Short SHA
         id: short_sha
-        run: echo "value=`echo ${{ github.sha }} | cut -c1-8`" >> $GITHUB_OUTPUT
+        run: echo "value=`echo ${{ github.sha }} | cut -c1-7`" >> $GITHUB_OUTPUT
       - name: Notify Slack
         uses: slackapi/slack-github-action@v1.23.0
         env:
@@ -99,7 +99,7 @@ jobs:
                       "type": "section",
                       "text": {
                         "type": "mrkdwn",
-                        "text": "*Tests*\n${{ inputs.unit_test_output == '' && 'Unit' || '~Unit~' }}, ${{ inputs.fuzz_test_output == '' && 'Fuzz' || '~Fuzz~' }},\n${{ inputs.e2e_legacy_test_output == '' && 'E2E Legacy' || '~E2E Legacy~' }}, ${{ inputs.e2e_polybft_test_output == '' && 'E2E PolyBFT' || '~E2E PolyBFT~' }},\n${{ inputs.property_polybft_test_output == '' && 'Property PolyBFT' || '~Property PolyBFT~' }}"
+                        "text": "${{ inputs.unit_test_output == '' && 'Unit' || '~Unit~' }}, ${{ inputs.fuzz_test_output == '' && 'Fuzz' || '~Fuzz~' }},\n${{ inputs.e2e_legacy_test_output == '' && 'E2E Legacy' || '~E2E Legacy~' }}, ${{ inputs.e2e_polybft_test_output == '' && 'E2E PolyBFT' || '~E2E PolyBFT~' }},\n${{ inputs.property_polybft_test_output == '' && 'Property PolyBFT' || '~Property PolyBFT~' }}"
                       }
                     }
                   ]
