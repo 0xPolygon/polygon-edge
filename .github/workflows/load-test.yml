@@ -203,7 +203,7 @@ jobs:
     name: Load Test Notification
     needs: load_test_scenario
     uses: ./.github/workflows/notification-load-test.yml
-    if: success() && github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch'
     with:
       environment: ${{ inputs.environment }}
       scenario: ${{ inputs.scenario }}

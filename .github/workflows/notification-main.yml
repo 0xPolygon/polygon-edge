@@ -197,7 +197,7 @@ jobs:
                   ]
                 },
                 {
-                  "color": "${{ inputs.destroy_network_logs_output && inputs.destroy_network_terraform_output == '' && env.green_color || env.red_color }}",
+                  "color": "${{ inputs.destroy_network_logs_output == '' && inputs.destroy_network_terraform_output == '' && env.green_color || env.red_color }}",
                   "blocks": [
                     {
                       "type": "section",

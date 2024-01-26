@@ -87,7 +87,7 @@ jobs:
     name: Tests Notification
     needs: [unit-test, e2e-polybft-test, e2e-legacy-test, property-polybft-test, fuzz-test]
     uses: ./.github/workflows/notification-tests.yml
-    if: always() && github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch'
     with:
       unit_test_output: ${{ needs.unit-test.outputs.workflow_output }}
       e2e_polybft_test_output: ${{ needs.e2e-polybft-test.outputs.workflow_output }}
