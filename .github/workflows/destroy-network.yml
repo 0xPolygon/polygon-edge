@@ -12,6 +12,10 @@ on: # yamllint disable-line rule:truthy
         description: Upload Logs
         type: boolean
         default: false
+      notification:
+        description: Send Notification
+        type: boolean
+        default: true
   workflow_call:
     inputs:
       environment:
@@ -20,6 +24,10 @@ on: # yamllint disable-line rule:truthy
         required: true
       logs:
         description: Upload Logs
+        type: boolean
+        required: true
+      notification:
+        description: Send Notification
         type: boolean
         required: true
     outputs:
@@ -134,7 +142,7 @@ jobs:
     name: Network Notifications
     uses: ./.github/workflows/notification-destroy-network.yml
     needs: [upload_logs, destroy_network]
-    if: github.event_name == 'workflow_dispatch'
+    if: ${{ inputs.notification == true }}
     with:
       environment: ${{ inputs.environment }}
       logs: ${{ inputs.logs }}

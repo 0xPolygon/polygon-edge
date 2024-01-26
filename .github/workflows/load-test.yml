@@ -42,6 +42,10 @@ on: # yamllint disable-line rule:truthy
         type: string
         default: "60"
         required: true
+      notification:
+        description: Send Notification
+        type: boolean
+        default: true
   workflow_call:
     inputs:
       environment:
@@ -75,6 +79,10 @@ on: # yamllint disable-line rule:truthy
       maxVUs:
         description: Max VUs
         type: string
+        required: true
+      notification:
+        description: Send Notification
+        type: boolean
         required: true
     outputs:
       load_test_output:
@@ -203,7 +211,7 @@ jobs:
     name: Load Test Notification
     needs: load_test_scenario
     uses: ./.github/workflows/notification-load-test.yml
-    if: github.event_name == 'workflow_dispatch'
+    if: ${{ inputs.notification == true }}
     with:
       environment: ${{ inputs.environment }}
       scenario: ${{ inputs.scenario }}

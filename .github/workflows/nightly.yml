@@ -33,6 +33,7 @@ jobs:
       e2e-legacy-test: true
       property-polybft-test: true
       fuzz-test: true
+      notification: false
   deploy_network:
     name: Deploy Network
     uses: ./.github/workflows/deploy-network.yml
@@ -43,6 +44,7 @@ jobs:
       block_gas_limit: "200000000"
       block_time: "2"
       is_bridge_active: true
+      notification: false
     secrets:
       AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
       AWS_S3_BLADE_BUCKET: ${{ secrets.AWS_S3_BLADE_BUCKET }}
@@ -60,6 +62,7 @@ jobs:
       duration: "10m"
       preAllocatedVUs: "60"
       maxVUs: "60"
+      notification: false
     secrets:
       AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
       AWS_S3_BLADE_BUCKET: ${{ secrets.AWS_S3_BLADE_BUCKET }}
@@ -82,6 +85,7 @@ jobs:
       duration: "10m"
       preAllocatedVUs: "60"
       maxVUs: "60"
+      notification: false
     secrets:
       AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
       AWS_S3_BLADE_BUCKET: ${{ secrets.AWS_S3_BLADE_BUCKET }}
@@ -99,6 +103,7 @@ jobs:
     with:
       environment: nightly
       logs: true
+      notification: false
     secrets:
       AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
       AWS_S3_BLADE_BUCKET: ${{ secrets.AWS_S3_BLADE_BUCKET }}

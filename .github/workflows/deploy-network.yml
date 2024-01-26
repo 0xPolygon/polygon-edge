@@ -22,6 +22,10 @@ on: # yamllint disable-line rule:truthy
         description: With Bridge
         type: boolean
         default: true
+      notification:
+        description: Send Notification
+        type: boolean
+        default: true
   workflow_call:
     inputs:
       environment:
@@ -38,6 +42,10 @@ on: # yamllint disable-line rule:truthy
         required: true
       is_bridge_active:
         description: With Bridge
+        type: boolean
+        required: true
+      notification:
+        description: Send Notification
         type: boolean
         required: true
     outputs:
@@ -139,7 +147,7 @@ jobs:
     name: Deploy Notification
     needs: deploy_network
     uses: ./.github/workflows/notification-deploy-network.yml
-    if: github.event_name == 'workflow_dispatch'
+    if: ${{ inputs.notification == true }}
     with:
       environment: ${{ inputs.environment }}
       deploy_network_terraform_output: ${{ needs.deploy_network.outputs.terraform_output }}
