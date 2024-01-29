@@ -17,10 +17,10 @@ jobs:
       build_output_failure: ${{ steps.blade_build_failure.outputs.build_output }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4.1.1
 
       - name: Setup Go environment
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v5.0.0
         with:
           go-version: 1.20.x
 
@@ -36,7 +36,7 @@ jobs:
         run: echo "build_output=false" >> $GITHUB_OUTPUT
 
       - name: "Upload Artifact"
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4.3.0
         with:
           name: blade
           path: blade.tar.gz
@@ -48,10 +48,10 @@ jobs:
     continue-on-error: true
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4.1.1
 
       - name: Setup Go environment
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v5.0.0
         with:
           go-version: 1.20.x
 

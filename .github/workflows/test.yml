@@ -16,12 +16,12 @@ jobs:
       test_output_failure: ${{ steps.run_tests_failure.outputs.test_output }}
     steps:
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v5.0.0
         with:
           go-version: 1.20.x
 
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4.1.1
         with:
           submodules: recursive
           fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis

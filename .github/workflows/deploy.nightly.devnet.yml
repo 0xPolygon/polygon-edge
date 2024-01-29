@@ -71,7 +71,7 @@ jobs:
     environment: ${{ inputs.environment }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4.1.1
         with:
           repository: Ethernal-Tech/blade-deployment
           ref: main
@@ -132,7 +132,7 @@ jobs:
         id: url
         run: |
           terraform output -raw aws_lb_ext_domain | grep -o -E '^ext[^:]*' > rpc_url.txt
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4.3.0
         with:
           name: rpc_url
           path: rpc_url.txt
@@ -185,7 +185,7 @@ jobs:
     environment: ${{ inputs.environment }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4.1.1
         with:
           repository: Ethernal-Tech/blade-deployment
           ref: main

@@ -91,7 +91,7 @@ jobs:
       loadtest_output_success: ${{ steps.run_k6_success.outputs.test_output }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4.1.1
 
       - id: random-number-generator
         run: echo "random-number=$(echo $RANDOM)" >> $GITHUB_OUTPUT
