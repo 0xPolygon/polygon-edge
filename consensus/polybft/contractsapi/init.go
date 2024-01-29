@@ -71,6 +71,8 @@ var (
 	RootERC20              *contracts.Artifact
 	TestSimple             *contracts.Artifact
 	TestRewardToken        *contracts.Artifact
+	Wrapper                *contracts.Artifact
+	NumberPersister        *contracts.Artifact
 
 	contractArtifacts map[string]*contracts.Artifact
 )
@@ -314,6 +316,16 @@ func init() {
 	}
 
 	ChildTimelock, err = contracts.DecodeArtifact([]byte(ChildTimelockArtifact))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	Wrapper, err = contracts.DecodeArtifact(readTestContractContent("Wrapper.json"))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	NumberPersister, err = contracts.DecodeArtifact(readTestContractContent("NumberPersister.json"))
 	if err != nil {
 		log.Fatal(err)
 	}
