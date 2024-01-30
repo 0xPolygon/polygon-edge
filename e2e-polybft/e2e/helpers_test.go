@@ -67,7 +67,6 @@ func getCheckpointManagerValidators(relayer txrelayer.TxRelayer, checkpointManag
 			return nil, errors.New("failed to decode validator")
 		}
 
-		//nolint:forcetypeassert
 		validators[i] = &polybft.ValidatorInfo{
 			Address: results["_address"].(ethgo.Address),
 			Stake:   results["votingPower"].(*big.Int),

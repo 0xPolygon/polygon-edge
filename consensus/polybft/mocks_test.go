@@ -25,7 +25,7 @@ type blockchainMock struct {
 func (m *blockchainMock) CurrentHeader() *types.Header {
 	args := m.Called()
 
-	return args.Get(0).(*types.Header) //nolint:forcetypeassert
+	return args.Get(0).(*types.Header)
 }
 
 func (m *blockchainMock) CommitBlock(block *types.FullBlock) error {
@@ -38,13 +38,13 @@ func (m *blockchainMock) NewBlockBuilder(parent *types.Header, coinbase types.Ad
 	txPool txPoolInterface, blockTime time.Duration, logger hclog.Logger) (blockBuilder, error) {
 	args := m.Called()
 
-	return args.Get(0).(blockBuilder), args.Error(1) //nolint:forcetypeassert
+	return args.Get(0).(blockBuilder), args.Error(1)
 }
 
 func (m *blockchainMock) ProcessBlock(parent *types.Header, block *types.Block) (*types.FullBlock, error) {
 	args := m.Called(parent, block)
 
-	return args.Get(0).(*types.FullBlock), args.Error(1) //nolint:forcetypeassert
+	return args.Get(0).(*types.FullBlock), args.Error(1)
 }
 
 func (m *blockchainMock) GetStateProviderForBlock(block *types.Header) (contract.Provider, error) {
@@ -78,7 +78,7 @@ func (m *blockchainMock) GetHeaderByNumber(number uint64) (*types.Header, bool) 
 			return h, h != nil
 		}
 	} else if len(args) == 2 {
-		return args.Get(0).(*types.Header), args.Get(1).(bool) //nolint:forcetypeassert
+		return args.Get(0).(*types.Header), args.Get(1).(bool)
 	}
 
 	panic("Unsupported mock for GetHeaderByNumber") //nolint:gocritic
@@ -105,7 +105,7 @@ func (m *blockchainMock) GetHeaderByHash(hash types.Hash) (*types.Header, bool) 
 func (m *blockchainMock) GetSystemState(provider contract.Provider) SystemState {
 	args := m.Called(provider)
 
-	return args.Get(0).(SystemState) //nolint:forcetypeassert
+	return args.Get(0).(SystemState)
 }
 
 func (m *blockchainMock) SubscribeEvents() blockchain.Subscription {
@@ -126,7 +126,7 @@ func (m *blockchainMock) GetChainID() uint64 {
 func (m *blockchainMock) GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, error) {
 	args := m.Called(hash)
 
-	return args.Get(0).([]*types.Receipt), args.Error(1) //nolint:forcetypeassert
+	return args.Get(0).([]*types.Receipt), args.Error(1)
 }
 
 var _ polybftBackend = (*polybftBackendMock)(nil)
@@ -199,12 +199,12 @@ func (m *blockBuilderMock) Fill() {
 func (m *blockBuilderMock) Receipts() []*types.Receipt {
 	args := m.Called()
 
-	return args.Get(0).([]*types.Receipt) //nolint:forcetypeassert
+	return args.Get(0).([]*types.Receipt)
 }
 
 func (m *blockBuilderMock) Build(handler func(*types.Header)) (*types.FullBlock, error) {
 	args := m.Called(handler)
-	builtBlock := args.Get(0).(*types.FullBlock) //nolint:forcetypeassert
+	builtBlock := args.Get(0).(*types.FullBlock)
 
 	handler(builtBlock.Block.Header)
 
@@ -214,7 +214,7 @@ func (m *blockBuilderMock) Build(handler func(*types.Header)) (*types.FullBlock,
 func (m *blockBuilderMock) GetState() *state.Transition {
 	args := m.Called()
 
-	return args.Get(0).(*state.Transition) //nolint:forcetypeassert
+	return args.Get(0).(*state.Transition)
 }
 
 var _ SystemState = (*systemStateMock)(nil)
@@ -330,13 +330,13 @@ func (tp *txPoolMock) Prepare() {
 func (tp *txPoolMock) Length() uint64 {
 	args := tp.Called()
 
-	return args[0].(uint64) //nolint
+	return args[0].(uint64)
 }
 
 func (tp *txPoolMock) Peek() *types.Transaction {
 	args := tp.Called()
 
-	return args[0].(*types.Transaction) //nolint
+	return args[0].(*types.Transaction)
 }
 
 func (tp *txPoolMock) Pop(tx *types.Transaction) {
@@ -380,13 +380,13 @@ func (tp *syncerMock) Close() error {
 func (tp *syncerMock) GetSyncProgression() *progress.Progression {
 	args := tp.Called()
 
-	return args[0].(*progress.Progression) //nolint
+	return args[0].(*progress.Progression)
 }
 
 func (tp *syncerMock) HasSyncPeer() bool {
 	args := tp.Called()
 
-	return args[0].(bool) //nolint
+	return args[0].(bool)
 }
 
 func (tp *syncerMock) Sync(func(*types.FullBlock) bool) error {

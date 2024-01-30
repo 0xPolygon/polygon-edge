@@ -31,7 +31,7 @@ func (c *codeHelper) pop() {
 }
 
 func getState(forks *chain.ForksInTime) (*state, func()) {
-	c := statePool.Get().(*state) //nolint:forcetypeassert
+	c := statePool.Get().(*state)
 
 	c.config = forks
 	c.gas = defaultInitialGas

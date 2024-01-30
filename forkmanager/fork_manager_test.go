@@ -156,7 +156,6 @@ func TestForkManager(t *testing.T) {
 		t.Parallel()
 
 		execute := func(name HandlerDesc, block uint64) string {
-			//nolint:forcetypeassert
 			return forkManager.GetHandler(name, block).(func() string)()
 		}
 
@@ -262,9 +261,7 @@ func TestForkManager_HandlerReplacement(t *testing.T) {
 		forkMap:     map[string]*Fork{},
 		handlersMap: map[HandlerDesc][]forkHandler{},
 	}
-
 	execute := func(name HandlerDesc, block uint64) string {
-		//nolint:forcetypeassert
 		return forkManager.GetHandler(name, block).(func() string)()
 	}
 
@@ -299,9 +296,7 @@ func TestForkManager_HandlerPrecedence(t *testing.T) {
 		forkMap:     map[string]*Fork{},
 		handlersMap: map[HandlerDesc][]forkHandler{},
 	}
-
 	execute := func(name HandlerDesc, block uint64) string {
-		//nolint:forcetypeassert
 		return forkManager.GetHandler(name, block).(func() string)()
 	}
 

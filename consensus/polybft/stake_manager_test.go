@@ -519,14 +519,14 @@ func (d *dummyStakeTxRelayer) Call(from ethgo.Address, to ethgo.Address, input [
 func (d *dummyStakeTxRelayer) SendTransaction(transaction *ethgo.Transaction, key ethgo.Key) (*ethgo.Receipt, error) {
 	args := d.Called(transaction, key)
 
-	return args.Get(0).(*ethgo.Receipt), args.Error(1) //nolint:forcetypeassert
+	return args.Get(0).(*ethgo.Receipt), args.Error(1)
 }
 
 // SendTransactionLocal sends non-signed transaction (this is only for testing purposes)
 func (d *dummyStakeTxRelayer) SendTransactionLocal(txn *ethgo.Transaction) (*ethgo.Receipt, error) {
 	args := d.Called(txn)
 
-	return args.Get(0).(*ethgo.Receipt), args.Error(1) //nolint:forcetypeassert
+	return args.Get(0).(*ethgo.Receipt), args.Error(1)
 }
 
 func (d *dummyStakeTxRelayer) Client() *jsonrpc.Client {

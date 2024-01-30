@@ -1,11 +1,17 @@
 package blockchain
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math/big"
+	"os"
+	"path/filepath"
 	"reflect"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
@@ -18,8 +24,14 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/0xPolygon/polygon-edge/blockchain/storage"
+	"github.com/0xPolygon/polygon-edge/blockchain/storage/leveldb"
 	"github.com/0xPolygon/polygon-edge/blockchain/storage/memory"
 	"github.com/0xPolygon/polygon-edge/types"
+)
+
+const (
+	B  = 1
+	kB = 1024 * B
 )
 
 func TestGenesis(t *testing.T) {
@@ -1643,4 +1655,430 @@ func TestBlockchain_WriteFullBlock(t *testing.T) {
 	require.NotNil(t, db[hex.EncodeToHex(getKey(storage.DIFFICULTY, header.Hash.Bytes()))])
 	require.NotNil(t, db[hex.EncodeToHex(getKey(storage.CANONICAL, common.EncodeUint64ToBytes(header.Number)))])
 	require.NotNil(t, db[hex.EncodeToHex(getKey(storage.RECEIPTS, header.Hash.Bytes()))])
+}
+
+func TestDiskUsageWriteBatchAndUpdate(t *testing.T) {
+	const (
+		checkInterval  = 100 * time.Millisecond
+		numberOfBlocks = 100
+		blockTime      = 1 * time.Nanosecond
+	)
+
+	blockJSONFile, err := os.Open("testfiles/testblock.json")
+	require.NoError(t, err)
+
+	blockBytes, err := io.ReadAll(blockJSONFile)
+	require.NoError(t, err)
+
+	receiptsJSONFile, err := os.Open("testfiles/testreceipts.json")
+	require.NoError(t, err)
+
+	receiptsBytes, err := io.ReadAll(receiptsJSONFile)
+	require.NoError(t, err)
+
+	blockWriter(t, numberOfBlocks, blockTime, checkInterval, blockBytes, receiptsBytes)
+}
+
+type blockCounter struct {
+	mu sync.RWMutex
+	x  uint64
+}
+
+func (bc *blockCounter) Increment() {
+	bc.mu.Lock()
+	defer bc.mu.Unlock()
+
+	bc.x++
+}
+
+func (bc *blockCounter) GetValue() uint64 {
+	bc.mu.RLock()
+	defer bc.mu.RUnlock()
+
+	return bc.x
+}
+
+func blockWriter(tb testing.TB, numberOfBlocks uint64, blockTime, checkInterval time.Duration, byteToRead []byte, receiptsBytesToRead []byte) {
+	tb.Helper()
+
+	blockTicker := time.NewTicker(blockTime)
+
+	counter := &blockCounter{x: 0}
+
+	quitCh := make(chan struct{})
+
+	dbPath := "/tmp/blockchain-disk-usage-test"
+	err := common.CreateDirSafe(dbPath, 0755)
+	require.NoError(tb, err)
+
+	db, err := leveldb.NewLevelDBStorage(
+		filepath.Join(dbPath),
+		hclog.NewNullLogger(),
+	)
+	require.NoError(tb, err)
+
+	tb.Cleanup(func() {
+		db.Close()
+
+		if err := os.RemoveAll(dbPath); err != nil {
+			tb.Fatal(err)
+		}
+	})
+
+	block, err := customJSONBlockUnmarshall(tb, byteToRead)
+	require.NoError(tb, err)
+
+	receipts, err := customJSONReceiptsUnmarshall(tb, receiptsBytesToRead)
+	require.NoError(tb, err)
+
+	dirSizeCheck := func() {
+		ticker := time.NewTicker(checkInterval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-quitCh:
+				return
+			case <-ticker.C:
+				dirSizeValue, err := dirSize(tb, dbPath)
+				if err != nil {
+					tb.Log(err)
+				}
+
+				tb.Logf("Block: %d, db size: %.2f [kb] and size per block: %.2f [kb]",
+					counter.GetValue(), float64(dirSizeValue)/float64(kB), (float64(dirSizeValue)/float64(counter.GetValue()))/kB)
+			}
+		}
+	}
+
+	blockchain := &Blockchain{db: db}
+
+	initialDBSize, err := dirSize(tb, dbPath)
+	require.NoError(tb, err)
+	tb.Logf("Empty db size: %d [kb]", initialDBSize/kB)
+
+	go dirSizeCheck()
+
+	for {
+		<-blockTicker.C
+
+		batchWriter := storage.NewBatchWriter(db)
+
+		block.Block.Header.Number = counter.GetValue()
+		block.Block.Header.Hash = types.StringToHash(fmt.Sprintf("%d", counter.GetValue()))
+
+		for i, transaction := range block.Block.Transactions {
+			transaction.Nonce = counter.x * uint64(i)
+			addr := types.StringToAddress(fmt.Sprintf("%d", counter.GetValue()*uint64(i)))
+			transaction.To = &addr
+		}
+
+		batchWriter.PutHeader(block.Block.Header)
+		batchWriter.PutBody(block.Block.Hash(), block.Block.Body())
+
+		batchWriter.PutReceipts(block.Block.Hash(), receipts)
+
+		require.NoError(tb, blockchain.writeBatchAndUpdate(batchWriter, block.Block.Header, big.NewInt(0), false))
+
+		counter.Increment()
+
+		if counter.GetValue() == numberOfBlocks {
+			break
+		}
+	}
+
+	quitCh <- struct{}{}
+
+	finalDBSize, err := dirSize(tb, dbPath)
+	require.NoError(tb, err)
+
+	avgDBSize := float64(finalDBSize) / float64(numberOfBlocks)
+	tb.Logf("Db size final: %d [kb], db size per block: %.2f [kb]", finalDBSize/kB, avgDBSize/kB)
+
+	require.Greater(tb, finalDBSize, initialDBSize)
+}
+
+func customJSONBlockUnmarshall(tb testing.TB, jsonData []byte) (*types.FullBlock, error) {
+	tb.Helper()
+
+	var (
+		dat map[string]interface{}
+		err error
+	)
+
+	if err = json.Unmarshal(jsonData, &dat); err != nil {
+		return nil, err
+	}
+
+	header := &types.Header{}
+
+	header.ParentHash = types.StringToHash(dat["parentHash"].(string))
+	header.Sha3Uncles = types.StringToHash(dat["sha3Uncles"].(string))
+	header.StateRoot = types.StringToHash(dat["stateRoot"].(string))
+	header.ReceiptsRoot = types.StringToHash(dat["receiptsRoot"].(string))
+	header.LogsBloom = types.Bloom(types.StringToBytes(dat["logsBloom"].(string)))
+
+	difficulty := dat["difficulty"].(string)
+
+	header.Difficulty, err = common.ParseUint64orHex(&difficulty)
+	if err != nil {
+		return nil, err
+	}
+
+	number := dat["number"].(string)
+
+	header.Number, err = common.ParseUint64orHex(&number)
+	if err != nil {
+		return nil, err
+	}
+
+	gasLimit := dat["gasLimit"].(string)
+
+	header.GasLimit, err = common.ParseUint64orHex(&gasLimit)
+	if err != nil {
+		return nil, err
+	}
+
+	gasUsed := dat["gasUsed"].(string)
+
+	header.GasUsed, err = common.ParseUint64orHex(&gasUsed)
+	if err != nil {
+		return nil, err
+	}
+
+	timestamp := dat["timestamp"].(string)
+
+	header.Timestamp, err = common.ParseUint64orHex(&timestamp)
+	if err != nil {
+		return nil, err
+	}
+
+	header.ExtraData = types.StringToBytes(dat["extraData"].(string))
+
+	nonce := dat["nonce"].(string)
+
+	nonceNumber, err := common.ParseUint64orHex(&nonce)
+	if err != nil {
+		return nil, err
+	}
+
+	header.Nonce = types.Nonce{byte(nonceNumber)}
+
+	header.Hash = types.StringToHash(dat["hash"].(string))
+
+	transactionsJSON := dat["transactions"].([]interface{})
+	transactions := make([]*types.Transaction, 0, len(transactionsJSON))
+
+	for _, transactionJSON := range transactionsJSON {
+		tr := transactionJSON.(map[string]interface{})
+		transaction := &types.Transaction{}
+		transaction.Hash = types.StringToHash(tr["hash"].(string))
+		nonce := tr["nonce"].(string)
+
+		nonceNumber, err := common.ParseUint64orHex(&nonce)
+		if err != nil {
+			return nil, err
+		}
+
+		transaction.Nonce = nonceNumber
+
+		transaction.From = types.StringToAddress(tr["from"].(string))
+		addr := types.StringToAddress(tr["to"].(string))
+		transaction.To = &addr
+
+		value := tr["value"].(string)
+
+		valueNumber, err := common.ParseUint256orHex(&value)
+		if err != nil {
+			return nil, err
+		}
+
+		transaction.Value = valueNumber
+
+		gasPrice := tr["gasPrice"].(string)
+
+		gasPriceNumber, err := common.ParseUint256orHex(&gasPrice)
+		if err != nil {
+			return nil, err
+		}
+
+		transaction.GasPrice = gasPriceNumber
+
+		transaction.Input = []byte(tr["input"].(string))
+
+		v := tr["v"].(string)
+
+		vNumber, err := common.ParseUint256orHex(&v)
+		if err != nil {
+			return nil, err
+		}
+
+		transaction.V = vNumber
+
+		r := tr["r"].(string)
+
+		rNumber, err := common.ParseUint256orHex(&r)
+		if err != nil {
+			return nil, err
+		}
+
+		transaction.R = rNumber
+
+		s := tr["s"].(string)
+
+		sNumber, err := common.ParseUint256orHex(&s)
+		if err != nil {
+			return nil, err
+		}
+
+		transaction.S = sNumber
+
+		chainID := tr["chainId"].(string)
+
+		chainIDNumber, err := common.ParseUint256orHex(&chainID)
+		if err != nil {
+			return nil, err
+		}
+
+		transaction.ChainID = chainIDNumber
+
+		txType := tr["type"].(string)
+
+		txTypeNumber, err := common.ParseUint64orHex(&txType)
+		if err != nil {
+			return nil, err
+		}
+
+		transaction.Type = types.TxType(txTypeNumber)
+
+		gasFeeCapGeneric, ok := tr["maxFeePerGas"]
+		if ok {
+			gasFeeCap := gasFeeCapGeneric.(string)
+
+			gasFeeCapNumber, err := common.ParseUint256orHex(&gasFeeCap)
+			require.NoError(tb, err)
+
+			transaction.GasFeeCap = gasFeeCapNumber
+		}
+
+		gasTipCapGeneric, ok := tr["maxPriorityFeePerGas"]
+		if ok {
+			gasTipCap := gasTipCapGeneric.(string)
+
+			gasTipCapNumber, err := common.ParseUint256orHex(&gasTipCap)
+			require.NoError(tb, err)
+
+			transaction.GasTipCap = gasTipCapNumber
+		}
+
+		transactions = append(transactions, transaction)
+	}
+
+	return &types.FullBlock{Block: &types.Block{Header: header, Transactions: transactions}}, nil
+}
+
+func customJSONReceiptsUnmarshall(tb testing.TB, jsonData []byte) ([]*types.Receipt, error) {
+	tb.Helper()
+
+	var (
+		dat map[string]interface{}
+		err error
+	)
+
+	if err = json.Unmarshal(jsonData, &dat); err != nil {
+		return nil, err
+	}
+
+	receiptsJSON := dat["result"].([]interface{})
+	receipts := make([]*types.Receipt, 0, len(receiptsJSON))
+
+	for _, receiptInterface := range receiptsJSON {
+		receipt := &types.Receipt{}
+		receiptJSON := receiptInterface.(map[string]interface{})
+
+		receipt.TxHash = types.StringToHash(receiptJSON["transactionHash"].(string))
+
+		if receiptJSON["contractAddress"] != nil {
+			addr := types.StringToAddress(receiptJSON["contractAddress"].(string))
+			receipt.ContractAddress = &addr
+		}
+
+		cumulativeGasUsed := receiptJSON["cumulativeGasUsed"].(string)
+
+		receipt.CumulativeGasUsed, err = common.ParseUint64orHex(&cumulativeGasUsed)
+		if err != nil {
+			return nil, err
+		}
+
+		gasUsed := receiptJSON["gasUsed"].(string)
+
+		receipt.GasUsed, err = common.ParseUint64orHex(&gasUsed)
+		if err != nil {
+			return nil, err
+		}
+
+		receipt.LogsBloom = types.Bloom(types.StringToBytes(receiptJSON["logsBloom"].(string)))
+
+		status := receiptJSON["status"].(string)
+
+		statusNumber, err := common.ParseUint64orHex(&status)
+		if err != nil {
+			return nil, err
+		}
+
+		if statusNumber == 1 {
+			success := types.ReceiptSuccess
+			receipt.Status = &success
+		} else {
+			failed := types.ReceiptFailed
+			receipt.Status = &failed
+		}
+
+		var logs []*types.Log
+
+		for _, logInterface := range receiptJSON["logs"].([]interface{}) {
+			log := &types.Log{}
+			logJSON := logInterface.(map[string]interface{})
+
+			log.Address = types.StringToAddress(logJSON["address"].(string))
+
+			if logJSON["topics"] != nil {
+				for _, topic := range logJSON["topics"].([]interface{}) {
+					log.Topics = append(log.Topics, types.StringToHash(topic.(string)))
+				}
+			}
+
+			log.Data = types.StringToBytes(logJSON["data"].(string))
+
+			logs = append(logs, log)
+		}
+
+		receipts = append(receipts, receipt)
+	}
+
+	return receipts, nil
+}
+
+func dirSize(tb testing.TB, dir string) (int64, error) {
+	tb.Helper()
+
+	totalSize := int64(0)
+
+	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if !info.IsDir() {
+			totalSize += info.Size()
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return 0, err
+	}
+
+	return totalSize, nil
 }

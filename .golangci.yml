@@ -58,13 +58,13 @@ linters-settings:
 
 issues:
   new-from-rev: origin/develop # report only new issues with reference to develop branch
-  whole-files: true
   exclude-rules:
     - path: _test\.go
       linters:
         - gosec
         - unparam
         - lll
+        - forcetypeassert
     - path: gen_sc_data\.go
       linters:
         - wsl

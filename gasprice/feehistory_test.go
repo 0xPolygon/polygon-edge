@@ -269,7 +269,7 @@ func (b *backendMock) GetBlockByNumber(number uint64, full bool) (*types.Block, 
 	if len(b.blocks) == 0 {
 		args := b.Called(number, full)
 
-		return args.Get(0).(*types.Block), args.Get(1).(bool) //nolint:forcetypeassert
+		return args.Get(0).(*types.Block), args.Get(1).(bool)
 	}
 
 	block, exists := b.blocksByNumber[number]

@@ -87,7 +87,7 @@ func TestStateSyncManager_PostEpoch_BuildCommitment(t *testing.T) {
 		require.Equal(t, uint64(0), s.pendingCommitments[1].Epoch)
 
 		// the message was sent
-		require.NotNil(t, s.config.topic.(*mockTopic).consume()) //nolint
+		require.NotNil(t, s.config.topic.(*mockTopic).consume())
 	})
 
 	t.Run("When node is not validator", func(t *testing.T) {

@@ -89,7 +89,7 @@ func Test_getResult(t *testing.T) {
 	res, err := ip.getResult(sm, []string{})
 	require.NoError(t, err)
 
-	sir := res.(*SecretsInitResult) //nolint:forcetypeassert
+	sir := res.(*SecretsInitResult)
 
 	// Test public key serialization
 	privKey, err := hex.DecodeString(sir.PrivateKey)
