@@ -60,17 +60,17 @@ jobs:
       logs_output: ${{ steps.logs_failure.outputs.logs_output }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4.1.1
         with:
           repository: Ethernal-Tech/blade-deployment
           ref: changes
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v3
+        uses: aws-actions/configure-aws-credentials@v4.0.1
         with:
           aws-region: ${{ vars.AWS_REGION }}
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
       - name: Install Terraform
-        uses: hashicorp/setup-terraform@v2.0.3
+        uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.4.5
       - name: Configure Terraform for ${{ inputs.environment }}
@@ -112,17 +112,17 @@ jobs:
       terraform_output: ${{ steps.terraform_failure.outputs.terraform_output }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4.1.1
         with:
           repository: Ethernal-Tech/blade-deployment
           ref: changes
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v3
+        uses: aws-actions/configure-aws-credentials@v4.0.1
         with:
           aws-region: ${{ vars.AWS_REGION }}
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
       - name: Install Terraform
-        uses: hashicorp/setup-terraform@v2.0.3
+        uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.4.5
       - name: Configure Terraform for ${{ inputs.environment }}

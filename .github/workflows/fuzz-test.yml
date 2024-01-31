@@ -21,11 +21,11 @@ jobs:
       fuzz_output_failure: ${{ steps.run_fuzz_failure.outputs.test_output }}
     steps:
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v5
         with:
           go-version: 1.20.x
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4.1.1
       - name: Run Fuzz Test
         run: make fuzz-test
       - name: Run fuzz tests failed
