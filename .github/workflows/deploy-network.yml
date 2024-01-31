@@ -84,7 +84,7 @@ jobs:
         uses: actions/checkout@v4.1.1
         with:
           repository: Ethernal-Tech/blade-deployment
-          ref: changes
+          ref: ce286ca480bbc661f1acea2fddae25a0bfd6d839
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4.0.1
         with:
