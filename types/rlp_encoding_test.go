@@ -43,7 +43,7 @@ func TestRLPEncoding(t *testing.T) {
 
 func TestRLPMarshall_And_Unmarshall_Transaction(t *testing.T) {
 	addrTo := StringToAddress("11")
-	txn := &Transaction{
+	txn := NewTx(&MixedTxn{
 		Nonce:    0,
 		GasPrice: big.NewInt(11),
 		Gas:      11,
@@ -53,11 +53,11 @@ func TestRLPMarshall_And_Unmarshall_Transaction(t *testing.T) {
 		V:        big.NewInt(25),
 		S:        big.NewInt(26),
 		R:        big.NewInt(27),
-	}
+	})
 
 	txn.ComputeHash()
 
-	unmarshalledTxn := new(Transaction)
+	unmarshalledTxn := NewTx(&MixedTxn{})
 	marshaledRlp := txn.MarshalRLP()
 
 	if err := unmarshalledTxn.UnmarshalRLP(marshaledRlp); err != nil {
@@ -66,7 +66,7 @@ func TestRLPMarshall_And_Unmarshall_Transaction(t *testing.T) {
 
 	unmarshalledTxn.ComputeHash()
 
-	assert.Equal(t, txn, unmarshalledTxn, "[ERROR] Unmarshalled transaction not equal to base transaction")
+	assert.Equal(t, txn.Inner, unmarshalledTxn.Inner, "[ERROR] Unmarshalled transaction not equal to base transaction")
 }
 
 func TestRLPStorage_Marshall_And_Unmarshall_Receipt(t *testing.T) {
@@ -137,7 +137,7 @@ func TestRLPUnmarshal_Header_ComputeHash(t *testing.T) {
 func TestRLPMarshall_And_Unmarshall_TypedTransaction(t *testing.T) {
 	addrTo := StringToAddress("11")
 	addrFrom := StringToAddress("22")
-	originalTx := &Transaction{
+	originalTx := NewTx(&MixedTxn{
 		Nonce:     0,
 		GasPrice:  big.NewInt(11),
 		GasFeeCap: big.NewInt(12),
@@ -150,7 +150,7 @@ func TestRLPMarshall_And_Unmarshall_TypedTransaction(t *testing.T) {
 		V:         big.NewInt(25),
 		S:         big.NewInt(26),
 		R:         big.NewInt(27),
-	}
+	})
 
 	txTypes := []TxType{
 		StateTx,
@@ -160,17 +160,17 @@ func TestRLPMarshall_And_Unmarshall_TypedTransaction(t *testing.T) {
 
 	for _, v := range txTypes {
 		t.Run(v.String(), func(t *testing.T) {
-			originalTx.Type = v
+			originalTx.SetTransactionType(v)
 			originalTx.ComputeHash()
 
 			txRLP := originalTx.MarshalRLP()
 
-			unmarshalledTx := new(Transaction)
+			unmarshalledTx := NewTx(&MixedTxn{})
 			assert.NoError(t, unmarshalledTx.UnmarshalRLP(txRLP))
 
 			unmarshalledTx.ComputeHash()
-			assert.Equal(t, originalTx.Type, unmarshalledTx.Type)
-			assert.Equal(t, originalTx.Hash, unmarshalledTx.Hash)
+			assert.Equal(t, originalTx.Type(), unmarshalledTx.Type())
+			assert.Equal(t, originalTx.Hash(), unmarshalledTx.Hash())
 		})
 	}
 }
@@ -240,13 +240,15 @@ func TestRLPMarshall_Unmarshall_Missing_Data(t *testing.T) {
 				v, err := parser.Parse(testData)
 				assert.Nil(t, err)
 
-				unmarshalledTx := &Transaction{Type: txType}
+				unmarshalledTx := NewTx(&MixedTxn{
+					Type: txType,
+				})
 
 				if tt.expectedErr {
 					assert.Error(t, unmarshalledTx.unmarshalRLPFrom(parser, v), tt.name)
 				} else {
 					assert.NoError(t, unmarshalledTx.unmarshalRLPFrom(parser, v), tt.name)
-					assert.Equal(t, tt.fromAddrSet, len(unmarshalledTx.From) != 0 && unmarshalledTx.From != ZeroAddress, unmarshalledTx.Type.String(), unmarshalledTx.From)
+					assert.Equal(t, tt.fromAddrSet, len(unmarshalledTx.From()) != 0 && unmarshalledTx.From() != ZeroAddress, unmarshalledTx.Type().String(), unmarshalledTx.From())
 				}
 
 				fastrlp.DefaultParserPool.Put(parser)
@@ -299,59 +301,59 @@ func TestRLPMarshall_And_Unmarshall_TxType(t *testing.T) {
 func testRLPData(arena *fastrlp.Arena, omitValues map[string]bool) []byte {
 	vv := arena.NewArray()
 
-	if omit, _ := omitValues["ChainID"]; !omit {
+	if omit := omitValues["ChainID"]; !omit {
 		vv.Set(arena.NewBigInt(big.NewInt(0)))
 	}
 
-	if omit, _ := omitValues["Nonce"]; !omit {
+	if omit := omitValues["Nonce"]; !omit {
 		vv.Set(arena.NewUint(10))
 	}
 
-	if omit, _ := omitValues["GasTipCap"]; !omit {
+	if omit := omitValues["GasTipCap"]; !omit {
 		vv.Set(arena.NewBigInt(big.NewInt(11)))
 	}
 
-	if omit, _ := omitValues["GasFeeCap"]; !omit {
+	if omit := omitValues["GasFeeCap"]; !omit {
 		vv.Set(arena.NewBigInt(big.NewInt(11)))
 	}
 
-	if omit, _ := omitValues["GasPrice"]; !omit {
+	if omit := omitValues["GasPrice"]; !omit {
 		vv.Set(arena.NewBigInt(big.NewInt(11)))
 	}
 
-	if omit, _ := omitValues["Gas"]; !omit {
+	if omit := omitValues["Gas"]; !omit {
 		vv.Set(arena.NewUint(12))
 	}
 
-	if omit, _ := omitValues["To"]; !omit {
+	if omit := omitValues["To"]; !omit {
 		vv.Set(arena.NewBytes((StringToAddress("13")).Bytes()))
 	}
 
-	if omit, _ := omitValues["Value"]; !omit {
+	if omit := omitValues["Value"]; !omit {
 		vv.Set(arena.NewBigInt(big.NewInt(14)))
 	}
 
-	if omit, _ := omitValues["Input"]; !omit {
+	if omit := omitValues["Input"]; !omit {
 		vv.Set(arena.NewCopyBytes([]byte{1, 2}))
 	}
 
-	if omit, _ := omitValues["AccessList"]; !omit {
+	if omit := omitValues["AccessList"]; !omit {
 		vv.Set(arena.NewArray())
 	}
 
-	if omit, _ := omitValues["V"]; !omit {
+	if omit := omitValues["V"]; !omit {
 		vv.Set(arena.NewBigInt(big.NewInt(15)))
 	}
 
-	if omit, _ := omitValues["R"]; !omit {
+	if omit := omitValues["R"]; !omit {
 		vv.Set(arena.NewBigInt(big.NewInt(16)))
 	}
 
-	if omit, _ := omitValues["S"]; !omit {
+	if omit := omitValues["S"]; !omit {
 		vv.Set(arena.NewBigInt(big.NewInt(17)))
 	}
 
-	if omit, _ := omitValues["From"]; !omit {
+	if omit := omitValues["From"]; !omit {
 		vv.Set(arena.NewBytes((StringToAddress("18")).Bytes()))
 	}
 

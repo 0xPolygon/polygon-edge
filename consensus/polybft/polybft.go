@@ -781,25 +781,25 @@ func (p *Polybft) PreCommitState(block *types.Block, _ *state.Transition) error 
 
 	// validate commitment state transactions
 	for _, tx := range block.Transactions {
-		if tx.Type != types.StateTx {
+		if tx.Type() != types.StateTx {
 			continue
 		}
 
-		decodedStateTx, err := decodeStateTransaction(tx.Input)
+		decodedStateTx, err := decodeStateTransaction(tx.Input())
 		if err != nil {
-			return fmt.Errorf("unknown state transaction: tx=%v, error: %w", tx.Hash, err)
+			return fmt.Errorf("unknown state transaction: tx=%v, error: %w", tx.Hash(), err)
 		}
 
 		if signedCommitment, ok := decodedStateTx.(*CommitmentMessageSigned); ok {
 			if commitmentTxExists {
-				return fmt.Errorf("only one commitment state tx is allowed per block: %v", tx.Hash)
+				return fmt.Errorf("only one commitment state tx is allowed per block: %v", tx.Hash())
 			}
 
 			commitmentTxExists = true
 
 			if err := verifyBridgeCommitmentTx(
 				block.Number(),
-				tx.Hash,
+				tx.Hash(),
 				signedCommitment,
 				validator.NewValidatorSet(validators, p.logger)); err != nil {
 				return err

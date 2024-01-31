@@ -25,6 +25,9 @@ const (
 
 	TxGas                 uint64 = 21000 // Per transaction not creating a contract
 	TxGasContractCreation uint64 = 53000 // Per transaction that creates a contract
+
+	TxAccessListAddressGas    uint64 = 2400 // Per address specified in EIP 2930 access list
+	TxAccessListStorageKeyGas uint64 = 1900 // Per storage key specified in EIP 2930 access list
 )
 
 // GetHashByNumber returns the hash function of a block number
@@ -142,7 +145,7 @@ func (e *Executor) ProcessBlock(
 	}
 
 	for _, t := range block.Transactions {
-		if t.Gas > block.Header.GasLimit {
+		if t.Gas() > block.Header.GasLimit {
 			continue
 		}
 
@@ -334,17 +337,16 @@ var emptyFrom = types.Address{}
 
 // Write writes another transaction to the executor
 func (t *Transition) Write(txn *types.Transaction) error {
-	var err error
-
-	if txn.From == emptyFrom &&
-		(txn.Type == types.LegacyTx || txn.Type == types.DynamicFeeTx) {
+	if txn.From() == emptyFrom && txn.Type() != types.StateTx {
 		// Decrypt the from address
 		signer := crypto.NewSigner(t.config, uint64(t.ctx.ChainID))
 
-		txn.From, err = signer.Sender(txn)
+		from, err := signer.Sender(txn)
 		if err != nil {
 			return NewTransitionApplicationError(err, false)
 		}
+
+		txn.SetFrom(from)
 	}
 
 	// Make a local copy and apply the transaction
@@ -363,8 +365,8 @@ func (t *Transition) Write(txn *types.Transaction) error {
 
 	receipt := &types.Receipt{
 		CumulativeGasUsed: t.totalGas,
-		TransactionType:   txn.Type,
-		TxHash:            txn.Hash,
+		TransactionType:   txn.Type(),
+		TxHash:            txn.Hash(),
 		GasUsed:           result.GasUsed,
 	}
 
@@ -380,8 +382,8 @@ func (t *Transition) Write(txn *types.Transaction) error {
 	}
 
 	// if the transaction created a contract, store the creation address in the receipt.
-	if msg.To == nil {
-		receipt.ContractAddress = crypto.CreateAddress(msg.From, txn.Nonce).Ptr()
+	if msg.To() == nil {
+		receipt.ContractAddress = crypto.CreateAddress(msg.From(), txn.Nonce()).Ptr()
 	}
 
 	// Set the receipt logs and create a bloom for filtering
@@ -450,9 +452,9 @@ func (t *Transition) ContextPtr() *runtime.TxContext {
 }
 
 func (t *Transition) subGasLimitPrice(msg *types.Transaction) error {
-	upfrontGasCost := new(big.Int).Mul(new(big.Int).SetUint64(msg.Gas), msg.GetGasPrice(t.ctx.BaseFee.Uint64()))
+	upfrontGasCost := new(big.Int).Mul(new(big.Int).SetUint64(msg.Gas()), msg.GetGasPrice(t.ctx.BaseFee.Uint64()))
 
-	if err := t.state.SubBalance(msg.From, upfrontGasCost); err != nil {
+	if err := t.state.SubBalance(msg.From(), upfrontGasCost); err != nil {
 		if errors.Is(err, runtime.ErrNotEnoughFunds) {
 			return ErrNotEnoughFundsForGas
 		}
@@ -464,9 +466,9 @@ func (t *Transition) subGasLimitPrice(msg *types.Transaction) error {
 }
 
 func (t *Transition) nonceCheck(msg *types.Transaction) error {
-	nonce := t.state.GetNonce(msg.From)
+	nonce := t.state.GetNonce(msg.From())
 
-	if nonce != msg.Nonce {
+	if nonce != msg.Nonce() {
 		return ErrNonceIncorrect
 	}
 
@@ -480,24 +482,24 @@ func (t *Transition) checkDynamicFees(msg *types.Transaction) error {
 		return nil
 	}
 
-	if msg.Type == types.DynamicFeeTx {
-		if msg.GasFeeCap.BitLen() == 0 && msg.GasTipCap.BitLen() == 0 {
+	if msg.Type() == types.DynamicFeeTx {
+		if msg.GasFeeCap().BitLen() == 0 && msg.GasTipCap().BitLen() == 0 {
 			return nil
 		}
 
-		if l := msg.GasFeeCap.BitLen(); l > 256 {
+		if l := msg.GasFeeCap().BitLen(); l > 256 {
 			return fmt.Errorf("%w: address %v, GasFeeCap bit length: %d", ErrFeeCapVeryHigh,
-				msg.From.String(), l)
+				msg.From().String(), l)
 		}
 
-		if l := msg.GasTipCap.BitLen(); l > 256 {
+		if l := msg.GasTipCap().BitLen(); l > 256 {
 			return fmt.Errorf("%w: address %v, GasTipCap bit length: %d", ErrTipVeryHigh,
-				msg.From.String(), l)
+				msg.From().String(), l)
 		}
 
-		if msg.GasFeeCap.Cmp(msg.GasTipCap) < 0 {
+		if msg.GasFeeCap().Cmp(msg.GasTipCap()) < 0 {
 			return fmt.Errorf("%w: address %v, GasTipCap: %s, GasFeeCap: %s", ErrTipAboveFeeCap,
-				msg.From.String(), msg.GasTipCap, msg.GasFeeCap)
+				msg.From().String(), msg.GasTipCap(), msg.GasFeeCap())
 		}
 	}
 
@@ -505,7 +507,7 @@ func (t *Transition) checkDynamicFees(msg *types.Transaction) error {
 	// as part of header validation.
 	if gasFeeCap := msg.GetGasFeeCap(); gasFeeCap.Cmp(t.ctx.BaseFee) < 0 {
 		return fmt.Errorf("%w: address %v, GasFeeCap/GasPrice: %s, BaseFee: %s", ErrFeeCapTooLow,
-			msg.From.String(), gasFeeCap, t.ctx.BaseFee)
+			msg.From().String(), gasFeeCap, t.ctx.BaseFee)
 	}
 
 	return nil
@@ -570,7 +572,7 @@ func NewGasLimitReachedTransitionApplicationError(err error) *GasLimitReachedTra
 func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, error) {
 	var err error
 
-	if msg.Type == types.StateTx {
+	if msg.Type() == types.StateTx {
 		err = checkAndProcessStateTx(msg)
 	} else {
 		err = checkAndProcessTx(msg, t)
@@ -581,12 +583,12 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 	}
 
 	// the amount of gas required is available in the block
-	if err = t.subGasPool(msg.Gas); err != nil {
+	if err = t.subGasPool(msg.Gas()); err != nil {
 		return nil, NewGasLimitReachedTransitionApplicationError(err)
 	}
 
 	if t.ctx.Tracer != nil {
-		t.ctx.Tracer.TxStart(msg.Gas)
+		t.ctx.Tracer.TxStart(msg.Gas())
 	}
 
 	// 4. there is no overflow when calculating intrinsic gas
@@ -596,31 +598,41 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 	}
 
 	// the purchased gas is enough to cover intrinsic usage
-	gasLeft := msg.Gas - intrinsicGasCost
+	gasLeft := msg.Gas() - intrinsicGasCost
 	// because we are working with unsigned integers for gas, the `>` operator is used instead of the more intuitive `<`
-	if gasLeft > msg.Gas {
+	if gasLeft > msg.Gas() {
 		return nil, NewTransitionApplicationError(ErrNotEnoughIntrinsicGas, false)
 	}
 
 	gasPrice := msg.GetGasPrice(t.ctx.BaseFee.Uint64())
-	value := new(big.Int).Set(msg.Value)
+	value := new(big.Int)
+
+	if msg.Value() != nil {
+		value = value.Set(msg.Value())
+	}
 
 	// set the specific transaction fields in the context
 	t.ctx.GasPrice = types.BytesToHash(gasPrice.Bytes())
-	t.ctx.Origin = msg.From
+	t.ctx.Origin = msg.From()
+
+	// set up initial access list
+	initialAccessList := runtime.NewAccessList()
+	if t.config.Berlin { // check if berlin fork is activated or not
+		initialAccessList.PrepareAccessList(msg.From(), msg.To(), t.precompiles.Addrs, msg.AccessList())
+	}
 
 	var result *runtime.ExecutionResult
 	if msg.IsContractCreation() {
-		result = t.Create2(msg.From, msg.Input, value, gasLeft)
+		result = t.Create2(msg.From(), msg.Input(), value, gasLeft, initialAccessList)
 	} else {
-		if err := t.state.IncrNonce(msg.From); err != nil {
+		if err := t.state.IncrNonce(msg.From()); err != nil {
 			return nil, err
 		}
-		result = t.Call2(msg.From, *msg.To, msg.Input, value, gasLeft)
+		result = t.Call2(msg.From(), *(msg.To()), msg.Input(), value, gasLeft, initialAccessList)
 	}
 
 	refund := t.state.GetRefund()
-	result.UpdateGasUsed(msg.Gas, refund)
+	result.UpdateGasUsed(msg.Gas(), refund)
 
 	if t.ctx.Tracer != nil {
 		t.ctx.Tracer.TxEnd(result.GasLeft)
@@ -628,7 +640,7 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 
 	// Refund the sender
 	remaining := new(big.Int).Mul(new(big.Int).SetUint64(result.GasLeft), gasPrice)
-	t.state.AddBalance(msg.From, remaining)
+	t.state.AddBalance(msg.From(), remaining)
 
 	// Spec: https://eips.ethereum.org/EIPS/eip-1559#specification
 	// Define effective tip based on tx type.
@@ -648,7 +660,7 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 
 	// Burn some amount if the london hardfork is applied.
 	// Basically, burn amount is just transferred to the current burn contract.
-	if t.config.London && msg.Type != types.StateTx {
+	if t.config.London && msg.Type() != types.StateTx {
 		burnAmount := new(big.Int).Mul(new(big.Int).SetUint64(result.GasUsed), t.ctx.BaseFee)
 		t.state.AddBalance(t.ctx.BurnContract, burnAmount)
 	}
@@ -664,15 +676,10 @@ func (t *Transition) Create2(
 	code []byte,
 	value *big.Int,
 	gas uint64,
+	initialAccessList *runtime.AccessList,
 ) *runtime.ExecutionResult {
 	address := crypto.CreateAddress(caller, t.state.GetNonce(caller))
-	contract := runtime.NewContractCreation(1, caller, caller, address, value, gas, code, runtime.NewAccessList())
-
-	if t.config.EIP2929 {
-		contract.AccessList.AddAddress(caller)
-		// add all precompiles to access list
-		contract.AccessList.AddAddress(t.precompiles.ContractAddr...)
-	}
+	contract := runtime.NewContractCreation(1, caller, caller, address, value, gas, code, initialAccessList)
 
 	return t.applyCreate(contract, t)
 }
@@ -683,15 +690,9 @@ func (t *Transition) Call2(
 	input []byte,
 	value *big.Int,
 	gas uint64,
+	initialAccessList *runtime.AccessList,
 ) *runtime.ExecutionResult {
-	c := runtime.NewContractCall(1, caller, caller, to, value, gas, t.state.GetCode(to), input, runtime.NewAccessList())
-
-	if t.config.EIP2929 {
-		c.AccessList.AddAddress(caller)
-		c.AccessList.AddAddress(to)
-		// add all precompiles to access list
-		c.AccessList.AddAddress(t.precompiles.ContractAddr...)
-	}
+	c := runtime.NewContractCall(1, caller, caller, to, value, gas, t.state.GetCode(to), input, initialAccessList)
 
 	return t.applyCall(c, runtime.Call, t)
 }
@@ -847,10 +848,10 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 		}
 	}
 
-	//EIP2929: check
+	//Berlin: check
 	// we add this to the access-list before taking a snapshot. Even if the creation fails,
 	// the access-list change should not be rolled back according to EIP2929 specs
-	if t.config.EIP2929 {
+	if t.config.Berlin {
 		c.AccessList.AddAddress(c.Address)
 	}
 
@@ -1145,7 +1146,7 @@ func TransactionGasCost(msg *types.Transaction, isHomestead, isIstanbul bool) (u
 		cost += TxGas
 	}
 
-	payload := msg.Input
+	payload := msg.Input()
 	if len(payload) > 0 {
 		zeros := uint64(0)
 
@@ -1173,6 +1174,11 @@ func TransactionGasCost(msg *types.Transaction, isHomestead, isIstanbul bool) (u
 		}
 
 		cost += zeros * 4
+	}
+
+	if msg.AccessList() != nil {
+		cost += uint64(len(msg.AccessList())) * TxAccessListAddressGas
+		cost += uint64(msg.AccessList().StorageKeys()) * TxAccessListStorageKeyGas
 	}
 
 	return cost, nil
@@ -1206,28 +1212,28 @@ func checkAndProcessTx(msg *types.Transaction, t *Transition) error {
 }
 
 func checkAndProcessStateTx(msg *types.Transaction) error {
-	if msg.GasPrice.Cmp(big.NewInt(0)) != 0 {
+	if msg.GasPrice().Cmp(big.NewInt(0)) != 0 {
 		return NewTransitionApplicationError(
 			errors.New("gasPrice of state transaction must be zero"),
 			true,
 		)
 	}
 
-	if msg.Gas != types.StateTransactionGasLimit {
+	if msg.Gas() != types.StateTransactionGasLimit {
 		return NewTransitionApplicationError(
 			fmt.Errorf("gas of state transaction must be %d", types.StateTransactionGasLimit),
 			true,
 		)
 	}
 
-	if msg.From != contracts.SystemCaller {
+	if msg.From() != contracts.SystemCaller {
 		return NewTransitionApplicationError(
-			fmt.Errorf("state transaction sender must be %v, but got %v", contracts.SystemCaller, msg.From),
+			fmt.Errorf("state transaction sender must be %v, but got %v", contracts.SystemCaller, msg.From()),
 			true,
 		)
 	}
 
-	if msg.To == nil || *msg.To == types.ZeroAddress {
+	if msg.To() == nil || *(msg.To()) == types.ZeroAddress {
 		return NewTransitionApplicationError(
 			errors.New("to of state transaction must be specified"),
 			true,

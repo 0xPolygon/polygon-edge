@@ -10,6 +10,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state"
+	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo/abi"
 )
@@ -412,7 +413,7 @@ func approveEpochManagerAsSpender(polyBFTConfig PolyBFTConfig, transition *state
 
 // callContract calls given smart contract function, encoded in input parameter
 func callContract(from, to types.Address, input []byte, contractName string, transition *state.Transition) error {
-	result := transition.Call2(from, to, input, big.NewInt(0), contractCallGasLimit)
+	result := transition.Call2(from, to, input, big.NewInt(0), contractCallGasLimit, runtime.NewAccessList())
 	if result.Failed() {
 		if result.Reverted() {
 			if revertReason, err := abi.UnpackRevertError(result.ReturnValue); err == nil {

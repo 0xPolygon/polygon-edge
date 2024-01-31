@@ -29,7 +29,6 @@ var (
 	one            = big.NewInt(1)
 
 	ErrInvalidBLSSignature = errors.New("invalid BLS Signature")
-	errZeroHash            = errors.New("can not recover public key from zero or empty message hash")
 	errHashOfInvalidLength = errors.New("message hash of invalid length")
 	errInvalidSignature    = errors.New("invalid signature")
 )

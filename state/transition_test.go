@@ -69,20 +69,20 @@ func TestSubGasLimitPrice(t *testing.T) {
 			t.Parallel()
 
 			transition := newTestTransition(tt.preState)
-			msg := &types.Transaction{
+			msg := types.NewTx(&types.MixedTxn{
 				From:     tt.from,
 				Gas:      tt.gas,
 				GasPrice: big.NewInt(tt.gasPrice),
-			}
+			})
 
 			err := transition.subGasLimitPrice(msg)
 
 			assert.Equal(t, tt.expectedErr, err)
 			if err == nil {
 				// should reduce cost for gas from balance
-				reducedAmount := new(big.Int).Mul(msg.GasPrice, big.NewInt(int64(msg.Gas)))
-				newBalance := transition.GetBalance(msg.From)
-				diff := new(big.Int).Sub(big.NewInt(int64(tt.preState[msg.From].Balance)), newBalance)
+				reducedAmount := new(big.Int).Mul(msg.GasPrice(), big.NewInt(int64(msg.Gas())))
+				newBalance := transition.GetBalance(msg.From())
+				diff := new(big.Int).Sub(big.NewInt(int64(tt.preState[msg.From()].Balance)), newBalance)
 				assert.Zero(t, diff.Cmp(reducedAmount))
 			}
 		})

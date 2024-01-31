@@ -23,6 +23,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state"
+	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -57,7 +58,7 @@ func TestIntegration_PerformExit(t *testing.T) {
 		input, err := abi.GetMethod(function).Encode(args)
 		require.NoError(t, err)
 
-		result := transition.Call2(deployerAddress, addr, input, big.NewInt(0), gasLimit)
+		result := transition.Call2(deployerAddress, addr, input, big.NewInt(0), gasLimit, runtime.NewAccessList())
 		require.True(t, result.Succeeded())
 
 		return result.ReturnValue
@@ -118,7 +119,7 @@ func TestIntegration_PerformExit(t *testing.T) {
 	}).EncodeAbi()
 	require.NoError(t, err)
 
-	result := transition.Call2(deployerAddress, rootERC20Addr, mintInput, nil, gasLimit)
+	result := transition.Call2(deployerAddress, rootERC20Addr, mintInput, nil, gasLimit, runtime.NewAccessList())
 	require.NoError(t, result.Err)
 
 	// approve
@@ -128,7 +129,7 @@ func TestIntegration_PerformExit(t *testing.T) {
 	}).EncodeAbi()
 	require.NoError(t, err)
 
-	result = transition.Call2(senderAddress, rootERC20Addr, approveInput, big.NewInt(0), gasLimit)
+	result = transition.Call2(senderAddress, rootERC20Addr, approveInput, big.NewInt(0), gasLimit, runtime.NewAccessList())
 	require.NoError(t, result.Err)
 
 	// deposit
@@ -140,7 +141,7 @@ func TestIntegration_PerformExit(t *testing.T) {
 	require.NoError(t, err)
 
 	// send sync events to childchain so that receiver can obtain tokens
-	result = transition.Call2(senderAddress, rootERC20PredicateAddr, depositInput, big.NewInt(0), gasLimit)
+	result = transition.Call2(senderAddress, rootERC20PredicateAddr, depositInput, big.NewInt(0), gasLimit, runtime.NewAccessList())
 	require.NoError(t, result.Err)
 
 	// simulate withdrawal from childchain to rootchain
@@ -228,7 +229,7 @@ func TestIntegration_PerformExit(t *testing.T) {
 	submitCheckpointEncoded, err := cm.abiEncodeCheckpointBlock(blockNumber, blockHash, extra, accSet)
 	require.NoError(t, err)
 
-	result = transition.Call2(senderAddress, checkpointManagerAddr, submitCheckpointEncoded, big.NewInt(0), gasLimit)
+	result = transition.Call2(senderAddress, checkpointManagerAddr, submitCheckpointEncoded, big.NewInt(0), gasLimit, runtime.NewAccessList())
 	require.NoError(t, result.Err)
 	require.Equal(t, getField(checkpointManagerAddr, contractsapi.CheckpointManager.Abi, "currentCheckpointBlockNumber")[31], uint8(1))
 
@@ -253,7 +254,7 @@ func TestIntegration_PerformExit(t *testing.T) {
 	}).EncodeAbi()
 	require.NoError(t, err)
 
-	result = transition.Call2(senderAddress, exitHelperContractAddress, exitFnInput, big.NewInt(0), gasLimit)
+	result = transition.Call2(senderAddress, exitHelperContractAddress, exitFnInput, big.NewInt(0), gasLimit, runtime.NewAccessList())
 	require.NoError(t, result.Err)
 
 	// check that first exit event is processed
@@ -380,7 +381,7 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 		require.NoError(t, err)
 
 		// call commit epoch
-		result := transition.Call2(contracts.SystemCaller, contracts.EpochManagerContract, input, big.NewInt(0), 10000000000)
+		result := transition.Call2(contracts.SystemCaller, contracts.EpochManagerContract, input, big.NewInt(0), 10000000000, runtime.NewAccessList())
 		require.NoError(t, result.Err)
 		t.Logf("Number of validators %d on commit epoch, Gas used %+v\n", accSet.Len(), result.GasUsed)
 
@@ -389,7 +390,7 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 		require.NoError(t, err)
 
 		// call commit epoch
-		result = transition.Call2(contracts.SystemCaller, contracts.EpochManagerContract, input, big.NewInt(0), 10000000000)
+		result = transition.Call2(contracts.SystemCaller, contracts.EpochManagerContract, input, big.NewInt(0), 10000000000, runtime.NewAccessList())
 		require.NoError(t, result.Err)
 		t.Logf("Number of validators %d on commit epoch, Gas used %+v\n", accSet.Len(), result.GasUsed)
 	}
@@ -399,14 +400,14 @@ func deployAndInitContract(t *testing.T, transition *state.Transition, bytecode 
 	initCallback func() ([]byte, error)) types.Address {
 	t.Helper()
 
-	deployResult := transition.Create2(sender, bytecode, big.NewInt(0), 1e9)
+	deployResult := transition.Create2(sender, bytecode, big.NewInt(0), 1e9, runtime.NewAccessList())
 	assert.NoError(t, deployResult.Err)
 
 	if initCallback != nil {
 		initInput, err := initCallback()
 		require.NoError(t, err)
 
-		result := transition.Call2(sender, deployResult.Address, initInput, big.NewInt(0), 1e9)
+		result := transition.Call2(sender, deployResult.Address, initInput, big.NewInt(0), 1e9, runtime.NewAccessList())
 		require.NoError(t, result.Err)
 	}
 

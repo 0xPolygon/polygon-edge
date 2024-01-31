@@ -75,21 +75,21 @@ func TestAddSlot(t *testing.T) {
 	finalAccessList := createInitialAccessList()
 
 	// add address1 and slotHash
-	addr1Exists, slot1Exists := initialAccessList.AddSlot(address1, slotHash)
-	assert.False(t, addr1Exists)
-	assert.False(t, slot1Exists)
+	initialAccessList.AddSlot(address1, slotHash)
 	assert.Equal(t, finalAccessList, initialAccessList)
 
 	// add address2 and slotHash
-	addr2Exists, slot2Exists := initialAccessList.AddSlot(address2, slotHash)
-	assert.False(t, addr2Exists)
+	initialAccessList.AddSlot(address2, slotHash)
+	addr2Exists, slot2Exists := initialAccessList.Contains(address2, slotHash)
+	assert.True(t, addr2Exists)
 	assert.True(t, slot2Exists)
 
 	(*finalAccessList)[address2][slotHash] = struct{}{}
 	assert.Equal(t, finalAccessList, initialAccessList)
 
 	// add address3 and slotHash
-	addr3Exists, slot3Exists := initialAccessList.AddSlot(address3, slotHash)
+	initialAccessList.AddSlot(address3, slotHash)
+	addr3Exists, slot3Exists := initialAccessList.Contains(address3, slotHash)
 	assert.True(t, addr3Exists)
 	assert.True(t, slot3Exists)
 

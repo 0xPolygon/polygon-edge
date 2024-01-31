@@ -124,7 +124,7 @@ func (m *modExp) gas(input []byte, config *chain.ForksInTime) uint64 {
 	}
 
 	//EIP-2565 gas cost calculation
-	if config.EIP2565 {
+	if config.Berlin {
 		// EIP-2565 has three changes
 		// 1. Different multComplexity (inlined here)
 		// in EIP-2565 (https://eips.ethereum.org/EIPS/eip-2565):

@@ -173,7 +173,7 @@ func (d *Debug) TraceTransaction(
 
 			defer cancel()
 
-			return d.store.TraceTxn(block, tx.Hash, tracer)
+			return d.store.TraceTxn(block, tx.Hash(), tracer)
 		},
 	)
 }
@@ -197,8 +197,8 @@ func (d *Debug) TraceCall(
 			}
 
 			// If the caller didn't supply the gas limit in the message, then we set it to maximum possible => block gas limit
-			if tx.Gas == 0 {
-				tx.Gas = header.GasLimit
+			if tx.Gas() == 0 {
+				tx.SetGas(header.GasLimit)
 			}
 
 			tracer, cancel, err := newTracer(config)

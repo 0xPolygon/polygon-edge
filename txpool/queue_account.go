@@ -50,7 +50,7 @@ func (q *accountQueue) prune(nonce uint64) (
 	pruned []*types.Transaction,
 ) {
 	for {
-		if tx := q.peek(); tx == nil || tx.Nonce >= nonce {
+		if tx := q.peek(); tx == nil || tx.Nonce() >= nonce {
 			break
 		}
 
@@ -123,11 +123,11 @@ func (q *minNonceQueue) Swap(i, j int) {
 
 func (q *minNonceQueue) Less(i, j int) bool {
 	// The higher gas price Tx comes first if the nonces are same
-	if (*q)[i].Nonce == (*q)[j].Nonce {
-		return (*q)[i].GasPrice.Cmp((*q)[j].GasPrice) > 0
+	if (*q)[i].Nonce() == (*q)[j].Nonce() {
+		return (*q)[i].GasPrice().Cmp((*q)[j].GasPrice()) > 0
 	}
 
-	return (*q)[i].Nonce < (*q)[j].Nonce
+	return (*q)[i].Nonce() < (*q)[j].Nonce()
 }
 
 func (q *minNonceQueue) Push(x interface{}) {

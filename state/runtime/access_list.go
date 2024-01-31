@@ -22,12 +22,8 @@ func (al *AccessList) ContainsAddress(address types.Address) bool {
 // Contains checks if a slot is present in an account.
 // Returns two boolean flags: `accountPresent` and `slotPresent`.
 func (al *AccessList) Contains(address types.Address, slot types.Hash) (bool, bool) {
-	var addrPresent, slotPresent bool
-
-	_, addrPresent = (*al)[address]
-	if addrPresent {
-		_, slotPresent = (*al)[address][slot]
-	}
+	_, addrPresent := (*al)[address]
+	_, slotPresent := (*al)[address][slot]
 
 	return addrPresent, slotPresent
 }
@@ -49,7 +45,6 @@ func (al *AccessList) Copy() *AccessList {
 }
 
 // AddAddress adds an address to the access list
-// returns 'true' if the operation results in a change (i.e., the address was not already present in the list).
 func (al *AccessList) AddAddress(address ...types.Address) {
 	for _, addr := range address {
 		if _, exists := (*al)[addr]; exists {
@@ -60,22 +55,39 @@ func (al *AccessList) AddAddress(address ...types.Address) {
 	}
 }
 
-// This function adds the specified address and slot pair to the access list.
-// The return values indicate whether the address was newly added and whether the slot was newly added.
-func (al *AccessList) AddSlot(address types.Address, slot types.Hash) (addrChange bool, slotChange bool) {
+// This function adds the specified address and slot pairs to the access list
+func (al *AccessList) AddSlot(address types.Address, slot ...types.Hash) {
 	slotMap, addressExists := (*al)[address]
 	if !addressExists {
 		slotMap = make(map[types.Hash]struct{})
 		(*al)[address] = slotMap
 	}
 
-	_, slotPresent := slotMap[slot]
-	if !slotPresent {
-		slotMap[slot] = struct{}{}
+	for _, s := range slot {
+		_, slotPresent := slotMap[s]
+		if !slotPresent {
+			slotMap[s] = struct{}{}
+		}
+	}
+}
 
-		return !addressExists, true
+func (al *AccessList) PrepareAccessList(
+	from types.Address,
+	to *types.Address,
+	precompiles []types.Address,
+	txAccessList types.TxAccessList) {
+	al.AddAddress(from)
+
+	if to != nil {
+		al.AddAddress(*to)
 	}
 
-	// slot and address were already present in access list
-	return false, false
+	// add the precompiles
+	al.AddAddress(precompiles...)
+
+	// add accessList provided with access list and dynamic tx
+	for _, accessListTuple := range txAccessList {
+		al.AddAddress(accessListTuple.Address)
+		al.AddSlot(accessListTuple.Address, accessListTuple.StorageKeys...)
+	}
 }

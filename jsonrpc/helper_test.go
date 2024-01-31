@@ -14,7 +14,7 @@ import (
 func createTestTransaction(hash types.Hash) *types.Transaction {
 	recipient := types.StringToAddress("2")
 
-	return &types.Transaction{
+	return types.NewTx(&types.MixedTxn{
 		Hash:     hash,
 		From:     types.StringToAddress("1"),
 		To:       &recipient,
@@ -23,7 +23,7 @@ func createTestTransaction(hash types.Hash) *types.Transaction {
 		V:        big.NewInt(1),
 		R:        big.NewInt(2),
 		S:        big.NewInt(3),
-	}
+	})
 }
 
 func createTestHeader(height uint64, setterFn func(h *types.Header)) *types.Header {
@@ -333,10 +333,10 @@ func TestGetTxAndBlockByTxHash(t *testing.T) {
 	}{
 		{
 			name:   "should return tx and block",
-			txHash: testTx1.Hash,
+			txHash: testTx1.Hash(),
 			store: &debugEndpointMockStore{
 				readTxLookupFn: func(hash types.Hash) (types.Hash, bool) {
-					assert.Equal(t, testTx1.Hash, hash)
+					assert.Equal(t, testTx1.Hash(), hash)
 
 					return blockWithTx.Hash(), true
 				},
@@ -352,10 +352,10 @@ func TestGetTxAndBlockByTxHash(t *testing.T) {
 		},
 		{
 			name:   "should return nil if ReadTxLookup returns nothing",
-			txHash: testTx1.Hash,
+			txHash: testTx1.Hash(),
 			store: &debugEndpointMockStore{
 				readTxLookupFn: func(hash types.Hash) (types.Hash, bool) {
-					assert.Equal(t, testTx1.Hash, hash)
+					assert.Equal(t, testTx1.Hash(), hash)
 
 					return types.ZeroHash, false
 				},
@@ -365,10 +365,10 @@ func TestGetTxAndBlockByTxHash(t *testing.T) {
 		},
 		{
 			name:   "should return nil if GetBlockByHash returns nothing",
-			txHash: testTx1.Hash,
+			txHash: testTx1.Hash(),
 			store: &debugEndpointMockStore{
 				readTxLookupFn: func(hash types.Hash) (types.Hash, bool) {
-					assert.Equal(t, testTx1.Hash, hash)
+					assert.Equal(t, testTx1.Hash(), hash)
 
 					return blockWithTx.Hash(), true
 				},
@@ -384,10 +384,10 @@ func TestGetTxAndBlockByTxHash(t *testing.T) {
 		},
 		{
 			name:   "should return nil if the block doesn't include the tx",
-			txHash: testTx1.Hash,
+			txHash: testTx1.Hash(),
 			store: &debugEndpointMockStore{
 				readTxLookupFn: func(hash types.Hash) (types.Hash, bool) {
-					assert.Equal(t, testTx1.Hash, hash)
+					assert.Equal(t, testTx1.Hash(), hash)
 
 					return blockWithTx.Hash(), true
 				},
@@ -707,7 +707,7 @@ func TestDecodeTxn(t *testing.T) {
 				Nonce:     &nonce,
 			},
 			store: &debugEndpointMockStore{},
-			expected: &types.Transaction{
+			expected: types.NewTx(&types.MixedTxn{
 				From:      from,
 				To:        &to,
 				Gas:       uint64(gas),
@@ -717,7 +717,7 @@ func TestDecodeTxn(t *testing.T) {
 				Value:     new(big.Int).SetBytes([]byte(value)),
 				Input:     input,
 				Nonce:     uint64(nonce),
-			},
+			}),
 			err: false,
 		},
 		{
@@ -731,7 +731,7 @@ func TestDecodeTxn(t *testing.T) {
 				Nonce:    &nonce,
 			},
 			store: &debugEndpointMockStore{},
-			expected: &types.Transaction{
+			expected: types.NewTx(&types.MixedTxn{
 				From:      types.ZeroAddress,
 				To:        &to,
 				Gas:       uint64(gas),
@@ -741,7 +741,7 @@ func TestDecodeTxn(t *testing.T) {
 				Value:     new(big.Int).SetBytes([]byte(value)),
 				Input:     input,
 				Nonce:     uint64(0),
-			},
+			}),
 			err: false,
 		},
 		{
@@ -766,7 +766,7 @@ func TestDecodeTxn(t *testing.T) {
 					}, nil
 				},
 			},
-			expected: &types.Transaction{
+			expected: types.NewTx(&types.MixedTxn{
 				From:      from,
 				To:        &to,
 				Gas:       uint64(gas),
@@ -776,7 +776,7 @@ func TestDecodeTxn(t *testing.T) {
 				Value:     new(big.Int).SetBytes([]byte(value)),
 				Input:     input,
 				Nonce:     uint64(stateNonce),
-			},
+			}),
 			err: false,
 		},
 		{
@@ -792,7 +792,7 @@ func TestDecodeTxn(t *testing.T) {
 				Nonce:    &nonce,
 			},
 			store: &debugEndpointMockStore{},
-			expected: &types.Transaction{
+			expected: types.NewTx(&types.MixedTxn{
 				From:      from,
 				To:        &to,
 				Gas:       uint64(gas),
@@ -802,7 +802,7 @@ func TestDecodeTxn(t *testing.T) {
 				Value:     new(big.Int).SetBytes([]byte(value)),
 				Input:     data,
 				Nonce:     uint64(nonce),
-			},
+			}),
 			err: false,
 		},
 		{
@@ -813,7 +813,7 @@ func TestDecodeTxn(t *testing.T) {
 				Nonce: &nonce,
 			},
 			store: &debugEndpointMockStore{},
-			expected: &types.Transaction{
+			expected: types.NewTx(&types.MixedTxn{
 				From:      from,
 				To:        &to,
 				Gas:       uint64(0),
@@ -823,7 +823,7 @@ func TestDecodeTxn(t *testing.T) {
 				Value:     new(big.Int),
 				Input:     []byte{},
 				Nonce:     uint64(nonce),
-			},
+			}),
 			err: false,
 		},
 		{

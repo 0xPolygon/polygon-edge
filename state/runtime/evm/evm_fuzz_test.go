@@ -58,11 +58,9 @@ func (m *mockHostF) SetStorage(
 }
 
 func (m *mockHostF) SetState(addr types.Address, key types.Hash, value types.Hash) {
-	return
 }
 
 func (m *mockHostF) SetNonPayable(nonPayable bool) {
-	return
 }
 
 func (m *mockHostF) GetBalance(addr types.Address) *big.Int {
@@ -88,7 +86,6 @@ func (m *mockHostF) GetCode(addr types.Address) []byte {
 }
 
 func (m *mockHostF) Selfdestruct(addr types.Address, beneficiary types.Address) {
-	return
 }
 func (m *mockHostF) GetTxContext() runtime.TxContext {
 	return runtime.TxContext{}
@@ -99,7 +96,6 @@ func (m *mockHostF) GetBlockHash(number int64) types.Hash {
 }
 
 func (m *mockHostF) EmitLog(addr types.Address, topics []types.Hash, data []byte) {
-	return
 }
 
 func (m *mockHostF) Callx(c *runtime.Contract, h runtime.Host) *runtime.ExecutionResult {

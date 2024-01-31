@@ -51,7 +51,7 @@ func (t *TxPool) Content() (interface{}, error) {
 			result[addr] = make(map[uint64]*transaction, len(txs))
 
 			for _, tx := range txs {
-				result[addr][tx.Nonce] = toTransaction(tx, nil, &types.ZeroHash, nil)
+				result[addr][tx.Nonce()] = toTransaction(tx, nil, &types.ZeroHash, nil)
 			}
 		}
 
@@ -78,9 +78,9 @@ func (t *TxPool) Inspect() (interface{}, error) {
 			result[addr.String()] = make(map[string]string, len(txs))
 
 			for _, tx := range txs {
-				nonceStr := strconv.FormatUint(tx.Nonce, 10)
+				nonceStr := strconv.FormatUint(tx.Nonce(), 10)
 				result[addr.String()][nonceStr] = fmt.Sprintf(
-					"%d wei + %d gas x %d wei", tx.Value, tx.Gas, tx.GetGasPrice(baseFee),
+					"%d wei + %d gas x %d wei", tx.Value(), tx.Gas(), tx.GetGasPrice(baseFee),
 				)
 			}
 		}

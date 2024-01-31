@@ -66,7 +66,7 @@ func RunSpecificTest(t *testing.T, file string, c testCase, fc *forkConfig, inde
 
 	// Try to recover tx with current signer
 	if len(p.TxBytes) != 0 {
-		var ttx types.Transaction
+		ttx := &types.Transaction{}
 		err := ttx.UnmarshalRLP(p.TxBytes)
 		if err != nil {
 			return err
@@ -74,7 +74,7 @@ func RunSpecificTest(t *testing.T, file string, c testCase, fc *forkConfig, inde
 
 		signer := crypto.NewSigner(currentForks, 1)
 
-		if _, err := signer.Sender(&ttx); err != nil {
+		if _, err := signer.Sender(ttx); err != nil {
 			return err
 		}
 	}

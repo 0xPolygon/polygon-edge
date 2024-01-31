@@ -238,7 +238,7 @@ type GenerateTxReqParams struct {
 func generateTx(params GenerateTxReqParams) (*types.Transaction, error) {
 	signer := crypto.NewEIP155Signer(100, true)
 
-	signedTx, signErr := signer.SignTx(&types.Transaction{
+	signedTx, signErr := signer.SignTx(types.NewTx(&types.MixedTxn{
 		Nonce:    params.Nonce,
 		From:     params.ReferenceAddr,
 		To:       &params.ToAddress,
@@ -247,7 +247,7 @@ func generateTx(params GenerateTxReqParams) (*types.Transaction, error) {
 		Value:    params.Value,
 		Input:    params.Input,
 		V:        big.NewInt(27), // it is necessary to encode in rlp
-	}, params.ReferenceKey)
+	}), params.ReferenceKey)
 
 	if signErr != nil {
 		return nil, fmt.Errorf("unable to sign transaction, %w", signErr)

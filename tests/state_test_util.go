@@ -325,7 +325,7 @@ func (t *stTransaction) At(i indexes, baseFee *big.Int) (*types.Transaction, err
 		value = v
 	}
 
-	return &types.Transaction{
+	return types.NewTx(&types.MixedTxn{
 		From:      t.From,
 		To:        t.To,
 		Nonce:     t.Nonce,
@@ -335,7 +335,7 @@ func (t *stTransaction) At(i indexes, baseFee *big.Int) (*types.Transaction, err
 		GasFeeCap: t.MaxFeePerGas,
 		GasTipCap: t.MaxPriorityFeePerGas,
 		Input:     hex.MustDecodeHex(t.Data[i.Data]),
-	}, nil
+	}), nil
 }
 
 func (t *stTransaction) UnmarshalJSON(input []byte) error {

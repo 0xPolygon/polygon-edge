@@ -272,7 +272,7 @@ func (txn *Txn) SetStorage(
 	if original == value {
 		if original == types.ZeroHash { // reset to original nonexistent slot (2.2.2.1)
 			// Storage was used as memory (allocation and deallocation occurred within the same contract)
-			if config.EIP2929 {
+			if config.Berlin {
 				// Refund: SstoreSetGasEIP2200 - WarmStorageReadCostEIP2929
 				txn.AddRefund(19900)
 			} else if config.Istanbul {
@@ -281,7 +281,7 @@ func (txn *Txn) SetStorage(
 				txn.AddRefund(19800)
 			}
 		} else { // reset to original existing slot (2.2.2.2)
-			if config.EIP2929 {
+			if config.Berlin {
 				// Refund: SstoreResetGasEIP2200 - ColdStorageReadCostEIP2929 - WarmStorageReadCostEIP2929
 				txn.AddRefund(2800)
 			} else if config.Istanbul {

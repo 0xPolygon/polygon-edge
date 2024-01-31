@@ -79,11 +79,11 @@ func Test_Transition_checkDynamicFees(t *testing.T) {
 		{
 			name:    "happy path",
 			baseFee: big.NewInt(100),
-			tx: &types.Transaction{
+			tx: types.NewTx(&types.MixedTxn{
 				Type:      types.DynamicFeeTx,
 				GasFeeCap: big.NewInt(100),
 				GasTipCap: big.NewInt(100),
-			},
+			}),
 			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
 				assert.NoError(t, err, i)
 
@@ -93,11 +93,11 @@ func Test_Transition_checkDynamicFees(t *testing.T) {
 		{
 			name:    "happy path with empty values",
 			baseFee: big.NewInt(0),
-			tx: &types.Transaction{
+			tx: types.NewTx(&types.MixedTxn{
 				Type:      types.DynamicFeeTx,
 				GasFeeCap: big.NewInt(0),
 				GasTipCap: big.NewInt(0),
-			},
+			}),
 			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
 				assert.NoError(t, err, i)
 
@@ -107,11 +107,11 @@ func Test_Transition_checkDynamicFees(t *testing.T) {
 		{
 			name:    "gas fee cap less than base fee",
 			baseFee: big.NewInt(20),
-			tx: &types.Transaction{
+			tx: types.NewTx(&types.MixedTxn{
 				Type:      types.DynamicFeeTx,
 				GasFeeCap: big.NewInt(10),
 				GasTipCap: big.NewInt(0),
-			},
+			}),
 			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
 				expectedError := fmt.Sprintf("max fee per gas less than block base fee: "+
 					"address %s, GasFeeCap/GasPrice: 10, BaseFee: 20", types.ZeroAddress)
@@ -123,11 +123,11 @@ func Test_Transition_checkDynamicFees(t *testing.T) {
 		{
 			name:    "gas fee cap less than tip cap",
 			baseFee: big.NewInt(5),
-			tx: &types.Transaction{
+			tx: types.NewTx(&types.MixedTxn{
 				Type:      types.DynamicFeeTx,
 				GasFeeCap: big.NewInt(10),
 				GasTipCap: big.NewInt(15),
-			},
+			}),
 			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
 				expectedError := fmt.Sprintf("max priority fee per gas higher than max fee per gas: "+
 					"address %s, GasTipCap: 15, GasFeeCap: 10", types.ZeroAddress)
@@ -260,8 +260,10 @@ func Test_Transition_EIP2929(t *testing.T) {
 
 			enabledForks := chain.AllForksEnabled.At(0)
 			transition := NewTransition(enabledForks, state, txn)
+			initialAccessList := runtime.NewAccessList()
+			initialAccessList.PrepareAccessList(transition.ctx.Origin, &addr, transition.precompiles.Addrs, nil)
 
-			result := transition.Call2(transition.ctx.Origin, addr, nil, big.NewInt(0), uint64(1000000))
+			result := transition.Call2(transition.ctx.Origin, addr, nil, big.NewInt(0), uint64(1000000), initialAccessList)
 			assert.Equal(t, tt.gasConsumed, result.GasUsed, "Gas consumption for %s is inaccurate according to EIP 2929", tt.name)
 		})
 	}

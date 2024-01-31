@@ -105,8 +105,14 @@ func (b *Block) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 
 	// transactions
 	if err = unmarshalRLPFrom(p, elems[1], func(txType TxType, p *fastrlp.Parser, v *fastrlp.Value) error {
-		bTxn := &Transaction{
-			Type: txType,
+		var bTxn *Transaction
+		switch txType {
+		case AccessListTx:
+			bTxn = NewTx(&AccessListTxn{})
+		case DynamicFeeTx, LegacyTx, StateTx:
+			bTxn = NewTx(&MixedTxn{
+				Type: txType,
+			})
 		}
 
 		if err = bTxn.unmarshalRLPFrom(p, v); err != nil {
@@ -364,17 +370,21 @@ func (l *Log) unmarshalRLPFrom(_ *fastrlp.Parser, v *fastrlp.Value) error {
 // UnmarshalRLP unmarshals transaction from byte slice
 // Caution: Hash calculation should be done from the outside!
 func (t *Transaction) UnmarshalRLP(input []byte) error {
-	t.Type = LegacyTx
+	txType := LegacyTx
 	offset := 0
 
 	if len(input) > 0 && input[0] <= RLPSingleByteUpperLimit {
-		var err error
-		if t.Type, err = txTypeFromByte(input[0]); err != nil {
+		tType, err := txTypeFromByte(input[0])
+		if err != nil {
 			return err
 		}
 
+		txType = tType
+
 		offset = 1
 	}
+
+	t.InitInnerData(txType)
 
 	if err := UnmarshalRlp(t.unmarshalRLPFrom, input[offset:]); err != nil {
 		return err
@@ -402,114 +412,313 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 
 	var num int
 
-	switch t.Type {
+	switch t.Type() {
 	case LegacyTx:
 		num = 9
 	case StateTx:
 		num = 10
 	case DynamicFeeTx:
 		num = 12
+	case AccessListTx:
+		num = 11
 	default:
-		return fmt.Errorf("transaction type %d not found", t.Type)
+		return fmt.Errorf("transaction type %d not found", t.Type())
 	}
 
 	if numElems := len(elems); numElems != num {
 		return fmt.Errorf("incorrect number of transaction elements, expected %d but found %d", num, numElems)
 	}
 
-	// Load Chain ID for dynamic transactions
-	if t.Type == DynamicFeeTx {
-		t.ChainID = new(big.Int)
-		if err = getElem().GetBigInt(t.ChainID); err != nil {
-			return err
-		}
-	}
+	switch t.Inner.(type) {
+	case *MixedTxn:
+		// Load Chain ID for dynamic transactions
+		if t.Type() == DynamicFeeTx {
+			txChainID := new(big.Int)
+			if err = getElem().GetBigInt(txChainID); err != nil {
+				return err
+			}
 
-	// nonce
-	if t.Nonce, err = getElem().GetUint64(); err != nil {
-		return err
-	}
-
-	if t.Type == DynamicFeeTx {
-		// gasTipCap
-		t.GasTipCap = new(big.Int)
-		if err = getElem().GetBigInt(t.GasTipCap); err != nil {
-			return err
+			t.SetChainID(txChainID)
 		}
 
-		// gasFeeCap
-		t.GasFeeCap = new(big.Int)
-		if err = getElem().GetBigInt(t.GasFeeCap); err != nil {
+		// nonce
+		txNonce, err := getElem().GetUint64()
+		if err != nil {
 			return err
 		}
-	} else {
-		// gasPrice
-		t.GasPrice = new(big.Int)
-		if err = getElem().GetBigInt(t.GasPrice); err != nil {
+
+		t.SetNonce(txNonce)
+
+		if t.Type() == DynamicFeeTx {
+			// gasTipCap
+			txGasTipCap := new(big.Int)
+			if err = getElem().GetBigInt(txGasTipCap); err != nil {
+				return err
+			}
+
+			t.SetGasTipCap(txGasTipCap)
+
+			// gasFeeCap
+			txGasFeeCap := new(big.Int)
+			if err = getElem().GetBigInt(txGasFeeCap); err != nil {
+				return err
+			}
+
+			t.SetGasFeeCap(txGasFeeCap)
+		} else {
+			// gasPrice
+			txGasPrice := new(big.Int)
+			if err = getElem().GetBigInt(txGasPrice); err != nil {
+				return err
+			}
+
+			t.SetGasPrice(txGasPrice)
+		}
+
+		// gas
+		txGas, err := getElem().GetUint64()
+		if err != nil {
 			return err
 		}
-	}
 
-	// gas
-	if t.Gas, err = getElem().GetUint64(); err != nil {
-		return err
-	}
+		t.SetGas(txGas)
 
-	// to
-	if vv, _ := getElem().Bytes(); len(vv) == 20 {
-		// address
-		addr := BytesToAddress(vv)
-		t.To = &addr
-	} else {
-		// reset To
-		t.To = nil
-	}
-
-	// value
-	t.Value = new(big.Int)
-	if err = getElem().GetBigInt(t.Value); err != nil {
-		return err
-	}
-
-	// input
-	if t.Input, err = getElem().GetBytes(t.Input[:0]); err != nil {
-		return err
-	}
-
-	// Skipping Access List field since we don't support it.
-	// This is needed to be compatible with other EVM chains and have the same format.
-	// Since we don't have access list, just skip it here.
-	if t.Type == DynamicFeeTx {
-		_ = getElem()
-	}
-
-	// V
-	t.V = new(big.Int)
-	if err = getElem().GetBigInt(t.V); err != nil {
-		return err
-	}
-
-	// R
-	t.R = new(big.Int)
-	if err = getElem().GetBigInt(t.R); err != nil {
-		return err
-	}
-
-	// S
-	t.S = new(big.Int)
-	if err = getElem().GetBigInt(t.S); err != nil {
-		return err
-	}
-
-	if t.Type == StateTx {
-		t.From = ZeroAddress
-
-		// We need to set From field for state transaction,
-		// because we are using unique, predefined address, for sending such transactions
-		if vv, err := getElem().Bytes(); err == nil && len(vv) == AddressLength {
+		// to
+		if vv, _ := getElem().Bytes(); len(vv) == 20 {
 			// address
-			t.From = BytesToAddress(vv)
+			addr := BytesToAddress(vv)
+			t.SetTo(&addr)
+		} else {
+			// reset To
+			t.SetTo(nil)
 		}
+
+		// value
+		txValue := new(big.Int)
+		if err = getElem().GetBigInt(txValue); err != nil {
+			return err
+		}
+
+		t.SetValue(txValue)
+
+		// input
+		var txInput []byte
+
+		txInput, err = getElem().GetBytes(txInput)
+		if err != nil {
+			return err
+		}
+
+		t.SetInput(txInput)
+
+		if t.Type() == DynamicFeeTx {
+			accessListVV, err := getElem().GetElems()
+			if err != nil {
+				return err
+			}
+
+			var txAccessList TxAccessList
+			if len(accessListVV) != 0 {
+				txAccessList = make(TxAccessList, len(accessListVV))
+			}
+
+			for i, accessTupleVV := range accessListVV {
+				accessTupleElems, err := accessTupleVV.GetElems()
+				if err != nil {
+					return err
+				}
+
+				// Read the address
+				addressVV := accessTupleElems[0]
+
+				addressBytes, err := addressVV.Bytes()
+				if err != nil {
+					return err
+				}
+
+				txAccessList[i].Address = BytesToAddress(addressBytes)
+
+				// Read the storage keys
+				storageKeysArrayVV := accessTupleElems[1]
+
+				storageKeysElems, err := storageKeysArrayVV.GetElems()
+				if err != nil {
+					return err
+				}
+
+				txAccessList[i].StorageKeys = make([]Hash, len(storageKeysElems))
+
+				for j, storageKeyVV := range storageKeysElems {
+					storageKeyBytes, err := storageKeyVV.Bytes()
+					if err != nil {
+						return err
+					}
+
+					txAccessList[i].StorageKeys[j] = BytesToHash(storageKeyBytes)
+				}
+			}
+
+			t.SetAccessList(txAccessList)
+		}
+
+		// V
+		txV := new(big.Int)
+		if err = getElem().GetBigInt(txV); err != nil {
+			return err
+		}
+
+		// R
+		txR := new(big.Int)
+		if err = getElem().GetBigInt(txR); err != nil {
+			return err
+		}
+
+		// S
+		txS := new(big.Int)
+		if err = getElem().GetBigInt(txS); err != nil {
+			return err
+		}
+
+		t.SetSignatureValues(txV, txR, txS)
+
+		if t.Type() == StateTx {
+			t.SetFrom(ZeroAddress)
+
+			// We need to set From field for state transaction,
+			// because we are using unique, predefined address, for sending such transactions
+			if vv, err := getElem().Bytes(); err == nil && len(vv) == AddressLength {
+				// address
+				t.SetFrom(BytesToAddress(vv))
+			}
+		}
+	case *AccessListTxn:
+		txChainID := new(big.Int)
+		if err = getElem().GetBigInt(txChainID); err != nil {
+			return err
+		}
+
+		t.SetChainID(txChainID)
+
+		// nonce
+		txNonce, err := getElem().GetUint64()
+		if err != nil {
+			return err
+		}
+
+		t.SetNonce(txNonce)
+
+		// gasPrice
+		txGasPrice := new(big.Int)
+		if err = getElem().GetBigInt(txGasPrice); err != nil {
+			return err
+		}
+
+		t.SetGasPrice(txGasPrice)
+
+		// gas
+		txGas, err := getElem().GetUint64()
+		if err != nil {
+			return err
+		}
+
+		t.SetGas(txGas)
+
+		// to
+		if vv, _ := getElem().Bytes(); len(vv) == 20 {
+			// address
+			addr := BytesToAddress(vv)
+			t.SetTo(&addr)
+		} else {
+			// reset To
+			t.SetTo(nil)
+		}
+
+		// value
+		txValue := new(big.Int)
+		if err = getElem().GetBigInt(txValue); err != nil {
+			return err
+		}
+
+		t.SetValue(txValue)
+
+		// input
+		var txInput []byte
+
+		txInput, err = getElem().GetBytes(txInput)
+		if err != nil {
+			return err
+		}
+
+		t.SetInput(txInput)
+
+		//accessList
+		accessListVV, err := getElem().GetElems()
+		if err != nil {
+			return err
+		}
+
+		var txAccessList TxAccessList
+		if len(accessListVV) != 0 {
+			txAccessList = make(TxAccessList, len(accessListVV))
+		}
+
+		for i, accessTupleVV := range accessListVV {
+			accessTupleElems, err := accessTupleVV.GetElems()
+			if err != nil {
+				return err
+			}
+
+			// Read the address
+			addressVV := accessTupleElems[0]
+
+			addressBytes, err := addressVV.Bytes()
+			if err != nil {
+				return err
+			}
+
+			txAccessList[i].Address = BytesToAddress(addressBytes)
+
+			// Read the storage keys
+			storageKeysArrayVV := accessTupleElems[1]
+
+			storageKeysElems, err := storageKeysArrayVV.GetElems()
+			if err != nil {
+				return err
+			}
+
+			txAccessList[i].StorageKeys = make([]Hash, len(storageKeysElems))
+
+			for j, storageKeyVV := range storageKeysElems {
+				storageKeyBytes, err := storageKeyVV.Bytes()
+				if err != nil {
+					return err
+				}
+
+				txAccessList[i].StorageKeys[j] = BytesToHash(storageKeyBytes)
+			}
+		}
+
+		t.SetAccessList(txAccessList)
+
+		// V
+		txV := new(big.Int)
+		if err = getElem().GetBigInt(txV); err != nil {
+			return err
+		}
+
+		// R
+		txR := new(big.Int)
+		if err = getElem().GetBigInt(txR); err != nil {
+			return err
+		}
+
+		// S
+		txS := new(big.Int)
+		if err = getElem().GetBigInt(txS); err != nil {
+			return err
+		}
+
+		t.SetSignatureValues(txV, txR, txS)
 	}
 
 	return nil

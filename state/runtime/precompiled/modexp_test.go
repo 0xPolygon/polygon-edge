@@ -180,7 +180,7 @@ var modExpTestsEIP2565 = []precompiledTest{
 func TestModExp(t *testing.T) {
 	p := &Precompiled{}
 	enabledForks := chain.AllForksEnabled.At(0)
-	enabledForks.EIP2565 = false
+	enabledForks.Berlin = false
 
 	testPrecompiled(t, &modExp{p}, modExpTests, &enabledForks)
 }
