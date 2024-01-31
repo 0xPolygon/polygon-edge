@@ -1590,7 +1590,7 @@ func Test_opSload(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			s, closeFn := getState()
+			s, closeFn := getState(tt.config)
 			defer closeFn()
 			s.msg = tt.contract
 			s.gas = tt.initState.gas
@@ -2186,7 +2186,6 @@ func Test_opCall(t *testing.T) {
 				memory: []byte{0x01},
 				stop:   false,
 				err:    nil,
-				gas:    300,
 			},
 			mockHost: &mockHostForInstructions{
 				callxResult: &runtime.ExecutionResult{
@@ -2213,7 +2212,8 @@ func Test_opCall(t *testing.T) {
 					big.NewInt(0x03),                        // address
 					big.NewInt(0).SetUint64(math.MaxUint64), // initialGas
 				},
-				memory: []byte{0x01},
+				memory:     []byte{0x01},
+				accessList: runtime.NewAccessList(),
 			},
 			resultState: &state{
 				memory: []byte{0x01},
@@ -2246,7 +2246,8 @@ func Test_opCall(t *testing.T) {
 					big.NewInt(0x03),                        // address
 					big.NewInt(0).SetUint64(math.MaxUint64), // initialGas
 				},
-				memory: []byte{0x01},
+				memory:     []byte{0x01},
+				accessList: runtime.NewAccessList(),
 			},
 			resultState: &state{
 				memory: []byte{0x01},
@@ -2266,7 +2267,7 @@ func Test_opCall(t *testing.T) {
 		test := tt
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			state, closeFn := getState(&chain.ForksInTime{})
+			state, closeFn := getState(&tt.config)
 			defer closeFn()
 
 			state.gas = test.initState.gas

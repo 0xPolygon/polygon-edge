@@ -22,8 +22,12 @@ func (al *AccessList) ContainsAddress(address types.Address) bool {
 // Contains checks if a slot is present in an account.
 // Returns two boolean flags: `accountPresent` and `slotPresent`.
 func (al *AccessList) Contains(address types.Address, slot types.Hash) (bool, bool) {
-	_, addrPresent := (*al)[address]
-	_, slotPresent := (*al)[address][slot]
+	var addrPresent, slotPresent bool
+
+	_, addrPresent = (*al)[address]
+	if addrPresent {
+		_, slotPresent = (*al)[address][slot]
+	}
 
 	return addrPresent, slotPresent
 }
