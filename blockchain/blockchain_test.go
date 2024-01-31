@@ -1768,9 +1768,9 @@ func blockWriter(tb testing.TB, numberOfBlocks uint64, blockTime, checkInterval 
 		block.Block.Header.Hash = types.StringToHash(fmt.Sprintf("%d", counter.GetValue()))
 
 		for i, transaction := range block.Block.Transactions {
-			transaction.Nonce = counter.x * uint64(i)
+			transaction.SetNonce(counter.x * uint64(i))
 			addr := types.StringToAddress(fmt.Sprintf("%d", counter.GetValue()*uint64(i)))
-			transaction.To = &addr
+			transaction.SetTo(&addr)
 		}
 
 		batchWriter.PutHeader(block.Block.Header)
@@ -1871,8 +1871,8 @@ func customJSONBlockUnmarshall(tb testing.TB, jsonData []byte) (*types.FullBlock
 
 	for _, transactionJSON := range transactionsJSON {
 		tr := transactionJSON.(map[string]interface{})
-		transaction := &types.Transaction{}
-		transaction.Hash = types.StringToHash(tr["hash"].(string))
+		transaction := types.NewTx(&types.MixedTxn{})
+		transaction.SetHash(types.StringToHash(tr["hash"].(string)))
 		nonce := tr["nonce"].(string)
 
 		nonceNumber, err := common.ParseUint64orHex(&nonce)
@@ -1880,11 +1880,11 @@ func customJSONBlockUnmarshall(tb testing.TB, jsonData []byte) (*types.FullBlock
 			return nil, err
 		}
 
-		transaction.Nonce = nonceNumber
+		transaction.SetNonce(nonceNumber)
 
-		transaction.From = types.StringToAddress(tr["from"].(string))
+		transaction.SetFrom(types.StringToAddress(tr["from"].(string)))
 		addr := types.StringToAddress(tr["to"].(string))
-		transaction.To = &addr
+		transaction.SetTo(&addr)
 
 		value := tr["value"].(string)
 
@@ -1893,7 +1893,7 @@ func customJSONBlockUnmarshall(tb testing.TB, jsonData []byte) (*types.FullBlock
 			return nil, err
 		}
 
-		transaction.Value = valueNumber
+		transaction.SetValue(valueNumber)
 
 		gasPrice := tr["gasPrice"].(string)
 
@@ -1902,9 +1902,9 @@ func customJSONBlockUnmarshall(tb testing.TB, jsonData []byte) (*types.FullBlock
 			return nil, err
 		}
 
-		transaction.GasPrice = gasPriceNumber
+		transaction.SetGasPrice(gasPriceNumber)
 
-		transaction.Input = []byte(tr["input"].(string))
+		transaction.SetInput([]byte(tr["input"].(string)))
 
 		v := tr["v"].(string)
 
@@ -1913,16 +1913,12 @@ func customJSONBlockUnmarshall(tb testing.TB, jsonData []byte) (*types.FullBlock
 			return nil, err
 		}
 
-		transaction.V = vNumber
-
 		r := tr["r"].(string)
 
 		rNumber, err := common.ParseUint256orHex(&r)
 		if err != nil {
 			return nil, err
 		}
-
-		transaction.R = rNumber
 
 		s := tr["s"].(string)
 
@@ -1931,7 +1927,7 @@ func customJSONBlockUnmarshall(tb testing.TB, jsonData []byte) (*types.FullBlock
 			return nil, err
 		}
 
-		transaction.S = sNumber
+		transaction.SetSignatureValues(vNumber, rNumber, sNumber)
 
 		chainID := tr["chainId"].(string)
 
@@ -1940,7 +1936,7 @@ func customJSONBlockUnmarshall(tb testing.TB, jsonData []byte) (*types.FullBlock
 			return nil, err
 		}
 
-		transaction.ChainID = chainIDNumber
+		transaction.SetChainID(chainIDNumber)
 
 		txType := tr["type"].(string)
 
@@ -1949,7 +1945,7 @@ func customJSONBlockUnmarshall(tb testing.TB, jsonData []byte) (*types.FullBlock
 			return nil, err
 		}
 
-		transaction.Type = types.TxType(txTypeNumber)
+		transaction.SetTransactionType(types.TxType(txTypeNumber))
 
 		gasFeeCapGeneric, ok := tr["maxFeePerGas"]
 		if ok {
@@ -1958,7 +1954,7 @@ func customJSONBlockUnmarshall(tb testing.TB, jsonData []byte) (*types.FullBlock
 			gasFeeCapNumber, err := common.ParseUint256orHex(&gasFeeCap)
 			require.NoError(tb, err)
 
-			transaction.GasFeeCap = gasFeeCapNumber
+			transaction.SetGasFeeCap(gasFeeCapNumber)
 		}
 
 		gasTipCapGeneric, ok := tr["maxPriorityFeePerGas"]
@@ -1968,7 +1964,7 @@ func customJSONBlockUnmarshall(tb testing.TB, jsonData []byte) (*types.FullBlock
 			gasTipCapNumber, err := common.ParseUint256orHex(&gasTipCap)
 			require.NoError(tb, err)
 
-			transaction.GasTipCap = gasTipCapNumber
+			transaction.SetGasTipCap(gasTipCapNumber)
 		}
 
 		transactions = append(transactions, transaction)
@@ -2052,6 +2048,8 @@ func customJSONReceiptsUnmarshall(tb testing.TB, jsonData []byte) ([]*types.Rece
 
 			logs = append(logs, log)
 		}
+
+		receipt.Logs = logs
 
 		receipts = append(receipts, receipt)
 	}
