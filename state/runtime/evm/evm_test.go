@@ -21,6 +21,7 @@ func newMockContract(value *big.Int, gas uint64, code []byte) *runtime.Contract 
 		value,
 		gas,
 		code,
+		runtime.NewAccessList(),
 	)
 }
 

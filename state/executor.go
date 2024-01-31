@@ -666,7 +666,13 @@ func (t *Transition) Create2(
 	gas uint64,
 ) *runtime.ExecutionResult {
 	address := crypto.CreateAddress(caller, t.state.GetNonce(caller))
-	contract := runtime.NewContractCreation(1, caller, caller, address, value, gas, code)
+	contract := runtime.NewContractCreation(1, caller, caller, address, value, gas, code, runtime.NewAccessList())
+
+	if t.config.EIP2929 {
+		contract.AccessList.AddAddress(caller)
+		// add all precompiles to access list
+		contract.AccessList.AddAddress(t.precompiles.ContractAddr...)
+	}
 
 	return t.applyCreate(contract, t)
 }
@@ -678,7 +684,14 @@ func (t *Transition) Call2(
 	value *big.Int,
 	gas uint64,
 ) *runtime.ExecutionResult {
-	c := runtime.NewContractCall(1, caller, caller, to, value, gas, t.state.GetCode(to), input)
+	c := runtime.NewContractCall(1, caller, caller, to, value, gas, t.state.GetCode(to), input, runtime.NewAccessList())
+
+	if t.config.EIP2929 {
+		c.AccessList.AddAddress(caller)
+		c.AccessList.AddAddress(to)
+		// add all precompiles to access list
+		c.AccessList.AddAddress(t.precompiles.ContractAddr...)
+	}
 
 	return t.applyCall(c, runtime.Call, t)
 }
@@ -784,8 +797,15 @@ func (t *Transition) applyCall(
 
 	t.captureCallStart(c, callType)
 
+	// create a deep copy of access list for reverted transaction
+	al := c.AccessList.Copy()
+
 	result = t.run(c, host)
 	if result.Failed() {
+		if result.Reverted() {
+			c.AccessList = al
+		}
+
 		if err := t.state.RevertToSnapshot(snapshot); err != nil {
 			return &runtime.ExecutionResult{
 				GasLeft: c.Gas,
@@ -825,6 +845,13 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 			GasLeft: gasLimit,
 			Err:     err,
 		}
+	}
+
+	//EIP2929: check
+	// we add this to the access-list before taking a snapshot. Even if the creation fails,
+	// the access-list change should not be rolled back according to EIP2929 specs
+	if t.config.EIP2929 {
+		c.AccessList.AddAddress(c.Address)
 	}
 
 	// Check if there is a collision and the address already exists

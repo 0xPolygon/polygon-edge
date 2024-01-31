@@ -1392,6 +1392,8 @@ type mockHostForInstructions struct {
 	nonce       uint64
 	code        []byte
 	callxResult *runtime.ExecutionResult
+	addresses   map[types.Address]int
+	storages    []map[types.Hash]types.Hash
 }
 
 func (m *mockHostForInstructions) GetNonce(types.Address) uint64 {
@@ -1406,9 +1408,209 @@ func (m *mockHostForInstructions) GetCode(addr types.Address) []byte {
 	return m.code
 }
 
+func (m *mockHostForInstructions) GetStorage(addr types.Address, key types.Hash) types.Hash {
+	idx, ok := m.addresses[addr]
+	if !ok {
+		return types.ZeroHash
+	}
+
+	res, ok := m.storages[idx][key]
+	if !ok {
+		return types.ZeroHash
+	}
+
+	return res
+}
+
 var (
 	addr1 = types.StringToAddress("1")
 )
+
+func Test_opSload(t *testing.T) {
+	t.Parallel()
+
+	type state struct {
+		gas        uint64
+		sp         int
+		stack      []*big.Int
+		memory     []byte
+		accessList *runtime.AccessList
+		stop       bool
+		err        error
+	}
+
+	address1 := types.StringToAddress("address1")
+	key1 := types.StringToHash("1")
+	val1 := types.StringToHash("2")
+	tests := []struct {
+		name        string
+		op          OpCode
+		contract    *runtime.Contract
+		config      *chain.ForksInTime
+		initState   *state
+		resultState *state
+		mockHost    *mockHostForInstructions
+	}{
+		{
+			name: "charge ColdStorageReadCostEIP2929 if the (address, storage_key) pair is not accessed_storage_keys",
+			op:   SLOAD,
+			contract: &runtime.Contract{
+				Address: address1,
+			},
+			config: &chain.ForksInTime{
+				EIP2929: true,
+			},
+			initState: &state{
+				gas: 10000,
+				sp:  1,
+				stack: []*big.Int{
+					new(big.Int).SetBytes(key1.Bytes()),
+				},
+				memory:     []byte{0x01},
+				accessList: runtime.NewAccessList(),
+			},
+			resultState: &state{
+				gas: 7900,
+				sp:  1,
+				stack: []*big.Int{
+					new(big.Int).SetBytes(val1.Bytes()),
+				},
+				memory: []byte{0x01},
+				stop:   false,
+				err:    nil,
+				accessList: &runtime.AccessList{
+					address1: {
+						key1: struct{}{},
+					},
+				},
+			},
+			mockHost: &mockHostForInstructions{
+				addresses: map[types.Address]int{
+					address1: 0,
+				},
+				storages: []map[types.Hash]types.Hash{
+					{
+						key1: val1,
+					},
+				},
+			},
+		},
+		{
+			name: "charge WarmStorageReadCostEIP2929 if the (address, storage_key) pair is in access list",
+			op:   SLOAD,
+			contract: &runtime.Contract{
+				Address: address1,
+			},
+			config: &chain.ForksInTime{
+				EIP2929: true,
+			},
+			initState: &state{
+				gas: 10000,
+				sp:  1,
+				stack: []*big.Int{
+					new(big.Int).SetBytes(key1.Bytes()),
+				},
+				memory: []byte{0x01},
+				accessList: &runtime.AccessList{
+					address1: {
+						key1: struct{}{},
+					},
+				},
+			},
+			resultState: &state{
+				gas: 9900,
+				sp:  1,
+				stack: []*big.Int{
+					new(big.Int).SetBytes(val1.Bytes()),
+				},
+				memory: []byte{0x01},
+				stop:   false,
+				err:    nil,
+				accessList: &runtime.AccessList{
+					address1: {
+						key1: struct{}{},
+					},
+				},
+			},
+			mockHost: &mockHostForInstructions{
+				addresses: map[types.Address]int{
+					address1: 0,
+				},
+				storages: []map[types.Hash]types.Hash{
+					{
+						key1: val1,
+					},
+				},
+			},
+		},
+		{
+			name: "charge Gas 800 when EIP2929 is not enabled and Istanbul is enabled",
+			op:   SLOAD,
+			contract: &runtime.Contract{
+				Address: address1,
+			},
+			config: &chain.ForksInTime{
+				EIP2929:  false,
+				Istanbul: true,
+			},
+			initState: &state{
+				gas: 10000,
+				sp:  1,
+				stack: []*big.Int{
+					new(big.Int).SetBytes(key1.Bytes()),
+				},
+				memory:     []byte{0x01},
+				accessList: nil,
+			},
+			resultState: &state{
+				gas: 9200,
+				sp:  1,
+				stack: []*big.Int{
+					new(big.Int).SetBytes(val1.Bytes()),
+				},
+				memory:     []byte{0x01},
+				stop:       false,
+				err:        nil,
+				accessList: nil,
+			},
+			mockHost: &mockHostForInstructions{
+				addresses: map[types.Address]int{
+					address1: 0,
+				},
+				storages: []map[types.Hash]types.Hash{
+					{
+						key1: val1,
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			s, closeFn := getState()
+			defer closeFn()
+			s.msg = tt.contract
+			s.gas = tt.initState.gas
+			s.sp = tt.initState.sp
+			s.stack = tt.initState.stack
+			s.memory = tt.initState.memory
+			s.config = tt.config
+			s.host = tt.mockHost
+			s.accessList = tt.initState.accessList
+			opSload(s)
+			assert.Equal(t, tt.resultState.gas, s.gas, "gas in state after execution is not correct")
+			assert.Equal(t, tt.resultState.sp, s.sp, "sp in state after execution is not correct")
+			assert.Equal(t, tt.resultState.stack, s.stack, "stack in state after execution is not correct")
+			assert.Equal(t, tt.resultState.memory, s.memory, "memory in state after execution is not correct")
+			assert.Equal(t, tt.resultState.accessList, s.accessList, "accesslist in state after execution is not correct")
+			assert.Equal(t, tt.resultState.stop, s.stop, "stop in state after execution is not correct")
+			assert.Equal(t, tt.resultState.err, s.err, "err in state after execution is not correct")
+		})
+	}
+}
 
 func TestCreate(t *testing.T) {
 	type state struct {
@@ -1936,6 +2138,7 @@ func Test_opReturnDataCopy(t *testing.T) {
 			state.tmp = nil
 			state.bitmap = bitmap{}
 			state.ret = nil
+			state.accessList = nil
 			state.currentConsumedGas = 0
 
 			opReturnDataCopy(state)
@@ -1966,7 +2169,7 @@ func Test_opCall(t *testing.T) {
 			},
 			config: allEnabledForks,
 			initState: &state{
-				gas: 1000,
+				gas: 2600, //EIP2929: check gas increased to remove error, org gas 1000
 				sp:  6,
 				stack: []*big.Int{
 					big.NewInt(0x00), // outSize
@@ -1976,7 +2179,8 @@ func Test_opCall(t *testing.T) {
 					big.NewInt(0x00), // address
 					big.NewInt(0x00), // initialGas
 				},
-				memory: []byte{0x01},
+				memory:     []byte{0x01},
+				accessList: runtime.NewAccessList(),
 			},
 			resultState: &state{
 				memory: []byte{0x01},
@@ -2072,6 +2276,7 @@ func Test_opCall(t *testing.T) {
 			state.memory = test.initState.memory
 			state.config = &test.config
 			state.host = test.mockHost
+			state.accessList = test.initState.accessList
 
 			opCall(test.op)(state)
 

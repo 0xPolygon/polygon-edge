@@ -76,6 +76,8 @@ type state struct {
 
 	returnData []byte
 	ret        []byte
+
+	accessList *runtime.AccessList
 }
 
 func (c *state) reset() {
