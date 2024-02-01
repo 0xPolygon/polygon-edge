@@ -798,14 +798,9 @@ func (t *Transition) applyCall(
 
 	t.captureCallStart(c, callType)
 
-	// create a deep copy of access list for reverted transaction
-	al := c.AccessList.Copy()
-
 	result = t.run(c, host)
 	if result.Failed() {
-		if result.Reverted() {
-			c.AccessList = al
-		}
+		c.RevertJournal()
 
 		if err := t.state.RevertToSnapshot(snapshot); err != nil {
 			return &runtime.ExecutionResult{
@@ -852,6 +847,7 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 	// we add this to the access-list before taking a snapshot. Even if the creation fails,
 	// the access-list change should not be rolled back according to EIP2929 specs
 	if t.config.Berlin {
+		c.AddToJournal(&runtime.AccessListAddAccountChange{Address: c.Address})
 		c.AccessList.AddAddress(c.Address)
 	}
 
@@ -927,6 +923,8 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 
 	result = t.run(c, host)
 	if result.Failed() {
+		c.RevertJournal()
+
 		if err := t.state.RevertToSnapshot(snapshot); err != nil {
 			return &runtime.ExecutionResult{
 				Err: err,

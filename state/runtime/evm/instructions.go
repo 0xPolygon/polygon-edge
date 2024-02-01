@@ -34,6 +34,7 @@ func (c *state) calculateGasForEIP2929(addr types.Address) uint64 {
 		gas = WarmStorageReadCostEIP2929
 	} else {
 		gas = ColdAccountAccessCostEIP2929
+		c.msg.AddToJournal(&runtime.AccessListAddAccountChange{Address: addr})
 		c.accessList.AddAddress(addr)
 	}
 
@@ -487,8 +488,7 @@ func opSload(c *state) {
 	if c.config.Berlin {
 		if _, slotPresent := c.accessList.Contains(c.msg.Address, bigToHash(loc)); !slotPresent {
 			gas = ColdStorageReadCostEIP2929
-
-			c.accessList.AddSlot(c.msg.Address, bigToHash(loc))
+			c.addAccessListSlot(c.msg.Address, bigToHash(loc))
 		} else {
 			gas = WarmStorageReadCostEIP2929
 		}
@@ -533,8 +533,7 @@ func opSStore(c *state) {
 	if c.config.Berlin {
 		if _, slotPresent := c.accessList.Contains(c.msg.Address, key); !slotPresent {
 			cost = ColdStorageReadCostEIP2929
-
-			c.accessList.AddSlot(c.msg.Address, key)
+			c.addAccessListSlot(c.msg.Address, key)
 		}
 	}
 
@@ -544,11 +543,11 @@ func opSStore(c *state) {
 			cost += WarmStorageReadCostEIP2929
 		} else if c.config.Istanbul {
 			// eip-2200
-			cost = 800
+			cost += 800
 		} else if legacyGasMetering {
-			cost = 5000
+			cost += 5000
 		} else {
-			cost = 200
+			cost += 200
 		}
 
 	case runtime.StorageModified:
@@ -562,11 +561,11 @@ func opSStore(c *state) {
 			cost += WarmStorageReadCostEIP2929
 		} else if c.config.Istanbul {
 			// eip-2200
-			cost = 800
+			cost += 800
 		} else if legacyGasMetering {
-			cost = 5000
+			cost += 5000
 		} else {
-			cost = 200
+			cost += 200
 		}
 
 	case runtime.StorageAdded:
@@ -999,8 +998,7 @@ func opSelfDestruct(c *state) {
 	// EIP 2929 gas
 	if c.config.Berlin && !c.accessList.ContainsAddress(address) {
 		gas += ColdAccountAccessCostEIP2929
-
-		c.accessList.AddAddress(address)
+		c.addAccessListAddress(address)
 	}
 
 	if !c.consumeGas(gas) {
@@ -1475,6 +1473,16 @@ func (c *state) buildCreateContract(op OpCode) (*runtime.Contract, error) {
 	)
 
 	return contract, nil
+}
+
+func (c *state) addAccessListSlot(address types.Address, slot types.Hash) {
+	c.msg.AddToJournal(&runtime.AccessListAddSlotChange{Address: address, Slot: slot})
+	c.accessList.AddSlot(address, slot)
+}
+
+func (c *state) addAccessListAddress(address types.Address) {
+	c.msg.AddToJournal(&runtime.AccessListAddAccountChange{Address: address})
+	c.accessList.AddAddress(address)
 }
 
 func opHalt(op OpCode) instruction {

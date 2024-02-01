@@ -22,8 +22,15 @@ func (al *AccessList) ContainsAddress(address types.Address) bool {
 // Contains checks if a slot is present in an account.
 // Returns two boolean flags: `accountPresent` and `slotPresent`.
 func (al *AccessList) Contains(address types.Address, slot types.Hash) (bool, bool) {
-	_, addrPresent := (*al)[address]
-	_, slotPresent := (*al)[address][slot]
+	var (
+		addrPresent, slotPresent bool
+		slots                    map[types.Hash]struct{}
+	)
+
+	slots, addrPresent = (*al)[address]
+	if addrPresent {
+		_, slotPresent = slots[slot]
+	}
 
 	return addrPresent, slotPresent
 }
@@ -71,6 +78,8 @@ func (al *AccessList) AddSlot(address types.Address, slot ...types.Hash) {
 	}
 }
 
+// PrepareAccessList prepares the access list for a transaction by adding addresses and storage slots.
+// The precompiled contract addresses are added to the access list as well.
 func (al *AccessList) PrepareAccessList(
 	from types.Address,
 	to *types.Address,
@@ -89,5 +98,18 @@ func (al *AccessList) PrepareAccessList(
 	for _, accessListTuple := range txAccessList {
 		al.AddAddress(accessListTuple.Address)
 		al.AddSlot(accessListTuple.Address, accessListTuple.StorageKeys...)
+	}
+}
+
+// DeleteAddress deletes the specified address from the AccessList.
+func (al *AccessList) DeleteAddress(address types.Address) {
+	delete(*al, address)
+}
+
+// DeleteSlot deletes the specified slot from the access list for the given address.
+// If the address is not found in the access list, the method does nothing.
+func (al *AccessList) DeleteSlot(address types.Address, slot types.Hash) {
+	if slotMap, ok := (*al)[address]; ok {
+		delete(slotMap, slot)
 	}
 }

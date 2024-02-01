@@ -199,6 +199,8 @@ type Contract struct {
 	Gas         uint64
 	Static      bool
 	AccessList  *AccessList
+
+	Journal *Journal
 }
 
 func NewContract(
@@ -221,6 +223,7 @@ func NewContract(
 		Code:        code,
 		Depth:       depth,
 		AccessList:  accessList,
+		Journal:     &Journal{},
 	}
 
 	return f
@@ -256,4 +259,12 @@ func NewContractCall(
 	c.Input = input
 
 	return c
+}
+
+func (c *Contract) RevertJournal() {
+	c.Journal.Revert(c)
+}
+
+func (c *Contract) AddToJournal(e JournalEntry) {
+	c.Journal.Append(e)
 }
