@@ -38,7 +38,6 @@ func (e *EVM) Run(c *runtime.Contract, host runtime.Host, config *chain.ForksInT
 	contract.gas = c.Gas
 	contract.host = host
 	contract.config = config
-	contract.accessList = c.AccessList
 
 	contract.bitmap.setCode(c.Code)
 

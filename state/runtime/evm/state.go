@@ -76,8 +76,6 @@ type state struct {
 
 	returnData []byte
 	ret        []byte
-
-	accessList *runtime.AccessList
 }
 
 func (c *state) reset() {
@@ -88,7 +86,6 @@ func (c *state) reset() {
 	c.lastGasCost = 0
 	c.stop = false
 	c.err = nil
-	c.accessList = nil
 
 	// reset bitmap
 	c.bitmap.reset()
