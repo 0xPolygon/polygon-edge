@@ -1487,6 +1487,7 @@ func Test_opSload(t *testing.T) {
 			op:   SLOAD,
 			contract: &runtime.Contract{
 				Address: address1,
+				Journal: &runtime.Journal{},
 			},
 			config: &chain.ForksInTime{
 				Berlin: true,
@@ -1531,6 +1532,7 @@ func Test_opSload(t *testing.T) {
 			op:   SLOAD,
 			contract: &runtime.Contract{
 				Address: address1,
+				Journal: &runtime.Journal{},
 			},
 			config: &chain.ForksInTime{
 				Berlin: true,
@@ -1579,6 +1581,7 @@ func Test_opSload(t *testing.T) {
 			op:   SLOAD,
 			contract: &runtime.Contract{
 				Address: address1,
+				Journal: &runtime.Journal{},
 			},
 			config: &chain.ForksInTime{
 				Berlin:   false,
@@ -2278,7 +2281,8 @@ func Test_opCall(t *testing.T) {
 			name: "should not copy result into memory if outSize is 0",
 			op:   STATICCALL,
 			contract: &runtime.Contract{
-				Static: true,
+				Static:  true,
+				Journal: &runtime.Journal{},
 			},
 			config: allEnabledForks,
 			initState: &state{
