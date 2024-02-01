@@ -24,7 +24,7 @@ jobs:
           go-version: 1.20.x
           cache: false
       - name: Build Blade
-        run: go build -o blade -tags netgo -ldflags="-s -w -X \"github.com/bane/blade/versioning.Version=${GITHUB_REF_NAME}\" -X \"github.com/bane/blade/versioning.Commit=${GITHUB_SHA}\"" && tar -czvf blade.tar.gz blade
+        run: go build -o blade -tags netgo -ldflags="-s -w -X \"github.com/${GITHUB_REPOSITORY}/versioning.Version=${GITHUB_REF_NAME}\" -X \"github.com/${GITHUB_REPOSITORY}/versioning.Commit=${GITHUB_SHA}\"" && tar -czvf blade.tar.gz blade
         env:
           GOARC: amd64
           GOOS: linux
