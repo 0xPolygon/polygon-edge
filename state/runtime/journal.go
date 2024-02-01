@@ -5,7 +5,7 @@ import (
 )
 
 type JournalEntry interface {
-	revert(c *Contract)
+	Revert(c *Contract)
 }
 
 type Journal struct {
@@ -18,7 +18,7 @@ func (j *Journal) Append(entry JournalEntry) {
 
 func (j *Journal) Revert(c *Contract) {
 	for i := len(j.entries) - 1; i >= 0; i-- {
-		j.entries[i].revert(c)
+		j.entries[i].Revert(c)
 	}
 
 	j.entries = j.entries[:0]
@@ -34,10 +34,14 @@ type (
 	}
 )
 
-func (ch AccessListAddAccountChange) revert(c *Contract) {
+var _ JournalEntry = (*AccessListAddAccountChange)(nil)
+
+func (ch AccessListAddAccountChange) Revert(c *Contract) {
 	c.AccessList.DeleteAddress(ch.Address)
 }
 
-func (ch AccessListAddSlotChange) revert(c *Contract) {
+var _ JournalEntry = (*AccessListAddSlotChange)(nil)
+
+func (ch AccessListAddSlotChange) Revert(c *Contract) {
 	c.AccessList.DeleteSlot(ch.Address, ch.Slot)
 }
