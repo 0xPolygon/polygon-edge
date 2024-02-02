@@ -11,7 +11,7 @@ require (
 	github.com/aws/aws-sdk-go v1.50.8
 	github.com/btcsuite/btcd v0.22.1
 	github.com/docker/docker v25.0.2+incompatible
-	github.com/docker/go-connections v0.4.0
+	github.com/docker/go-connections v0.5.0
 	github.com/envoyproxy/protoc-gen-validate v1.0.2
 	github.com/golang/protobuf v1.5.3
 	github.com/google/uuid v1.5.0
