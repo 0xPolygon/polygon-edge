@@ -809,41 +809,44 @@ func opReturnDataCopy(c *state) {
 		return
 	}
 
-	memOffset := c.pop()
-	dataOffset := c.pop()
-	length := c.pop()
+	var (
+		memOffset  = c.pop()
+		dataOffset = c.pop()
+		length     = c.pop()
+	)
 
-	if !dataOffset.IsUint64() {
+	// Check if:
+	// 1. the dataOffset is uint64 (overflow check)
+	// 2. the sum of dataOffset and length overflows uint64
+	// 3. the length of return data has enough space to receive offset + length bytes
+	end := new(big.Int).Add(dataOffset, length)
+	endAddress := end.Uint64()
+
+	if !dataOffset.IsUint64() ||
+		!end.IsUint64() ||
+		uint64(len(c.returnData)) < endAddress {
 		c.exit(errReturnDataOutOfBounds)
 
 		return
 	}
 
 	// if length is 0, return immediately since no need for the data copying nor memory allocation
-	if length.Sign() == 0 || !c.allocateMemory(memOffset, length) {
+	if length.Sign() == 0 {
+		return
+	}
+
+	if !c.allocateMemory(memOffset, length) {
+		// Error code is set inside the allocateMemory call
 		return
 	}
 
 	ulength := length.Uint64()
 	if !c.consumeGas(((ulength + 31) / 32) * copyGas) {
+		// Error code is set inside the consumeGas
 		return
 	}
 
-	dataEnd := length.Add(dataOffset, length)
-	if !dataEnd.IsUint64() {
-		c.exit(errReturnDataOutOfBounds)
-
-		return
-	}
-
-	dataEndIndex := dataEnd.Uint64()
-	if uint64(len(c.returnData)) < dataEndIndex {
-		c.exit(errReturnDataOutOfBounds)
-
-		return
-	}
-
-	data := c.returnData[dataOffset.Uint64():dataEndIndex]
+	data := c.returnData[dataOffset.Uint64():endAddress]
 	copy(c.memory[memOffset.Uint64():memOffset.Uint64()+ulength], data)
 }
 
