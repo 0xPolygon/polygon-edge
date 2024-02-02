@@ -3,7 +3,7 @@ module github.com/0xPolygon/polygon-edge
 go 1.20
 
 require (
-	cloud.google.com/go/secretmanager v1.11.4
+	cloud.google.com/go/secretmanager v1.11.5
 	github.com/0xPolygon/go-ibft v0.4.1-0.20230717081138-628065cf23b6
 	github.com/Ethernal-Tech/blockchain-event-tracker v0.0.0-20231202204931-b886edca635a
 	github.com/Ethernal-Tech/merkle-tree v0.0.0-20231213143318-4db9da419e04
@@ -39,11 +39,11 @@ require (
 	github.com/umbracle/fastrlp v0.1.1-0.20230504065717-58a1b8a9929d
 	github.com/umbracle/go-eth-bn256 v0.0.0-20230125114011-47cb310d9b0b
 	go.etcd.io/bbolt v1.3.8
-	golang.org/x/crypto v0.17.0
-	golang.org/x/sync v0.5.0
+	golang.org/x/crypto v0.18.0
+	golang.org/x/sync v0.6.0
 	golang.org/x/tools v0.16.1
-	google.golang.org/genproto v0.0.0-20231016165738-49dd2c1f3d0b
-	google.golang.org/grpc v1.60.1
+	google.golang.org/genproto v0.0.0-20240116215550-a9fa1716bcac
+	google.golang.org/grpc v1.61.0
 	google.golang.org/protobuf v1.32.0
 	gopkg.in/DataDog/dd-trace-go.v1 v1.54.1
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce
@@ -54,19 +54,20 @@ require (
 require (
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/distribution/reference v0.5.0 // indirect
-	github.com/felixge/httpsnoop v1.0.3 // indirect
+	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-logr/logr v1.4.1 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
-	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.44.0 // indirect
+	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.47.0 // indirect
+	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.47.0 // indirect
 	go.opentelemetry.io/otel v1.22.0 // indirect
 	go.opentelemetry.io/otel/metric v1.22.0 // indirect
 	go.opentelemetry.io/otel/trace v1.22.0 // indirect
 )
 
 require (
-	cloud.google.com/go/compute v1.23.1 // indirect
+	cloud.google.com/go/compute v1.23.3 // indirect
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
-	cloud.google.com/go/iam v1.1.3 // indirect
+	cloud.google.com/go/iam v1.1.5 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
 	github.com/DataDog/appsec-internal-go v1.0.0 // indirect
 	github.com/DataDog/datadog-agent/pkg/obfuscate v0.48.0 // indirect
@@ -213,16 +214,16 @@ require (
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d // indirect
 	golang.org/x/exp/typeparams v0.0.0-20230307190834-24139beb5833 // indirect
 	golang.org/x/mod v0.14.0 // indirect
-	golang.org/x/net v0.19.0 // indirect
-	golang.org/x/oauth2 v0.13.0 // indirect
-	golang.org/x/sys v0.15.0 // indirect
+	golang.org/x/net v0.20.0 // indirect
+	golang.org/x/oauth2 v0.16.0 // indirect
+	golang.org/x/sys v0.16.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
-	golang.org/x/time v0.3.0 // indirect
+	golang.org/x/time v0.5.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
-	google.golang.org/api v0.149.0 // indirect
+	google.golang.org/api v0.160.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20231016165738-49dd2c1f3d0b // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20231016165738-49dd2c1f3d0b // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20240125205218-1f4bbc51befe // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20240116215550-a9fa1716bcac // indirect
 	gotest.tools/v3 v3.0.2 // indirect
 	inet.af/netaddr v0.0.0-20230525184311-b8eac61e914a // indirect
 	lukechampine.com/blake3 v1.2.1 // indirect
