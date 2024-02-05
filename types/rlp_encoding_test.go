@@ -70,23 +70,40 @@ func TestRLPMarshall_And_Unmarshall_Transaction(t *testing.T) {
 }
 
 func TestRLPStorage_Marshall_And_Unmarshall_Receipt(t *testing.T) {
-	addr := StringToAddress("11")
-	hash := StringToHash("10")
+	var (
+		addr = StringToAddress("11")
+		hash = StringToHash("10")
+
+		statusSuccess = ReceiptSuccess
+		statusFailed  = ReceiptFailed
+	)
 
 	testTable := []struct {
-		name      string
-		receipt   *Receipt
-		setStatus bool
+		name    string
+		receipt *Receipt
+		status  *ReceiptStatus
 	}{
 		{
-			"Marshal receipt with status",
+			"Marshal receipt with success status",
 			&Receipt{
 				CumulativeGasUsed: 10,
 				GasUsed:           100,
 				ContractAddress:   &addr,
 				TxHash:            hash,
+				Status:            &statusSuccess,
 			},
-			true,
+			&statusSuccess,
+		},
+		{
+			"Marshal receipt with failed status",
+			&Receipt{
+				CumulativeGasUsed: 10,
+				GasUsed:           100,
+				ContractAddress:   &addr,
+				TxHash:            hash,
+				Status:            &statusFailed,
+			},
+			&statusFailed,
 		},
 		{
 			"Marshal receipt without status",
@@ -97,7 +114,7 @@ func TestRLPStorage_Marshall_And_Unmarshall_Receipt(t *testing.T) {
 				ContractAddress:   &addr,
 				TxHash:            hash,
 			},
-			false,
+			nil,
 		},
 	}
 
@@ -105,20 +122,18 @@ func TestRLPStorage_Marshall_And_Unmarshall_Receipt(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			receipt := testCase.receipt
 
-			if testCase.setStatus {
-				receipt.SetStatus(ReceiptSuccess)
+			if testCase.status != nil {
+				receipt.SetStatus(*testCase.status)
 			}
+
+			marshalledReceipt := receipt.MarshalStoreRLPTo(nil)
 
 			unmarshalledReceipt := new(Receipt)
-			marshaledRlp := receipt.MarshalStoreRLPTo(nil)
 
-			if err := unmarshalledReceipt.UnmarshalStoreRLP(marshaledRlp); err != nil {
-				t.Fatal(err)
-			}
+			err := unmarshalledReceipt.UnmarshalStoreRLP(marshalledReceipt)
+			require.NoError(t, err)
 
-			if !assert.Exactly(t, receipt, unmarshalledReceipt) {
-				t.Fatal("[ERROR] Unmarshalled receipt not equal to base receipt")
-			}
+			require.Exactly(t, receipt, unmarshalledReceipt, "Unmarshalled receipt not equal to the base receipt")
 		})
 	}
 }

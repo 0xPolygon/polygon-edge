@@ -286,7 +286,7 @@ func (r *Receipt) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	}
 
 	switch size := len(buf); size {
-	case 32:
+	case HashLength:
 		// root
 		copy(r.Root[:], buf[:])
 	case 1:

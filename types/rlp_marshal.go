@@ -130,7 +130,8 @@ func (r *Receipt) MarshalRLPTo(dst []byte) []byte {
 func (r *Receipt) MarshalRLPWith(a *fastrlp.Arena) *fastrlp.Value {
 	vv := a.NewArray()
 
-	if r.Status != nil {
+	if r.Status != nil &&
+		(len(r.Root) == 0 || r.Root == ZeroHash) {
 		vv.Set(a.NewUint(uint64(*r.Status)))
 	} else {
 		vv.Set(a.NewCopyBytes(r.Root[:]))
