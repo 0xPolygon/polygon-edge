@@ -22,7 +22,7 @@ jobs:
     name: Build Blade
     uses: ./.github/workflows/build.yml
     needs: check
-    if: ${{ needs.check.outputs.new_commit_count > 0 }}
+    if: needs.check.outputs.new_commit_count > 0
   tests:
     name: Tests
     uses: ./.github/workflows/tests.yml
@@ -38,11 +38,12 @@ jobs:
     name: Deploy Network
     uses: ./.github/workflows/deploy-network.yml
     needs: check
-    if: ${{ needs.check.outputs.new_commit_count > 0 }}
+    if: needs.check.outputs.new_commit_count > 0
     with:
       environment: nightly
       block_gas_limit: "200000000"
       block_time: "2"
+      is_london_fork_active: true
       is_bridge_active: true
       notification: false
     secrets:

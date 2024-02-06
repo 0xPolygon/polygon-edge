@@ -12,10 +12,6 @@ on: # yamllint disable-line rule:truthy
         description: Upload Logs
         type: boolean
         default: false
-      notification:
-        description: Notification
-        type: boolean
-        default: true
   workflow_call:
     inputs:
       environment:
@@ -33,7 +29,7 @@ on: # yamllint disable-line rule:truthy
     outputs:
       logs_output:
         description: Upload Logs output
-        value: ${{ jobs.upload_logs.outputs.logs_output }}
+        value: ${{ jobs.upload_logs_and_data.outputs.logs_output }}
       terraform_output:
         description: Terraform output
         value: ${{ jobs.destroy_network.outputs.terraform_output }}
@@ -51,11 +47,11 @@ permissions:
   security-events: write
 
 jobs:
-  upload_logs:
-    name: Upload Logs
+  upload_logs_and_data:
+    name: Upload Logs and Data
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
-    if: ${{ inputs.logs == true }}
+    if: inputs.logs == true || inputs.environment == 'test'
     outputs:
       logs_output: ${{ steps.logs_failure.outputs.logs_output }}
     steps:
@@ -63,7 +59,7 @@ jobs:
         uses: actions/checkout@v4.1.1
         with:
           repository: Ethernal-Tech/blade-deployment
-          ref: ce286ca480bbc661f1acea2fddae25a0bfd6d839
+          ref: changes
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4.0.1
         with:
@@ -96,26 +92,30 @@ jobs:
           sed 's/devnet/${{ inputs.environment }}/g' roles/upload-logs/tasks/logs.yml > roles/upload-logs/tasks/logs.yml.tmp && mv roles/upload-logs/tasks/logs.yml.tmp roles/upload-logs/tasks/logs.yml
           sed 's/{{ current_datetime\.stdout }}/${{ github.run_id }}/g' roles/upload-logs/tasks/logs.yml > roles/upload-logs/tasks/logs.yml.tmp && mv roles/upload-logs/tasks/logs.yml.tmp roles/upload-logs/tasks/logs.yml
       - name: Upload Logs
+        if: inputs.logs == true
         working-directory: ansible
         run: ansible-playbook upload-logs.yml --extra-vars "clean_deploy_title=${{ inputs.environment }}"
       - name: Logs Failed
         if: failure()
         id: logs_failure
         run: echo "logs_output=false" >> $GITHUB_OUTPUT
+      - name: Upload Data
+        if: inputs.environment == 'test'
+        working-directory: ansible
+        run: ansible-playbook upload-data.yml --extra-vars "clean_deploy_title=${{ inputs.environment }} s3_bucket=${{ secrets.AWS_S3_BLADE_BUCKET }}"
+      - name: Data Failed
+        if: failure()
+        id: data_failure
+        run: echo "data_output=false" >> $GITHUB_OUTPUT
   destroy_network:
     name: Destroy ${{ inputs.environment }}
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
-    needs: upload_logs
+    needs: upload_logs_and_data
     if: always()
     outputs:
       terraform_output: ${{ steps.terraform_failure.outputs.terraform_output }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4.1.1
-        with:
-          repository: Ethernal-Tech/blade-deployment
-          ref: ce286ca480bbc661f1acea2fddae25a0bfd6d839
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4.0.1
         with:
@@ -125,15 +125,10 @@ jobs:
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.4.5
-      - name: Configure Terraform for ${{ inputs.environment }}
-        run: |
-          sed 's/# backend "s3" {}/backend "s3" {}/' main.tf > main.tf.tmp && mv main.tf.tmp main.tf
-      - name: Terraform Init
-        id: init
-        run: terraform init -backend-config="bucket=${{ secrets.AWS_S3_BLADE_BUCKET }}" -backend-config="key=states/${{ inputs.environment }}" -backend-config="region=${{ vars.AWS_REGION }}"
+      - name: Retrieve state file from s3
+        run: aws s3 cp s3://${{ secrets.AWS_S3_BLADE_BUCKET }}/states/${{ inputs.environment }} state.json
       - name: Terraform Destroy
-        id: destroy
-        run: terraform destroy -auto-approve
+        run: terraform destroy -auto-approve -state=state.json
       - name: Terraform Failed
         if: failure()
         id: terraform_failure
@@ -141,12 +136,12 @@ jobs:
   notification:
     name: Network Notifications
     uses: ./.github/workflows/notification-destroy-network.yml
-    needs: [upload_logs, destroy_network]
-    if: ${{ inputs.notification == true }}
+    needs: [upload_logs_and_data, destroy_network]
+    if: inputs.notification == true
     with:
       environment: ${{ inputs.environment }}
       logs: ${{ inputs.logs }}
-      destroy_network_upload_logs: ${{ needs.upload_logs.outputs.logs_output }}
+      destroy_network_upload_logs: ${{ needs.upload_logs_and_data.outputs.logs_output }}
       destroy_network_terraform_logs: ${{ needs.destroy_network.outputs.terraform_output }}
     secrets:
       AWS_S3_BLADE_BUCKET: ${{ secrets.AWS_S3_BLADE_BUCKET }}
