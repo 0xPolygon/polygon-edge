@@ -116,6 +116,11 @@ jobs:
     outputs:
       terraform_output: ${{ steps.terraform_failure.outputs.terraform_output }}
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4.1.1
+        with:
+          repository: Ethernal-Tech/blade-deployment
+          ref: changes
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4.0.1
         with:
