@@ -172,11 +172,11 @@ jobs:
       - name: Run Ansible (Bootstrap blade)
         if: steps.previous_data.outputs.previous_data_output == '' || contains(steps.previous_data.outputs.previous_data_output, 'error')
         working-directory: ansible
-        run: ansible-playbook site.yml --extra-vars "clean_deploy_title=${{ inputs.environment }} block_gas_limit=${{ inputs.block_gas_limit }} block_time=${{ inputs.block_time }} is_london_fork_active=${{ inputs.is_london_fork_active }} is_bridge_active=${{ inputs.is_bridge_active }}"
+        run: ansible-playbook site.yml --extra-vars "clean_deploy_title=${{ inputs.environment }} blade_repository=${{ github.repository }} block_gas_limit=${{ inputs.block_gas_limit }} block_time=${{ inputs.block_time }} is_london_fork_active=${{ inputs.is_london_fork_active }} is_bridge_active=${{ inputs.is_bridge_active }}"
       - name: Run Ansible (Restore data)
         if: steps.previous_data.outputs.previous_data_output != '' && ${{ !contains(steps.previous_data.outputs.previous_data_output, 'error') }}
         working-directory: ansible
-        run: ansible-playbook site.yml --extra-vars "clean_deploy_title=${{ inputs.environment }} block_gas_limit=${{ inputs.block_gas_limit }} block_time=${{ inputs.block_time }} s3_bucket=${{ secrets.AWS_S3_BLADE_BUCKET }} restore_data=true"
+        run: ansible-playbook site.yml --extra-vars "clean_deploy_title=${{ inputs.environment }} blade_repository=${{ github.repository }} block_gas_limit=${{ inputs.block_gas_limit }} block_time=${{ inputs.block_time }} s3_bucket=${{ secrets.AWS_S3_BLADE_BUCKET }} restore_data=true"
       - name: Ansible Failed
         if: failure()
         id: ansible_failure
@@ -188,7 +188,7 @@ jobs:
     name: Deploy Notification
     needs: [check_network, deploy_network]
     uses: ./.github/workflows/notification-deploy-network.yml
-    if: inputs.notification == true && needs.check_network.outputs.check_output == 0
+    if: inputs.notification != false && needs.check_network.outputs.check_output == 0
     with:
       environment: ${{ inputs.environment }}
       deploy_network_terraform_output: ${{ needs.deploy_network.outputs.terraform_output }}
