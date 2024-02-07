@@ -160,21 +160,21 @@ jobs:
           sed 's/devnet/${{ inputs.environment }}/g' inventory/aws_ec2.yml > inventory/aws_ec2.yml.tmp && mv inventory/aws_ec2.yml.tmp inventory/aws_ec2.yml
           sed 's/blade_tag: .*/blade_tag: ${{ github.sha }}/g' group_vars/all.yml > group_vars/all.yml.tmp && mv group_vars/all.yml.tmp group_vars/all.yml
           sed 's/INFO/${{ vars.LOG_LEVEL }}/g' roles/blade/templates/blade.service > roles/blade/templates/blade.service.tmp && mv roles/blade/templates/blade.service.tmp roles/blade/templates/blade.service
-      - name: Check previous blade data
-        id: previous_data
-        if: inputs.environment == 'test'
-        run: echo "previous_data_output=$(aws s3 cp s3://${{ secrets.AWS_S3_BLADE_BUCKET }}/states/${{ inputs.environment }}.data.tar.gz .)" >> $GITHUB_OUTPUT
       - name: Setup Ansible
         working-directory: ansible
         run: |
           ansible-inventory --graph
           ansible-galaxy install -r requirements.yml
+      - name: Check previous blade data
+        id: previous_data
+        if: inputs.environment == 'test'
+        run: echo "previous_data_output=$(aws s3 cp s3://${{ secrets.AWS_S3_BLADE_BUCKET }}/states/${{ inputs.environment }}.data.tar.gz .)" >> $GITHUB_OUTPUT
       - name: Run Ansible (Bootstrap blade)
-        if: steps.previous_data.outputs.previous_data_output == '' || contains(steps.previous_data.outputs.previous_data_output, 'error')
+        if: steps.previous_data.outputs.previous_data_output == '' && contains(steps.previous_data.outputs.previous_data_output, 'error')
         working-directory: ansible
         run: ansible-playbook site.yml --extra-vars "clean_deploy_title=${{ inputs.environment }} blade_repository=${{ github.repository }} block_gas_limit=${{ inputs.block_gas_limit }} block_time=${{ inputs.block_time }} is_london_fork_active=${{ inputs.is_london_fork_active }} is_bridge_active=${{ inputs.is_bridge_active }}"
       - name: Run Ansible (Restore data)
-        if: steps.previous_data.outputs.previous_data_output != '' && ${{ !contains(steps.previous_data.outputs.previous_data_output, 'error') }}
+        if: contains(steps.previous_data.outputs.previous_data_output, 'download')
         working-directory: ansible
         run: ansible-playbook site.yml --extra-vars "clean_deploy_title=${{ inputs.environment }} blade_repository=${{ github.repository }} block_gas_limit=${{ inputs.block_gas_limit }} block_time=${{ inputs.block_time }} s3_bucket=${{ secrets.AWS_S3_BLADE_BUCKET }} restore_data=true"
       - name: Ansible Failed
@@ -188,7 +188,7 @@ jobs:
     name: Deploy Notification
     needs: [check_network, deploy_network]
     uses: ./.github/workflows/notification-deploy-network.yml
-    if: inputs.notification != false && needs.check_network.outputs.check_output == 0
+    if: (always() && (inputs.notification || true))
     with:
       environment: ${{ inputs.environment }}
       deploy_network_terraform_output: ${{ needs.deploy_network.outputs.terraform_output }}

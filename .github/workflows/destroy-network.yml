@@ -145,7 +145,7 @@ jobs:
     name: Network Notifications
     uses: ./.github/workflows/notification-destroy-network.yml
     needs: [upload_logs_and_data, destroy_network]
-    if: inputs.notification != false
+    if: (always() && (inputs.notification || true))
     with:
       environment: ${{ inputs.environment }}
       logs: ${{ inputs.logs }}
