@@ -38,9 +38,9 @@ func testLogicalOperation(t *testing.T, f instruction, test OperandsLogical, s *
 	f(s)
 
 	if test.expectedResult {
-		assert.Equal(t, uint64(1), s.pop().Uint64())
+		assert.Equal(t, one, s.pop())
 	} else {
-		assert.Equal(t, uint64(0), s.pop().Uint64())
+		assert.Equal(t, zero, s.pop())
 	}
 }
 
@@ -58,7 +58,7 @@ func testArithmeticOperation(t *testing.T, f instruction, test OperandsArithmeti
 
 	f(s)
 
-	assert.EqualValues(t, test.expectedResult.Uint64(), s.pop().Uint64())
+	assert.Equal(t, test.expectedResult, s.pop())
 }
 
 func TestAdd(t *testing.T) {
@@ -464,10 +464,17 @@ func TestSignExtension(t *testing.T) {
 		s, cancelFn := getState(&chain.ForksInTime{})
 		defer cancelFn()
 
+		firstValue, ok := new(big.Int).SetString("115792089237316195423570985008687907853269984665640564039457584007913129639808", 10)
+		require.True(t, ok)
+		secondValue, ok := new(big.Int).SetString("115792089237316195423570985008687907853269984665640564039457584007913129607168", 10)
+		require.True(t, ok)
+		thirdValue, ok := new(big.Int).SetString("115792089237316195423570985008687907853269984665640564039457584007913121251328", 10)
+		require.True(t, ok)
+
 		testOperands := []OperandsArithmetic{
-			{[]*big.Int{big.NewInt(128), zero}, new(big.Int).SetUint64(18446744073709551488)},
-			{[]*big.Int{big.NewInt(32768), one}, new(big.Int).SetUint64(18446744073709518848)},
-			{[]*big.Int{big.NewInt(8388608), two}, new(big.Int).SetUint64(18446744073701163008)},
+			{[]*big.Int{big.NewInt(128), zero}, firstValue},
+			{[]*big.Int{big.NewInt(32768), one}, secondValue},
+			{[]*big.Int{big.NewInt(8388608), two}, thirdValue},
 		}
 
 		for _, testOperand := range testOperands {
@@ -495,10 +502,13 @@ func TestNot(t *testing.T) {
 	defer closeFn()
 
 	testOperands := []OperandsArithmetic{
-		{[]*big.Int{zero}, new(big.Int).SetUint64(uint64(math.MaxUint64))},
-		{[]*big.Int{one}, new(big.Int).SetUint64(uint64(math.MaxUint64) - 1)},
+		{[]*big.Int{big.NewInt(-1)}, zero},
+		{[]*big.Int{zero}, tt256m1},
+		{[]*big.Int{one}, new(big.Int).Sub(tt256m1, big.NewInt(1))},
+		{[]*big.Int{big.NewInt(10)}, new(big.Int).Sub(tt256m1, big.NewInt(10))},
 	}
 	for _, testOperand := range testOperands {
+		t.Log(testOperand.expectedResult)
 		testArithmeticOperation(t, opNot, testOperand, s)
 	}
 }
@@ -533,7 +543,7 @@ func TestMStore(t *testing.T) {
 
 	opMLoad(s)
 
-	assert.Equal(t, one.Uint64(), s.pop().Uint64())
+	assert.Equal(t, one, s.pop())
 }
 
 func TestMStore8(t *testing.T) {
@@ -552,7 +562,7 @@ func TestMStore8(t *testing.T) {
 
 	opMLoad(s)
 
-	assert.Equal(t, one.Uint64(), s.pop().Uint64())
+	assert.Equal(t, one, s.pop())
 }
 
 func TestSload(t *testing.T) {
@@ -714,7 +724,7 @@ func TestBalance(t *testing.T) {
 
 		opBalance(s)
 
-		assert.EqualValues(t, balance, s.pop())
+		assert.Equal(t, balance, s.pop())
 		assert.Equal(t, gasLeft, s.gas)
 	})
 
@@ -728,7 +738,7 @@ func TestBalance(t *testing.T) {
 
 		opBalance(s)
 
-		assert.Equal(t, int64(100), s.pop().Int64())
+		assert.Equal(t, big.NewInt(100), s.pop())
 		assert.Equal(t, gasLeft, s.gas)
 	})
 
@@ -742,7 +752,7 @@ func TestBalance(t *testing.T) {
 
 		opBalance(s)
 
-		assert.EqualValues(t, balance, s.pop())
+		assert.Equal(t, balance, s.pop())
 		assert.Equal(t, gasLeft, s.gas)
 	})
 }
@@ -760,7 +770,7 @@ func TestSelfBalance(t *testing.T) {
 
 		opSelfBalance(s)
 
-		assert.Equal(t, int64(100), s.pop().Int64())
+		assert.Equal(t, big.NewInt(100), s.pop())
 	})
 
 	t.Run("NoForkErrorExpected", func(t *testing.T) {
@@ -791,7 +801,7 @@ func TestChainID(t *testing.T) {
 
 		opChainID(s)
 
-		assert.Equal(t, chainID, s.pop().Int64())
+		assert.Equal(t, big.NewInt(chainID), s.pop())
 	})
 	t.Run("NoForksErrorExpected", func(t *testing.T) {
 		s, cancelFn := getState(&chain.ForksInTime{})
@@ -855,25 +865,29 @@ func TestCallValue(t *testing.T) {
 		defer cancelFn()
 
 		opCallValue(s)
-		assert.Equal(t, uint64(0), s.pop().Uint64())
+		assert.Equal(t, zero, s.pop())
 	})
 }
 
 func TestCallDataLoad(t *testing.T) {
-	t.Run("Zero", func(t *testing.T) {
+	t.Run("NonZeroOffset", func(t *testing.T) {
 		s, cancelFn := getState(&chain.ForksInTime{})
 		defer cancelFn()
 
 		s.push(one)
 
+		s.msg = &runtime.Contract{Input: big.NewInt(7).Bytes()}
+
 		opCallDataLoad(s)
-		assert.Equal(t, zero.Uint64(), s.pop().Uint64())
+		assert.Equal(t, zero, s.pop())
 	})
-	t.Run("NotZero", func(t *testing.T) {
+	t.Run("ZeroOffset", func(t *testing.T) {
 		s, cancelFn := getState(&chain.ForksInTime{})
 		defer cancelFn()
 
 		s.push(zero)
+
+		s.msg = &runtime.Contract{Input: big.NewInt(7).Bytes()}
 
 		opCallDataLoad(s)
 		assert.NotEqual(t, zero, s.pop())
@@ -887,7 +901,7 @@ func TestCallDataSize(t *testing.T) {
 	s.msg.Input = make([]byte, 10)
 
 	opCallDataSize(s)
-	assert.Equal(t, uint64(10), s.pop().Uint64())
+	assert.Equal(t, big.NewInt(10), s.pop())
 }
 
 func TestCodeSize(t *testing.T) {
@@ -897,7 +911,7 @@ func TestCodeSize(t *testing.T) {
 	s.code = make([]byte, 10)
 
 	opCodeSize(s)
-	assert.Equal(t, uint64(10), s.pop().Uint64())
+	assert.Equal(t, big.NewInt(10), s.pop())
 }
 
 func TestExtCodeSize(t *testing.T) {
@@ -917,7 +931,7 @@ func TestExtCodeSize(t *testing.T) {
 		opExtCodeSize(s)
 
 		assert.Equal(t, gasLeft, s.gas)
-		assert.Equal(t, uint64(codeSize), s.pop().Uint64())
+		assert.Equal(t, big.NewInt(int64(codeSize)), s.pop())
 	})
 	t.Run("NoForks", func(t *testing.T) {
 		gasLeft := uint64(980)
@@ -934,27 +948,27 @@ func TestExtCodeSize(t *testing.T) {
 		opExtCodeSize(s)
 
 		assert.Equal(t, gasLeft, s.gas)
-		assert.Equal(t, uint64(codeSize), s.pop().Uint64())
+		assert.Equal(t, big.NewInt(int64(codeSize)), s.pop())
 	})
 }
 
 func TestGasPrice(t *testing.T) {
-	gasPrice := 10
+	gasPrice := int64(10)
 
 	s, cancelFn := getState(&chain.ForksInTime{})
 	defer cancelFn()
 
 	mockHost := &mockHost{}
-	mockHost.On("GetTxContext").Return(runtime.TxContext{GasPrice: bigToHash(big.NewInt(int64(gasPrice)))}).Once()
+	mockHost.On("GetTxContext").Return(runtime.TxContext{GasPrice: bigToHash(big.NewInt(gasPrice))}).Once()
 	s.host = mockHost
 
 	opGasPrice(s)
 
-	assert.Equal(t, bigToHash(big.NewInt(int64(gasPrice))), s.popHash())
+	assert.Equal(t, bigToHash(big.NewInt(gasPrice)), s.popHash())
 }
 
 func TestReturnDataSize(t *testing.T) {
-	dataSize := uint64(1024)
+	dataSize := int64(1024)
 
 	t.Run("Byzantium", func(t *testing.T) {
 		s, cancelFn := getState(&chain.ForksInTime{Byzantium: true})
@@ -964,7 +978,7 @@ func TestReturnDataSize(t *testing.T) {
 
 		opReturnDataSize(s)
 
-		assert.Equal(t, dataSize, s.pop().Uint64())
+		assert.Equal(t, big.NewInt(dataSize), s.pop())
 	})
 	t.Run("NoForks", func(t *testing.T) {
 		s, cancelFn := getState(&chain.ForksInTime{})
@@ -999,7 +1013,7 @@ func TestExtCodeHash(t *testing.T) {
 		opExtCodeHash(s)
 
 		assert.Equal(t, s.gas, gasLeft)
-		assert.Equal(t, one.Uint64(), s.pop().Uint64())
+		assert.Equal(t, one, s.pop())
 	})
 
 	t.Run("NonIstanbul", func(t *testing.T) {
@@ -1018,7 +1032,7 @@ func TestExtCodeHash(t *testing.T) {
 
 		opExtCodeHash(s)
 		assert.Equal(t, gasLeft, s.gas)
-		assert.Equal(t, zero.Int64(), s.pop().Int64())
+		assert.Equal(t, zero, s.pop())
 	})
 
 	t.Run("NoForks", func(t *testing.T) {
@@ -1048,7 +1062,7 @@ func TestPCMSizeGas(t *testing.T) {
 		s.ip = 1
 		opPC(s)
 
-		assert.Equal(t, uint64(1), s.pop().Uint64())
+		assert.Equal(t, one, s.pop())
 	})
 
 	t.Run("MSize", func(t *testing.T) {
@@ -1056,13 +1070,13 @@ func TestPCMSizeGas(t *testing.T) {
 
 		opMSize(s)
 
-		assert.Equal(t, memorySize, s.pop().Uint64())
+		assert.Equal(t, new(big.Int).SetUint64(memorySize), s.pop())
 	})
 
 	t.Run("Gas", func(t *testing.T) {
 		opGas(s)
 
-		assert.Equal(t, gasLeft, s.pop().Uint64())
+		assert.Equal(t, new(big.Int).SetUint64(gasLeft), s.pop())
 	})
 }
 
@@ -1127,6 +1141,23 @@ func TestCallDataCopy(t *testing.T) {
 	assert.Equal(t, big.NewInt(1).FillBytes(make([]byte, 32)), s.memory)
 }
 
+func TestCodeCopyLenZero(t *testing.T) {
+	s, cancelFn := getState(&chain.ForksInTime{})
+	defer cancelFn()
+
+	var expectedGas = s.gas
+
+	s.push(big.NewInt(0)) //length
+	s.push(big.NewInt(0)) //dataOffset
+	s.push(big.NewInt(0)) //memOffset
+
+	opCodeCopy(s)
+
+	// We check that no gas was spent and there was no error
+	assert.Equal(t, expectedGas, s.gas)
+	assert.NoError(t, s.err)
+}
+
 func TestCodeCopy(t *testing.T) {
 	s, cancelFn := getState(&chain.ForksInTime{})
 	defer cancelFn()
@@ -1180,7 +1211,7 @@ func TestTimeStamp(t *testing.T) {
 
 	opTimestamp(s)
 
-	assert.Equal(t, uint64(335), s.pop().Uint64())
+	assert.Equal(t, big.NewInt(335), s.pop())
 }
 
 func TestNumber(t *testing.T) {
@@ -1193,7 +1224,7 @@ func TestNumber(t *testing.T) {
 
 	opNumber(s)
 
-	assert.Equal(t, uint64(5), s.pop().Uint64())
+	assert.Equal(t, five, s.pop())
 }
 
 func TestDifficulty(t *testing.T) {
@@ -1234,7 +1265,7 @@ func TestGasLimit(t *testing.T) {
 
 		opBaseFee(s)
 
-		assert.Equal(t, baseFee, s.pop().Uint64())
+		assert.Equal(t, new(big.Int).SetUint64(baseFee), s.pop())
 	})
 }
 
@@ -1303,7 +1334,7 @@ func TestDup(t *testing.T) {
 	instr := opDup(4)
 	instr(s)
 
-	assert.Equal(t, uint64(2), s.pop().Uint64())
+	assert.Equal(t, two, s.pop())
 }
 
 func TestSwap(t *testing.T) {
@@ -1319,8 +1350,8 @@ func TestSwap(t *testing.T) {
 	instr := opSwap(4)
 	instr(s)
 
-	assert.Equal(t, uint64(5), s.stack[1].Uint64())
-	assert.Equal(t, uint64(1), s.stack[6-1].Uint64())
+	assert.Equal(t, five, s.stack[1])
+	assert.Equal(t, one, s.stack[6-1])
 }
 
 func TestLog(t *testing.T) {
@@ -1928,6 +1959,16 @@ func TestCreate(t *testing.T) {
 func Test_opReturnDataCopy(t *testing.T) {
 	t.Parallel()
 
+	// Positive number that does not fit in uint64 (math.MaxUint64 + 1)
+	largeNumber := "18446744073709551616"
+	bigIntValue := new(big.Int)
+	bigIntValue.SetString(largeNumber, 10)
+
+	// Positive number that does fit in uint64 but multiplied by two does not
+	largeNumber2 := "18446744073709551615"
+	bigIntValue2 := new(big.Int)
+	bigIntValue2.SetString(largeNumber2, 10)
+
 	tests := []struct {
 		name        string
 		config      *chain.ForksInTime
@@ -1957,7 +1998,8 @@ func Test_opReturnDataCopy(t *testing.T) {
 					big.NewInt(0),  // dataOffset
 					big.NewInt(-1), // memOffset
 				},
-				sp: 3,
+				sp:         3,
+				returnData: []byte{0xff},
 			},
 			resultState: &state{
 				config: &allEnabledForks,
@@ -1966,9 +2008,10 @@ func Test_opReturnDataCopy(t *testing.T) {
 					big.NewInt(0),
 					big.NewInt(-1),
 				},
-				sp:   0,
-				stop: true,
-				err:  errReturnDataOutOfBounds,
+				sp:         0,
+				returnData: []byte{0xff},
+				stop:       true,
+				err:        errReturnDataOutOfBounds,
 			},
 		},
 		{
@@ -2002,21 +2045,23 @@ func Test_opReturnDataCopy(t *testing.T) {
 			initState: &state{
 				stack: []*big.Int{
 					big.NewInt(-1), // length
-					big.NewInt(0),  // dataOffset
+					big.NewInt(2),  // dataOffset
 					big.NewInt(0),  // memOffset
 				},
-				sp: 3,
+				sp:         3,
+				returnData: []byte{0xff},
 			},
 			resultState: &state{
 				config: &allEnabledForks,
 				stack: []*big.Int{
 					big.NewInt(-1),
-					big.NewInt(0),
+					big.NewInt(2),
 					big.NewInt(0),
 				},
-				sp:   0,
-				stop: true,
-				err:  errReturnDataOutOfBounds,
+				sp:         0,
+				returnData: []byte{0xff},
+				stop:       true,
+				err:        errReturnDataOutOfBounds,
 			},
 		},
 		{
@@ -2051,41 +2096,6 @@ func Test_opReturnDataCopy(t *testing.T) {
 			},
 		},
 		{
-			name:   "should expand memory and copy data returnData",
-			config: &allEnabledForks,
-			initState: &state{
-				stack: []*big.Int{
-					big.NewInt(5), // length
-					big.NewInt(1), // dataOffset
-					big.NewInt(2), // memOffset
-				},
-				sp:         3,
-				returnData: []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06},
-				memory:     []byte{0x11, 0x22},
-				gas:        20,
-			},
-			resultState: &state{
-				config: &allEnabledForks,
-				stack: []*big.Int{
-					big.NewInt(6), // updated for end index
-					big.NewInt(1),
-					big.NewInt(2),
-				},
-				sp:         0,
-				returnData: []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06},
-				memory: append(
-					// 1 word (32 bytes)
-					[]byte{0x11, 0x22, 0x02, 0x03, 0x04, 0x05, 0x06},
-					make([]byte, 25)...,
-				),
-				gas:                14,
-				lastGasCost:        3,
-				currentConsumedGas: 6,
-				stop:               false,
-				err:                nil,
-			},
-		},
-		{
 			// this test case also verifies that code does not panic when the length is 0 and memOffset > len(memory)
 			name:   "should not copy data if length is zero",
 			config: &allEnabledForks,
@@ -2111,6 +2121,109 @@ func Test_opReturnDataCopy(t *testing.T) {
 				memory:     []byte{0x02},
 				stop:       false,
 				err:        nil,
+			},
+		},
+		{
+			name:   "should return error if data offset overflows uint64",
+			config: &allEnabledForks,
+			initState: &state{
+				stack: []*big.Int{
+					big.NewInt(1),  // length
+					bigIntValue,    // dataOffset
+					big.NewInt(-1), // memOffset
+				},
+				sp: 3,
+			},
+			resultState: &state{
+				config: &allEnabledForks,
+				stack: []*big.Int{
+					big.NewInt(1),
+					bigIntValue,
+					big.NewInt(-1),
+				},
+				sp:   0,
+				stop: true,
+				err:  errReturnDataOutOfBounds,
+			},
+		},
+		{
+			name:   "should return error if sum of data offset and length overflows uint64",
+			config: &allEnabledForks,
+			initState: &state{
+				stack: []*big.Int{
+					bigIntValue2,   // length
+					bigIntValue2,   // dataOffset
+					big.NewInt(-1), // memOffset
+				},
+				sp: 3,
+			},
+			resultState: &state{
+				config: &allEnabledForks,
+				stack: []*big.Int{
+					bigIntValue2,
+					bigIntValue2,
+					big.NewInt(-1),
+				},
+				sp:   0,
+				stop: true,
+				err:  errReturnDataOutOfBounds,
+			},
+		},
+		{
+			name:   "should return error if the length of return data does not have enough space to receive offset + length bytes",
+			config: &allEnabledForks,
+			initState: &state{
+				stack: []*big.Int{
+					big.NewInt(2), // length
+					big.NewInt(0), // dataOffset
+					big.NewInt(0), // memOffset
+				},
+				sp:         3,
+				returnData: []byte{0xff},
+				memory:     []byte{0x0},
+			},
+			resultState: &state{
+				config: &allEnabledForks,
+				stack: []*big.Int{
+					big.NewInt(2),
+					big.NewInt(0),
+					big.NewInt(0),
+				},
+				sp:         0,
+				returnData: []byte{0xff},
+				memory:     []byte{0x0},
+				stop:       true,
+				err:        errReturnDataOutOfBounds,
+			},
+		},
+		{
+			name:   "should return error if there is no gas",
+			config: &allEnabledForks,
+			initState: &state{
+				stack: []*big.Int{
+					big.NewInt(1), // length
+					big.NewInt(0), // dataOffset
+					big.NewInt(0), // memOffset
+				},
+				sp:         3,
+				returnData: []byte{0xff},
+				memory:     []byte{0x0},
+				gas:        0,
+			},
+			resultState: &state{
+				config: &allEnabledForks,
+				stack: []*big.Int{
+					big.NewInt(1),
+					big.NewInt(0),
+					big.NewInt(0),
+				},
+				sp:                 0,
+				returnData:         []byte{0xff},
+				memory:             []byte{0x0},
+				gas:                0,
+				currentConsumedGas: 3,
+				stop:               true,
+				err:                errOutOfGas,
 			},
 		},
 	}
