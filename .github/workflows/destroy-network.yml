@@ -125,10 +125,13 @@ jobs:
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.4.5
-      - name: Retrieve state file from s3
-        run: aws s3 cp s3://${{ secrets.AWS_S3_BLADE_BUCKET }}/states/${{ inputs.environment }} state.json
+      - name: Configure Terraform for ${{ inputs.environment }}
+        run: sed 's/# backend "s3" {}/backend "s3" {}/' main.tf > main.tf.tmp && mv main.tf.tmp main.tf
+      - name: Terraform Init
+        id: init
+        run: terraform init -backend-config="bucket=${{ secrets.AWS_S3_BLADE_BUCKET }}" -backend-config="key=states/${{ inputs.environment }}" -backend-config="region=${{ vars.AWS_REGION }}"
       - name: Terraform Destroy
-        run: terraform destroy -auto-approve -state=state.json
+        run: terraform destroy -auto-approve
       - name: Terraform Failed
         if: failure()
         id: terraform_failure
