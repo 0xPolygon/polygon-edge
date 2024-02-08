@@ -1,7 +1,7 @@
 ---
 name: Lint
 on: # yamllint disable-line rule:truthy
-  workflow_call: {}
+  workflow_call:
 
 jobs:
   golangci_lint:

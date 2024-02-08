@@ -2,7 +2,6 @@
 name: Build Blade
 on: # yamllint disable-line rule:truthy
   workflow_call:
-    # Map the workflow outputs to job outputs
     outputs:
       workflow_output:
         description: "Build output"

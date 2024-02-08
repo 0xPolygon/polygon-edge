@@ -8,10 +8,6 @@ on: # yamllint disable-line rule:truthy
   pull_request:
   workflow_dispatch:
     inputs:
-      build-blade:
-        description: Build Blade
-        type: boolean
-        default: true
       lint:
         description: Lint
         type: boolean
@@ -42,11 +38,6 @@ on: # yamllint disable-line rule:truthy
         default: false
   workflow_call:
     inputs:
-      build-blade:
-        description: Build Blade
-        type: boolean
-        default: true
-        required: true
       lint:
         description: Lint
         type: boolean
@@ -101,13 +92,10 @@ jobs:
   build-blade:
     name: Build Blade
     uses: ./.github/workflows/build.yml
-    if: |
-      inputs.build-blade || 
-      github.event_name == 'pull_request' || 
-      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'))
   lint:
     name: Lint
     uses: ./.github/workflows/lint.yml
+    needs: build-blade
     if: |
       inputs.lint || 
       github.event_name == 'pull_request' || 
@@ -115,6 +103,7 @@ jobs:
   unit-test:
     name: Unit Tests
     uses: ./.github/workflows/unit-test.yml
+    needs: build-blade
     if: |
       inputs.unit-test || 
       github.event_name == 'pull_request' || 
@@ -122,6 +111,7 @@ jobs:
   e2e-polybft-test:
     name: E2E PolyBFT Tests
     uses: ./.github/workflows/e2e-polybft-test.yml
+    needs: build-blade
     if: |
       inputs.e2e-polybft-test || 
       github.event_name == 'pull_request' || 
@@ -129,6 +119,7 @@ jobs:
   e2e-legacy-test:
     name: E2E Legacy Tests
     uses: ./.github/workflows/e2e-legacy-test.yml
+    needs: build-blade
     if: |
       inputs.e2e-legacy-test || 
       github.event_name == 'pull_request' || 
@@ -136,6 +127,7 @@ jobs:
   property-polybft-test:
     name: Property PolyBFT Tests
     uses: ./.github/workflows/property-polybft-test.yml
+    needs: build-blade
     if: |
       inputs.property-polybft-test || 
       github.event_name == 'pull_request' || 
@@ -143,6 +135,7 @@ jobs:
   fuzz-test:
     name: Fuzz Tests
     uses: ./.github/workflows/fuzz-test.yml
+    needs: build-blade
     if: |
       inputs.fuzz-test || 
       github.event_name == 'pull_request' || 

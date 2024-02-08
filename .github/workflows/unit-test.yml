@@ -1,9 +1,7 @@
 ---
 name: Unit Tests
 on: # yamllint disable-line rule:truthy
-  workflow_dispatch:
   workflow_call:
-    # Map the workflow outputs to job outputs
     outputs:
       workflow_output:
         description: "Unit Tests output"

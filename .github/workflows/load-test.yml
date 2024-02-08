@@ -148,7 +148,7 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
       - name: Start Load Test Runner
         id: start_load_teste_runner
-        uses: bane/ec2-github-runner@v2.3.4.nodejs20
+        uses: bane/ec2-github-runner@v3.0.0
         with:
           mode: start
           ec2-instance-type: ${{ vars.AWS_INSTANCE_TYPE }}
@@ -237,7 +237,7 @@ jobs:
           aws-region: ${{ vars.AWS_REGION }}
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
       - name: Stop Load Test Runner
-        uses: bane/ec2-github-runner@v2.3.4.nodejs20
+        uses: bane/ec2-github-runner@v3.0.0
         with:
           mode: stop
           label: ${{ needs.load_test_runner.outputs.load_test_runner_label }}
