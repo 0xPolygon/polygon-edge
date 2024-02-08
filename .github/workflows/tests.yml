@@ -142,7 +142,7 @@ jobs:
       (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'))
   notification:
     name: Tests Notification
-    needs: [unit-test, e2e-polybft-test, e2e-legacy-test, property-polybft-test, fuzz-test]
+    needs: [lint, unit-test, e2e-polybft-test, e2e-legacy-test, property-polybft-test, fuzz-test]
     uses: ./.github/workflows/notification-tests.yml
     if: (always() && inputs.notification)
     with:
