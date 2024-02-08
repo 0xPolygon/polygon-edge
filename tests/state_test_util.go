@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -558,50 +560,46 @@ func contains(l []string, name string) bool {
 }
 
 func listFolders(tests ...string) ([]string, error) {
-	// var folders []string
+	var folders []string
 
-	// for _, t := range tests {
-	// 	dir, err := os.Open(t)
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-	// 	defer dir.Close()
+	for _, t := range tests {
+		dir, err := os.Open(t)
+		if err != nil {
+			return nil, err
+		}
+		defer dir.Close()
 
-	// 	fileInfos, err := dir.Readdir(-1)
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
+		fileInfos, err := dir.Readdir(-1)
+		if err != nil {
+			return nil, err
+		}
 
-	// 	for _, fileInfo := range fileInfos {
-	// 		if fileInfo.IsDir() && t != "path" {
-	// 			folders = append(folders, filepath.Join(t, fileInfo.Name()))
-	// 		}
-	// 	}
-	// }
+		for _, fileInfo := range fileInfos {
+			if fileInfo.IsDir() && t != "path" {
+				folders = append(folders, filepath.Join(t, fileInfo.Name()))
+			}
+		}
+	}
 
-	// return folders, nil
-
-	return []string{"a"}, nil
+	return folders, nil
 }
 
 func listFiles(folder string) ([]string, error) {
-	// var files []string
+	var files []string
 
-	// err := filepath.Walk(folder, func(path string, info os.FileInfo, err error) error {
-	// 	if err != nil {
-	// 		return err
-	// 	}
+	err := filepath.Walk(folder, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
 
-	// 	if !info.IsDir() {
-	// 		files = append(files, path)
-	// 	}
+		if !info.IsDir() {
+			files = append(files, path)
+		}
 
-	// 	return nil
-	// })
+		return nil
+	})
 
-	// return files, err
-
-	return []string{"tests/GeneralStateTests/stTransactionTest/PointAtInfinityECRecover.json"}, nil
+	return files, err
 }
 
 func rlpHashLogs(logs []*types.Log) (res types.Hash) {
