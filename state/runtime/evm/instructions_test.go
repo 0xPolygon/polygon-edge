@@ -1,7 +1,6 @@
 package evm
 
 import (
-	"math"
 	"math/big"
 	"testing"
 
