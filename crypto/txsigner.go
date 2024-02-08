@@ -2,6 +2,7 @@ package crypto
 
 import (
 	"crypto/ecdsa"
+	"errors"
 	"fmt"
 	"math/big"
 
@@ -68,12 +69,16 @@ func encodeSignature(R, S, V *big.Int, isHomestead bool) ([]byte, error) {
 func recoverAddress(txHash types.Hash, r, s, v *big.Int, isHomestead bool) (types.Address, error) {
 	sig, err := encodeSignature(r, s, v, isHomestead)
 	if err != nil {
-		return types.Address{}, err
+		return types.ZeroAddress, err
 	}
 
 	pub, err := Ecrecover(txHash.Bytes(), sig)
 	if err != nil {
-		return types.Address{}, err
+		return types.ZeroAddress, err
+	}
+
+	if len(pub) == 0 || pub[0] != 4 {
+		return types.ZeroAddress, errors.New("invalid public key")
 	}
 
 	buf := Keccak256(pub[1:])[12:]

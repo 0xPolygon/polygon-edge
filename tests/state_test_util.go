@@ -202,10 +202,7 @@ func buildState(allocs map[types.Address]*chain.GenesisAccount) (state.State, st
 		txn.CreateAccount(addr)
 		txn.SetNonce(addr, alloc.Nonce)
 		txn.SetBalance(addr, alloc.Balance)
-
-		if len(alloc.Code) != 0 {
-			txn.SetCode(addr, alloc.Code)
-		}
+		txn.SetCode(addr, alloc.Code)
 
 		for k, v := range alloc.Storage {
 			txn.SetState(addr, k, v)
@@ -266,15 +263,16 @@ type postState []postEntry
 //
 //nolint:godox
 type stTransaction struct {
-	Data                 []string       `json:"data"`
-	Value                []string       `json:"value"`
-	Nonce                uint64         `json:"nonce"`
-	To                   *types.Address `json:"to"`
-	GasLimit             []uint64       `json:"gasLimit"`
-	GasPrice             *big.Int       `json:"gasPrice"`
-	MaxFeePerGas         *big.Int       `json:"maxFeePerGas"`
-	MaxPriorityFeePerGas *big.Int       `json:"maxPriorityFeePerGas"`
-	From                 types.Address  // derived field
+	Data                 []string              `json:"data"`
+	Value                []string              `json:"value"`
+	Nonce                uint64                `json:"nonce"`
+	To                   *types.Address        `json:"to"`
+	GasLimit             []uint64              `json:"gasLimit"`
+	GasPrice             *big.Int              `json:"gasPrice"`
+	MaxFeePerGas         *big.Int              `json:"maxFeePerGas"`
+	MaxPriorityFeePerGas *big.Int              `json:"maxPriorityFeePerGas"`
+	From                 types.Address         // derived field
+	AccessLists          []*types.TxAccessList `json:"accessLists,omitempty"`
 }
 
 func (t *stTransaction) At(i indexes, baseFee *big.Int) (*types.Transaction, error) {
@@ -290,8 +288,14 @@ func (t *stTransaction) At(i indexes, baseFee *big.Int) (*types.Transaction, err
 		return nil, fmt.Errorf("value index %d out of bounds (%d)", i.Value, len(t.Value))
 	}
 
+	var accessList types.TxAccessList
+	if t.AccessLists != nil && t.AccessLists[i.Data] != nil {
+		accessList = *t.AccessLists[i.Data]
+	}
+
 	gasPrice := t.GasPrice
 
+	var isDynamicTransaction bool
 	// If baseFee provided, set gasPrice to effectiveGasPrice.
 	if baseFee != nil {
 		if t.MaxFeePerGas == nil {
@@ -300,10 +304,14 @@ func (t *stTransaction) At(i indexes, baseFee *big.Int) (*types.Transaction, err
 
 		if t.MaxFeePerGas == nil {
 			t.MaxFeePerGas = new(big.Int)
+		} else {
+			isDynamicTransaction = true
 		}
 
 		if t.MaxPriorityFeePerGas == nil {
 			t.MaxPriorityFeePerGas = t.MaxFeePerGas
+		} else {
+			isDynamicTransaction = true
 		}
 
 		gasPrice = common.BigMin(new(big.Int).Add(t.MaxPriorityFeePerGas, baseFee), t.MaxFeePerGas)
@@ -325,31 +333,47 @@ func (t *stTransaction) At(i indexes, baseFee *big.Int) (*types.Transaction, err
 		value = v
 	}
 
+	// if tx is not dynamic and accessList is not nil, create an access list transaction
+	if !isDynamicTransaction && accessList != nil {
+		return types.NewTx(&types.AccessListTxn{
+			From:       t.From,
+			To:         t.To,
+			Nonce:      t.Nonce,
+			Value:      value,
+			Gas:        t.GasLimit[i.Gas],
+			GasPrice:   gasPrice,
+			Input:      hex.MustDecodeHex(t.Data[i.Data]),
+			AccessList: accessList,
+		}), nil
+	}
+
 	return types.NewTx(&types.MixedTxn{
-		From:      t.From,
-		To:        t.To,
-		Nonce:     t.Nonce,
-		Value:     value,
-		Gas:       t.GasLimit[i.Gas],
-		GasPrice:  gasPrice,
-		GasFeeCap: t.MaxFeePerGas,
-		GasTipCap: t.MaxPriorityFeePerGas,
-		Input:     hex.MustDecodeHex(t.Data[i.Data]),
+		From:       t.From,
+		To:         t.To,
+		Nonce:      t.Nonce,
+		Value:      value,
+		Gas:        t.GasLimit[i.Gas],
+		GasPrice:   gasPrice,
+		GasFeeCap:  t.MaxFeePerGas,
+		GasTipCap:  t.MaxPriorityFeePerGas,
+		Input:      hex.MustDecodeHex(t.Data[i.Data]),
+		AccessList: accessList,
 	}), nil
 }
 
 func (t *stTransaction) UnmarshalJSON(input []byte) error {
 	type txUnmarshall struct {
-		Data                 []string `json:"data,omitempty"`
-		GasLimit             []string `json:"gasLimit,omitempty"`
-		Value                []string `json:"value,omitempty"`
-		GasPrice             string   `json:"gasPrice,omitempty"`
-		MaxFeePerGas         string   `json:"maxFeePerGas,omitempty"`
-		MaxPriorityFeePerGas string   `json:"maxPriorityFeePerGas,omitempty"`
-		Nonce                string   `json:"nonce,omitempty"`
-		PrivateKey           string   `json:"secretKey,omitempty"`
-		Sender               string   `json:"sender"`
-		To                   string   `json:"to,omitempty"`
+		Data                 []string              `json:"data,omitempty"`
+		GasLimit             []string              `json:"gasLimit,omitempty"`
+		Value                []string              `json:"value,omitempty"`
+		GasPrice             string                `json:"gasPrice,omitempty"`
+		MaxFeePerGas         string                `json:"maxFeePerGas,omitempty"`
+		MaxPriorityFeePerGas string                `json:"maxPriorityFeePerGas,omitempty"`
+		Nonce                string                `json:"nonce,omitempty"`
+		PrivateKey           string                `json:"secretKey,omitempty"`
+		Sender               string                `json:"sender"`
+		To                   string                `json:"to,omitempty"`
+		AccessLists          []*types.TxAccessList `json:"accessLists,omitempty"`
 	}
 
 	var dec txUnmarshall
@@ -359,6 +383,7 @@ func (t *stTransaction) UnmarshalJSON(input []byte) error {
 
 	t.Data = dec.Data
 	t.Value = dec.Value
+	t.AccessLists = dec.AccessLists
 
 	for _, i := range dec.GasLimit {
 		j, err := stringToUint64(i)
