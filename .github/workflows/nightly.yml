@@ -18,16 +18,14 @@ jobs:
       - name: Get new commits
         id: get_new_commits
         run: echo "commit_count=$(git log --oneline --since '24 hours ago' | wc -l | tr -d ' ')" >> $GITHUB_OUTPUT
-  build:
-    name: Build Blade
-    uses: ./.github/workflows/build.yml
-    needs: check
-    if: needs.check.outputs.new_commit_count > 0
   tests:
     name: Tests
     uses: ./.github/workflows/tests.yml
-    needs: build
+    needs: check
+    if: needs.check.outputs.new_commit_count > 0
     with:
+      build-blade: true
+      lint: false
       unit-test: true
       e2e-polybft-test: true
       e2e-legacy-test: true
@@ -112,12 +110,12 @@ jobs:
   notification_main:
     name: Nightly Notification
     uses: ./.github/workflows/notification-main.yml
-    needs: [build, tests, deploy_network, load_test_multiple_eoa, load_test_multiple_erc20, destroy_network]
+    needs: [tests, deploy_network, load_test_multiple_eoa, load_test_multiple_erc20, destroy_network]
     if: success() || failure()
     with:
       environment: nightly
       logs: true
-      build_output: ${{ needs.build.outputs.workflow_output }}
+      build_blade_output: ${{ needs.tests.outputs.build-blade }}
       unit_test_output: ${{ needs.tests.outputs.unit-test }}
       e2e_polybft_test_output: ${{ needs.tests.outputs.e2e-polybft-test }}
       e2e_legacy_test_output: ${{ needs.tests.outputs.e2e-legacy-test }}

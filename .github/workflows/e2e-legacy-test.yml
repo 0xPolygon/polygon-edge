@@ -1,14 +1,7 @@
 ---
 name: E2E Legacy Tests
 on: # yamllint disable-line rule:truthy
-  # push:
-  #   branches:
-  #     - main
-  #     - develop
-  # pull_request:
-  workflow_dispatch:
   workflow_call:
-    # Map the workflow outputs to job outputs
     outputs:
       workflow_output:
         description: "E2E Legacy Tests output"
@@ -33,7 +26,6 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: 1.20.x
-          cache: false
       - name: Run tests
         run: make test-e2e-legacy
       - name: Run tests failed

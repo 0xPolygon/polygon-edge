@@ -55,7 +55,7 @@ jobs:
     name: Upload Logs and Data
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
-    if: inputs.logs == true || inputs.environment == 'test'
+    if: (inputs.logs || inputs.environment == 'test')
     outputs:
       logs_output: ${{ steps.logs_failure.outputs.logs_output }}
     steps:
@@ -82,7 +82,7 @@ jobs:
         id: check_network
         run: echo "pk_output=$(terraform output -json | jq -r '.pk_ansible.value // empty' | wc -c | tr -d ' ')" >> $GITHUB_OUTPUT
       - name: Configure private keys
-        if: steps.check_network.outputs.pk_output != 0
+        if: steps.check_network.outputs.pk_output > 0
         run: |
           terraform output pk_ansible > ~/private.key
           chmod 600 ~/private.key 
@@ -99,7 +99,7 @@ jobs:
           sed 's/devnet/${{ inputs.environment }}/g' inventory/aws_ec2.yml > inventory/aws_ec2.yml.tmp && mv inventory/aws_ec2.yml.tmp inventory/aws_ec2.yml
           sed 's/{{ current_datetime\.stdout }}/${{ github.run_id }}/g' roles/upload-logs/tasks/main.yml > roles/upload-logs/tasks/main.yml.tmp && mv roles/upload-logs/tasks/main.yml.tmp roles/upload-logs/tasks/main.yml
       - name: Upload Logs
-        if: (steps.check_network.outputs.pk_output != 0 && inputs.logs == true)
+        if: (steps.check_network.outputs.pk_output > 0 && inputs.logs)
         working-directory: ansible
         run: ansible-playbook upload-logs.yml --extra-vars "clean_deploy_title=${{ inputs.environment }} s3_bucket=${{ secrets.AWS_S3_BLADE_BUCKET }}"
       - name: Logs Failed
@@ -107,7 +107,7 @@ jobs:
         id: logs_failure
         run: echo "logs_output=false" >> $GITHUB_OUTPUT
       - name: Upload Data
-        if: (always() && steps.check_network.outputs.pk_output != 0 && inputs.environment == 'test')
+        if: (always() && steps.check_network.outputs.pk_output > 0 && inputs.environment == 'test')
         working-directory: ansible
         run: ansible-playbook upload-data.yml --extra-vars "clean_deploy_title=${{ inputs.environment }} s3_bucket=${{ secrets.AWS_S3_BLADE_BUCKET }}"
       - name: Data Failed
@@ -152,7 +152,7 @@ jobs:
     name: Network Notifications
     uses: ./.github/workflows/notification-destroy-network.yml
     needs: [upload_logs_and_data, destroy_network]
-    if: (always() && inputs.notification == true)
+    if: (always() && inputs.notification)
     with:
       environment: ${{ inputs.environment }}
       logs: ${{ inputs.logs }}

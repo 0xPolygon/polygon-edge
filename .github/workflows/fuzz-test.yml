@@ -1,13 +1,7 @@
 ---
 name: Fuzz Tests
 on: # yamllint disable-line rule:truthy
-  # push:
-  #   branches:
-  #     - main
-  #     - develop  
-  workflow_dispatch:
   workflow_call:
-    # Map the workflow outputs to job outputs
     outputs:
       workflow_output:
         description: "Fuzz Tests output"
@@ -24,7 +18,6 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: 1.20.x
-          cache: false
       - name: Checkout Code
         uses: actions/checkout@v4.1.1
       - name: Run Fuzz Test

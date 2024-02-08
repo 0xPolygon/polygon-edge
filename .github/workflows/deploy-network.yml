@@ -170,10 +170,9 @@ jobs:
           ansible-galaxy install -r requirements.yml
       - name: Check previous blade data
         id: previous_data
-        if: inputs.environment == 'test'
         run: echo "previous_data_output=$(aws s3 cp s3://${{ secrets.AWS_S3_BLADE_BUCKET }}/states/${{ inputs.environment }}.data.tar.gz .)" >> $GITHUB_OUTPUT
       - name: Run Ansible (Bootstrap blade)
-        if: steps.previous_data.outputs.previous_data_output == '' && contains(steps.previous_data.outputs.previous_data_output, 'error')
+        if: contains(steps.previous_data.outputs.previous_data_output, 'error')
         working-directory: ansible
         run: ansible-playbook site.yml --extra-vars "clean_deploy_title=${{ inputs.environment }} blade_repository=${{ github.repository }} block_gas_limit=${{ inputs.block_gas_limit }} block_time=${{ inputs.block_time }} is_london_fork_active=${{ inputs.is_london_fork_active }} is_bridge_active=${{ inputs.is_bridge_active }}"
       - name: Run Ansible (Restore data)
@@ -191,7 +190,7 @@ jobs:
     name: Deploy Notification
     needs: [check_network, deploy_network]
     uses: ./.github/workflows/notification-deploy-network.yml
-    if: (always() && inputs.notification == true)
+    if: (always() && inputs.notification)
     with:
       environment: ${{ inputs.environment }}
       deploy_network_terraform_output: ${{ needs.deploy_network.outputs.terraform_output }}

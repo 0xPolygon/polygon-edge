@@ -1,8 +1,21 @@
 ---
 name: Tests
 on: # yamllint disable-line rule:truthy
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
   workflow_dispatch:
     inputs:
+      build-blade:
+        description: Build Blade
+        type: boolean
+        default: true
+      lint:
+        description: Lint
+        type: boolean
+        default: true
       unit-test:
         description: Unit Tests
         type: boolean
@@ -26,9 +39,19 @@ on: # yamllint disable-line rule:truthy
       notification:
         description: Notification
         type: boolean
-        default: true
+        default: false
   workflow_call:
     inputs:
+      build-blade:
+        description: Build Blade
+        type: boolean
+        default: true
+        required: true
+      lint:
+        description: Lint
+        type: boolean
+        default: false
+        required: true
       unit-test:
         description: Unit Tests
         type: boolean
@@ -53,7 +76,11 @@ on: # yamllint disable-line rule:truthy
         description: Notification
         type: boolean
         required: true
+        default: false
     outputs:
+      build-blade:
+        description: Build Blade output
+        value: ${{ jobs.build-blade.outputs.workflow_output }}
       unit-test:
         description: Unit Tests output
         value: ${{ jobs.unit-test.outputs.workflow_output }}
@@ -71,31 +98,39 @@ on: # yamllint disable-line rule:truthy
         value: ${{ jobs.fuzz-test.outputs.workflow_output }}
 
 jobs:
+  build-blade:
+    name: Build Blade
+    uses: ./.github/workflows/build.yml
+    if: inputs.build-blade
+  lint:
+    name: Lint
+    uses: ./.github/workflows/lint.yml
+    if: inputs.lint
   unit-test:
     name: Unit Tests
     uses: ./.github/workflows/unit-test.yml
-    if: inputs.unit-test == true
+    if: inputs.unit-test
   e2e-polybft-test:
     name: E2E PolyBFT Tests
     uses: ./.github/workflows/e2e-polybft-test.yml
-    if: inputs.e2e-polybft-test == true
+    if: inputs.e2e-polybft-test
   e2e-legacy-test:
     name: E2E Legacy Tests
     uses: ./.github/workflows/e2e-legacy-test.yml
-    if: inputs.e2e-legacy-test == true
+    if: inputs.e2e-legacy-test
   property-polybft-test:
     name: Property PolyBFT Tests
     uses: ./.github/workflows/property-polybft-test.yml
-    if: inputs.property-polybft-test == true
+    if: inputs.property-polybft-test
   fuzz-test:
     name: Fuzz Tests
     uses: ./.github/workflows/fuzz-test.yml
-    if: inputs.fuzz-test == true
+    if: inputs.fuzz-test
   notification:
     name: Tests Notification
     needs: [unit-test, e2e-polybft-test, e2e-legacy-test, property-polybft-test, fuzz-test]
     uses: ./.github/workflows/notification-tests.yml
-    if: (always() && inputs.notification == true)
+    if: (always() && inputs.notification)
     with:
       unit_test_output: ${{ needs.unit-test.outputs.workflow_output }}
       e2e_polybft_test_output: ${{ needs.e2e-polybft-test.outputs.workflow_output }}

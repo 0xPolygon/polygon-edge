@@ -11,8 +11,8 @@ on: # yamllint disable-line rule:truthy
         description: Upload Logs
         type: string
         required: true
-      build_output:
-        description: Build output
+      build_blade_output:
+        description: Build Blade output
         type: string
         required: true
       unit_test_output:
@@ -87,7 +87,7 @@ jobs:
             {
               "attachments": [
                 {
-                  "color": "${{ inputs.build_output == '' && inputs.unit_test_output == '' && inputs.e2e_polybft_test_output == '' && inputs.e2e_legacy_test_output == '' && inputs.property_polybft_test_output == '' && inputs.fuzz_test_output == '' && inputs.deploy_network_terraform_output == '' && inputs.deploy_network_ansible_output == '' && inputs.load_test_multiple_eoa_output == 'true' && inputs.load_test_multiple_erc20_output == 'true' && inputs.destroy_network_logs_output == '' && inputs.destroy_network_terraform_output == '' && env.green_color || env.red_color }}",
+                  "color": "${{ inputs.build_blade_output == '' && inputs.unit_test_output == '' && inputs.e2e_polybft_test_output == '' && inputs.e2e_legacy_test_output == '' && inputs.property_polybft_test_output == '' && inputs.fuzz_test_output == '' && inputs.deploy_network_terraform_output == '' && inputs.deploy_network_ansible_output == '' && inputs.load_test_multiple_eoa_output == 'true' && inputs.load_test_multiple_erc20_output == 'true' && inputs.destroy_network_logs_output == '' && inputs.destroy_network_terraform_output == '' && env.green_color || env.red_color }}",
                   "blocks": [
                     {
                       "type": "header",
@@ -132,7 +132,7 @@ jobs:
                             "type": "plain_text",
                             "text": "Workflow Run"
                           },
-                          "style": "${{ inputs.build_output == '' && inputs.unit_test_output == '' && inputs.e2e_polybft_test_output == '' && inputs.e2e_legacy_test_output == '' && inputs.property_polybft_test_output == '' && inputs.fuzz_test_output == '' && inputs.deploy_network_terraform_output == '' && inputs.deploy_network_ansible_output == '' && inputs.load_test_multiple_eoa_output == 'true' && inputs.load_test_multiple_erc20_output == 'true' && inputs.destroy_network_logs_output == '' && inputs.destroy_network_terraform_output == '' && env.succeed_bnt || env.failed_bnt }}",
+                          "style": "${{ inputs.build_blade_output == '' && inputs.unit_test_output == '' && inputs.e2e_polybft_test_output == '' && inputs.e2e_legacy_test_output == '' && inputs.property_polybft_test_output == '' && inputs.fuzz_test_output == '' && inputs.deploy_network_terraform_output == '' && inputs.deploy_network_ansible_output == '' && inputs.load_test_multiple_eoa_output == 'true' && inputs.load_test_multiple_erc20_output == 'true' && inputs.destroy_network_logs_output == '' && inputs.destroy_network_terraform_output == '' && env.succeed_bnt || env.failed_bnt }}",
                           "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
                         },
                         {
@@ -149,7 +149,7 @@ jobs:
                   ]
                 },
                 {
-                  "color": "${{ inputs.build_output == '' && env.green_color || env.red_color }}",
+                  "color": "${{ inputs.build_blade_output == '' && env.green_color || env.red_color }}",
                   "blocks": [
                     {
                       "type": "section",

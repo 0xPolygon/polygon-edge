@@ -1,0 +1,15 @@
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    target-branch: "develop"
+    schedule:
+      interval: monthly
+    ignore:
+      - dependency-name: "github.com/aws/aws-sdk-go"
+        update-types: [ "version-update:semver-patch" ]
+    open-pull-requests-limit: 20
+    pull-request-branch-name:
+      separator: "-"
+    reviewers:
+      - "Ethernal-Tech/blade-devs"

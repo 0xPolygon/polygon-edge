@@ -1,13 +1,7 @@
 ---
 name: Property PolyBFT Tests
 on: # yamllint disable-line rule:truthy
-  # push:
-  #   branches:
-  #     - main
-  #     - develop
-  workflow_dispatch:
   workflow_call:
-    # Map the workflow outputs to job outputs
     outputs:
       workflow_output:
         description: "Property PolyBFT Tests output"
@@ -30,7 +24,6 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: 1.20.x
-          cache: false
       - name: Run tests
         run: make test-property-polybft
       - name: Run tests failed

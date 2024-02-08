@@ -1,7 +1,6 @@
 ---
 name: Build Blade
 on: # yamllint disable-line rule:truthy
-  workflow_dispatch:
   workflow_call:
     # Map the workflow outputs to job outputs
     outputs:
@@ -22,7 +21,6 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: 1.20.x
-          cache: false
       - name: Build Blade
         run: go build -o blade -tags netgo -ldflags="-s -w -X \"github.com/${GITHUB_REPOSITORY}/versioning.Version=${GITHUB_REF_NAME}\" -X \"github.com/${GITHUB_REPOSITORY}/versioning.Commit=${GITHUB_SHA}\"" && tar -czvf blade.tar.gz blade
         env:
@@ -49,7 +47,6 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: 1.20.x
-          cache: false
       - name: Reproduce builds
         continue-on-error: true
         run: |
