@@ -51,7 +51,7 @@ jobs:
                       "type": "header",
                       "text": {
                         "type": "plain_text",
-                        "text": "Deploy ${{ inputs.environment }}"
+                        "text": "Deploy ${{ inputs.environment }}net"
                       }
                     },
                     {
@@ -99,7 +99,7 @@ jobs:
                             "type": "plain_text",
                             "text": "JSON-RPC"
                           },
-                          "url": "${{ inputs.rpc_url }}"
+                          "url": "http://${{ inputs.rpc_url }}"
                         }
                       ]
                     }

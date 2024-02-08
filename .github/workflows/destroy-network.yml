@@ -12,6 +12,10 @@ on: # yamllint disable-line rule:truthy
         description: Upload Logs
         type: boolean
         default: false
+      notification:
+        description: Notification
+        type: boolean
+        default: true
   workflow_call:
     inputs:
       environment:
@@ -69,12 +73,16 @@ jobs:
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.4.5
-      - name: Configure Terraform for ${{ inputs.environment }}
+      - name: Configure Terraform
         run: sed 's/# backend "s3" {}/backend "s3" {}/' main.tf > main.tf.tmp && mv main.tf.tmp main.tf
       - name: Terraform Init
         id: init
         run: terraform init -backend-config="bucket=${{ secrets.AWS_S3_BLADE_BUCKET }}" -backend-config="key=states/${{ inputs.environment }}" -backend-config="region=${{ vars.AWS_REGION }}"
+      - name: Check if the network is already deployed
+        id: check_network
+        run: echo "pk_output=$(terraform output -json | jq -r '.pk_ansible.value // empty' | wc -c | tr -d ' ')" >> $GITHUB_OUTPUT
       - name: Configure private keys
+        if: steps.check_network.outputs.pk_output != 0
         run: |
           terraform output pk_ansible > ~/private.key
           chmod 600 ~/private.key 
@@ -84,23 +92,22 @@ jobs:
         run: |
           python3 -m pip install --user ansible
           python3 -m pip install boto3 botocore
-      - name: Configure Ansible for ${{ inputs.environment }}
+      - name: Configure Ansible
         working-directory: ansible
         run: |
           echo "${{ secrets.VAULT_PASSWORD }}" > password.txt
           sed 's/devnet/${{ inputs.environment }}/g' inventory/aws_ec2.yml > inventory/aws_ec2.yml.tmp && mv inventory/aws_ec2.yml.tmp inventory/aws_ec2.yml
-          sed 's/devnet/${{ inputs.environment }}/g' roles/upload-logs/tasks/logs.yml > roles/upload-logs/tasks/logs.yml.tmp && mv roles/upload-logs/tasks/logs.yml.tmp roles/upload-logs/tasks/logs.yml
-          sed 's/{{ current_datetime\.stdout }}/${{ github.run_id }}/g' roles/upload-logs/tasks/logs.yml > roles/upload-logs/tasks/logs.yml.tmp && mv roles/upload-logs/tasks/logs.yml.tmp roles/upload-logs/tasks/logs.yml
+          sed 's/{{ current_datetime\.stdout }}/${{ github.run_id }}/g' roles/upload-logs/tasks/main.yml > roles/upload-logs/tasks/main.yml.tmp && mv roles/upload-logs/tasks/main.yml.tmp roles/upload-logs/tasks/main.yml
       - name: Upload Logs
-        if: inputs.logs == true
+        if: (steps.check_network.outputs.pk_output != 0 && inputs.logs == true)
         working-directory: ansible
-        run: ansible-playbook upload-logs.yml --extra-vars "clean_deploy_title=${{ inputs.environment }}"
+        run: ansible-playbook upload-logs.yml --extra-vars "clean_deploy_title=${{ inputs.environment }} s3_bucket=${{ secrets.AWS_S3_BLADE_BUCKET }}"
       - name: Logs Failed
         if: failure()
         id: logs_failure
         run: echo "logs_output=false" >> $GITHUB_OUTPUT
       - name: Upload Data
-        if: inputs.environment == 'test'
+        if: (always() && steps.check_network.outputs.pk_output != 0 && inputs.environment == 'test')
         working-directory: ansible
         run: ansible-playbook upload-data.yml --extra-vars "clean_deploy_title=${{ inputs.environment }} s3_bucket=${{ secrets.AWS_S3_BLADE_BUCKET }}"
       - name: Data Failed
@@ -108,7 +115,7 @@ jobs:
         id: data_failure
         run: echo "data_output=false" >> $GITHUB_OUTPUT
   destroy_network:
-    name: Destroy ${{ inputs.environment }}
+    name: Destroy the network
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     needs: upload_logs_and_data
@@ -130,7 +137,7 @@ jobs:
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.4.5
-      - name: Configure Terraform for ${{ inputs.environment }}
+      - name: Configure Terraform
         run: sed 's/# backend "s3" {}/backend "s3" {}/' main.tf > main.tf.tmp && mv main.tf.tmp main.tf
       - name: Terraform Init
         id: init
@@ -145,7 +152,7 @@ jobs:
     name: Network Notifications
     uses: ./.github/workflows/notification-destroy-network.yml
     needs: [upload_logs_and_data, destroy_network]
-    if: (always() && (inputs.notification || true))
+    if: (always() && inputs.notification == true)
     with:
       environment: ${{ inputs.environment }}
       logs: ${{ inputs.logs }}

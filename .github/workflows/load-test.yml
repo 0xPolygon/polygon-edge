@@ -42,6 +42,10 @@ on: # yamllint disable-line rule:truthy
         type: string
         default: "60"
         required: true
+      notification:
+        description: Notification
+        type: boolean
+        default: true
   workflow_call:
     inputs:
       environment:
@@ -207,7 +211,7 @@ jobs:
     name: Load Test Notification
     needs: load_test_scenario
     uses: ./.github/workflows/notification-load-test.yml
-    if: (always() && (inputs.notification || true))
+    if: (always() && inputs.notification == true)
     with:
       environment: ${{ inputs.environment }}
       scenario: ${{ inputs.scenario }}

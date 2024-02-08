@@ -51,7 +51,7 @@ jobs:
                       "type": "header",
                       "text": {
                         "type": "plain_text",
-                        "text": "Destroy ${{ inputs.environment }}"
+                        "text": "Destroy ${{ inputs.environment }}net"
                       }
                     },
                     {

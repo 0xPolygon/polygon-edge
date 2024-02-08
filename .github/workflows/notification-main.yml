@@ -93,7 +93,7 @@ jobs:
                       "type": "header",
                       "text": {
                         "type": "plain_text",
-                        "text": "Build: ${{ inputs.environment }}"
+                        "text": "${{ inputs.environment }} build"
                       }
                     },
                     {

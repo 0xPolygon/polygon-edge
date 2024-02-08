@@ -23,6 +23,10 @@ on: # yamllint disable-line rule:truthy
         description: Fuzz Tests
         type: boolean
         default: true
+      notification:
+        description: Notification
+        type: boolean
+        default: true
   workflow_call:
     inputs:
       unit-test:
@@ -91,7 +95,7 @@ jobs:
     name: Tests Notification
     needs: [unit-test, e2e-polybft-test, e2e-legacy-test, property-polybft-test, fuzz-test]
     uses: ./.github/workflows/notification-tests.yml
-    if: (always() && (inputs.notification || true))
+    if: (always() && inputs.notification == true)
     with:
       unit_test_output: ${{ needs.unit-test.outputs.workflow_output }}
       e2e_polybft_test_output: ${{ needs.e2e-polybft-test.outputs.workflow_output }}
