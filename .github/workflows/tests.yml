@@ -75,8 +75,8 @@ on: # yamllint disable-line rule:truthy
       notification:
         description: Notification
         type: boolean
-        required: true
         default: false
+        required: true
     outputs:
       build-blade:
         description: Build Blade output
@@ -101,31 +101,52 @@ jobs:
   build-blade:
     name: Build Blade
     uses: ./.github/workflows/build.yml
-    if: inputs.build-blade
+    if: |
+      inputs.build-blade || 
+      github.event_name == 'pull_request' || 
+      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'))
   lint:
     name: Lint
     uses: ./.github/workflows/lint.yml
-    if: inputs.lint
+    if: |
+      inputs.lint || 
+      github.event_name == 'pull_request' || 
+      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'))
   unit-test:
     name: Unit Tests
     uses: ./.github/workflows/unit-test.yml
-    if: inputs.unit-test
+    if: |
+      inputs.unit-test || 
+      github.event_name == 'pull_request' || 
+      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'))
   e2e-polybft-test:
     name: E2E PolyBFT Tests
     uses: ./.github/workflows/e2e-polybft-test.yml
-    if: inputs.e2e-polybft-test
+    if: |
+      inputs.e2e-polybft-test || 
+      github.event_name == 'pull_request' || 
+      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'))
   e2e-legacy-test:
     name: E2E Legacy Tests
     uses: ./.github/workflows/e2e-legacy-test.yml
-    if: inputs.e2e-legacy-test
+    if: |
+      inputs.e2e-legacy-test || 
+      github.event_name == 'pull_request' || 
+      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'))
   property-polybft-test:
     name: Property PolyBFT Tests
     uses: ./.github/workflows/property-polybft-test.yml
-    if: inputs.property-polybft-test
+    if: |
+      inputs.property-polybft-test || 
+      github.event_name == 'pull_request' || 
+      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'))
   fuzz-test:
     name: Fuzz Tests
     uses: ./.github/workflows/fuzz-test.yml
-    if: inputs.fuzz-test
+    if: |
+      inputs.fuzz-test || 
+      github.event_name == 'pull_request' || 
+      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'))
   notification:
     name: Tests Notification
     needs: [unit-test, e2e-polybft-test, e2e-legacy-test, property-polybft-test, fuzz-test]
