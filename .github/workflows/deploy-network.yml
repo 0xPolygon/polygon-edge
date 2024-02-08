@@ -124,7 +124,7 @@ jobs:
           aws-region: ${{ vars.AWS_REGION }}
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
       - name: Install Terraform
-        uses: hashicorp/setup-terraform@v3
+        uses: hashicorp/setup-terraform@v3.0.0
         with:
           terraform_version: 1.4.5
       - name: Configure Terraform
@@ -172,7 +172,7 @@ jobs:
         id: previous_data
         run: echo "previous_data_output=$(aws s3 cp s3://${{ secrets.AWS_S3_BLADE_BUCKET }}/states/${{ inputs.environment }}.data.tar.gz .)" >> $GITHUB_OUTPUT
       - name: Run Ansible (Bootstrap blade)
-        if: contains(steps.previous_data.outputs.previous_data_output, 'error')
+        if: (steps.previous_data.outputs.previous_data_output == '' || contains(steps.previous_data.outputs.previous_data_output, 'error'))
         working-directory: ansible
         run: ansible-playbook site.yml --extra-vars "clean_deploy_title=${{ inputs.environment }} blade_repository=${{ github.repository }} block_gas_limit=${{ inputs.block_gas_limit }} block_time=${{ inputs.block_time }} is_london_fork_active=${{ inputs.is_london_fork_active }} is_bridge_active=${{ inputs.is_bridge_active }}"
       - name: Run Ansible (Restore data)

@@ -15,7 +15,7 @@ jobs:
       fuzz_output_failure: ${{ steps.run_fuzz_failure.outputs.test_output }}
     steps:
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v5.0.0
         with:
           go-version: 1.20.x
       - name: Checkout Code
