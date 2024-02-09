@@ -119,11 +119,11 @@ func (r *ExecutionResult) Succeeded() bool { return r.Err == nil }
 func (r *ExecutionResult) Failed() bool    { return r.Err != nil }
 func (r *ExecutionResult) Reverted() bool  { return errors.Is(r.Err, ErrExecutionReverted) }
 
-func (r *ExecutionResult) UpdateGasUsed(gasLimit uint64, refund uint64) {
+func (r *ExecutionResult) UpdateGasUsed(gasLimit uint64, refund, refundQuotient uint64) {
 	r.GasUsed = gasLimit - r.GasLeft
 
 	// Refund can go up to half the gas used
-	if maxRefund := r.GasUsed / 2; refund > maxRefund {
+	if maxRefund := r.GasUsed / refundQuotient; refund > maxRefund {
 		refund = maxRefund
 	}
 
@@ -143,6 +143,7 @@ var (
 	ErrUnauthorizedCaller       = errors.New("unauthorized caller")
 	ErrInvalidInputData         = errors.New("invalid input data")
 	ErrNotAuth                  = errors.New("not in allow list")
+	ErrInvalidCode              = errors.New("invalid code: must not begin with 0xef")
 )
 
 // StackUnderflowError wraps an evm error when the items on the stack less

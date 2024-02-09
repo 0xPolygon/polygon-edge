@@ -347,7 +347,13 @@ func (t *stTransaction) At(i indexes, baseFee *big.Int) (*types.Transaction, err
 		}), nil
 	}
 
+	txType := types.LegacyTx
+	if isDynamicTransaction {
+		txType = types.DynamicFeeTx
+	}
+
 	return types.NewTx(&types.MixedTxn{
+		Type:       txType,
 		From:       t.From,
 		To:         t.To,
 		Nonce:      t.Nonce,
@@ -561,17 +567,18 @@ var Forks = map[string]*chain.Forks{
 		chain.Berlin:         chain.NewFork(0),
 		chain.London:         chain.NewFork(5),
 	},
-	// "London": {
-	// 	chain.Homestead:      chain.NewFork(0),
-	// 	chain.EIP150:         chain.NewFork(0),
-	// 	chain.EIP155:         chain.NewFork(0),
-	// 	chain.EIP158:         chain.NewFork(0),
-	// 	chain.Byzantium:      chain.NewFork(0),
-	// 	chain.Constantinople: chain.NewFork(0),
-	// 	chain.Petersburg:     chain.NewFork(0),
-	// 	chain.Istanbul:       chain.NewFork(0),
-	// 	chain.London:         chain.NewFork(0),
-	// },
+	"London": {
+		chain.Homestead:      chain.NewFork(0),
+		chain.EIP150:         chain.NewFork(0),
+		chain.EIP155:         chain.NewFork(0),
+		chain.EIP158:         chain.NewFork(0),
+		chain.Byzantium:      chain.NewFork(0),
+		chain.Constantinople: chain.NewFork(0),
+		chain.Petersburg:     chain.NewFork(0),
+		chain.Istanbul:       chain.NewFork(0),
+		chain.Berlin:         chain.NewFork(0),
+		chain.London:         chain.NewFork(0),
+	},
 }
 
 func contains(l []string, name string) bool {

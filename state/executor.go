@@ -466,10 +466,17 @@ func (t *Transition) subGasLimitPrice(msg *types.Transaction) error {
 }
 
 func (t *Transition) nonceCheck(msg *types.Transaction) error {
-	nonce := t.state.GetNonce(msg.From())
+	currentNonce := t.state.GetNonce(msg.From())
 
-	if nonce != msg.Nonce() {
-		return ErrNonceIncorrect
+	if msgNonce := msg.Nonce(); currentNonce < msgNonce {
+		return fmt.Errorf("%w: address %v, tx: %d state: %d", ErrNonceTooHigh,
+			msg.From(), msgNonce, currentNonce)
+	} else if currentNonce > msgNonce {
+		return fmt.Errorf("%w: address %v, tx: %d state: %d", ErrNonceTooLow,
+			msg.From(), msgNonce, currentNonce)
+	} else if currentNonce+1 < currentNonce {
+		return fmt.Errorf("%w: address %v, nonce: %d", ErrNonceMax,
+			msg.From(), currentNonce)
 	}
 
 	return nil
@@ -517,7 +524,9 @@ func (t *Transition) checkDynamicFees(msg *types.Transaction) error {
 // surfacing of these errors reject the transaction thus not including it in the block
 
 var (
-	ErrNonceIncorrect        = errors.New("incorrect nonce")
+	ErrNonceTooLow           = errors.New("nonce too low")
+	ErrNonceTooHigh          = errors.New("nonce too high")
+	ErrNonceMax              = errors.New("nonce has max value")
 	ErrNotEnoughFundsForGas  = errors.New("not enough funds to cover gas costs")
 	ErrBlockLimitReached     = errors.New("gas limit reached in the pool")
 	ErrIntrinsicGasOverflow  = errors.New("overflow in intrinsic gas calculation")
@@ -631,8 +640,13 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 		result = t.Call2(msg.From(), *(msg.To()), msg.Input(), value, gasLeft, initialAccessList)
 	}
 
+	refundQuotient := LegacyRefundQuotient
+	if t.config.London {
+		refundQuotient = LondonRefundQuotient
+	}
+
 	refund := t.state.GetRefund()
-	result.UpdateGasUsed(msg.Gas(), refund)
+	result.UpdateGasUsed(msg.Gas(), refund, refundQuotient)
 
 	if t.ctx.Tracer != nil {
 		t.ctx.Tracer.TxEnd(result.GasLeft)
@@ -660,10 +674,10 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 
 	// Burn some amount if the london hardfork is applied.
 	// Basically, burn amount is just transferred to the current burn contract.
-	if t.config.London && msg.Type() != types.StateTx {
-		burnAmount := new(big.Int).Mul(new(big.Int).SetUint64(result.GasUsed), t.ctx.BaseFee)
-		t.state.AddBalance(t.ctx.BurnContract, burnAmount)
-	}
+	// if t.config.London && msg.Type() != types.StateTx {
+	// 	burnAmount := new(big.Int).Mul(new(big.Int).SetUint64(result.GasUsed), t.ctx.BaseFee)
+	// 	t.state.AddBalance(t.ctx.BurnContract, burnAmount)
+	// }
 
 	// return gas to the pool
 	t.addGasPool(result.GasLeft)
@@ -948,6 +962,20 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 		}
 	}
 
+	// Reject code starting with 0xEF if EIP-3541 is enabled.
+	if result.Err == nil && len(result.ReturnValue) >= 1 && result.ReturnValue[0] == 0xEF && t.config.London {
+		if err := t.state.RevertToSnapshot(snapshot); err != nil {
+			return &runtime.ExecutionResult{
+				Err: err,
+			}
+		}
+
+		return &runtime.ExecutionResult{
+			GasLeft: 0,
+			Err:     runtime.ErrInvalidCode,
+		}
+	}
+
 	gasCost := uint64(len(result.ReturnValue)) * 200
 
 	if result.GasLeft < gasCost {
@@ -1068,10 +1096,6 @@ func (t *Transition) GetNonce(addr types.Address) uint64 {
 }
 
 func (t *Transition) Selfdestruct(addr types.Address, beneficiary types.Address) {
-	if !t.state.HasSuicided(addr) {
-		t.state.AddRefund(24000)
-	}
-
 	t.state.AddBalance(beneficiary, t.state.GetBalance(addr))
 	t.state.Suicide(addr)
 }
