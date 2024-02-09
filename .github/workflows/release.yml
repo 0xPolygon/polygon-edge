@@ -49,7 +49,7 @@ jobs:
           		-v `pwd`:/go/src/$(PACKAGE_NAME) \
           		-w /go/src/$(PACKAGE_NAME) \
           		ghcr.io/goreleaser/goreleaser-cross:${GOLANG_CROSS_VERSION} \
-          		--rm-dist --skip-validate
+          		--clean --skip=validate
         env:
           PACKAGE_NAME: github.com/Ethernal-Tech/blade
           GOLANG_CROSS_VERSION: v1.21.5
