@@ -8,7 +8,7 @@ COPY blade /usr/local/bin/
 
 EXPOSE 8545 9632 1478
 
-RUN addgroup -S blade \
+RUN addgroup -S blade-group \
     && adduser -S blade -G blade-group
 
 USER blade

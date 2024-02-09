@@ -46,13 +46,13 @@ jobs:
           		-e SLACK_WEBHOOK \
               -e DOCKER_CONFIG \
           		-v /var/run/docker.sock:/var/run/docker.sock \
-          		-v `pwd`:/go/src/$(PACKAGE_NAME) \
-          		-w /go/src/$(PACKAGE_NAME) \
+          		-v `pwd`:/go/src/${PACKAGE_NAME} \
+          		-w /go/src/${PACKAGE_NAME} \
           		ghcr.io/goreleaser/goreleaser-cross:${GOLANG_CROSS_VERSION} \
-          		--clean --skip=validate
+          		--clean --skip-validate
         env:
-          PACKAGE_NAME: github.com/Ethernal-Tech/blade
-          GOLANG_CROSS_VERSION: v1.21.5
+          PACKAGE_NAME: github.com/${GITHUB_REPOSITORY}
+          GOLANG_CROSS_VERSION: v1.20.5
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.prepare.outputs.tag_name }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
