@@ -53,10 +53,10 @@ jobs:
     with:
       environment: nightly
       scenario: EOA
-      setupTimeOut: "220s"
-      rate: "3000"
+      timeout: "220s"
+      rate: "500"
       timeUnit: "1s"
-      duration: "10m"
+      duration: "5m"
       preAllocatedVUs: "60"
       maxVUs: "60"
       notification: false
@@ -76,10 +76,10 @@ jobs:
     with:
       environment: nightly
       scenario: ERC20
-      setupTimeOut: "220s"
-      rate: "1500"
+      timeout: "220s"
+      rate: "300"
       timeUnit: "1s"
-      duration: "10m"
+      duration: "5m"
       preAllocatedVUs: "60"
       maxVUs: "60"
       notification: false

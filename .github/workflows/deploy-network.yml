@@ -97,6 +97,7 @@ jobs:
         run: echo "retrieve_state_output=$(aws s3 cp s3://${{ secrets.AWS_S3_BLADE_BUCKET }}/states/${{ inputs.environment }} state.json)" >> $GITHUB_OUTPUT
       - name: Check state file
         id: check_state_file
+        if: contains(steps.retrieve_state.outputs.retrieve_state_output, 'download')
         run: echo "resources=$(cat state.json | jq -r ".resources" | jq length)" >> $GITHUB_OUTPUT
       - name: Set RPC URL
         id: rpc_url

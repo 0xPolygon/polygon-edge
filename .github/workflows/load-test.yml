@@ -12,8 +12,8 @@ on: # yamllint disable-line rule:truthy
         description: The scenario to run
         type: choice
         options: [EOA, ERC20]
-      setupTimeOut:
-        description: Setup TimeOut
+      timeout:
+        description: Time Out
         type: string
         default: "220s"
         required: true
@@ -56,8 +56,8 @@ on: # yamllint disable-line rule:truthy
         description: The scenario to run
         type: string
         required: true
-      setupTimeOut:
-        description: Setup TimeOut
+      timeout:
+        description: Time Out
         type: string
         required: true
       rate:
@@ -133,10 +133,33 @@ permissions:
   security-events: write
 
 jobs:
+  check_network:
+    name: Check if the network is already deployed
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    outputs:
+      rpc_url: ${{ steps.rpc_url.outputs.url }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4.1.1
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4.0.1
+        with:
+          aws-region: ${{ vars.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+      - name: Retrieve state file from s3
+        id: retrieve_state
+        run: echo "retrieve_state_output=$(aws s3 cp s3://${{ secrets.AWS_S3_BLADE_BUCKET }}/states/${{ inputs.environment }} state.json)" >> $GITHUB_OUTPUT
+      - name: Set RPC URL
+        id: rpc_url
+        if: contains(steps.retrieve_state.outputs.retrieve_state_output, 'download')
+        run: echo "url=$(cat state.json | jq -r '.outputs.aws_lb_ext_domain.value // empty')" >> $GITHUB_OUTPUT
   load_test_runner:
     name: Deploy Load Test Runner
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
+    needs: check_network
+    if: needs.check_network.outputs.rpc_url != ''
     outputs:
       load_test_runner_label: ${{ steps.start_load_teste_runner.outputs.label }}
       load_test_runner_instance_id: ${{ steps.start_load_teste_runner.outputs.ec2-instance-id }}
@@ -159,7 +182,7 @@ jobs:
   load_test_scenario:
     name: Run Load Test ${{ inputs.scenario }} Scenario
     runs-on: ${{ needs.load_test_runner.outputs.load_test_runner_label }}
-    needs: load_test_runner
+    needs: [check_network, load_test_runner]
     outputs:
       test_output_success: ${{ steps.load_test_results_success.outputs.test_output }}
       tps_avg: ${{ steps.load_test_results.outputs.tps_avg }}
@@ -172,16 +195,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4.1.1
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4.0.1
-        with:
-          aws-region: ${{ vars.AWS_REGION }}
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-      - name: Retrieve state file from s3
-        run: aws s3 cp s3://${{ secrets.AWS_S3_BLADE_BUCKET }}/states/${{ inputs.environment }} state.json
-      - name: Set RPC URL
-        id: set_rpc_url
-        run: echo "rpc_url_value=http://$(cat state.json | jq -r '.outputs.aws_lb_ext_domain.value')" >> $GITHUB_OUTPUT
       - name: Run scenario
         id: load_test_results
         run: |
@@ -195,14 +208,14 @@ jobs:
           echo "gas_max=$(cat summary.json | jq -r '.metrics.ethereum_gas_used.values.max')" >> $GITHUB_OUTPUT
         env:
           K6_STATSD_ENABLE_TAGS: true
-          SETUP_TIMEOUT: ${{ inputs.setupTimeOut }}
+          SETUP_TIMEOUT: ${{ inputs.timeout }}
           RATE: ${{ inputs.rate }}
           TIME_UNIT: ${{ inputs.timeUnit }}
           DURATION: ${{ inputs.duration }}
           PREALLOCATED_VUS: ${{ inputs.preAllocatedVUs }}
           MAX_VUS: ${{ inputs.maxVUs }}
           LOADTEST_MNEMONIC: ${{ secrets.AWS_LOADTESTRUNNER_MNEMONIC }}
-          RPC_URL: ${{ steps.set_rpc_url.outputs.rpc_url_value }}
+          RPC_URL: "http://${{ needs.check_network.outputs.rpc_url }}"
       - name: Run tests success
         if: success()
         id: load_test_results_success
