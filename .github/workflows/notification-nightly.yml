@@ -82,8 +82,8 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
-          green_color: '#03C03C'
-          red_color: '#E60012'
+          green_color: '#007651'
+          red_color: '#E21550'
           succeed_bnt: 'primary'
           failed_bnt: 'danger'
         with:
@@ -97,7 +97,7 @@ jobs:
                       "type": "header",
                       "text": {
                         "type": "plain_text",
-                        "text": "${{ inputs.environment }} build"
+                        "text": "Nightly build"
                       }
                     },
                     {
@@ -152,25 +152,13 @@ jobs:
                   ]
                 },
                 {
-                  "color": "${{ inputs.build_blade_output == '' && env.green_color || env.red_color }}",
+                  "color": "${{ inputs.build_blade_output == '' && inputs.lint_output == '' && inputs.unit_test_output == '' && inputs.fuzz_test_output == '' && inputs.e2e_legacy_test_output == '' && inputs.e2e_polybft_test_output == '' && inputs.property_polybft_test_output == '' && env.green_color || env.red_color }}",
                   "blocks": [
                     {
                       "type": "section",
                       "text": {
                         "type": "mrkdwn",
-                        "text": "*Build Blade*"
-                      }
-                    }
-                  ]
-                },
-                {
-                  "color": "${{ inputs.lint_output == '' && inputs.unit_test_output == '' && inputs.fuzz_test_output == '' && inputs.e2e_legacy_test_output == '' && inputs.e2e_polybft_test_output == '' && inputs.property_polybft_test_output == '' && env.green_color || env.red_color }}",
-                  "blocks": [
-                    {
-                      "type": "section",
-                      "text": {
-                        "type": "mrkdwn",
-                        "text": "*CI*\n${{ inputs.lint_output == '' && 'Lint' || '~Lint~' }}, ${{ inputs.unit_test_output == '' && 'Unit' || '~Unit~' }}, ${{ inputs.fuzz_test_output == '' && 'Fuzz' || '~Fuzz~' }},\n${{ inputs.e2e_legacy_test_output == '' && 'E2E Legacy' || '~E2E Legacy~' }}, ${{ inputs.e2e_polybft_test_output == '' && 'E2E PolyBFT' || '~E2E PolyBFT~' }},\n${{ inputs.property_polybft_test_output == '' && 'Property PolyBFT' || '~Property PolyBFT~' }}"
+                        "text": "*CI*\n${{ inputs.build_blade_output == '' && 'Build Blade' || '~Build Blade~' }}, ${{ inputs.lint_output == '' && 'Lint' || '~Lint~' }}, ${{ inputs.unit_test_output == '' && 'Unit Tests' || '~Unit Tests~' }},\n${{ inputs.fuzz_test_output == '' && 'Fuzz Tests' || '~Fuzz Tests~' }}, ${{ inputs.e2e_legacy_test_output == '' && 'E2E Legacy Tests' || '~E2E Legacy Tests~' }},\n${{ inputs.e2e_polybft_test_output == '' && 'E2E PolyBFT Tests' || '~E2E PolyBFT Tests~' }}, ${{ inputs.property_polybft_test_output == '' && 'Property PolyBFT Tests' || '~Property PolyBFT Tests~' }}"
                       }
                     }
                   ]

@@ -53,7 +53,7 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
-          green_color: '#03C03C'
+          green_color: '#007651'
           succeed_bnt: 'primary'
         with:
           payload: |

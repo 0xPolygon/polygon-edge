@@ -35,8 +35,8 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
-          green_color: '#03C03C'
-          red_color: '#E60012'
+          green_color: '#007651'
+          red_color: '#E21550'
           succeed_bnt: 'primary'
           failed_bnt: 'danger'
           url: https://s3.console.aws.amazon.com/s3/buckets/${{ secrets.AWS_S3_BLADE_BUCKET }}?region=${{ vars.AWS_REGION }}&prefix=logs/${{ github.run_id }}/

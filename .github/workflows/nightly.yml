@@ -106,9 +106,9 @@ jobs:
       AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
       AWS_S3_BLADE_BUCKET: ${{ secrets.AWS_S3_BLADE_BUCKET }}
       VAULT_PASSWORD: ${{ secrets.VAULT_PASSWORD }}
-  notification_main:
+  notification_nightly:
     name: Nightly Notification
-    uses: ./.github/workflows/notification-main.yml
+    uses: ./.github/workflows/notification-nightly.yml
     needs: [ci, deploy_network, load_test_multiple_eoa, load_test_multiple_erc20, destroy_network]
     if: success() || failure()
     with:
@@ -133,7 +133,8 @@ jobs:
   notification_load_test_multiple_eoa:
     name: Load Test EOA Notification
     uses: ./.github/workflows/notification-load-test.yml
-    needs: [load_test_multiple_eoa, notification_main]
+    needs: [load_test_multiple_eoa, notification_nightly]
+    if: needs.load_test_multiple_eoa.outputs.load_test_output == 'true'
     with:
       environment: nightly
       scenario: EOA
@@ -149,7 +150,8 @@ jobs:
   notification_load_test_multiple_erc20:
     name: Load Test ERC20 Notification
     uses: ./.github/workflows/notification-load-test.yml
-    needs: [load_test_multiple_erc20, notification_main]
+    needs: [load_test_multiple_erc20, notification_nightly]
+    if: needs.load_test_multiple_erc20.outputs.load_test_output
     with:
       environment: nightly
       scenario: ERC20
