@@ -8,15 +8,15 @@ on: # yamllint disable-line rule:truthy
         type: string
         required: true
       deploy_network_terraform_output:
-        description: "Deploy Network - Terraform output"
+        description: Deploy Network - Terraform output
         type: string
         required: true
       deploy_network_ansible_output:
-        description: "Deploy Network - Ansible output"
+        description: Deploy Network - Ansible output
         type: string
         required: true
       rpc_url:
-        description: "JSON-RPC URL"
+        description: JSON-RPC URL
         type: string
         required: true
     secrets:
@@ -90,7 +90,6 @@ jobs:
                             "type": "plain_text",
                             "text": "Workflow Run"
                           },
-                          "style": "${{ inputs.deploy_network_terraform_output == '' && inputs.deploy_network_ansible_output == '' && env.succeed_bnt || env.failed_bnt }}",
                           "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
                         },
                         {

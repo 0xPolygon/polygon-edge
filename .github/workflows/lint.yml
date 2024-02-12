@@ -2,11 +2,17 @@
 name: Lint
 on: # yamllint disable-line rule:truthy
   workflow_call:
+    outputs:
+      workflow_output:
+        description: "Lint output"
+        value: ${{ jobs.golangci_lint.outputs.lint_output_failure }}
 
 jobs:
   golangci_lint:
-    name: Linter
+    name: Run Lint
     runs-on: ubuntu-latest
+    outputs:
+      lint_output_failure: ${{ steps.lint_failure.outputs.lint_output }}
     steps:
       - name: Install Go
         uses: actions/setup-go@v5.0.0
@@ -20,3 +26,7 @@ jobs:
         uses: bane/golangci-lint-action@v4.0.0
         with:
           args: --timeout 10m --verbose
+      - name: Lint Failed
+        if: failure()
+        id: lint_failure
+        run: echo "lint_output=false" >> $GITHUB_OUTPUT

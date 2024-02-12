@@ -4,7 +4,7 @@ on: # yamllint disable-line rule:truthy
   workflow_call:
     outputs:
       workflow_output:
-        description: "Build output"
+        description: "Build Blade output"
         value: ${{ jobs.go_build.outputs.build_output_failure }}
 
 jobs:

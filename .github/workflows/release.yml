@@ -28,6 +28,8 @@ jobs:
         run: |
           TAG=${GITHUB_REF#refs/tags/}
           echo tag_name=${TAG} >> $GITHUB_OUTPUT
+      - name: Set Dockerhub organization
+        run: sed 's/DOCKERHUB_ORGANIZATION/${{ vars.DOCKERHUB_ORGANIZATION }}/g' .goreleaser.yml > .goreleaser.yml.tmp && mv .goreleaser.yml.tmp .goreleaser.yml
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3.0.0
       - name: Login to Docker Hub
@@ -35,7 +37,6 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-
       - name: Run GoReleaser
         run: |
           docker run \

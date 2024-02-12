@@ -224,7 +224,7 @@ jobs:
     name: Load Test Notification
     needs: load_test_scenario
     uses: ./.github/workflows/notification-load-test.yml
-    if: (always() && inputs.notification)
+    if: (needs.load_test_scenario.outputs.test_output_success == 'true' && inputs.notification)
     with:
       environment: ${{ inputs.environment }}
       scenario: ${{ inputs.scenario }}

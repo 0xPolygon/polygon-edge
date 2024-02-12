@@ -77,7 +77,7 @@ snapshot:
 
 dockers:
   - image_templates:
-      - b4n3/{{ .ProjectName }}:{{ .Version }}-amd64
+      - DOCKERHUB_ORGANIZATION/{{ .ProjectName }}:{{ .Version }}-amd64
     dockerfile: Dockerfile.release
     use: buildx
     goarch: amd64
@@ -88,7 +88,7 @@ dockers:
     skip_push: false
 
   - image_templates:
-      - b4n3/{{ .ProjectName }}:{{ .Version }}-arm64
+      - DOCKERHUB_ORGANIZATION/{{ .ProjectName }}:{{ .Version }}-arm64
     dockerfile: Dockerfile.release
     use: buildx
     goarch: arm64
@@ -99,14 +99,14 @@ dockers:
     skip_push: false
 
 docker_manifests:
-  - name_template: b4n3/{{ .ProjectName }}:{{ .Version }}
+  - name_template: DOCKERHUB_ORGANIZATION/{{ .ProjectName }}:{{ .Version }}
     image_templates:
-      - b4n3/{{ .ProjectName }}:{{ .Version }}-amd64
-      - b4n3/{{ .ProjectName }}:{{ .Version }}-arm64
+      - DOCKERHUB_ORGANIZATION/{{ .ProjectName }}:{{ .Version }}-amd64
+      - DOCKERHUB_ORGANIZATION/{{ .ProjectName }}:{{ .Version }}-arm64
     skip_push: false
 
-  - name_template: b4n3/{{ .ProjectName }}:latest
+  - name_template: DOCKERHUB_ORGANIZATION/{{ .ProjectName }}:latest
     image_templates:
-      - b4n3/{{ .ProjectName }}:{{ .Version }}-amd64
-      - b4n3/{{ .ProjectName }}:{{ .Version }}-arm64
+      - DOCKERHUB_ORGANIZATION/{{ .ProjectName }}:{{ .Version }}-amd64
+      - DOCKERHUB_ORGANIZATION/{{ .ProjectName }}:{{ .Version }}-arm64
     skip_push: auto

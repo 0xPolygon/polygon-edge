@@ -12,11 +12,11 @@ on: # yamllint disable-line rule:truthy
         type: boolean
         required: true
       destroy_network_upload_logs:
-        description: "Destory Network - Upload Logs"
+        description: Destory Network - Upload Logs
         type: string
         required: true
       destroy_network_terraform_logs:
-        description: "Deploy Network - Terraform output"
+        description: Deploy Network - Terraform output
         type: string
         required: true
     secrets:
@@ -81,7 +81,6 @@ jobs:
                             "type": "plain_text",
                             "text": "Workflow Run"
                           },
-                          "style": "${{ inputs.destroy_network_upload_logs == '' && inputs.destroy_network_terraform_logs == '' && env.succeed_bnt || env.failed_bnt }}",
                           "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
                         },
                         {

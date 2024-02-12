@@ -18,19 +18,19 @@ jobs:
       - name: Get new commits
         id: get_new_commits
         run: echo "commit_count=$(git log --oneline --since '24 hours ago' | wc -l | tr -d ' ')" >> $GITHUB_OUTPUT
-  tests:
-    name: Tests
-    uses: ./.github/workflows/tests.yml
+  ci:
+    name: CI
+    uses: ./.github/workflows/ci.yml
     needs: check
     if: needs.check.outputs.new_commit_count > 0
     with:
-      lint: false
+      build-blade: true
+      lint: true
       unit-test: true
       e2e-polybft-test: true
       e2e-legacy-test: true
       property-polybft-test: true
       fuzz-test: true
-      notification: false
   deploy_network:
     name: Deploy Network
     uses: ./.github/workflows/deploy-network.yml
@@ -109,17 +109,18 @@ jobs:
   notification_main:
     name: Nightly Notification
     uses: ./.github/workflows/notification-main.yml
-    needs: [tests, deploy_network, load_test_multiple_eoa, load_test_multiple_erc20, destroy_network]
+    needs: [ci, deploy_network, load_test_multiple_eoa, load_test_multiple_erc20, destroy_network]
     if: success() || failure()
     with:
       environment: nightly
       logs: true
-      build_blade_output: ${{ needs.tests.outputs.build-blade }}
-      unit_test_output: ${{ needs.tests.outputs.unit-test }}
-      e2e_polybft_test_output: ${{ needs.tests.outputs.e2e-polybft-test }}
-      e2e_legacy_test_output: ${{ needs.tests.outputs.e2e-legacy-test }}
-      property_polybft_test_output: ${{ needs.tests.outputs.property-polybft-test }}
-      fuzz_test_output: ${{ needs.tests.outputs.fuzz-test }}
+      build_blade_output: ${{ needs.ci.outputs.build-blade }}
+      lint_output: ${{ needs.ci.outputs.lint }}
+      unit_test_output: ${{ needs.ci.outputs.unit-test }}
+      e2e_polybft_test_output: ${{ needs.ci.outputs.e2e-polybft-test }}
+      e2e_legacy_test_output: ${{ needs.ci.outputs.e2e-legacy-test }}
+      property_polybft_test_output: ${{ needs.ci.outputs.property-polybft-test }}
+      fuzz_test_output: ${{ needs.ci.outputs.fuzz-test }}
       deploy_network_terraform_output: ${{ needs.deploy_network.outputs.terraform_output }}
       deploy_network_ansible_output: ${{ needs.deploy_network.outputs.ansible_output }}
       load_test_multiple_eoa_output: ${{ needs.load_test_multiple_eoa.outputs.load_test_output }}

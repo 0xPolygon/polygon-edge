@@ -1,5 +1,5 @@
 ---
-name: Tests
+name: CI
 on: # yamllint disable-line rule:truthy
   push:
     branches:
@@ -8,6 +8,10 @@ on: # yamllint disable-line rule:truthy
   pull_request:
   workflow_dispatch:
     inputs:
+      build-blade:
+        description: Build Blade
+        type: boolean
+        default: true
       lint:
         description: Lint
         type: boolean
@@ -32,16 +36,14 @@ on: # yamllint disable-line rule:truthy
         description: Fuzz Tests
         type: boolean
         default: true
-      notification:
-        description: Notification
-        type: boolean
-        default: false
   workflow_call:
     inputs:
+      build-blade:
+        description: Build Blade
+        type: boolean
       lint:
         description: Lint
         type: boolean
-        default: false
         required: true
       unit-test:
         description: Unit Tests
@@ -62,16 +64,14 @@ on: # yamllint disable-line rule:truthy
       fuzz-test:
         description: Fuzz Tests
         type: boolean
-        required: true
-      notification:
-        description: Notification
-        type: boolean
-        default: false
         required: true
     outputs:
       build-blade:
         description: Build Blade output
         value: ${{ jobs.build-blade.outputs.workflow_output }}
+      lint:
+        description: Lint output
+        value: ${{ jobs.lint.outputs.workflow_output }}
       unit-test:
         description: Unit Tests output
         value: ${{ jobs.unit-test.outputs.workflow_output }}
@@ -92,6 +92,10 @@ jobs:
   build-blade:
     name: Build Blade
     uses: ./.github/workflows/build.yml
+    if: |
+      inputs.build-blade || 
+      github.event_name == 'pull_request' || 
+      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'))
   lint:
     name: Lint
     uses: ./.github/workflows/lint.yml
@@ -140,16 +144,3 @@ jobs:
       inputs.fuzz-test || 
       github.event_name == 'pull_request' || 
       (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'))
-  notification:
-    name: Tests Notification
-    needs: [lint, unit-test, e2e-polybft-test, e2e-legacy-test, property-polybft-test, fuzz-test]
-    uses: ./.github/workflows/notification-tests.yml
-    if: (always() && inputs.notification)
-    with:
-      unit_test_output: ${{ needs.unit-test.outputs.workflow_output }}
-      e2e_polybft_test_output: ${{ needs.e2e-polybft-test.outputs.workflow_output }}
-      e2e_legacy_test_output: ${{ needs.e2e-legacy-test.outputs.workflow_output }}
-      property_polybft_test_output: ${{ needs.property-polybft-test.outputs.workflow_output }}
-      fuzz_test_output: ${{ needs.fuzz-test.outputs.workflow_output }}
-    secrets:
-      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
