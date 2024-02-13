@@ -134,7 +134,7 @@ jobs:
     name: Load Test EOA Notification
     uses: ./.github/workflows/notification-load-test.yml
     needs: [load_test_multiple_eoa, notification_nightly]
-    if: needs.load_test_multiple_eoa.outputs.load_test_output == 'true'
+    if: always() && needs.load_test_multiple_eoa.outputs.load_test_output == 'true'
     with:
       environment: nightly
       scenario: EOA
@@ -151,7 +151,7 @@ jobs:
     name: Load Test ERC20 Notification
     uses: ./.github/workflows/notification-load-test.yml
     needs: [load_test_multiple_erc20, notification_nightly]
-    if: needs.load_test_multiple_erc20.outputs.load_test_output == 'true'
+    if: always() && needs.load_test_multiple_erc20.outputs.load_test_output == 'true'
     with:
       environment: nightly
       scenario: ERC20
