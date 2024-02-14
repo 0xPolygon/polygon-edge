@@ -182,15 +182,13 @@ func (v *validatorsSnapshotCache) computeSnapshot(
 
 	v.logger.Trace("Compute snapshot started...", "BlockNumber", nextEpochEndBlockNumber)
 
-	if len(parents) > 0 {
-		for i := len(parents) - 1; i >= 0; i-- {
-			parentHeader := parents[i]
-			if parentHeader.Number == nextEpochEndBlockNumber {
-				v.logger.Trace("Compute snapshot. Found header in parents", "Header", parentHeader.Number)
-				header = parentHeader
+	for i := len(parents) - 1; i >= 0; i-- {
+		parentHeader := parents[i]
+		if parentHeader.Number == nextEpochEndBlockNumber {
+			v.logger.Trace("Compute snapshot. Found header in parents", "Header", parentHeader.Number)
+			header = parentHeader
 
-				break
-			}
+			break
 		}
 	}
 

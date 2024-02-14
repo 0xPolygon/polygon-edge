@@ -35,7 +35,7 @@ func TestOverride(t *testing.T) {
 	balance := big.NewInt(2)
 	code := []byte{0x1}
 
-	tt := NewTransition(chain.ForksInTime{}, state, newTxn(state))
+	tt := NewTransition(chain.ForksInTime{}, state, newTxn(state), nil)
 
 	require.Empty(t, tt.state.GetCode(types.ZeroAddress))
 

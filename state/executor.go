@@ -41,6 +41,10 @@ type Executor struct {
 
 	PostHook        func(txn *Transition)
 	GenesisPostHook func(*Transition) error
+
+	// this value should be set if we want to enable validator set precompile
+	// NOTE that this precompile wont be enabled for WriteGenesis
+	validatorSetBackend precompiled.ValidatoSetPrecompiledBackend
 }
 
 // NewExecutor creates a new executor
@@ -84,7 +88,7 @@ func (e *Executor) WriteGenesis(
 		auxState:    e.state,
 		gasPool:     uint64(env.GasLimit),
 		config:      config,
-		precompiles: precompiled.NewPrecompiled(),
+		precompiles: precompiled.NewPrecompiled(nil),
 	}
 
 	for addr, account := range alloc {
@@ -216,7 +220,7 @@ func (e *Executor) BeginTxn(
 		totalGas: 0,
 
 		evm:         evm.NewEVM(),
-		precompiles: precompiled.NewPrecompiled(),
+		precompiles: precompiled.NewPrecompiled(e.validatorSetBackend),
 		PostHook:    e.PostHook,
 	}
 
@@ -248,6 +252,10 @@ func (e *Executor) BeginTxn(
 	}
 
 	return txn, nil
+}
+
+func (e *Executor) SetValidatorSetBackend(validatorSetBackend precompiled.ValidatoSetPrecompiledBackend) {
+	e.validatorSetBackend = validatorSetBackend
 }
 
 type Transition struct {
@@ -282,13 +290,14 @@ type Transition struct {
 	bridgeBlockList     *addresslist.AddressList
 }
 
-func NewTransition(config chain.ForksInTime, snap Snapshot, radix *Txn) *Transition {
+func NewTransition(config chain.ForksInTime, snap Snapshot,
+	radix *Txn, validatorSetBackend precompiled.ValidatoSetPrecompiledBackend) *Transition {
 	return &Transition{
 		config:      config,
 		state:       radix,
 		snap:        snap,
 		evm:         evm.NewEVM(),
-		precompiles: precompiled.NewPrecompiled(),
+		precompiles: precompiled.NewPrecompiled(validatorSetBackend),
 	}
 }
 

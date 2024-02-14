@@ -471,6 +471,9 @@ func (p *Polybft) Initialize() error {
 		executor:   p.config.Executor,
 	}
 
+	// enable validatorset precompile
+	p.config.Executor.SetValidatorSetBackend(p)
+
 	// create bridge and consensus topics
 	if err = p.createTopics(); err != nil {
 		return fmt.Errorf("cannot create topics: %w", err)
@@ -752,6 +755,10 @@ func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, blockTimeDrift 
 
 func (p *Polybft) GetValidators(blockNumber uint64, parents []*types.Header) (validator.AccountSet, error) {
 	return p.validatorsCache.GetSnapshot(blockNumber, parents, nil)
+}
+
+func (p *Polybft) GetValidatorsForBlock(blockNumber uint64) (validator.AccountSet, error) {
+	return p.validatorsCache.GetSnapshot(blockNumber, nil, nil)
 }
 
 func (p *Polybft) GetValidatorsWithTx(blockNumber uint64, parents []*types.Header,

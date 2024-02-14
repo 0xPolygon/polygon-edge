@@ -59,6 +59,7 @@ type dummyHost struct {
 	t *testing.T
 
 	balances map[types.Address]*big.Int
+	context  *runtime.TxContext
 }
 
 func newDummyHost(t *testing.T) *dummyHost {
@@ -138,6 +139,10 @@ func (d dummyHost) Selfdestruct(addr types.Address, beneficiary types.Address) {
 }
 
 func (d dummyHost) GetTxContext() runtime.TxContext {
+	if d.context != nil {
+		return *d.context
+	}
+
 	d.t.Fatalf("GetTxContext is not implemented")
 
 	return runtime.TxContext{}

@@ -48,14 +48,14 @@ type Precompiled struct {
 }
 
 // NewPrecompiled creates a new runtime for the precompiled contracts
-func NewPrecompiled() *Precompiled {
+func NewPrecompiled(validatorSetBackend ValidatoSetPrecompiledBackend) *Precompiled {
 	p := &Precompiled{}
-	p.setupContracts()
+	p.setupContracts(validatorSetBackend)
 
 	return p
 }
 
-func (p *Precompiled) setupContracts() {
+func (p *Precompiled) setupContracts(validatorSetBackend ValidatoSetPrecompiledBackend) {
 	p.register("1", &ecrecover{p})
 	p.register("2", &sha256h{})
 	p.register("3", &ripemd160h{p})
@@ -78,6 +78,11 @@ func (p *Precompiled) setupContracts() {
 
 	// BLS aggregated signatures verification precompile
 	p.register(contracts.BLSAggSigsVerificationPrecompile.String(), &blsAggSignsVerification{})
+
+	// ValidatorSet precompile
+	p.register(contracts.ValidatorSetPrecompile.String(), &validatorSetPrecompile{
+		backend: validatorSetBackend,
+	})
 }
 
 func (p *Precompiled) register(addrStr string, b contract) {
