@@ -1,37 +1,32 @@
 ---
-name: Test
-on:  # yamllint disable-line rule:truthy
-  workflow_dispatch:
+name: Unit Tests
+on: # yamllint disable-line rule:truthy
   workflow_call:
     outputs:
       workflow_output:
-        description: "Unit tests output"
-        value: ${{ jobs.go_test.outputs.test_output_failure }}
+        description: "Unit Tests output"
+        value: ${{ jobs.unit_test.outputs.test_output_failure }}
 
 jobs:
-  go_test:
-    name: Blade
+  unit_test:
+    name: Run Unit Tests
     runs-on: ubuntu-latest
     outputs:
       test_output_failure: ${{ steps.run_tests_failure.outputs.test_output }}
     steps:
-      - name: Setup Go
-        uses: actions/setup-go@v5.0.0
-        with:
-          go-version: 1.20.x
-
       - name: Checkout Code
         uses: actions/checkout@v4.1.1
         with:
           submodules: recursive
           fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
-
+      - name: Setup Go
+        uses: actions/setup-go@v5.0.0
+        with:
+          go-version: 1.20.x
       - name: Install Dependencies
         run: ./setup-ci.sh
-
       - name: Run Go Test
-        run: make test
-
+        run: make unit-test
       - name: Run Go Test Failed
         if: failure()
         id: run_tests_failure

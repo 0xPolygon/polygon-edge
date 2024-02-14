@@ -1,38 +1,28 @@
 ---
-name: Fuzz tests
-on:  # yamllint disable-line rule:truthy
-  push:
-    branches:
-      - main
-      - develop  
-  workflow_dispatch:
+name: Fuzz Tests
+on: # yamllint disable-line rule:truthy
   workflow_call:
     outputs:
       workflow_output:
-        description: "Fuzz output"
+        description: "Fuzz Tests output"
         value: ${{ jobs.fuzz_test.outputs.fuzz_output_failure }} 
-
 
 jobs:
   fuzz_test:
-    name: Blade
+    name: Run Fuzz Tests
     runs-on: ubuntu-latest
     outputs:
       fuzz_output_failure: ${{ steps.run_fuzz_failure.outputs.test_output }}
     steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4.1.1
       - name: Setup Go
         uses: actions/setup-go@v5.0.0
         with:
           go-version: 1.20.x
-
-      - name: Checkout Code
-        uses: actions/checkout@v4.1.1
-
       - name: Run Fuzz Test
         run: make fuzz-test
-
       - name: Run fuzz tests failed
         if: failure()
         id: run_fuzz_failure
         run: echo "test_output=false" >> $GITHUB_OUTPUT
-      

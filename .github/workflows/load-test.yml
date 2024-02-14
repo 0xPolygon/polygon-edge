@@ -1,0 +1,258 @@
+---
+concurrency: ci-$ # Only a single workflow can be executed concurrently
+name: Load Tests
+on: # yamllint disable-line rule:truthy
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: The environment to run against
+        type: choice
+        options: [dev, test] # nightly should not be initiated manually
+      scenario:
+        description: The scenario to run
+        type: choice
+        options: [EOA, ERC20]
+      timeout:
+        description: Time Out
+        type: string
+        default: "220s"
+        required: true
+      rate:
+        description: Rate
+        type: string
+        default: "3000"
+        required: true
+      timeUnit:
+        description: Time Unit
+        type: string
+        default: "1s"
+        required: true
+      duration:
+        description: Duration
+        type: string
+        default: "10m"
+        required: true
+      preAllocatedVUs:
+        description: Preallocated VUs
+        type: string
+        default: "60"
+        required: true
+      maxVUs:
+        description: Max VUs
+        type: string
+        default: "60"
+        required: true
+      notification:
+        description: Notification
+        type: boolean
+        default: true
+  workflow_call:
+    inputs:
+      environment:
+        description: The environment to run against
+        type: string
+        required: true
+      scenario:
+        description: The scenario to run
+        type: string
+        required: true
+      timeout:
+        description: Time Out
+        type: string
+        required: true
+      rate:
+        description: Rate
+        type: string
+        required: true
+      timeUnit:
+        description: Time Unit
+        type: string
+        required: true
+      duration:
+        description: Duration
+        type: string
+        required: true
+      preAllocatedVUs:
+        description: Preallocated VUs
+        type: string
+        required: true
+      maxVUs:
+        description: Max VUs
+        type: string
+        required: true
+      notification:
+        description: Notification
+        type: boolean
+        required: true
+    outputs:
+      load_test_output:
+        description: "Load Test output"
+        value: ${{ jobs.load_test_scenario.outputs.test_output_success }}
+      tps_avg:
+        description: "Average Transactions Per Second"
+        value: ${{ jobs.load_test_scenario.outputs.tps_avg }}
+      tps_max:
+        description: "Maximum Transactions Per Second"
+        value: ${{ jobs.load_test_scenario.outputs.tps_max }}
+      iterations:
+        description: "Number Of Transactions"
+        value: ${{ jobs.load_test_scenario.outputs.iterations }}
+      block:
+        description: "Block Number"
+        value: ${{ jobs.load_test_scenario.outputs.block }}
+      ttm:
+        description: "Time To Mine"
+        value: ${{ jobs.load_test_scenario.outputs.ttm }}
+      gas_avg:
+        description: "Average Gas Used"
+        value: ${{ jobs.load_test_scenario.outputs.gas_avg }}
+      gas_max:
+        description: "Maximum Gas Used"
+        value: ${{ jobs.load_test_scenario.outputs.gas_max }}
+    secrets:
+      AWS_ROLE_ARN:
+        required: true
+      AWS_S3_BLADE_BUCKET:
+        required: true
+      AWS_LOADTESTRUNNER_AMI_ID:
+        required: true
+      AWS_LOADTESTRUNNER_SUBNET_ID:
+        required: true
+      AWS_LOADTESTRUNNER_SG_ID:
+        required: true
+      AWS_LOADTESTRUNNER_MNEMONIC:
+        required: true
+      PERSONAL_ACCESS_TOKEN:
+        required: true
+      SLACK_WEBHOOK_URL:
+        required: true
+
+permissions:
+  id-token: write
+  contents: read
+  security-events: write
+
+jobs:
+  check_network:
+    name: Check if the network is already deployed
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    outputs:
+      rpc_url: ${{ steps.rpc_url.outputs.url }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4.1.1
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4.0.1
+        with:
+          aws-region: ${{ vars.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+      - name: Retrieve state file from s3
+        id: retrieve_state
+        run: echo "retrieve_state_output=$(aws s3 cp s3://${{ secrets.AWS_S3_BLADE_BUCKET }}/states/${{ inputs.environment }} state.json)" >> $GITHUB_OUTPUT
+      - name: Set RPC URL
+        id: rpc_url
+        if: contains(steps.retrieve_state.outputs.retrieve_state_output, 'download')
+        run: echo "url=$(cat state.json | jq -r '.outputs.aws_lb_ext_domain.value // empty')" >> $GITHUB_OUTPUT
+  load_test_runner:
+    name: Deploy Load Test Runner
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    needs: check_network
+    if: needs.check_network.outputs.rpc_url != ''
+    outputs:
+      load_test_runner_label: ${{ steps.start_load_teste_runner.outputs.label }}
+      load_test_runner_instance_id: ${{ steps.start_load_teste_runner.outputs.ec2-instance-id }}
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4.0.1
+        with:
+          aws-region: ${{ vars.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+      - name: Start Load Test Runner
+        id: start_load_teste_runner
+        uses: Ethernal-Tech/ec2-github-runner@v3.0.0
+        with:
+          mode: start
+          ec2-instance-type: ${{ vars.AWS_INSTANCE_TYPE }}
+          ec2-image-id: ${{ secrets.AWS_LOADTESTRUNNER_AMI_ID }}
+          subnet-id: ${{ secrets.AWS_LOADTESTRUNNER_SUBNET_ID }}
+          security-group-id: ${{ secrets.AWS_LOADTESTRUNNER_SG_ID }}
+          github-token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+  load_test_scenario:
+    name: Run Load Test ${{ inputs.scenario }} Scenario
+    runs-on: ${{ needs.load_test_runner.outputs.load_test_runner_label }}
+    needs: [check_network, load_test_runner]
+    outputs:
+      test_output_success: ${{ steps.load_test_results_success.outputs.test_output }}
+      tps_avg: ${{ steps.load_test_results.outputs.tps_avg }}
+      tps_max: ${{ steps.load_test_results.outputs.tps_max }}
+      iterations: ${{ steps.load_test_results.outputs.iterations }}
+      block: ${{ steps.load_test_results.outputs.block }}
+      ttm: ${{ steps.load_test_results.outputs.ttm }}
+      gas_avg: ${{ steps.load_test_results.outputs.gas_avg }}
+      gas_max: ${{ steps.load_test_results.outputs.gas_max }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4.1.1
+      - name: Run scenario
+        id: load_test_results
+        run: |
+          /home/ubuntu/k6 run --out statsd loadtest/scenarios/multiple_${{ inputs.scenario }}.js
+          echo "tps_avg=$(cat summary.json | jq -r '.metrics.ethereum_tps.values.avg')" >> $GITHUB_OUTPUT
+          echo "tps_max=$(cat summary.json | jq -r '.metrics.ethereum_tps.values.max')" >> $GITHUB_OUTPUT
+          echo "iterations=$(cat summary.json | jq -r '.metrics.iterations.values.count')" >> $GITHUB_OUTPUT
+          echo "block=$(cat summary.json | jq -r '.metrics.ethereum_block.values.count')" >> $GITHUB_OUTPUT
+          echo "ttm=$(cat summary.json | jq -r '.metrics.ethereum_time_to_mine.values.avg')" >> $GITHUB_OUTPUT
+          echo "gas_avg=$(cat summary.json | jq -r '.metrics.ethereum_gas_used.values.avg')" >> $GITHUB_OUTPUT
+          echo "gas_max=$(cat summary.json | jq -r '.metrics.ethereum_gas_used.values.max')" >> $GITHUB_OUTPUT
+        env:
+          K6_STATSD_ENABLE_TAGS: true
+          SETUP_TIMEOUT: ${{ inputs.timeout }}
+          RATE: ${{ inputs.rate }}
+          TIME_UNIT: ${{ inputs.timeUnit }}
+          DURATION: ${{ inputs.duration }}
+          PREALLOCATED_VUS: ${{ inputs.preAllocatedVUs }}
+          MAX_VUS: ${{ inputs.maxVUs }}
+          LOADTEST_MNEMONIC: ${{ secrets.AWS_LOADTESTRUNNER_MNEMONIC }}
+          RPC_URL: "http://${{ needs.check_network.outputs.rpc_url }}"
+      - name: Run tests success
+        if: success()
+        id: load_test_results_success
+        run: echo "test_output=true" >> $GITHUB_OUTPUT
+  notification:
+    name: Load Test Notification
+    needs: load_test_scenario
+    uses: ./.github/workflows/notification-load-test.yml
+    if: (always() && inputs.notification && needs.load_test_scenario.outputs.test_output_success == 'true')
+    with:
+      environment: ${{ inputs.environment }}
+      scenario: ${{ inputs.scenario }}
+      tps_avg: ${{ needs.load_test_scenario.outputs.tps_avg }}
+      tps_max: ${{ needs.load_test_scenario.outputs.tps_max }}
+      iterations: ${{ needs.load_test_scenario.outputs.iterations }}
+      block: ${{ needs.load_test_scenario.outputs.block }}
+      ttm: ${{ needs.load_test_scenario.outputs.ttm }}
+      gas_avg: ${{ needs.load_test_scenario.outputs.gas_avg }}
+      gas_max: ${{ needs.load_test_scenario.outputs.gas_max }}
+    secrets:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+  destroy_load_test_runner:
+    name: Destroy Load Test Runner
+    environment: ${{ inputs.environment }}
+    needs: [load_test_runner, load_test_scenario]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4.0.1
+        with:
+          aws-region: ${{ vars.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+      - name: Stop Load Test Runner
+        uses: Ethernal-Tech/ec2-github-runner@v3.0.0
+        with:
+          mode: stop
+          label: ${{ needs.load_test_runner.outputs.load_test_runner_label }}
+          ec2-instance-id: ${{ needs.load_test_runner.outputs.load_test_runner_instance_id }}
+          github-token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}

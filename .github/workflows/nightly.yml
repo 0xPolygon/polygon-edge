@@ -1,213 +1,166 @@
 ---
 name: Nightly Build
-on:  #yamllint disable-line rule:truthy
-  workflow_dispatch:
+on: # yamllint disable-line rule:truthy
+  workflow_dispatch: {}
   schedule:
     # * is a special character in YAML so you have to quote this string
     - cron: '0 0 * * *'
 
-permissions:
-  id-token: write
-  contents: read
-  security-events: write
-
 jobs:
-  build:
-    name: Build
-    uses: ./.github/workflows/build.yml
-
-  test:
-    name: Test
-    uses: ./.github/workflows/test.yml
-    needs: build
-
-  e2e-polybft:
-    name: PolyBFT E2E Tests
-    uses: ./.github/workflows/e2e-polybft.yml
-    needs: build
-
-  e2e-legacy:
-    name: Legacy E2E Tests
-    uses: ./.github/workflows/e2e-legacy.yaml
-    needs: build
-
-  property:
-    name: Polybft Property Tests
-    uses: ./.github/workflows/property-polybft.yml
-    needs: build
-
-  fuzz:
-    name: Fuzz Tests
-    uses: ./.github/workflows/fuzz-test.yml
-    needs: build
-
-  loadtest:
-    name: Build Devnet
-    uses: ./.github/workflows/deploy.nightly.devnet.yml
-    secrets:
-      AWS_REGION: ${{ secrets.AWS_REGION }}
-      AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
-      TF_VAR_DEPLOYMENT_NAME: ${{ secrets.TF_VAR_DEPLOYMENT_NAME }}
-      TF_VAR_OWNER: ${{ secrets.TF_VAR_OWNER }}
-      TF_VAR_BASE_INSTANCE_TYPE: ${{ secrets.TF_VAR_BASE_INSTANCE_TYPE }}
-      SLACK_PERFORMANCE_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
-      LOADTESTER_AWS_SUBNET_ID: ${{ secrets.LOADTESTER_AWS_SUBNET_ID }}
-      LOADTESTER_AWS_SG_ID: ${{ secrets.LOADTESTER_AWS_SG_ID }}
-      LOADTESTER_INSTANCE_TYPE: ${{ secrets.LOADTESTER_INSTANCE_TYPE }}
-      LOADTEST_MNEMONIC: ${{ secrets.LOADTEST_MNEMONIC }}
-      VAULT_PASSWORD_FILE: ${{ secrets.VAULT_PASSWORD_FILE }}
-      LOADTESTER_AMI: ${{ secrets.LOADTESTER_AMI }}
-      IS_BRIDGE_ACTIVE: ${{ secrets.IS_BRIDGE_ACTIVE }}
-      PTA: ${{ secrets.PTA }}
-      BLADE_TAG: ${{ secrets.BLADE_TAG }}
-      LOG_LEVEL: ${{ secrets.LOG_LEVEL }}
-    with:
-      environment: devnet
- 
-  notification:
-    name: Nightly Notifications
+  check:
+    name: Check new commits
     runs-on: ubuntu-latest
-    needs: [build, test, e2e-polybft, e2e-legacy, property, fuzz, loadtest]
-    if: success() || failure()
+    outputs:
+      new_commit_count: ${{ steps.get_new_commits.outputs.commit_count }}
     steps:
-      - name: Notify Slack
-        uses: slackapi/slack-github-action@v1.23.0
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_BLADE_GITHUB_URL }}
-          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
-        with:
-          payload: |
-            {
-              "attachments": [
-                {
-                  "color": "${{ needs.build.outputs.workflow_output == '' && needs.test.outputs.workflow_output == '' && needs.e2e-polybft.outputs.workflow_output == '' && needs.e2e-legacy.outputs.workflow_output == '' && needs.property.outputs.workflow_output == '' && needs.fuzz.outputs.workflow_output == '' && needs.loadtest.outputs.workflow_output == '' && '#03C03C' || '#E60012' }}",
-                  "blocks": [
-                    {
-                      "type": "header",
-                      "text": {
-                        "type": "plain_text",
-                        "text": "Nightly Build ${{ needs.build.outputs.workflow_output == '' && needs.test.outputs.workflow_output == '' && needs.e2e-polybft.outputs.workflow_output == '' && needs.e2e-legacy.outputs.workflow_output == '' && needs.property.outputs.workflow_output == '' && needs.fuzz.outputs.workflow_output == '' && needs.loadtest.outputs.workflow_output == '' && ':rocket:' || ':rotating_light:' }}"
-                      }
-                    },
-                    {
-                      "type": "context",
-                      "elements": [
-                        {
-                          "type": "mrkdwn",
-                          "text": "Logs: *<https://s3.console.aws.amazon.com/s3/buckets/blade-terraform-states?region=us-west-2&prefix=logs/${{ github.run_id }}/|Open URL>*"
-                        }
-                      ]
-                    },
-                    {
-                      "type": "actions",
-                      "elements": [
-                        {
-                          "type": "button",
-                          "text": {
-                            "type": "plain_text",
-                            "text": "View workflow run"
-                          },
-                          "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-                        }
-                      ]
-                    }
-                  ]
-                },
-                {
-                  "color": "${{ needs.build.outputs.workflow_output == '' && '#03C03C' || '#E60012' }}",
-                  "blocks": [
-                    {
-                      "type": "section",
-                      "text": {
-                        "type": "mrkdwn",
-                        "text": "*Build*"
-                      }
-                    }
-                  ]
-                },
-                {
-                  "color": "${{ needs.test.outputs.workflow_output == '' && '#03C03C' || '#E60012' }}",
-                  "blocks": [
-                    {
-                      "type": "section",
-                      "text": {
-                        "type": "mrkdwn",
-                        "text": "*Unit Tests*"
-                      }
-                    }
-                  ]
-                },
-                {
-                  "color": "${{ needs.property.outputs.workflow_output == '' && '#03C03C' || '#E60012' }}",
-                  "blocks": [
-                    {
-                      "type": "section",
-                      "text": {
-                        "type": "mrkdwn",
-                        "text": "*Property Tests*"
-                      }
-                    }
-                  ]
-                },
-                {
-                  "color": "${{ needs.e2e-legacy.outputs.workflow_output == '' && '#03C03C' || '#E60012' }}",
-                  "blocks": [
-                    {
-                      "type": "section",
-                      "text": {
-                        "type": "mrkdwn",
-                        "text": "*Legacy E2E Tests*"
-                      }
-                    }
-                  ]
-                },
-                {
-                  "color": "${{ needs.e2e-polybft.outputs.workflow_output == '' && '#03C03C' || '#E60012' }}",
-                  "blocks": [
-                    {
-                      "type": "section",
-                      "text": {
-                        "type": "mrkdwn",
-                        "text": "*PolyBFT E2E Tests*"
-                      }
-                    }
-                  ]
-                },
-                {
-                  "color": "${{ needs.fuzz.outputs.workflow_output == '' && '#03C03C' || '#E60012' }}",
-                  "blocks": [
-                    {
-                      "type": "section",
-                      "text": {
-                        "type": "mrkdwn",
-                        "text": "*Fuzz Tests*"
-                      }
-                    }
-                  ]
-                },
-                {
-                  "color": "${{ needs.loadtest.outputs.workflow_output_loadtest1 == 'true' && '#03C03C' || '#E60012' }}",
-                  "blocks": [
-                    {
-                      "type": "section",
-                      "text": {
-                        "type": "mrkdwn",
-                        "text": "*Load Tests multiple_EOA*"
-                      }
-                    }
-                  ]
-                },
-                {
-                  "color": "${{ needs.loadtest.outputs.workflow_output_loadtest2 == 'true' && '#03C03C' || '#E60012' }}",
-                  "blocks": [
-                    {
-                      "type": "section",
-                      "text": {
-                        "type": "mrkdwn",
-                        "text": "*Load Tests multiple_ERC20*"
-                      }
-                    }
-                  ]
-                }
-              ]
-            }
+      - name: Checkout Code
+        uses: actions/checkout@v4.1.1
+      - name: Get new commits
+        id: get_new_commits
+        run: echo "commit_count=$(git log --oneline --since '24 hours ago' | wc -l | tr -d ' ')" >> $GITHUB_OUTPUT
+  ci:
+    name: CI
+    uses: ./.github/workflows/ci.yml
+    needs: check
+    if: needs.check.outputs.new_commit_count > 0
+    with:
+      build-blade: true
+      lint: true
+      unit-test: true
+      e2e-polybft-test: true
+      e2e-legacy-test: true
+      property-polybft-test: true
+      fuzz-test: true
+  deploy_network:
+    name: Deploy Network
+    uses: ./.github/workflows/deploy-network.yml
+    needs: check
+    if: needs.check.outputs.new_commit_count > 0
+    with:
+      environment: nightly
+      block_gas_limit: "200000000"
+      block_time: "2"
+      is_london_fork_active: true
+      is_bridge_active: true
+      notification: false
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+      AWS_S3_BLADE_BUCKET: ${{ secrets.AWS_S3_BLADE_BUCKET }}
+      VAULT_PASSWORD: ${{ secrets.VAULT_PASSWORD }}
+  load_test_multiple_eoa:
+    name: Load Test EOA
+    uses: ./.github/workflows/load-test.yml
+    needs: deploy_network
+    with:
+      environment: nightly
+      scenario: EOA
+      timeout: "220s"
+      rate: "3000"
+      timeUnit: "1s"
+      duration: "10m"
+      preAllocatedVUs: "60"
+      maxVUs: "60"
+      notification: false
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+      AWS_S3_BLADE_BUCKET: ${{ secrets.AWS_S3_BLADE_BUCKET }}
+      AWS_LOADTESTRUNNER_AMI_ID: ${{ secrets.AWS_LOADTESTRUNNER_AMI_ID }}
+      AWS_LOADTESTRUNNER_SUBNET_ID: ${{ secrets.AWS_LOADTESTRUNNER_SUBNET_ID }}
+      AWS_LOADTESTRUNNER_SG_ID: ${{ secrets.AWS_LOADTESTRUNNER_SG_ID }}
+      AWS_LOADTESTRUNNER_MNEMONIC: ${{ secrets.AWS_LOADTESTRUNNER_MNEMONIC }}
+      PERSONAL_ACCESS_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+  load_test_multiple_erc20:
+    name: Load Test ERC20
+    uses: ./.github/workflows/load-test.yml
+    needs: [deploy_network, load_test_multiple_eoa]
+    with:
+      environment: nightly
+      scenario: ERC20
+      timeout: "220s"
+      rate: "1500"
+      timeUnit: "1s"
+      duration: "10m"
+      preAllocatedVUs: "60"
+      maxVUs: "60"
+      notification: false
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+      AWS_S3_BLADE_BUCKET: ${{ secrets.AWS_S3_BLADE_BUCKET }}
+      AWS_LOADTESTRUNNER_AMI_ID: ${{ secrets.AWS_LOADTESTRUNNER_AMI_ID }}
+      AWS_LOADTESTRUNNER_SUBNET_ID: ${{ secrets.AWS_LOADTESTRUNNER_SUBNET_ID }}
+      AWS_LOADTESTRUNNER_SG_ID: ${{ secrets.AWS_LOADTESTRUNNER_SG_ID }}
+      AWS_LOADTESTRUNNER_MNEMONIC: ${{ secrets.AWS_LOADTESTRUNNER_MNEMONIC }}
+      PERSONAL_ACCESS_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+  destroy_network:
+    name: Destroy Network
+    uses: ./.github/workflows/destroy-network.yml
+    needs: [deploy_network, load_test_multiple_eoa, load_test_multiple_erc20]
+    if: always()
+    with:
+      environment: nightly
+      logs: true
+      notification: false
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+      AWS_S3_BLADE_BUCKET: ${{ secrets.AWS_S3_BLADE_BUCKET }}
+      VAULT_PASSWORD: ${{ secrets.VAULT_PASSWORD }}
+  notification_nightly:
+    name: Nightly Notification
+    uses: ./.github/workflows/notification-nightly.yml
+    needs: [ci, deploy_network, load_test_multiple_eoa, load_test_multiple_erc20, destroy_network]
+    if: success() || failure()
+    with:
+      environment: nightly
+      logs: true
+      build_blade_output: ${{ needs.ci.outputs.build-blade }}
+      lint_output: ${{ needs.ci.outputs.lint }}
+      unit_test_output: ${{ needs.ci.outputs.unit-test }}
+      e2e_polybft_test_output: ${{ needs.ci.outputs.e2e-polybft-test }}
+      e2e_legacy_test_output: ${{ needs.ci.outputs.e2e-legacy-test }}
+      property_polybft_test_output: ${{ needs.ci.outputs.property-polybft-test }}
+      fuzz_test_output: ${{ needs.ci.outputs.fuzz-test }}
+      deploy_network_terraform_output: ${{ needs.deploy_network.outputs.terraform_output }}
+      deploy_network_ansible_output: ${{ needs.deploy_network.outputs.ansible_output }}
+      load_test_multiple_eoa_output: ${{ needs.load_test_multiple_eoa.outputs.load_test_output }}
+      load_test_multiple_erc20_output: ${{ needs.load_test_multiple_erc20.outputs.load_test_output }}
+      destroy_network_logs_output: ${{ needs.destroy_network.outputs.logs_output }}
+      destroy_network_terraform_output: ${{ needs.destroy_network.outputs.terraform_output }}
+    secrets:
+      AWS_S3_BLADE_BUCKET: ${{ secrets.AWS_S3_BLADE_BUCKET }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+  notification_load_test_multiple_eoa:
+    name: Load Test EOA Notification
+    uses: ./.github/workflows/notification-load-test.yml
+    needs: [load_test_multiple_eoa, notification_nightly]
+    if: (always() && needs.load_test_multiple_eoa.outputs.load_test_output == 'true')
+    with:
+      environment: nightly
+      scenario: EOA
+      tps_avg: ${{ needs.load_test_multiple_eoa.outputs.tps_avg }}
+      tps_max: ${{ needs.load_test_multiple_eoa.outputs.tps_max }}
+      iterations: ${{ needs.load_test_multiple_eoa.outputs.iterations }}
+      block: ${{ needs.load_test_multiple_eoa.outputs.block }}
+      ttm: ${{ needs.load_test_multiple_eoa.outputs.ttm }}
+      gas_avg: ${{ needs.load_test_multiple_eoa.outputs.gas_avg }}
+      gas_max: ${{ needs.load_test_multiple_eoa.outputs.gas_max }}
+    secrets:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+  notification_load_test_multiple_erc20:
+    name: Load Test ERC20 Notification
+    uses: ./.github/workflows/notification-load-test.yml
+    needs: [load_test_multiple_erc20, notification_nightly]
+    if: (always() && needs.load_test_multiple_erc20.outputs.load_test_output == 'true')
+    with:
+      environment: nightly
+      scenario: ERC20
+      tps_avg: ${{ needs.load_test_multiple_erc20.outputs.tps_avg }}
+      tps_max: ${{ needs.load_test_multiple_erc20.outputs.tps_max }}
+      iterations: ${{ needs.load_test_multiple_erc20.outputs.iterations }}
+      block: ${{ needs.load_test_multiple_erc20.outputs.block }}
+      ttm: ${{ needs.load_test_multiple_erc20.outputs.ttm }}
+      gas_avg: ${{ needs.load_test_multiple_erc20.outputs.gas_avg }}
+      gas_max: ${{ needs.load_test_multiple_erc20.outputs.gas_max }}
+    secrets:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

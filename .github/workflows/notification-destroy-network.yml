@@ -1,0 +1,100 @@
+---
+name: Notification - Destroy Network
+on: # yamllint disable-line rule:truthy
+  workflow_call:
+    inputs:
+      environment:
+        description: The environment to run against
+        type: string
+        required: true
+      logs:
+        description: Upload Logs
+        type: boolean
+        required: true
+      destroy_network_upload_logs:
+        description: Destory Network - Upload Logs
+        type: string
+        required: true
+      destroy_network_terraform_logs:
+        description: Deploy Network - Terraform output
+        type: string
+        required: true
+    secrets:
+      AWS_S3_BLADE_BUCKET:
+        required: true
+      SLACK_WEBHOOK_URL:
+        required: true
+
+jobs:
+  notification:
+    name: Notification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Slack
+        uses: slackapi/slack-github-action@v1.25.0
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+          green_color: '#03C03C'
+          red_color: '#E60012'
+          succeed_bnt: 'primary'
+          failed_bnt: 'danger'
+          url: https://s3.console.aws.amazon.com/s3/buckets/${{ secrets.AWS_S3_BLADE_BUCKET }}?region=${{ vars.AWS_REGION }}&prefix=logs/${{ github.run_id }}/
+        with:
+          payload: |
+            {
+              "attachments": [
+                {
+                  "color": "${{ inputs.destroy_network_upload_logs == '' && inputs.destroy_network_terraform_logs == '' && env.green_color || env.red_color }}",
+                  "blocks": [
+                    {
+                      "type": "header",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "Destroy ${{ inputs.environment }}net"
+                      }
+                    },
+                    {
+                      "type": "context",
+                      "elements": [
+                        {
+                          "type": "mrkdwn",
+                          "text": "Environment: *${{ inputs.environment }}*"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "context",
+                      "elements": [
+                        {
+                          "type": "mrkdwn",
+                          "text": "Triggered by: *${{ github.triggering_actor }}*"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "actions",
+                      "elements": [
+                        {
+                          "type": "button",
+                          "text": {
+                            "type": "plain_text",
+                            "text": "Workflow Run"
+                          },
+                          "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                        },
+                        {
+                          "type": "button",
+                          "text": {
+                            "type": "plain_text",
+                            "text": "${{ inputs.logs && inputs.destroy_network_upload_logs == '' && 'Logs' || 'No Logs' }}"
+                          },
+                          "style": "${{ inputs.logs && inputs.destroy_network_upload_logs == '' && env.succeed_bnt || env.failed_bnt }}",
+                          "url": "https://s3.console.aws.amazon.com/s3/buckets/${{ secrets.AWS_S3_BLADE_BUCKET }}?region=${{ vars.AWS_REGION }}&prefix=logs/${{ github.run_id }}/"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }

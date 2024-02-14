@@ -1,0 +1,139 @@
+---
+name: Notification - Load Test
+on: # yamllint disable-line rule:truthy
+  workflow_call:
+    inputs:
+      environment:
+        description: The environment to run against
+        type: string
+        required: true
+      scenario:
+        description: The scenario to run
+        type: string
+        required: true
+      tps_avg:
+        description: "Average Transactions Per Second"
+        type: string
+        required: true
+      tps_max:
+        description: "Maximum Transactions Per Second"
+        type: string
+        required: true
+      iterations:
+        description: "Number Of Transactions"
+        type: string
+        required: true
+      block:
+        description: "Block Number"
+        type: string
+        required: true
+      ttm:
+        description: "Time To Mine"
+        type: string
+        required: true
+      gas_avg:
+        description: "Average Gas Used"
+        type: string
+        required: true
+      gas_max:
+        description: "Maximum Gas Used"
+        type: string
+        required: true
+    secrets:
+      SLACK_WEBHOOK_URL:
+        required: true
+
+jobs:
+  notification:
+    name: Notification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Slack
+        uses: slackapi/slack-github-action@v1.25.0
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+          green_color: '#03C03C'
+          succeed_bnt: 'primary'
+        with:
+          payload: |
+            {
+              "attachments": [
+                {
+                  "color": "${{ env.green_color }}",
+                  "blocks": [
+                    {
+                      "type": "header",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "Load Test: ${{ inputs.scenario }}"
+                      }
+                    },
+                    {
+                      "type": "context",
+                      "elements": [
+                        {
+                          "type": "mrkdwn",
+                          "text": "Environment: *${{ inputs.environment }}*"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "context",
+                      "elements": [
+                        {
+                          "type": "mrkdwn",
+                          "text": "Triggered by: *${{ github.triggering_actor }}*"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "actions",
+                      "elements": [
+                        {
+                          "type": "button",
+                          "text": {
+                            "type": "plain_text",
+                            "text": "Workflow Run"
+                          },
+                          "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "section",
+                      "fields": [
+                        {
+                          "type": "mrkdwn",
+                          "text": "*Average TPS*\n${{ inputs.tps_avg }}"
+                        },
+                        {
+                          "type": "mrkdwn",
+                          "text": "*Max TPS*\n${{ inputs.tps_max }}"
+                        },
+                        {
+                          "type": "mrkdwn",
+                          "text": "*Average Gas Used*\n${{ inputs.gas_avg }}"
+                        },
+                        {
+                          "type": "mrkdwn",
+                          "text": "*Max Gas Used*\n${{ inputs.gas_max }}"
+                        },
+                        {
+                          "type": "mrkdwn",
+                          "text": "*Transactions*\n${{ inputs.iterations }}"
+                        },
+                        {
+                          "type": "mrkdwn",
+                          "text": "*Block Number*\n${{ inputs.block }}"
+                        },
+                        {
+                          "type": "mrkdwn",
+                          "text": "*Time to Mine*\n${{ inputs.ttm }}"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }

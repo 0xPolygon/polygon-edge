@@ -3,21 +3,46 @@ import exec from 'k6/execution';
 import { fundTestAccounts } from '../helpers/init.js';
 import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.2/index.js';
 
-let duration = __ENV.LOADTEST_DURATION;
+let setupTimeout = __ENV.SETUP_TIMEOUT;
+if (setupTimeout == undefined) {
+  setupTimeout = "220s"
+}
+
+let rate = __ENV.RATE;
+if (rate == undefined) {
+  rate = "3000"
+}
+
+let timeUnit = __ENV.TIME_UNIT;
+if (timeUnit == undefined) {
+  timeUnit = "1s"
+}
+
+let duration = __ENV.DURATION;
 if (duration == undefined) {
     duration = "2m";
 }
 
+let preAllocatedVUs = __ENV.PREALLOCATED_VUS;
+if (preAllocatedVUs == undefined) {
+  preAllocatedVUs = "60";
+}
+
+let maxVUs = __ENV.MAX_VUS;
+if (maxVUs == undefined) {
+  maxVUs = "60";
+}
+
 export const options = {
-  setupTimeout: '220s',
+  setupTimeout: setupTimeout,
   scenarios: {
     constant_request_rate: {
       executor: 'constant-arrival-rate',
-      rate: 3000,
-      timeUnit: '1s',
+      rate: parseInt(rate),
+      timeUnit: timeUnit,
       duration: duration,
-      preAllocatedVUs: 60,
-      maxVUs: 60,
+      preAllocatedVUs: parseInt(preAllocatedVUs),
+      maxVUs: parseInt(maxVUs),
     },
   },
 };
