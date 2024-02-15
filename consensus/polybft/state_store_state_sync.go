@@ -117,6 +117,7 @@ func (s *StateSyncStore) list() ([]*contractsapi.StateSyncedEvent, error) {
 			if err := json.Unmarshal(v, &event); err != nil {
 				return err
 			}
+
 			events = append(events, event)
 
 			return nil
@@ -297,6 +298,7 @@ func (s *StateSyncStore) getMessageVotes(epoch uint64, hash []byte) ([]*MessageS
 		if err != nil {
 			return err
 		}
+
 		signatures = res
 
 		return nil

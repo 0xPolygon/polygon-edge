@@ -361,6 +361,7 @@ func TestPush0(t *testing.T) {
 
 	t.Run("single push0 (EIP-3855 disabled)", func(t *testing.T) {
 		allExceptEIP3855Fork := chain.AllForksEnabled.Copy().RemoveFork(chain.EIP3855).At(0)
+
 		s, closeFn := getState(&allExceptEIP3855Fork)
 		defer closeFn()
 

@@ -38,6 +38,7 @@ func Test_ExtendByteSlice(t *testing.T) {
 
 			newSlice := ExtendByteSlice(originalSlice, c.newLength)
 			require.Len(t, newSlice, c.newLength)
+
 			if c.length > c.newLength {
 				require.Equal(t, originalSlice[:c.newLength], newSlice)
 			} else {
@@ -98,6 +99,7 @@ func Test_Duration_Marshal_UnmarshalJSON(t *testing.T) {
 		require.NoError(t, err)
 
 		var otherTimer *timer
+
 		require.NoError(t, json.Unmarshal(timerRaw, &otherTimer))
 		require.Equal(t, origTimer, otherTimer)
 	})

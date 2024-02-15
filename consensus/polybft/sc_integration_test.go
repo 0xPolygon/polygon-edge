@@ -209,7 +209,9 @@ func TestIntegration_PerformExit(t *testing.T) {
 
 	currentValidators.IterAcct(nil, func(v *validator.TestValidator) {
 		signatures = append(signatures, v.MustSign(checkpointHash[:], signer.DomainCheckpointManager))
+
 		bmp.Set(i)
+
 		i++
 	})
 

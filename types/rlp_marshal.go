@@ -38,6 +38,7 @@ func (b *Block) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 		vv.Set(ar.NewNullArray())
 	} else {
 		v0 := ar.NewArray()
+
 		for _, tx := range b.Transactions {
 			if tx.Type != LegacyTx {
 				v0.Set(ar.NewCopyBytes([]byte{byte(tx.Type)}))
@@ -45,6 +46,7 @@ func (b *Block) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 
 			v0.Set(tx.MarshalRLPWith(ar))
 		}
+
 		vv.Set(v0)
 	}
 
@@ -55,6 +57,7 @@ func (b *Block) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 		for _, uncle := range b.Uncles {
 			v1.Set(uncle.MarshalRLPWith(ar))
 		}
+
 		vv.Set(v1)
 	}
 

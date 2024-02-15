@@ -149,6 +149,7 @@ func TestValidatorsSnapshotCache_Cleanup(t *testing.T) {
 
 	for i := uint64(0); i < validatorSnapshotLimit; i++ {
 		require.NoError(cache.storeSnapshot(&validatorSnapshot{i, i * 10, snapshot}, nil))
+
 		maxEpoch++
 	}
 

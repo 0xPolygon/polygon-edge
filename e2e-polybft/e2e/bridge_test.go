@@ -77,6 +77,7 @@ func TestE2E_Bridge_RootchainTokensTransfers(t *testing.T) {
 				tcc.StakeAmounts = append(tcc.StakeAmounts, ethgo.Ether(10))
 				// premine receivers, so that they are able to do withdrawals
 			}
+
 			tcc.Premine = append(tcc.Premine, receivers...)
 		}))
 	defer cluster.Stop()
@@ -830,6 +831,7 @@ func TestE2E_Bridge_ChildchainTokensTransfer(t *testing.T) {
 			for i, receiver := range depositors {
 				balance := erc20BalanceOf(t, receiver, contracts.NativeERC20TokenContract, childchainTxRelayer)
 				t.Log("Attempt", it+1, "Balance before", balancesBefore[i], "Balance after", balance)
+
 				if balance.Cmp(balancesBefore[i].Add(balancesBefore[i], big.NewInt(amount))) != 0 {
 					allSuccessful = false
 
@@ -910,6 +912,7 @@ func TestE2E_Bridge_ChildchainTokensTransfer(t *testing.T) {
 		// first exit event is mapping child token on a rootchain
 		// remaining ones are the deposits
 		initialExitEventID++
+
 		require.NoError(t, cluster.WaitUntil(time.Minute*3, time.Second*2, func() bool {
 			for i := initialExitEventID; i <= initialExitEventID+transfersCount; i++ {
 				if !isExitEventProcessed(t, polybftCfg.Bridge.ExitHelperAddr, rootchainTxRelayer, i) {
@@ -966,6 +969,7 @@ func TestE2E_Bridge_ChildchainTokensTransfer(t *testing.T) {
 			for i, receiver := range depositors {
 				owner := erc721OwnerOf(t, big.NewInt(int64(i)), types.Address(rootERC721Token), childchainTxRelayer)
 				t.Log("Attempt:", it+1, " Owner:", owner, " Receiver:", receiver)
+
 				if receiver != owner {
 					allSuccessful = false
 
@@ -1211,6 +1215,7 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 			rootchainTxRelayer, polybftCfg.Bridge.CheckpointManagerAddr))
 
 		oldBalances := map[types.Address]*big.Int{}
+
 		for _, receiver := range receivers {
 			balance := erc20BalanceOf(t, types.StringToAddress(receiver), rootERC20Token, rootchainTxRelayer)
 			oldBalances[types.StringToAddress(receiver)] = balance

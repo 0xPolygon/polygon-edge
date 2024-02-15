@@ -161,6 +161,7 @@ func TestDel(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			q := NewDialQueue()
+
 			for _, task := range tt.tasks {
 				id := peer.ID(task.id)
 
@@ -178,6 +179,7 @@ func TestDel(t *testing.T) {
 					t.Errorf("unsupported action: %s", task.action)
 				}
 			}
+
 			assert.Equal(t, tt.expectedLen, q.heap.Len())
 		})
 	}

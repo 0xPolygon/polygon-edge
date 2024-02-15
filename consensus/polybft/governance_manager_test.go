@@ -125,8 +125,10 @@ func TestGovernanceManager_PostBlock(t *testing.T) {
 		governanceManager, err := newGovernanceManager(chainParams, genesisPolybftConfig,
 			hclog.NewNullLogger(), state, blockchainMock, nil)
 		require.NoError(t, err)
+
 		// this cheats that we have this fork in code
 		governanceManager.allForksHashes[newForkHash] = newForkName
+
 		require.NoError(t, state.GovernanceStore.insertGovernanceEvent(1, newForkBlock.Uint64(),
 			&contractsapi.NewFeatureEvent{
 				Feature: newForkHash, Block: newForkBlock,

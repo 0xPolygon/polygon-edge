@@ -459,13 +459,10 @@ func TestInsertHeaders(t *testing.T) {
 			}
 
 			checkEvents := func(a []*header, b []*types.Header) {
-				if len(a) != len(b) {
-					t.Fatal("bad size")
-				}
+				require.Equal(t, len(a), len(b), "unexpected size")
+
 				for indx := range a {
-					if chain.headers[a[indx].hash].Hash != b[indx].Hash {
-						t.Fatal("bad")
-					}
+					require.Equal(t, chain.headers[a[indx].hash].Hash, b[indx].Hash)
 				}
 			}
 

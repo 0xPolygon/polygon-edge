@@ -15,6 +15,7 @@ func TestHelpers_isEpochEndingBlock_DeltaNotEmpty(t *testing.T) {
 	t.Parallel()
 
 	validators := validator.NewTestValidators(t, 3).GetPublicIdentities()
+
 	bitmap := bitmap.Bitmap{}
 	bitmap.Set(0)
 

@@ -551,9 +551,11 @@ func (t *TestServer) WaitForReceipt(ctx context.Context, hash ethgo.Hash) (*ethg
 
 	res, err := tests.RetryUntilTimeout(ctx, func() (interface{}, bool) {
 		receipt, err := client.Eth().GetTransactionReceipt(hash)
+
 		if err != nil && err.Error() != "not found" {
 			return result{receipt, err}, false
 		}
+
 		if receipt != nil {
 			return result{receipt, nil}, false
 		}

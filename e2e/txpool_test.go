@@ -186,6 +186,7 @@ func TestTxPool_ErrorCodes(t *testing.T) {
 
 				convertedHash := types.StringToHash(addResponse.TxHash)
 				_, receiptErr := tests.WaitForReceipt(receiptCtx, srv.JSONRPC().Eth(), ethgo.Hash(convertedHash))
+
 				if receiptErr != nil {
 					t.Fatalf("Unable to get receipt, %v", receiptErr)
 				}

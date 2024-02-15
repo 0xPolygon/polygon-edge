@@ -628,6 +628,7 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 
 	// Refund the sender
 	remaining := new(big.Int).Mul(new(big.Int).SetUint64(result.GasLeft), gasPrice)
+
 	t.state.AddBalance(msg.From, remaining)
 
 	// Spec: https://eips.ethereum.org/EIPS/eip-1559#specification

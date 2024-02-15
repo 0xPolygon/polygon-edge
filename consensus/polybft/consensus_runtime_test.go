@@ -1060,6 +1060,7 @@ func createTestBitmaps(t *testing.T, validators validator.AccountSet, numberOfBl
 
 			if !bitmap.IsSet(index) {
 				bitmap.Set(index)
+
 				j++
 			}
 		}

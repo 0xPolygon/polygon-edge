@@ -71,6 +71,7 @@ func TestValidatorSetDelta_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 		t.Parallel()
 
 		ar := &fastrlp.Arena{}
+
 		delta := &ValidatorSetDelta{}
 		require.NoError(t, delta.UnmarshalRLPWith(ar.NewArray()))
 	})
@@ -84,6 +85,7 @@ func TestValidatorSetDelta_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 		deltaMarshalled.Set(ar.NewBytes([]byte{0x33}))
 		deltaMarshalled.Set(ar.NewBytes([]byte{0x26}))
 		deltaMarshalled.Set(ar.NewBytes([]byte{0x74}))
+
 		delta := &ValidatorSetDelta{}
 		require.ErrorContains(t, delta.UnmarshalRLPWith(deltaMarshalled), "incorrect elements count to decode validator set delta, expected 3 but found 4")
 	})
@@ -93,9 +95,11 @@ func TestValidatorSetDelta_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 
 		ar := &fastrlp.Arena{}
 		deltaMarshalled := ar.NewArray()
+
 		deltaMarshalled.Set(ar.NewBytes([]byte{0x59}))
 		deltaMarshalled.Set(ar.NewBytes([]byte{0x33}))
 		deltaMarshalled.Set(ar.NewBytes([]byte{0x27}))
+
 		delta := &ValidatorSetDelta{}
 		require.ErrorContains(t, delta.UnmarshalRLPWith(deltaMarshalled), "array expected for added validators")
 	})
@@ -110,6 +114,7 @@ func TestValidatorSetDelta_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 		deltaMarshalled.Set(addedArray)
 		deltaMarshalled.Set(ar.NewNullArray())
 		deltaMarshalled.Set(ar.NewNull())
+
 		delta := &ValidatorSetDelta{}
 		require.ErrorContains(t, delta.UnmarshalRLPWith(deltaMarshalled), "value is not of type array")
 	})
@@ -122,19 +127,21 @@ func TestValidatorSetDelta_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 		addedValidators := NewTestValidators(t, 3).GetPublicIdentities()
 		addedArray := ar.NewArray()
 		updatedArray := ar.NewArray()
+
 		for _, validator := range addedValidators {
 			addedArray.Set(validator.MarshalRLPWith(ar))
-		}
-		for _, validator := range addedValidators {
+
 			votingPower, err := rand.Int(rand.Reader, big.NewInt(100))
 			require.NoError(t, err)
 
 			validator.VotingPower = new(big.Int).Set(votingPower)
 			updatedArray.Set(validator.MarshalRLPWith(ar))
 		}
+
 		deltaMarshalled.Set(addedArray)
 		deltaMarshalled.Set(updatedArray)
 		deltaMarshalled.Set(ar.NewNull())
+
 		delta := &ValidatorSetDelta{}
 		require.ErrorContains(t, delta.UnmarshalRLPWith(deltaMarshalled), "value is not of type bytes")
 	})
@@ -147,6 +154,7 @@ func TestValidatorSetDelta_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 		deltaMarshalled.Set(ar.NewArray())
 		deltaMarshalled.Set(ar.NewBytes([]byte{0x33}))
 		deltaMarshalled.Set(ar.NewNull())
+
 		delta := &ValidatorSetDelta{}
 		require.ErrorContains(t, delta.UnmarshalRLPWith(deltaMarshalled), "array expected for updated validators")
 	})
@@ -156,11 +164,14 @@ func TestValidatorSetDelta_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 
 		ar := &fastrlp.Arena{}
 		deltaMarshalled := ar.NewArray()
+
 		updatedArray := ar.NewArray()
+
 		updatedArray.Set(ar.NewNull())
 		deltaMarshalled.Set(ar.NewArray())
 		deltaMarshalled.Set(updatedArray)
 		deltaMarshalled.Set(ar.NewNull())
+
 		delta := &ValidatorSetDelta{}
 		require.ErrorContains(t, delta.UnmarshalRLPWith(deltaMarshalled), "value is not of type array")
 	})
@@ -197,6 +208,7 @@ func TestExtra_CreateValidatorSetDelta_Cases(t *testing.T) {
 			for _, name := range c.oldSet {
 				vals.Create(t, name, 1)
 			}
+
 			for _, name := range c.newSet {
 				vals.Create(t, name, 1)
 			}
@@ -204,6 +216,7 @@ func TestExtra_CreateValidatorSetDelta_Cases(t *testing.T) {
 			oldValidatorSet := vals.GetPublicIdentities(c.oldSet...)
 			// update voting power to random value
 			maxVotingPower := big.NewInt(100)
+
 			for _, name := range c.updated {
 				v := vals.GetValidator(name)
 				vp, err := rand.Int(rand.Reader, maxVotingPower)
@@ -211,6 +224,7 @@ func TestExtra_CreateValidatorSetDelta_Cases(t *testing.T) {
 				// make sure generated voting power is different than the original one
 				v.VotingPower += vp.Uint64() + 1
 			}
+
 			newValidatorSet := vals.GetPublicIdentities(c.newSet...)
 
 			delta, err := CreateValidatorSetDelta(oldValidatorSet, newValidatorSet)
@@ -218,6 +232,7 @@ func TestExtra_CreateValidatorSetDelta_Cases(t *testing.T) {
 
 			// added validators
 			require.Len(t, delta.Added, len(c.added))
+
 			for i, name := range c.added {
 				require.Equal(t, delta.Added[i].Address, vals.GetValidator(name).Address())
 			}
@@ -229,6 +244,7 @@ func TestExtra_CreateValidatorSetDelta_Cases(t *testing.T) {
 
 			// updated validators
 			require.Len(t, delta.Updated, len(c.updated))
+
 			for i, name := range c.updated {
 				require.Equal(t, delta.Updated[i].Address, vals.GetValidator(name).Address())
 			}
