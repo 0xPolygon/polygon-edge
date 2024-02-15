@@ -425,8 +425,25 @@ func (t *Transition) Txn() *Txn {
 	return t.state
 }
 
+// checkSenderAccount rejects transactions from senders with deployed code.
+// This check is performed only in case EIP 3607 is enabled.
+func (t Transition) checkSenderAccount(msg *types.Transaction) bool {
+	if !t.config.EIP3607 {
+		return true
+	}
+
+	codeHash := t.state.GetCodeHash(msg.From)
+
+	return codeHash == types.ZeroHash || codeHash == types.EmptyCodeHash
+}
+
 // Apply applies a new transaction
 func (t *Transition) Apply(msg *types.Transaction) (*runtime.ExecutionResult, error) {
+	if !t.checkSenderAccount(msg) {
+		return nil, fmt.Errorf("%w: address %v, codehash: %v", ErrSenderNoEOA, msg.From.String(),
+			t.state.GetCodeHash(msg.From).String())
+	}
+
 	s := t.state.Snapshot()
 
 	result, err := t.apply(msg)
@@ -516,6 +533,7 @@ func (t *Transition) checkDynamicFees(msg *types.Transaction) error {
 
 var (
 	ErrNonceIncorrect        = errors.New("incorrect nonce")
+	ErrSenderNoEOA           = errors.New("sender not an eoa")
 	ErrNotEnoughFundsForGas  = errors.New("not enough funds to cover gas costs")
 	ErrBlockLimitReached     = errors.New("gas limit reached in the pool")
 	ErrIntrinsicGasOverflow  = errors.New("overflow in intrinsic gas calculation")
