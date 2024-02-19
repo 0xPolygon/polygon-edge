@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"sort"
 
 	"github.com/hashicorp/go-hclog"
 
@@ -25,6 +26,9 @@ const (
 
 	TxGas                 uint64 = 21000 // Per transaction not creating a contract
 	TxGasContractCreation uint64 = 53000 // Per transaction that creates a contract
+
+	TxAccessListAddressGas    uint64 = 2400 // Per address specified in EIP 2930 access list
+	TxAccessListStorageKeyGas uint64 = 1900 // Per storage key specified in EIP 2930 access list
 )
 
 // GetHashByNumber returns the hash function of a block number
@@ -77,15 +81,8 @@ func (e *Executor) WriteGenesis(
 		ChainID: e.config.ChainID,
 	}
 
-	transition := &Transition{
-		logger:      e.logger,
-		ctx:         env,
-		state:       txn,
-		auxState:    e.state,
-		gasPool:     uint64(env.GasLimit),
-		config:      config,
-		precompiles: precompiled.NewPrecompiled(),
-	}
+	transition := NewTransition(e.logger, config, snap, txn)
+	transition.ctx = env
 
 	for addr, account := range alloc {
 		if account.Balance != nil {
@@ -142,7 +139,7 @@ func (e *Executor) ProcessBlock(
 	}
 
 	for _, t := range block.Transactions {
-		if t.Gas > block.Header.GasLimit {
+		if t.Gas() > block.Header.GasLimit {
 			continue
 		}
 
@@ -176,7 +173,7 @@ func (e *Executor) BeginTxn(
 ) (*Transition, error) {
 	forkConfig := e.config.Forks.At(header.Number)
 
-	auxSnap2, err := e.state.NewSnapshotAt(parentRoot)
+	snap, err := e.state.NewSnapshotAt(parentRoot)
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +186,7 @@ func (e *Executor) BeginTxn(
 		}
 	}
 
-	newTxn := NewTxn(auxSnap2)
+	newTxn := NewTxn(snap)
 
 	txCtx := runtime.TxContext{
 		Coinbase:     coinbaseReceiver,
@@ -202,60 +199,47 @@ func (e *Executor) BeginTxn(
 		BurnContract: burnContract,
 	}
 
-	txn := &Transition{
-		logger:   e.logger,
-		ctx:      txCtx,
-		state:    newTxn,
-		snap:     auxSnap2,
-		getHash:  e.GetHash(header),
-		auxState: e.state,
-		config:   forkConfig,
-		gasPool:  uint64(txCtx.GasLimit),
-
-		receipts: []*types.Receipt{},
-		totalGas: 0,
-
-		evm:         evm.NewEVM(),
-		precompiles: precompiled.NewPrecompiled(),
-		PostHook:    e.PostHook,
-	}
+	t := NewTransition(e.logger, forkConfig, snap, newTxn)
+	t.PostHook = e.PostHook
+	t.getHash = e.GetHash(header)
+	t.ctx = txCtx
+	t.gasPool = uint64(txCtx.GasLimit)
 
 	// enable contract deployment allow list (if any)
 	if e.config.ContractDeployerAllowList != nil {
-		txn.deploymentAllowList = addresslist.NewAddressList(txn, contracts.AllowListContractsAddr)
+		t.deploymentAllowList = addresslist.NewAddressList(t, contracts.AllowListContractsAddr)
 	}
 
 	if e.config.ContractDeployerBlockList != nil {
-		txn.deploymentBlockList = addresslist.NewAddressList(txn, contracts.BlockListContractsAddr)
+		t.deploymentBlockList = addresslist.NewAddressList(t, contracts.BlockListContractsAddr)
 	}
 
 	// enable transactions allow list (if any)
 	if e.config.TransactionsAllowList != nil {
-		txn.txnAllowList = addresslist.NewAddressList(txn, contracts.AllowListTransactionsAddr)
+		t.txnAllowList = addresslist.NewAddressList(t, contracts.AllowListTransactionsAddr)
 	}
 
 	if e.config.TransactionsBlockList != nil {
-		txn.txnBlockList = addresslist.NewAddressList(txn, contracts.BlockListTransactionsAddr)
+		t.txnBlockList = addresslist.NewAddressList(t, contracts.BlockListTransactionsAddr)
 	}
 
 	// enable transactions allow list (if any)
 	if e.config.BridgeAllowList != nil {
-		txn.bridgeAllowList = addresslist.NewAddressList(txn, contracts.AllowListBridgeAddr)
+		t.bridgeAllowList = addresslist.NewAddressList(t, contracts.AllowListBridgeAddr)
 	}
 
 	if e.config.BridgeBlockList != nil {
-		txn.bridgeBlockList = addresslist.NewAddressList(txn, contracts.BlockListBridgeAddr)
+		t.bridgeBlockList = addresslist.NewAddressList(t, contracts.BlockListBridgeAddr)
 	}
 
-	return txn, nil
+	return t, nil
 }
 
 type Transition struct {
 	logger hclog.Logger
 
 	// dummy
-	auxState State
-	snap     Snapshot
+	snap Snapshot
 
 	config  chain.ForksInTime
 	state   *Txn
@@ -280,15 +264,24 @@ type Transition struct {
 	txnBlockList        *addresslist.AddressList
 	bridgeAllowList     *addresslist.AddressList
 	bridgeBlockList     *addresslist.AddressList
+
+	// journaling
+	journal          *runtime.Journal
+	journalRevisions []runtime.JournalRevision
+
+	accessList *runtime.AccessList
 }
 
-func NewTransition(config chain.ForksInTime, snap Snapshot, radix *Txn) *Transition {
+func NewTransition(logger hclog.Logger, config chain.ForksInTime, snap Snapshot, radix *Txn) *Transition {
 	return &Transition{
+		logger:      logger,
 		config:      config,
 		state:       radix,
 		snap:        snap,
 		evm:         evm.NewEVM(),
 		precompiles: precompiled.NewPrecompiled(),
+		journal:     &runtime.Journal{},
+		accessList:  runtime.NewAccessList(),
 	}
 }
 
@@ -334,17 +327,16 @@ var emptyFrom = types.Address{}
 
 // Write writes another transaction to the executor
 func (t *Transition) Write(txn *types.Transaction) error {
-	var err error
-
-	if txn.From == emptyFrom &&
-		(txn.Type == types.LegacyTx || txn.Type == types.DynamicFeeTx) {
+	if txn.From() == emptyFrom && txn.Type() != types.StateTx {
 		// Decrypt the from address
 		signer := crypto.NewSigner(t.config, uint64(t.ctx.ChainID))
 
-		txn.From, err = signer.Sender(txn)
+		from, err := signer.Sender(txn)
 		if err != nil {
 			return NewTransitionApplicationError(err, false)
 		}
+
+		txn.SetFrom(from)
 	}
 
 	// Make a local copy and apply the transaction
@@ -363,8 +355,8 @@ func (t *Transition) Write(txn *types.Transaction) error {
 
 	receipt := &types.Receipt{
 		CumulativeGasUsed: t.totalGas,
-		TransactionType:   txn.Type,
-		TxHash:            txn.Hash,
+		TransactionType:   txn.Type(),
+		TxHash:            txn.Hash(),
 		GasUsed:           result.GasUsed,
 	}
 
@@ -380,8 +372,8 @@ func (t *Transition) Write(txn *types.Transaction) error {
 	}
 
 	// if the transaction created a contract, store the creation address in the receipt.
-	if msg.To == nil {
-		receipt.ContractAddress = crypto.CreateAddress(msg.From, txn.Nonce).Ptr()
+	if msg.To() == nil {
+		receipt.ContractAddress = crypto.CreateAddress(msg.From(), txn.Nonce()).Ptr()
 	}
 
 	// Set the receipt logs and create a bloom for filtering
@@ -432,7 +424,7 @@ func (t Transition) checkSenderAccount(msg *types.Transaction) bool {
 		return true
 	}
 
-	codeHash := t.state.GetCodeHash(msg.From)
+	codeHash := t.state.GetCodeHash(msg.From())
 
 	return codeHash == types.ZeroHash || codeHash == types.EmptyCodeHash
 }
@@ -440,15 +432,17 @@ func (t Transition) checkSenderAccount(msg *types.Transaction) bool {
 // Apply applies a new transaction
 func (t *Transition) Apply(msg *types.Transaction) (*runtime.ExecutionResult, error) {
 	if !t.checkSenderAccount(msg) {
-		return nil, fmt.Errorf("%w: address %v, codehash: %v", ErrSenderNoEOA, msg.From.String(),
-			t.state.GetCodeHash(msg.From).String())
+		sender := msg.From()
+
+		return nil, fmt.Errorf("%w: address %s, codehash: %v", ErrSenderNoEOA, sender.String(),
+			t.state.GetCodeHash(sender).String())
 	}
 
-	s := t.state.Snapshot()
+	s := t.Snapshot()
 
 	result, err := t.apply(msg)
 	if err != nil {
-		if revertErr := t.state.RevertToSnapshot(s); revertErr != nil {
+		if revertErr := t.RevertToSnapshot(s); revertErr != nil {
 			return nil, revertErr
 		}
 	}
@@ -467,9 +461,21 @@ func (t *Transition) ContextPtr() *runtime.TxContext {
 }
 
 func (t *Transition) subGasLimitPrice(msg *types.Transaction) error {
-	upfrontGasCost := new(big.Int).Mul(new(big.Int).SetUint64(msg.Gas), msg.GetGasPrice(t.ctx.BaseFee.Uint64()))
+	upfrontGasCost := new(big.Int).Mul(new(big.Int).SetUint64(msg.Gas()), msg.GetGasPrice(t.ctx.BaseFee.Uint64()))
+	balanceCheck := new(big.Int).Set(upfrontGasCost)
 
-	if err := t.state.SubBalance(msg.From, upfrontGasCost); err != nil {
+	if msg.Type() == types.DynamicFeeTx {
+		balanceCheck.Add(balanceCheck, msg.Value())
+		balanceCheck.SetUint64(msg.Gas())
+		balanceCheck = balanceCheck.Mul(balanceCheck, msg.GasFeeCap())
+		balanceCheck.Add(balanceCheck, msg.Value())
+	}
+
+	if have, want := t.state.GetBalance(msg.From()), balanceCheck; have.Cmp(want) < 0 {
+		return fmt.Errorf("%w: address %v have %v want %v", ErrInsufficientFunds, msg.From(), have, want)
+	}
+
+	if err := t.state.SubBalance(msg.From(), upfrontGasCost); err != nil {
 		if errors.Is(err, runtime.ErrNotEnoughFunds) {
 			return ErrNotEnoughFundsForGas
 		}
@@ -481,10 +487,17 @@ func (t *Transition) subGasLimitPrice(msg *types.Transaction) error {
 }
 
 func (t *Transition) nonceCheck(msg *types.Transaction) error {
-	nonce := t.state.GetNonce(msg.From)
+	currentNonce := t.state.GetNonce(msg.From())
 
-	if nonce != msg.Nonce {
-		return ErrNonceIncorrect
+	if msgNonce := msg.Nonce(); currentNonce < msgNonce {
+		return fmt.Errorf("%w: address %v, tx: %d state: %d", ErrNonceTooHigh,
+			msg.From(), msgNonce, currentNonce)
+	} else if currentNonce > msgNonce {
+		return fmt.Errorf("%w: address %v, tx: %d state: %d", ErrNonceTooLow,
+			msg.From(), msgNonce, currentNonce)
+	} else if currentNonce+1 < currentNonce {
+		return fmt.Errorf("%w: address %v, nonce: %d", ErrNonceMax,
+			msg.From(), currentNonce)
 	}
 
 	return nil
@@ -497,24 +510,24 @@ func (t *Transition) checkDynamicFees(msg *types.Transaction) error {
 		return nil
 	}
 
-	if msg.Type == types.DynamicFeeTx {
-		if msg.GasFeeCap.BitLen() == 0 && msg.GasTipCap.BitLen() == 0 {
+	if msg.Type() == types.DynamicFeeTx {
+		if msg.GasFeeCap().BitLen() == 0 && msg.GasTipCap().BitLen() == 0 {
 			return nil
 		}
 
-		if l := msg.GasFeeCap.BitLen(); l > 256 {
+		if l := msg.GasFeeCap().BitLen(); l > 256 {
 			return fmt.Errorf("%w: address %v, GasFeeCap bit length: %d", ErrFeeCapVeryHigh,
-				msg.From.String(), l)
+				msg.From().String(), l)
 		}
 
-		if l := msg.GasTipCap.BitLen(); l > 256 {
+		if l := msg.GasTipCap().BitLen(); l > 256 {
 			return fmt.Errorf("%w: address %v, GasTipCap bit length: %d", ErrTipVeryHigh,
-				msg.From.String(), l)
+				msg.From().String(), l)
 		}
 
-		if msg.GasFeeCap.Cmp(msg.GasTipCap) < 0 {
+		if msg.GasFeeCap().Cmp(msg.GasTipCap()) < 0 {
 			return fmt.Errorf("%w: address %v, GasTipCap: %s, GasFeeCap: %s", ErrTipAboveFeeCap,
-				msg.From.String(), msg.GasTipCap, msg.GasFeeCap)
+				msg.From().String(), msg.GasTipCap(), msg.GasFeeCap())
 		}
 	}
 
@@ -522,7 +535,7 @@ func (t *Transition) checkDynamicFees(msg *types.Transaction) error {
 	// as part of header validation.
 	if gasFeeCap := msg.GetGasFeeCap(); gasFeeCap.Cmp(t.ctx.BaseFee) < 0 {
 		return fmt.Errorf("%w: address %v, GasFeeCap/GasPrice: %s, BaseFee: %s", ErrFeeCapTooLow,
-			msg.From.String(), gasFeeCap, t.ctx.BaseFee)
+			msg.From().String(), gasFeeCap, t.ctx.BaseFee)
 	}
 
 	return nil
@@ -532,12 +545,15 @@ func (t *Transition) checkDynamicFees(msg *types.Transaction) error {
 // surfacing of these errors reject the transaction thus not including it in the block
 
 var (
-	ErrNonceIncorrect        = errors.New("incorrect nonce")
+	ErrNonceTooLow           = errors.New("nonce too low")
+	ErrNonceTooHigh          = errors.New("nonce too high")
+	ErrNonceMax              = errors.New("nonce has max value")
 	ErrSenderNoEOA           = errors.New("sender not an eoa")
 	ErrNotEnoughFundsForGas  = errors.New("not enough funds to cover gas costs")
 	ErrBlockLimitReached     = errors.New("gas limit reached in the pool")
 	ErrIntrinsicGasOverflow  = errors.New("overflow in intrinsic gas calculation")
 	ErrNotEnoughIntrinsicGas = errors.New("not enough gas supplied for intrinsic gas costs")
+	ErrInsufficientFunds     = errors.New("insufficient funds for gas * price + value")
 
 	// ErrTipAboveFeeCap is a sanity error to ensure no one is able to specify a
 	// transaction with a tip higher than the total fee cap.
@@ -588,7 +604,7 @@ func NewGasLimitReachedTransitionApplicationError(err error) *GasLimitReachedTra
 func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, error) {
 	var err error
 
-	if msg.Type == types.StateTx {
+	if msg.Type() == types.StateTx {
 		err = checkAndProcessStateTx(msg)
 	} else {
 		err = checkAndProcessTx(msg, t)
@@ -599,12 +615,12 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 	}
 
 	// the amount of gas required is available in the block
-	if err = t.subGasPool(msg.Gas); err != nil {
+	if err = t.subGasPool(msg.Gas()); err != nil {
 		return nil, NewGasLimitReachedTransitionApplicationError(err)
 	}
 
 	if t.ctx.Tracer != nil {
-		t.ctx.Tracer.TxStart(msg.Gas)
+		t.ctx.Tracer.TxStart(msg.Gas())
 	}
 
 	// 4. there is no overflow when calculating intrinsic gas
@@ -614,31 +630,49 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 	}
 
 	// the purchased gas is enough to cover intrinsic usage
-	gasLeft := msg.Gas - intrinsicGasCost
+	gasLeft := msg.Gas() - intrinsicGasCost
 	// because we are working with unsigned integers for gas, the `>` operator is used instead of the more intuitive `<`
-	if gasLeft > msg.Gas {
+	if gasLeft > msg.Gas() {
 		return nil, NewTransitionApplicationError(ErrNotEnoughIntrinsicGas, false)
 	}
 
 	gasPrice := msg.GetGasPrice(t.ctx.BaseFee.Uint64())
-	value := new(big.Int).Set(msg.Value)
+	value := new(big.Int)
+
+	if msg.Value() != nil {
+		value = value.Set(msg.Value())
+	}
 
 	// set the specific transaction fields in the context
 	t.ctx.GasPrice = types.BytesToHash(gasPrice.Bytes())
-	t.ctx.Origin = msg.From
+	t.ctx.Origin = msg.From()
+
+	// set up initial access list
+	initialAccessList := runtime.NewAccessList()
+	if t.config.Berlin { // check if berlin fork is activated or not
+		initialAccessList.PrepareAccessList(msg.From(), msg.To(), t.precompiles.Addrs, msg.AccessList())
+	}
+
+	t.accessList = initialAccessList
 
 	var result *runtime.ExecutionResult
 	if msg.IsContractCreation() {
-		result = t.Create2(msg.From, msg.Input, value, gasLeft)
+		result = t.Create2(msg.From(), msg.Input(), value, gasLeft)
 	} else {
-		if err := t.state.IncrNonce(msg.From); err != nil {
+		if err := t.state.IncrNonce(msg.From()); err != nil {
 			return nil, err
 		}
-		result = t.Call2(msg.From, *msg.To, msg.Input, value, gasLeft)
+
+		result = t.Call2(msg.From(), *(msg.To()), msg.Input(), value, gasLeft)
+	}
+
+	refundQuotient := LegacyRefundQuotient
+	if t.config.London {
+		refundQuotient = LondonRefundQuotient
 	}
 
 	refund := t.state.GetRefund()
-	result.UpdateGasUsed(msg.Gas, refund)
+	result.UpdateGasUsed(msg.Gas(), refund, refundQuotient)
 
 	if t.ctx.Tracer != nil {
 		t.ctx.Tracer.TxEnd(result.GasLeft)
@@ -646,8 +680,7 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 
 	// Refund the sender
 	remaining := new(big.Int).Mul(new(big.Int).SetUint64(result.GasLeft), gasPrice)
-
-	t.state.AddBalance(msg.From, remaining)
+	t.state.AddBalance(msg.From(), remaining)
 
 	// Spec: https://eips.ethereum.org/EIPS/eip-1559#specification
 	// Define effective tip based on tx type.
@@ -665,12 +698,14 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 	coinbaseFee := new(big.Int).Mul(new(big.Int).SetUint64(result.GasUsed), effectiveTip)
 	t.state.AddBalance(t.ctx.Coinbase, coinbaseFee)
 
+	//nolint:godox
+	// TODO - burning of base fee should not be done in the EVM
 	// Burn some amount if the london hardfork is applied.
 	// Basically, burn amount is just transferred to the current burn contract.
-	if t.config.London && msg.Type != types.StateTx {
-		burnAmount := new(big.Int).Mul(new(big.Int).SetUint64(result.GasUsed), t.ctx.BaseFee)
-		t.state.AddBalance(t.ctx.BurnContract, burnAmount)
-	}
+	// if t.config.London && msg.Type() != types.StateTx {
+	// 	burnAmount := new(big.Int).Mul(new(big.Int).SetUint64(result.GasUsed), t.ctx.BaseFee)
+	// 	t.state.AddBalance(t.ctx.BurnContract, burnAmount)
+	// }
 
 	// return gas to the pool
 	t.addGasPool(result.GasLeft)
@@ -786,7 +821,7 @@ func (t *Transition) applyCall(
 		}
 	}
 
-	snapshot := t.state.Snapshot()
+	snapshot := t.Snapshot()
 	t.state.TouchAccount(c.Address)
 
 	if callType == runtime.Call {
@@ -805,7 +840,7 @@ func (t *Transition) applyCall(
 
 	result = t.run(c, host)
 	if result.Failed() {
-		if err := t.state.RevertToSnapshot(snapshot); err != nil {
+		if err := t.RevertToSnapshot(snapshot); err != nil {
 			return &runtime.ExecutionResult{
 				GasLeft: c.Gas,
 				Err:     err,
@@ -846,6 +881,13 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 		}
 	}
 
+	//Berlin: check
+	// we add this to the access-list before taking a snapshot. Even if the creation fails,
+	// the access-list change should not be rolled back according to EIP2929 specs
+	if t.config.Berlin {
+		t.AddAddressToAccessList(c.Address)
+	}
+
 	// Check if there is a collision and the address already exists
 	if t.hasCodeOrNonce(c.Address) {
 		return &runtime.ExecutionResult{
@@ -855,7 +897,7 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 	}
 
 	// Take snapshot of the current state
-	snapshot := t.state.Snapshot()
+	snapshot := t.Snapshot()
 
 	if t.config.EIP158 {
 		// Force the creation of the account
@@ -918,7 +960,7 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 
 	result = t.run(c, host)
 	if result.Failed() {
-		if err := t.state.RevertToSnapshot(snapshot); err != nil {
+		if err := t.RevertToSnapshot(snapshot); err != nil {
 			return &runtime.ExecutionResult{
 				Err: err,
 			}
@@ -929,7 +971,7 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 
 	if t.config.EIP158 && len(result.ReturnValue) > SpuriousDragonMaxCodeSize {
 		// Contract size exceeds 'SpuriousDragon' size limit
-		if err := t.state.RevertToSnapshot(snapshot); err != nil {
+		if err := t.RevertToSnapshot(snapshot); err != nil {
 			return &runtime.ExecutionResult{
 				Err: err,
 			}
@@ -941,6 +983,20 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 		}
 	}
 
+	// Reject code starting with 0xEF if EIP-3541 is enabled.
+	if result.Err == nil && len(result.ReturnValue) >= 1 && result.ReturnValue[0] == 0xEF && t.config.London {
+		if err := t.RevertToSnapshot(snapshot); err != nil {
+			return &runtime.ExecutionResult{
+				Err: err,
+			}
+		}
+
+		return &runtime.ExecutionResult{
+			GasLeft: 0,
+			Err:     runtime.ErrInvalidCode,
+		}
+	}
+
 	gasCost := uint64(len(result.ReturnValue)) * 200
 
 	if result.GasLeft < gasCost {
@@ -949,7 +1005,7 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 
 		// Out of gas creating the contract
 		if t.config.Homestead {
-			if err := t.state.RevertToSnapshot(snapshot); err != nil {
+			if err := t.RevertToSnapshot(snapshot); err != nil {
 				return &runtime.ExecutionResult{
 					Err: err,
 				}
@@ -1061,7 +1117,7 @@ func (t *Transition) GetNonce(addr types.Address) uint64 {
 }
 
 func (t *Transition) Selfdestruct(addr types.Address, beneficiary types.Address) {
-	if !t.state.HasSuicided(addr) {
+	if !t.config.London && !t.state.HasSuicided(addr) {
 		t.state.AddRefund(24000)
 	}
 
@@ -1137,7 +1193,7 @@ func TransactionGasCost(msg *types.Transaction, isHomestead, isIstanbul bool) (u
 		cost += TxGas
 	}
 
-	payload := msg.Input
+	payload := msg.Input()
 	if len(payload) > 0 {
 		zeros := uint64(0)
 
@@ -1165,6 +1221,11 @@ func TransactionGasCost(msg *types.Transaction, isHomestead, isIstanbul bool) (u
 		}
 
 		cost += zeros * 4
+	}
+
+	if msg.AccessList() != nil {
+		cost += uint64(len(msg.AccessList())) * TxAccessListAddressGas
+		cost += uint64(msg.AccessList().StorageKeys()) * TxAccessListStorageKeyGas
 	}
 
 	return cost, nil
@@ -1198,28 +1259,28 @@ func checkAndProcessTx(msg *types.Transaction, t *Transition) error {
 }
 
 func checkAndProcessStateTx(msg *types.Transaction) error {
-	if msg.GasPrice.Cmp(big.NewInt(0)) != 0 {
+	if msg.GasPrice().Cmp(big.NewInt(0)) != 0 {
 		return NewTransitionApplicationError(
 			errors.New("gasPrice of state transaction must be zero"),
 			true,
 		)
 	}
 
-	if msg.Gas != types.StateTransactionGasLimit {
+	if msg.Gas() != types.StateTransactionGasLimit {
 		return NewTransitionApplicationError(
 			fmt.Errorf("gas of state transaction must be %d", types.StateTransactionGasLimit),
 			true,
 		)
 	}
 
-	if msg.From != contracts.SystemCaller {
+	if msg.From() != contracts.SystemCaller {
 		return NewTransitionApplicationError(
-			fmt.Errorf("state transaction sender must be %v, but got %v", contracts.SystemCaller, msg.From),
+			fmt.Errorf("state transaction sender must be %v, but got %v", contracts.SystemCaller, msg.From()),
 			true,
 		)
 	}
 
-	if msg.To == nil || *msg.To == types.ZeroAddress {
+	if msg.To() == nil || *(msg.To()) == types.ZeroAddress {
 		return NewTransitionApplicationError(
 			errors.New("to of state transaction must be specified"),
 			true,
@@ -1257,4 +1318,64 @@ func (t *Transition) captureCallEnd(c *runtime.Contract, result *runtime.Executi
 		result.ReturnValue,
 		result.Err,
 	)
+}
+
+func (t *Transition) AddToJournal(j runtime.JournalEntry) {
+	t.journal.Append(j)
+}
+
+func (t *Transition) Snapshot() int {
+	snapshot := t.state.Snapshot()
+	t.journalRevisions = append(t.journalRevisions, runtime.JournalRevision{ID: snapshot, Index: t.journal.Len()})
+
+	return snapshot
+}
+
+func (t *Transition) RevertToSnapshot(snapshot int) error {
+	if err := t.state.RevertToSnapshot(snapshot); err != nil {
+		return err
+	}
+
+	// Find the snapshot in the stack of valid snapshots.
+	idx := sort.Search(len(t.journalRevisions), func(i int) bool {
+		return t.journalRevisions[i].ID >= snapshot
+	})
+
+	if idx == len(t.journalRevisions) || t.journalRevisions[idx].ID != snapshot {
+		return fmt.Errorf("journal revision id %d cannot be reverted", snapshot)
+	}
+
+	journalIndex := t.journalRevisions[idx].Index
+
+	// Replay the journal to undo changes and remove invalidated snapshots
+	t.journal.Revert(t, journalIndex)
+	t.journalRevisions = t.journalRevisions[:idx]
+
+	return nil
+}
+
+func (t *Transition) AddSlotToAccessList(addr types.Address, slot types.Hash) {
+	t.journal.Append(&runtime.AccessListAddSlotChange{Address: addr, Slot: slot})
+	t.accessList.AddSlot(addr, slot)
+}
+
+func (t *Transition) AddAddressToAccessList(addr types.Address) {
+	t.journal.Append(&runtime.AccessListAddAccountChange{Address: addr})
+	t.accessList.AddAddress(addr)
+}
+
+func (t *Transition) ContainsAccessListAddress(addr types.Address) bool {
+	return t.accessList.ContainsAddress(addr)
+}
+
+func (t *Transition) ContainsAccessListSlot(addr types.Address, slot types.Hash) (bool, bool) {
+	return t.accessList.Contains(addr, slot)
+}
+
+func (t *Transition) DeleteAccessListAddress(addr types.Address) {
+	t.accessList.DeleteAddress(addr)
+}
+
+func (t *Transition) DeleteAccessListSlot(addr types.Address, slot types.Hash) {
+	t.accessList.DeleteSlot(addr, slot)
 }

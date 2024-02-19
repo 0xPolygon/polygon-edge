@@ -98,7 +98,7 @@ func (p *blockchainWrapper) ProcessBlock(parent *types.Header, block *types.Bloc
 	// apply transactions from block
 	for _, tx := range block.Transactions {
 		if err = transition.Write(tx); err != nil {
-			return nil, fmt.Errorf("process block tx error, tx = %v, err = %w", tx.Hash, err)
+			return nil, fmt.Errorf("process block tx error, tx = %v, err = %w", tx.Hash(), err)
 		}
 	}
 
@@ -212,7 +212,13 @@ func NewStateProvider(transition *state.Transition) contract.Provider {
 
 // Call implements the contract.Provider interface to make contract calls directly to the state
 func (s *stateProvider) Call(addr ethgo.Address, input []byte, opts *contract.CallOpts) ([]byte, error) {
-	result := s.transition.Call2(contracts.SystemCaller, types.Address(addr), input, big.NewInt(0), 10000000)
+	result := s.transition.Call2(
+		contracts.SystemCaller,
+		types.Address(addr),
+		input,
+		big.NewInt(0),
+		10000000,
+	)
 	if result.Failed() {
 		return nil, result.Err
 	}

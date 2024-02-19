@@ -31,25 +31,15 @@ func (f *FrontierSigner) Hash(tx *types.Transaction) types.Hash {
 // Sender decodes the signature and returns the sender of the transaction
 func (f *FrontierSigner) Sender(tx *types.Transaction) (types.Address, error) {
 	refV := big.NewInt(0)
-	if tx.V != nil {
-		refV.SetBytes(tx.V.Bytes())
+
+	v, r, s := tx.RawSignatureValues()
+	if v != nil {
+		refV.SetBytes(v.Bytes())
 	}
 
 	refV.Sub(refV, big27)
 
-	sig, err := encodeSignature(tx.R, tx.S, refV, f.isHomestead)
-	if err != nil {
-		return types.Address{}, err
-	}
-
-	pub, err := Ecrecover(f.Hash(tx).Bytes(), sig)
-	if err != nil {
-		return types.Address{}, err
-	}
-
-	buf := Keccak256(pub[1:])[12:]
-
-	return types.BytesToAddress(buf), nil
+	return recoverAddress(f.Hash(tx), r, s, refV, f.isHomestead)
 }
 
 // SignTx signs the transaction using the passed in private key
@@ -66,9 +56,11 @@ func (f *FrontierSigner) SignTx(
 		return nil, err
 	}
 
-	tx.R = new(big.Int).SetBytes(sig[:32])
-	tx.S = new(big.Int).SetBytes(sig[32:64])
-	tx.V = new(big.Int).SetBytes(f.calculateV(sig[64]))
+	r := new(big.Int).SetBytes(sig[:32])
+	s := new(big.Int).SetBytes(sig[32:64])
+	v := new(big.Int).SetBytes(f.calculateV(sig[64]))
+
+	tx.SetSignatureValues(v, r, s)
 
 	return tx, nil
 }

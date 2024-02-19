@@ -35,13 +35,6 @@ func (m *accountsMap) initOnce(addr types.Address, nonce uint64) *account {
 	return newAccount
 }
 
-// exists checks if an account exists within the map.
-func (m *accountsMap) exists(addr types.Address) bool {
-	_, ok := m.Load(addr)
-
-	return ok
-}
-
 // getPrimaries collects the heads (first-in-line transaction)
 // from each of the promoted queues.
 func (m *accountsMap) getPrimaries() (primaries []*types.Transaction) {
@@ -160,7 +153,7 @@ func (m *nonceToTxLookup) get(nonce uint64) *types.Transaction {
 }
 
 func (m *nonceToTxLookup) set(tx *types.Transaction) {
-	m.mapping[tx.Nonce] = tx
+	m.mapping[tx.Nonce()] = tx
 }
 
 func (m *nonceToTxLookup) reset() {
@@ -169,7 +162,7 @@ func (m *nonceToTxLookup) reset() {
 
 func (m *nonceToTxLookup) remove(txs ...*types.Transaction) {
 	for _, tx := range txs {
-		delete(m.mapping, tx.Nonce)
+		delete(m.mapping, tx.Nonce())
 	}
 }
 
@@ -260,9 +253,9 @@ func (a *account) reset(nonce uint64, promoteCh chan<- promoteRequest) (
 	// it is important to signal promotion while
 	// the locks are held to ensure no other
 	// handler will mutate the account
-	if first := a.enqueued.peek(); first != nil && first.Nonce == nonce {
+	if first := a.enqueued.peek(); first != nil && first.Nonce() == nonce {
 		// first enqueued tx is expected -> signal promotion
-		promoteCh <- promoteRequest{account: first.From}
+		promoteCh <- promoteRequest{account: first.From()}
 	}
 
 	return
@@ -272,7 +265,7 @@ func (a *account) reset(nonce uint64, promoteCh chan<- promoteRequest) (
 func (a *account) enqueue(tx *types.Transaction, replace bool) {
 	replaceInQueue := func(queue minNonceQueue) bool {
 		for i, x := range queue {
-			if x.Nonce == tx.Nonce {
+			if x.Nonce() == tx.Nonce() {
 				queue[i] = tx // replace
 
 				return true
@@ -311,18 +304,18 @@ func (a *account) promote() (promoted []*types.Transaction, pruned []*types.Tran
 
 	// sanity check
 	currentNonce := a.getNonce()
-	if a.enqueued.length() == 0 || a.enqueued.peek().Nonce > currentNonce {
+	if a.enqueued.length() == 0 || a.enqueued.peek().Nonce() > currentNonce {
 		// nothing to promote
 		return
 	}
 
-	nextNonce := a.enqueued.peek().Nonce
+	nextNonce := a.enqueued.peek().Nonce()
 
 	// move all promotable txs (enqueued txs that are sequential in nonce)
 	// to the account's promoted queue
 	for {
 		tx := a.enqueued.peek()
-		if tx == nil || tx.Nonce != nextNonce {
+		if tx == nil || tx.Nonce() != nextNonce {
 			break
 		}
 
@@ -333,7 +326,7 @@ func (a *account) promote() (promoted []*types.Transaction, pruned []*types.Tran
 		a.promoted.push(tx)
 
 		// update counters
-		nextNonce = tx.Nonce + 1
+		nextNonce = tx.Nonce() + 1
 
 		// prune the transactions with lower nonce
 		pruned = append(pruned, a.enqueued.prune(nextNonce)...)

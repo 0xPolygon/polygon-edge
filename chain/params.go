@@ -93,6 +93,7 @@ const (
 	EIP155         = "EIP155"
 	Governance     = "governance"
 	EIP3855        = "EIP3855"
+	Berlin         = "Berlin"
 	EIP3607        = "EIP3607"
 )
 
@@ -131,6 +132,7 @@ func (f *Forks) At(block uint64) ForksInTime {
 		EIP155:         f.IsActive(EIP155, block),
 		Governance:     f.IsActive(Governance, block),
 		EIP3855:        f.IsActive(EIP3855, block),
+		Berlin:         f.IsActive(Berlin, block),
 		EIP3607:        f.IsActive(EIP3607, block),
 	}
 }
@@ -184,6 +186,7 @@ type ForksInTime struct {
 	EIP155,
 	Governance,
 	EIP3855,
+	Berlin,
 	EIP3607 bool
 }
 
@@ -200,5 +203,6 @@ var AllForksEnabled = &Forks{
 	London:         NewFork(0),
 	Governance:     NewFork(0),
 	EIP3855:        NewFork(0),
+	Berlin:         NewFork(0),
 	EIP3607:        NewFork(0),
 }

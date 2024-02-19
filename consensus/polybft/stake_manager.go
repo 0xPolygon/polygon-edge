@@ -79,7 +79,6 @@ type stakeManager struct {
 func newStakeManager(
 	logger hclog.Logger,
 	state *State,
-	key ethgo.Key,
 	stakeManagerAddr types.Address,
 	blockchain blockchainBackend,
 	polybftBackend polybftBackend,
@@ -88,7 +87,6 @@ func newStakeManager(
 	sm := &stakeManager{
 		logger:                   logger,
 		state:                    state,
-		key:                      key,
 		stakeManagerContractAddr: stakeManagerAddr,
 		polybftBackend:           polybftBackend,
 		blockchain:               blockchain,

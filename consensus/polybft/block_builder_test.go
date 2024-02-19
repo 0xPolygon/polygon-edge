@@ -1,12 +1,12 @@
 package polybft
 
 import (
+	"crypto/ecdsa"
 	"math/big"
 	"testing"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/state"
@@ -29,10 +29,21 @@ func TestBlockBuilder_BuildBlockTxOneFailedTxAndOneTakesTooMuchGas(t *testing.T)
 		chainID       = 100
 	)
 
-	accounts := [6]*wallet.Account{}
+	type account struct {
+		privKey *ecdsa.PrivateKey
+		address types.Address
+	}
+
+	accounts := [6]*account{}
 
 	for i := range accounts {
-		accounts[i] = generateTestAccount(t)
+		ecdsaKey, err := crypto.GenerateECDSAKey()
+		require.NoError(t, err)
+
+		accounts[i] = &account{
+			privKey: ecdsaKey,
+			address: crypto.PubKeyToAddress(&ecdsaKey.PublicKey),
+		}
 	}
 
 	forks := &chain.Forks{}
@@ -60,9 +71,7 @@ func TestBlockBuilder_BuildBlockTxOneFailedTxAndOneTakesTooMuchGas(t *testing.T)
 	for i, acc := range accounts {
 		// the third tx will fail because of insufficient balance
 		if i != 2 {
-			balanceMap[types.Address(acc.Ecdsa.Address())] = &chain.GenesisAccount{
-				Balance: ethgo.Ether(1),
-			}
+			balanceMap[acc.address] = &chain.GenesisAccount{Balance: ethgo.Ether(1)}
 		}
 	}
 
@@ -72,31 +81,27 @@ func TestBlockBuilder_BuildBlockTxOneFailedTxAndOneTakesTooMuchGas(t *testing.T)
 	require.NotEqual(t, types.ZeroHash, hash)
 
 	// Gas Limit is important to be high for tx pool
-	parentHeader := &types.Header{StateRoot: hash, GasLimit: 1_000_000_000_000_000}
+	parentHeader := &types.Header{StateRoot: hash, GasLimit: 1e15}
 
 	txPool := &txPoolMock{}
 	txPool.On("Prepare").Once()
 
 	for i, acc := range accounts {
-		receiver := types.Address(acc.Ecdsa.Address())
-		privateKey, err := acc.GetEcdsaPrivateKey()
-
-		require.NoError(t, err)
-
-		tx := &types.Transaction{
-			Value:    big.NewInt(amount),
-			GasPrice: big.NewInt(gasPrice),
-			Gas:      gasLimit,
-			Nonce:    0,
-			To:       &receiver,
-		}
-
+		gas := uint64(gasLimit)
 		// fifth tx will cause filling to stop
 		if i == 4 {
-			tx.Gas = blockGasLimit - 1
+			gas = blockGasLimit - 1
 		}
 
-		tx, err = signer.SignTx(tx, privateKey)
+		tx := types.NewTx(&types.MixedTxn{
+			Value:    big.NewInt(amount),
+			GasPrice: big.NewInt(gasPrice),
+			Gas:      gas,
+			Nonce:    0,
+			To:       &acc.address,
+		})
+
+		tx, err = signer.SignTx(tx, acc.privKey)
 		require.NoError(t, err)
 
 		// all tx until the fifth will be retrieved from the pool
@@ -146,15 +151,17 @@ func TestBlockBuilder_BuildBlockTxOneFailedTxAndOneTakesTooMuchGas(t *testing.T)
 	require.Len(t, bb.txns, 3, "Should have 3 transactions but has %d", len(bb.txns))
 	require.Len(t, bb.Receipts(), 3)
 
+	logsBloom := fb.Block.Header.LogsBloom
+
 	// assert logs bloom
 	for _, r := range bb.Receipts() {
 		for _, l := range r.Logs {
-			assert.True(t, fb.Block.Header.LogsBloom.IsLogInBloom(l))
+			assert.True(t, logsBloom.IsLogInBloom(l))
 		}
 	}
 
-	assert.False(t, fb.Block.Header.LogsBloom.IsLogInBloom(
+	assert.False(t, logsBloom.IsLogInBloom(
 		&types.Log{Address: types.StringToAddress("999911117777")}))
-	assert.False(t, fb.Block.Header.LogsBloom.IsLogInBloom(
+	assert.False(t, logsBloom.IsLogInBloom(
 		&types.Log{Address: types.StringToAddress("111177779999")}))
 }

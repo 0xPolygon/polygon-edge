@@ -101,7 +101,7 @@ func TestE2E_JsonRPC(t *testing.T) {
 			Data: input,
 		})
 		require.NoError(t, err)
-		require.Equal(t, uint64(0x56a3), estimatedGas)
+		require.Equal(t, uint64(0x5bb7), estimatedGas)
 	})
 
 	t.Run("eth_estimateGas by zero-balance account", func(t *testing.T) {
@@ -122,7 +122,7 @@ func TestE2E_JsonRPC(t *testing.T) {
 			Data: input,
 		})
 		require.NoError(t, err)
-		require.Equal(t, uint64(0x56a3), resp)
+		require.Equal(t, uint64(0x5bb7), resp)
 	})
 
 	t.Run("eth_estimateGas by zero-balance account - simple value transfer", func(t *testing.T) {

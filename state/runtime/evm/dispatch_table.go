@@ -61,7 +61,7 @@ func init() {
 	register(SLT, handler{inst: opSlt, stack: 2, gas: 3})
 	register(SGT, handler{inst: opSgt, stack: 2, gas: 3})
 
-	register(SIGNEXTEND, handler{inst: opSignExtension, stack: 1, gas: 5})
+	register(SIGNEXTEND, handler{inst: opSignExtension, stack: 2, gas: 5})
 
 	register(SHL, handler{inst: opShl, stack: 2, gas: 3})
 	register(SHR, handler{inst: opShr, stack: 2, gas: 3})

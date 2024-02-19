@@ -32,8 +32,10 @@ func (e *EIP155Signer) Sender(tx *types.Transaction) (types.Address, error) {
 
 	// Check if v value conforms to an earlier standard (before EIP155)
 	bigV := big.NewInt(0)
-	if tx.V != nil {
-		bigV.SetBytes(tx.V.Bytes())
+
+	v, r, s := tx.RawSignatureValues()
+	if v != nil {
+		bigV.SetBytes(v.Bytes())
 	}
 
 	if vv := bigV.Uint64(); bits.Len(uint(vv)) <= 8 {
@@ -50,19 +52,7 @@ func (e *EIP155Signer) Sender(tx *types.Transaction) (types.Address, error) {
 	bigV.Sub(bigV, mulOperand)
 	bigV.Sub(bigV, big35)
 
-	sig, err := encodeSignature(tx.R, tx.S, bigV, e.isHomestead)
-	if err != nil {
-		return types.Address{}, err
-	}
-
-	pub, err := Ecrecover(e.Hash(tx).Bytes(), sig)
-	if err != nil {
-		return types.Address{}, err
-	}
-
-	buf := Keccak256(pub[1:])[12:]
-
-	return types.BytesToAddress(buf), nil
+	return recoverAddress(e.Hash(tx), r, s, bigV, e.isHomestead)
 }
 
 // SignTx signs the transaction using the passed in private key
@@ -79,9 +69,11 @@ func (e *EIP155Signer) SignTx(
 		return nil, err
 	}
 
-	tx.R = new(big.Int).SetBytes(sig[:32])
-	tx.S = new(big.Int).SetBytes(sig[32:64])
-	tx.V = new(big.Int).SetBytes(e.calculateV(sig[64]))
+	r := new(big.Int).SetBytes(sig[:32])
+	s := new(big.Int).SetBytes(sig[32:64])
+	v := new(big.Int).SetBytes(e.calculateV(sig[64]))
+
+	tx.SetSignatureValues(v, r, s)
 
 	return tx, nil
 }

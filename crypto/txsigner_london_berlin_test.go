@@ -4,7 +4,6 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
 
@@ -14,85 +13,90 @@ import (
 func TestLondonSignerSender(t *testing.T) {
 	t.Parallel()
 
-	toAddress := types.StringToAddress("1")
+	recipient := types.StringToAddress("1")
 
-	testTable := []struct {
-		name        string
-		chainID     *big.Int
-		isGomestead bool
+	tcs := []struct {
+		name    string
+		chainID *big.Int
+		txType  types.TxType
 	}{
 		{
 			"mainnet",
 			big.NewInt(1),
-			true,
+			types.LegacyTx,
 		},
 		{
 			"expanse mainnet",
 			big.NewInt(2),
-			true,
+			types.DynamicFeeTx,
 		},
 		{
 			"ropsten",
 			big.NewInt(3),
-			true,
+			types.DynamicFeeTx,
 		},
 		{
 			"rinkeby",
 			big.NewInt(4),
-			true,
+			types.AccessListTx,
 		},
 		{
 			"goerli",
 			big.NewInt(5),
-			true,
+			types.AccessListTx,
 		},
 		{
 			"kovan",
 			big.NewInt(42),
-			true,
+			types.StateTx,
 		},
 		{
 			"geth private",
 			big.NewInt(1337),
-			true,
+			types.StateTx,
 		},
 		{
 			"mega large",
 			big.NewInt(0).Exp(big.NewInt(2), big.NewInt(20), nil), // 2**20
-			true,
+			types.AccessListTx,
 		},
 	}
 
-	for _, testCase := range testTable {
-		testCase := testCase
-		t.Run(testCase.name, func(t *testing.T) {
+	for _, tc := range tcs {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			key, keyGenError := GenerateECDSAKey()
-			if keyGenError != nil {
-				t.Fatalf("Unable to generate key")
+			key, err := GenerateECDSAKey()
+			require.NoError(t, err, "unable to generate private key")
+
+			var txn *types.Transaction
+
+			switch tc.txType {
+			case types.AccessListTx:
+				txn = types.NewTx(&types.AccessListTxn{
+					To:       &recipient,
+					Value:    big.NewInt(1),
+					GasPrice: big.NewInt(5),
+				})
+			case types.DynamicFeeTx, types.LegacyTx, types.StateTx:
+				txn = types.NewTx(&types.MixedTxn{
+					To:       &recipient,
+					Value:    big.NewInt(1),
+					GasPrice: big.NewInt(5),
+				})
 			}
 
-			txn := &types.Transaction{
-				To:       &toAddress,
-				Value:    big.NewInt(1),
-				GasPrice: big.NewInt(0),
-			}
+			chainID := tc.chainID.Uint64()
+			signer := NewLondonOrBerlinSigner(chainID, true, NewEIP155Signer(chainID, true))
 
-			chainID := testCase.chainID.Uint64()
-			signer := NewLondonSigner(chainID, true, NewEIP155Signer(chainID, true))
+			signedTx, err := signer.SignTx(txn, key)
+			require.NoError(t, err, "unable to sign transaction")
 
-			signedTx, signErr := signer.SignTx(txn, key)
-			if signErr != nil {
-				t.Fatalf("Unable to sign transaction")
-			}
+			sender, err := signer.Sender(signedTx)
+			require.NoError(t, err, "failed to recover sender")
 
-			recoveredSender, recoverErr := signer.Sender(signedTx)
-			if recoverErr != nil {
-				t.Fatalf("Unable to recover sender")
-			}
-
-			assert.Equal(t, recoveredSender.String(), PubKeyToAddress(&key.PublicKey).String())
+			require.Equal(t, sender, PubKeyToAddress(&key.PublicKey))
 		})
 	}
 }
@@ -100,7 +104,7 @@ func TestLondonSignerSender(t *testing.T) {
 func Test_LondonSigner_Sender(t *testing.T) {
 	t.Parallel()
 
-	signer := NewLondonSigner(100, true, NewEIP155Signer(100, true))
+	signer := NewLondonOrBerlinSigner(100, true, NewEIP155Signer(100, true))
 	to := types.StringToAddress("0xDeaDbeefdEAdbeefdEadbEEFdeadbeEFdEaDbeeF")
 
 	r, ok := big.NewInt(0).SetString("102623819621514684481463796449525884981685455700611671612296611353030973716382", 10)
@@ -116,7 +120,7 @@ func Test_LondonSigner_Sender(t *testing.T) {
 	}{
 		{
 			name: "sender is 0x85dA99c8a7C2C95964c8EfD687E95E632Fc533D6",
-			tx: &types.Transaction{
+			tx: types.NewTx(&types.MixedTxn{
 				Type:      types.DynamicFeeTx,
 				GasPrice:  big.NewInt(1000000402),
 				GasTipCap: ethgo.Gwei(1),
@@ -127,7 +131,7 @@ func Test_LondonSigner_Sender(t *testing.T) {
 				V:         big.NewInt(0),
 				R:         r,
 				S:         s,
-			},
+			}),
 			sender: types.StringToAddress("0x85dA99c8a7C2C95964c8EfD687E95E632Fc533D6"),
 		},
 	}

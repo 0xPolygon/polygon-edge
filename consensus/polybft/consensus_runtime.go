@@ -197,7 +197,6 @@ func (c *consensusRuntime) initStakeManager(logger hcf.Logger, dbTx *bolt.Tx) er
 	c.stakeManager, err = newStakeManager(
 		logger.Named("stake-manager"),
 		c.state,
-		wallet.NewEcdsaSigner(c.config.Key),
 		contracts.StakeManagerContract,
 		c.config.blockchain,
 		c.config.polybftBackend,

@@ -10,17 +10,16 @@ import (
 	"hash"
 	"math/big"
 
+	"github.com/btcsuite/btcd/btcec/v2"
+	btc_ecdsa "github.com/btcsuite/btcd/btcec/v2/ecdsa"
+	"github.com/umbracle/fastrlp"
+	"golang.org/x/crypto/sha3"
+
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/helper/keystore"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/btcsuite/btcd/btcec"
-	"github.com/umbracle/fastrlp"
-	"golang.org/x/crypto/sha3"
 )
-
-// S256 is the secp256k1 elliptic curve
-var S256 = btcec.S256()
 
 var (
 	secp256k1N, _  = new(big.Int).SetString("fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141", 16)
@@ -29,7 +28,6 @@ var (
 	one            = big.NewInt(1)
 
 	ErrInvalidBLSSignature = errors.New("invalid BLS Signature")
-	errZeroHash            = errors.New("can not recover public key from zero or empty message hash")
 	errHashOfInvalidLength = errors.New("message hash of invalid length")
 	errInvalidSignature    = errors.New("invalid signature")
 )
@@ -39,6 +37,18 @@ type KeyType string
 const (
 	KeyECDSA KeyType = "ecdsa"
 	KeyBLS   KeyType = "bls"
+)
+
+const (
+	// ECDSASignatureLength indicates the byte length required to carry a signature with recovery id.
+	// (64 bytes ECDSA signature + 1 byte recovery id)
+	ECDSASignatureLength = 64 + 1
+
+	// recoveryID is ECDSA signature recovery id
+	recoveryID = byte(27)
+
+	// recoveryIDOffset points to the byte offset within the signature that contains the recovery id.
+	recoveryIDOffset = 64
 )
 
 // KeccakState wraps sha3.state. In addition to the usual hash methods, it also supports
@@ -100,38 +110,45 @@ func CreateAddress2(addr types.Address, salt [32]byte, inithash []byte) types.Ad
 }
 
 func ParseECDSAPrivateKey(buf []byte) (*ecdsa.PrivateKey, error) {
-	prv, _ := btcec.PrivKeyFromBytes(S256, buf)
+	prv, _ := btcec.PrivKeyFromBytes(buf)
 
 	return prv.ToECDSA(), nil
 }
 
 // MarshalECDSAPrivateKey serializes the private key's D value to a []byte
 func MarshalECDSAPrivateKey(priv *ecdsa.PrivateKey) ([]byte, error) {
-	return (*btcec.PrivateKey)(priv).Serialize(), nil
+	btcPriv, err := convertToBtcPrivKey(priv)
+	if err != nil {
+		return nil, err
+	}
+
+	defer btcPriv.Zero()
+
+	return btcPriv.Serialize(), nil
 }
 
 // GenerateECDSAKey generates a new key based on the secp256k1 elliptic curve.
 func GenerateECDSAKey() (*ecdsa.PrivateKey, error) {
-	return ecdsa.GenerateKey(S256, rand.Reader)
+	return ecdsa.GenerateKey(btcec.S256(), rand.Reader)
 }
 
 // ParsePublicKey parses bytes into a public key on the secp256k1 elliptic curve.
 func ParsePublicKey(buf []byte) (*ecdsa.PublicKey, error) {
-	x, y := elliptic.Unmarshal(S256, buf)
+	x, y := elliptic.Unmarshal(btcec.S256(), buf)
 	if x == nil || y == nil {
 		return nil, fmt.Errorf("cannot unmarshal")
 	}
 
-	return &ecdsa.PublicKey{Curve: S256, X: x, Y: y}, nil
+	return &ecdsa.PublicKey{Curve: btcec.S256(), X: x, Y: y}, nil
 }
 
 // MarshalPublicKey marshals a public key on the secp256k1 elliptic curve.
 func MarshalPublicKey(pub *ecdsa.PublicKey) []byte {
-	return elliptic.Marshal(S256, pub.X, pub.Y)
+	return elliptic.Marshal(btcec.S256(), pub.X, pub.Y)
 }
 
 func Ecrecover(hash, sig []byte) ([]byte, error) {
-	pub, err := RecoverPubkey(sig, hash)
+	pub, err := RecoverPubKey(sig, hash)
 	if err != nil {
 		return nil, err
 	}
@@ -139,28 +156,23 @@ func Ecrecover(hash, sig []byte) ([]byte, error) {
 	return MarshalPublicKey(pub), nil
 }
 
-// RecoverPubkey verifies the compact signature "signature" of "hash" for the
-// secp256k1 curve.
-func RecoverPubkey(signature, hash []byte) (*ecdsa.PublicKey, error) {
+// RecoverPubKey verifies the compact signature "signature" of "hash" for the secp256k1 curve.
+func RecoverPubKey(signature, hash []byte) (*ecdsa.PublicKey, error) {
 	if len(hash) != types.HashLength {
 		return nil, errHashOfInvalidLength
 	}
 
-	size := len(signature)
-	term := byte(27)
-
-	// Make sure the signature is present
-	if signature == nil || size < 1 {
+	signatureSize := len(signature)
+	if signatureSize != ECDSASignatureLength {
 		return nil, errInvalidSignature
 	}
 
-	if signature[size-1] == 1 {
-		term = 28
-	}
+	// Convert to btcec input format with 'recovery id' v at the beginning.
+	btcsig := make([]byte, signatureSize)
+	btcsig[0] = signature[signatureSize-1] + recoveryID
+	copy(btcsig[1:], signature)
 
-	sig := append([]byte{term}, signature[:size-1]...)
-	pub, _, err := btcec.RecoverCompact(S256, sig, hash)
-
+	pub, _, err := btc_ecdsa.RecoverCompact(btcsig, hash)
 	if err != nil {
 		return nil, err
 	}
@@ -168,20 +180,38 @@ func RecoverPubkey(signature, hash []byte) (*ecdsa.PublicKey, error) {
 	return pub.ToECDSA(), nil
 }
 
-// Sign produces a compact signature of the data in hash with the given
+// Sign produces an ECDSA signature of the data in hash with the given
 // private key on the secp256k1 curve.
+
+// The produced signature is in the [R || S || V] format where V is 0 or 1.
 func Sign(priv *ecdsa.PrivateKey, hash []byte) ([]byte, error) {
-	sig, err := btcec.SignCompact(S256, (*btcec.PrivateKey)(priv), hash, false)
+	if len(hash) != types.HashLength {
+		return nil, fmt.Errorf("hash is required to be exactly %d bytes (%d)", types.HashLength, len(hash))
+	}
+
+	if priv.Curve != btcec.S256() {
+		return nil, errors.New("private key curve is not secp256k1")
+	}
+
+	// convert from ecdsa.PrivateKey to btcec.PrivateKey
+	btcPrivKey, err := convertToBtcPrivKey(priv)
 	if err != nil {
 		return nil, err
 	}
 
-	term := byte(0)
-	if sig[0] == 28 {
-		term = 1
+	defer btcPrivKey.Zero()
+
+	sig, err := btc_ecdsa.SignCompact(btcPrivKey, hash, false)
+	if err != nil {
+		return nil, err
 	}
 
-	return append(sig, term)[1:], nil
+	// Convert to Ethereum signature format with 'recovery id' v at the end.
+	v := sig[0] - recoveryID
+	copy(sig, sig[1:])
+	sig[recoveryIDOffset] = v
+
+	return sig, nil
 }
 
 // Keccak256 calculates the Keccak256
@@ -308,4 +338,17 @@ func ReadConsensusKey(manager secrets.SecretsManager) (*ecdsa.PrivateKey, error)
 	}
 
 	return BytesToECDSAPrivateKey(validatorKey)
+}
+
+// convertToBtcPrivKey converts provided ECDSA private key to btc private key format
+// used by btcec library
+func convertToBtcPrivKey(priv *ecdsa.PrivateKey) (*btcec.PrivateKey, error) {
+	var btcPriv btcec.PrivateKey
+
+	overflow := btcPriv.Key.SetByteSlice(priv.D.Bytes())
+	if overflow || btcPriv.Key.IsZero() {
+		return nil, errors.New("invalid private key")
+	}
+
+	return &btcPriv, nil
 }
