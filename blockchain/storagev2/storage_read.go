@@ -1,5 +1,5 @@
 //nolint:stylecheck
-package storageV2
+package storagev2
 
 import (
 	"errors"

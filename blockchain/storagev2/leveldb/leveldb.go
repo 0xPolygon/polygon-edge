@@ -1,7 +1,7 @@
 package leveldb
 
 import (
-	"github.com/0xPolygon/polygon-edge/blockchain/storageV2"
+	"github.com/0xPolygon/polygon-edge/blockchain/storagev2"
 	"github.com/hashicorp/go-hclog"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
@@ -14,21 +14,21 @@ type levelDB struct {
 
 // DB key = k + mapper
 var tableMapper = map[uint8][]byte{
-	storageV2.BODY:         []byte("b"),        // DB key = block number + mapper
-	storageV2.CANONICAL:    []byte("c"),        // DB key = block number + mapper
-	storageV2.DIFFICULTY:   []byte("d"),        // DB key = block number + mapper
-	storageV2.HEADER:       []byte("h"),        // DB key = block number + mapper
-	storageV2.RECEIPTS:     []byte("r"),        // DB key = block number + mapper
-	storageV2.FORK:         []byte("0000000f"), // DB key = empty + mapper
-	storageV2.HEAD_HASH:    []byte("0000000h"), // DB key = empty + mapper
-	storageV2.HEAD_NUMBER:  []byte("0000000n"), // DB key = empty + mapper
-	storageV2.BLOCK_LOOKUP: {},                 // DB key = block hash + mapper, value = block number
-	storageV2.TX_LOOKUP:    {},                 // DB key = tx hash + mapper, value = block number
+	storagev2.BODY:         []byte("b"),        // DB key = block number + mapper
+	storagev2.CANONICAL:    []byte("c"),        // DB key = block number + mapper
+	storagev2.DIFFICULTY:   []byte("d"),        // DB key = block number + mapper
+	storagev2.HEADER:       []byte("h"),        // DB key = block number + mapper
+	storagev2.RECEIPTS:     []byte("r"),        // DB key = block number + mapper
+	storagev2.FORK:         []byte("0000000f"), // DB key = empty + mapper
+	storagev2.HEAD_HASH:    []byte("0000000h"), // DB key = empty + mapper
+	storagev2.HEAD_NUMBER:  []byte("0000000n"), // DB key = empty + mapper
+	storagev2.BLOCK_LOOKUP: {},                 // DB key = block hash + mapper, value = block number
+	storagev2.TX_LOOKUP:    {},                 // DB key = tx hash + mapper, value = block number
 }
 
 // NewLevelDBStorage creates the new storage reference with leveldb default options
-func NewLevelDBStorage(path string, logger hclog.Logger) (*storageV2.Storage, error) {
-	var ldbs [2]storageV2.Database
+func NewLevelDBStorage(path string, logger hclog.Logger) (*storagev2.Storage, error) {
+	var ldbs [2]storagev2.Database
 
 	// Open LevelDB storage
 	// Set default options
@@ -36,6 +36,7 @@ func NewLevelDBStorage(path string, logger hclog.Logger) (*storageV2.Storage, er
 		BlockCacheCapacity: 64 * opt.MiB,
 		WriteBuffer:        128 * opt.MiB, // Two of these are used internally
 	}
+
 	db, err := openLevelDBStorage(path, options)
 	if err != nil {
 		return nil, err
@@ -48,6 +49,7 @@ func NewLevelDBStorage(path string, logger hclog.Logger) (*storageV2.Storage, er
 		WriteBuffer:        opt.DefaultWriteBuffer,
 	}
 	path = path + "/gidlid"
+
 	gidlid, err := openLevelDBStorage(path, options)
 	if err != nil {
 		return nil, err
@@ -55,7 +57,8 @@ func NewLevelDBStorage(path string, logger hclog.Logger) (*storageV2.Storage, er
 
 	ldbs[0] = &levelDB{db}
 	ldbs[1] = &levelDB{gidlid}
-	return storageV2.Open(logger.Named("leveldb"), ldbs)
+
+	return storagev2.Open(logger.Named("leveldb"), ldbs)
 }
 
 func openLevelDBStorage(path string, options *opt.Options) (*leveldb.DB, error) {
@@ -71,6 +74,7 @@ func openLevelDBStorage(path string, options *opt.Options) (*leveldb.DB, error) 
 func (l *levelDB) Get(t uint8, k []byte) ([]byte, error) {
 	mc := tableMapper[t]
 	k = append(k, mc...)
+
 	data, err := l.db.Get(k, nil)
 	if err != nil {
 		return nil, err
@@ -85,6 +89,6 @@ func (l *levelDB) Close() error {
 }
 
 // NewBatch creates batch for database write operations
-func (l *levelDB) NewBatch() storageV2.Batch {
+func (l *levelDB) NewBatch() storagev2.Batch {
 	return newBatchLevelDB(l.db)
 }

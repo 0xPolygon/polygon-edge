@@ -12,13 +12,13 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
-	"github.com/0xPolygon/polygon-edge/blockchain/storageV2"
+	"github.com/0xPolygon/polygon-edge/blockchain/storagev2"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
 )
 
-func newStorage(t *testing.T) (*storageV2.Storage, func()) {
+func newStorage(t *testing.T) (*storagev2.Storage, func()) {
 	t.Helper()
 
 	path, err := os.MkdirTemp("/tmp", "minimal_storage")
@@ -45,7 +45,7 @@ func newStorage(t *testing.T) (*storageV2.Storage, func()) {
 }
 
 func TestStorage(t *testing.T) {
-	storageV2.TestStorage(t, newStorage)
+	storagev2.TestStorage(t, newStorage)
 }
 
 func generateTxs(t *testing.T, startNonce, count int, from types.Address, to *types.Address) []*types.Transaction {
@@ -128,7 +128,7 @@ func generateBlock(t *testing.T, num uint64) *types.FullBlock {
 	return b
 }
 
-func newStorageP(t *testing.T) (*storageV2.Storage, func(), string) {
+func newStorageP(t *testing.T) (*storagev2.Storage, func(), string) {
 	t.Helper()
 
 	p, err := os.MkdirTemp("", "leveldbV2-test")
@@ -191,6 +191,7 @@ func dirSize(t *testing.T, path string) int64 {
 		if err != nil {
 			t.Fail()
 		}
+
 		if !info.IsDir() {
 			size += info.Size()
 		}

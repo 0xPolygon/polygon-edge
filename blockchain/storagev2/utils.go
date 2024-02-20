@@ -1,4 +1,4 @@
-package storageV2
+package storagev2
 
 import (
 	"github.com/0xPolygon/polygon-edge/types"

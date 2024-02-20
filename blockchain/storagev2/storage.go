@@ -1,4 +1,5 @@
-package storageV2
+//nolint:stylecheck
+package storagev2
 
 import (
 	"github.com/hashicorp/go-hclog"
@@ -50,8 +51,7 @@ const (
 	GIDLID_INDEX = uint8(1)
 )
 
-// Empty key
-var EMPTY = []byte{}
+var EMPTY = []byte{} // Empty key
 
 func Open(logger hclog.Logger, db [2]Database) (*Storage, error) {
 	return &Storage{logger: logger, db: db}, nil
@@ -68,15 +68,18 @@ func (s *Storage) Close() error {
 			s.db[i] = nil
 		}
 	}
+
 	return nil
 }
 
 func (s *Storage) NewWriter() *Writer {
 	var batch [2]Batch
 	batch[0] = s.db[0].NewBatch()
+
 	if s.db[1] != nil {
 		batch[1] = s.db[1].NewBatch()
 	}
+
 	return &Writer{batch: batch}
 }
 

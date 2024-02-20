@@ -47,6 +47,7 @@ func randStringBytes(n int) string {
 	for i := range b {
 		b[i] = letterBytes[rand.Intn(len(letterBytes))]
 	}
+
 	return string(b)
 }
 
@@ -128,6 +129,7 @@ func dbSize(t *testing.T, path string) int64 {
 		if err != nil {
 			t.Fail()
 		}
+
 		if info != nil && !info.IsDir() && strings.Contains(info.Name(), ".ldb") {
 			size += info.Size()
 		}
@@ -145,8 +147,10 @@ func updateBlock(t *testing.T, num uint64, b *types.FullBlock) *types.FullBlock 
 	t.Helper()
 
 	var addr types.Address
+
 	b.Block.Header.Number = num
 	b.Block.Header.ParentHash = types.StringToHash(randStringBytes(12))
+
 	for i := range b.Block.Transactions {
 		addr = types.StringToAddress(randStringBytes(8))
 		b.Block.Transactions[i].SetTo(&addr)
@@ -170,6 +174,7 @@ func prepareBatch(t *testing.T, s storage.Storage, b *types.FullBlock) *storage.
 	// GidLid 'sorted'
 	batchWriter.PutHeadHash(b.Block.Header.Hash)
 	batchWriter.PutHeadNumber(b.Block.Number())
+
 	for _, tx := range b.Block.Transactions {
 		batchWriter.PutTxLookup(tx.Hash(), b.Block.Hash())
 	}
@@ -187,24 +192,27 @@ func TestWriteBlockPerf(t *testing.T) {
 	s, _, path := openStorage(t, "/tmp/leveldbV1-test")
 	defer s.Close()
 
-	count := 10000
-
-	b := createBlock(t)
 	var watchTime int
+
+	count := 10000
+	b := createBlock(t)
 
 	for i := 1; i <= count; i++ {
 		updateBlock(t, uint64(i), b)
 		batchWriter := prepareBatch(t, s, b)
 
 		watch := stopwatch.Start()
+
 		if err := batchWriter.WriteBatch(); err != nil {
 			require.NoError(t, err)
 		}
+
 		watch.Stop()
 		watchTime = watchTime + int(watch.Milliseconds())
 	}
 
 	time.Sleep(time.Second)
+
 	size := dbSize(t, path)
 	t.Logf("\tdb size %d MB", size/(1024*1024))
 	t.Logf("\ttotal WriteBatch %d ms", watchTime)
@@ -214,8 +222,9 @@ func TestReadBlockPerf(t *testing.T) {
 	s, _, _ := openStorage(t, "/tmp/leveldbV1-test")
 	defer s.Close()
 
-	count := 1000
 	var watchTime int
+
+	count := 1000
 	for i := 1; i <= count; i++ {
 		n := uint64(1 + rand.Intn(10000))
 
@@ -224,6 +233,7 @@ func TestReadBlockPerf(t *testing.T) {
 		_, err2 := s.ReadBody(h)
 		_, err3 := s.ReadHeader(h)
 		_, err4 := s.ReadReceipts(h)
+
 		watch.Stop()
 		watchTime = watchTime + int(watch.Milliseconds())
 

@@ -1,4 +1,4 @@
-package storageV2
+package storagev2
 
 import (
 	"math/big"
@@ -402,24 +402,28 @@ func testWriteCanonicalHeader(t *testing.T, m PlaceholderStorage) {
 
 	hh, err := s.ReadHeader(h.Number)
 	assert.NoError(t, err)
+
 	if !reflect.DeepEqual(h, hh) {
 		t.Fatal("bad header")
 	}
 
 	headHash, err := s.ReadHeadHash()
 	assert.NoError(t, err)
+
 	if headHash != h.Hash {
 		t.Fatal("head hash not correct")
 	}
 
 	headNum, err := s.ReadHeadNumber()
 	assert.NoError(t, err)
+
 	if headNum != h.Number {
 		t.Fatal("head num not correct")
 	}
 
 	canHash, err := s.ReadCanonicalHash(h.Number)
 	assert.NoError(t, err)
+
 	if canHash != h.Hash {
 		t.Fatal("canonical hash not correct")
 	}

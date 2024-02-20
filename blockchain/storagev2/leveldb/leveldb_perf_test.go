@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
-	"github.com/0xPolygon/polygon-edge/blockchain/storageV2"
+	"github.com/0xPolygon/polygon-edge/blockchain/storagev2"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/bradhe/stopwatch"
 	"github.com/hashicorp/go-hclog"
@@ -48,6 +48,7 @@ func randStringBytes(n int) string {
 	for i := range b {
 		b[i] = letterBytes[rand.Intn(len(letterBytes))]
 	}
+
 	return string(b)
 }
 
@@ -101,7 +102,7 @@ func createBlock(t *testing.T) *types.FullBlock {
 	return b
 }
 
-func openStorage(t *testing.T, p string) (*storageV2.Storage, func(), string) {
+func openStorage(t *testing.T, p string) (*storagev2.Storage, func(), string) {
 	t.Helper()
 
 	s, err := NewLevelDBStorage(p, hclog.NewNullLogger())
@@ -129,6 +130,7 @@ func dbSize(t *testing.T, path string) int64 {
 		if err != nil {
 			t.Fail()
 		}
+
 		if info != nil && !info.IsDir() && strings.Contains(info.Name(), ".ldb") {
 			size += info.Size()
 		}
@@ -146,8 +148,10 @@ func updateBlock(t *testing.T, num uint64, b *types.FullBlock) *types.FullBlock 
 	t.Helper()
 
 	var addr types.Address
+
 	b.Block.Header.Number = num
 	b.Block.Header.ParentHash = types.StringToHash(randStringBytes(12))
+
 	for i := range b.Block.Transactions {
 		addr = types.StringToAddress(randStringBytes(8))
 		b.Block.Transactions[i].SetTo(&addr)
@@ -163,7 +167,7 @@ func updateBlock(t *testing.T, num uint64, b *types.FullBlock) *types.FullBlock 
 	return b
 }
 
-func prepareBatch(t *testing.T, s *storageV2.Storage, b *types.FullBlock) *storageV2.Writer {
+func prepareBatch(t *testing.T, s *storagev2.Storage, b *types.FullBlock) *storagev2.Writer {
 	t.Helper()
 
 	batchWriter := s.NewWriter()
@@ -172,6 +176,7 @@ func prepareBatch(t *testing.T, s *storageV2.Storage, b *types.FullBlock) *stora
 	batchWriter.PutHeadHash(b.Block.Header.Hash)
 	batchWriter.PutHeadNumber(b.Block.Number())
 	batchWriter.PutBlockLookup(b.Block.Hash(), b.Block.Number())
+
 	for _, tx := range b.Block.Transactions {
 		batchWriter.PutTxLookup(tx.Hash(), b.Block.Number())
 	}
@@ -189,24 +194,27 @@ func TestWriteBlockPerf(t *testing.T) {
 	s, _, path := openStorage(t, "/tmp/leveldbV2-test")
 	defer s.Close()
 
-	count := 10000
-
-	b := createBlock(t)
 	var watchTime int
+
+	count := 10000
+	b := createBlock(t)
 
 	for i := 1; i <= count; i++ {
 		updateBlock(t, uint64(i), b)
 		batchWriter := prepareBatch(t, s, b)
 
 		watch := stopwatch.Start()
+
 		if err := batchWriter.WriteBatch(); err != nil {
 			require.NoError(t, err)
 		}
+
 		watch.Stop()
 		watchTime = watchTime + int(watch.Milliseconds())
 	}
 
 	time.Sleep(time.Second)
+
 	size := dbSize(t, path)
 	t.Logf("\tdb size %d MB", size/(1024*1024))
 	t.Logf("\ttotal WriteBatch %d ms", watchTime)
@@ -216,8 +224,9 @@ func TestReadBlockPerf(t *testing.T) {
 	s, _, _ := openStorage(t, "/tmp/leveldbV2-test")
 	defer s.Close()
 
-	count := 1000
 	var watchTime int
+
+	count := 1000
 	for i := 1; i <= count; i++ {
 		n := uint64(1 + rand.Intn(10000))
 
@@ -227,12 +236,14 @@ func TestReadBlockPerf(t *testing.T) {
 		_, err3 := s.ReadHeader(n)
 		_, err4 := s.ReadReceipts(n)
 		b, err5 := s.ReadBlockLookup(h)
+
 		watch.Stop()
 		watchTime = watchTime + int(watch.Milliseconds())
 
 		if err1 != nil || err2 != nil || err3 != nil || err4 != nil || err5 != nil {
 			t.Logf("\terror")
 		}
+
 		assert.Equal(t, n, b)
 	}
 	t.Logf("\ttotal read %d ms", watchTime)
