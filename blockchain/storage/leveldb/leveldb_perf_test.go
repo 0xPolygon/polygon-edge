@@ -23,7 +23,7 @@ func createTxs(t *testing.T, startNonce, count int, from types.Address, to *type
 	txs := make([]*types.Transaction, count)
 
 	for i := range txs {
-		tx := &types.Transaction{
+		tx := types.NewTx(&types.MixedTxn{
 			Gas:       types.StateTransactionGasLimit,
 			Nonce:     uint64(startNonce + i),
 			From:      from,
@@ -32,7 +32,7 @@ func createTxs(t *testing.T, startNonce, count int, from types.Address, to *type
 			Type:      types.DynamicFeeTx,
 			GasFeeCap: big.NewInt(100),
 			GasTipCap: big.NewInt(10),
-		}
+		})
 
 		txs[i] = tx
 	}
@@ -82,7 +82,7 @@ func createBlock(t *testing.T) *types.FullBlock {
 
 	for i := 0; i < len(b.Block.Transactions); i++ {
 		b.Receipts[i] = &types.Receipt{
-			TxHash:            b.Block.Transactions[i].Hash,
+			TxHash:            b.Block.Transactions[i].Hash(),
 			Root:              types.StringToHash("mockhashstring"),
 			TransactionType:   types.LegacyTx,
 			GasUsed:           uint64(100000),
@@ -149,9 +149,9 @@ func updateBlock(t *testing.T, num uint64, b *types.FullBlock) *types.FullBlock 
 	b.Block.Header.ParentHash = types.StringToHash(randStringBytes(12))
 	for i := range b.Block.Transactions {
 		addr = types.StringToAddress(randStringBytes(8))
-		b.Block.Transactions[i].To = &addr
+		b.Block.Transactions[i].SetTo(&addr)
 		b.Block.Transactions[i].ComputeHash()
-		b.Receipts[i].TxHash = b.Block.Transactions[i].Hash
+		b.Receipts[i].TxHash = b.Block.Transactions[i].Hash()
 	}
 	// big := new(big.Int)
 	// big.SetInt64(int64(num))
@@ -171,7 +171,7 @@ func prepareBatch(t *testing.T, s storage.Storage, b *types.FullBlock) *storage.
 	batchWriter.PutHeadHash(b.Block.Header.Hash)
 	batchWriter.PutHeadNumber(b.Block.Number())
 	for _, tx := range b.Block.Transactions {
-		batchWriter.PutTxLookup(tx.Hash, b.Block.Hash())
+		batchWriter.PutTxLookup(tx.Hash(), b.Block.Hash())
 	}
 
 	// Main DB sorted

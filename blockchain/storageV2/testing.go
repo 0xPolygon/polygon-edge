@@ -260,7 +260,7 @@ func testBody(t *testing.T, m PlaceholderStorage) {
 	require.NoError(t, batch.WriteBatch())
 
 	addr1 := types.StringToAddress("11")
-	t0 := &types.Transaction{
+	t0 := types.NewTx(&types.MixedTxn{
 		Nonce:    0,
 		To:       &addr1,
 		Value:    big.NewInt(1),
@@ -268,11 +268,11 @@ func testBody(t *testing.T, m PlaceholderStorage) {
 		GasPrice: big.NewInt(11),
 		Input:    []byte{1, 2},
 		V:        big.NewInt(1),
-	}
+	})
 	t0.ComputeHash()
 
 	addr2 := types.StringToAddress("22")
-	t1 := &types.Transaction{
+	t1 := types.NewTx(&types.MixedTxn{
 		Nonce:    0,
 		To:       &addr2,
 		Value:    big.NewInt(1),
@@ -280,7 +280,7 @@ func testBody(t *testing.T, m PlaceholderStorage) {
 		GasPrice: big.NewInt(11),
 		Input:    []byte{4, 5},
 		V:        big.NewInt(2),
-	}
+	})
 	t1.ComputeHash()
 
 	block := types.Block{
@@ -305,7 +305,7 @@ func testBody(t *testing.T, m PlaceholderStorage) {
 	}
 
 	for indx, i := range tx0 {
-		if i.Hash != tx1[indx].Hash {
+		if i.Hash() != tx1[indx].Hash() {
 			t.Fatal("tx not correct")
 		}
 	}
@@ -328,19 +328,19 @@ func testReceipts(t *testing.T, m PlaceholderStorage) {
 
 	body := &types.Body{
 		Transactions: []*types.Transaction{
-			{
+			types.NewTx(&types.MixedTxn{
 				Nonce:    1000,
 				Gas:      50,
 				GasPrice: new(big.Int).SetUint64(100),
 				V:        big.NewInt(11),
-			},
+			}),
 		},
 	}
 	receipts := []*types.Receipt{
 		{
 			Root:              types.StringToHash("1"),
 			CumulativeGasUsed: 10,
-			TxHash:            body.Transactions[0].Hash,
+			TxHash:            body.Transactions[0].Hash(),
 			LogsBloom:         types.Bloom{0x1},
 			Logs: []*types.Log{
 				{
@@ -357,7 +357,7 @@ func testReceipts(t *testing.T, m PlaceholderStorage) {
 		{
 			Root:              types.StringToHash("1"),
 			CumulativeGasUsed: 10,
-			TxHash:            body.Transactions[0].Hash,
+			TxHash:            body.Transactions[0].Hash(),
 			LogsBloom:         types.Bloom{0x1},
 			GasUsed:           10,
 			ContractAddress:   &types.Address{0x1},
