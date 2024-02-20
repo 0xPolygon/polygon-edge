@@ -8,32 +8,32 @@ import (
 )
 
 func (w *Writer) PutHeader(h *types.Header) {
-	w.putRlp(common.EncodeUint64ToBytes(h.Number), HEADER, h)
+	w.putRlp(HEADER, common.EncodeUint64ToBytes(h.Number), h)
 }
 
 func (w *Writer) PutBody(bn uint64, body *types.Body) {
-	w.putRlp(common.EncodeUint64ToBytes(bn), BODY, body)
+	w.putRlp(BODY, common.EncodeUint64ToBytes(bn), body)
 }
 
 func (w *Writer) PutHeadHash(h types.Hash) {
-	w.putWithSuffix(HASH, GIDLID, h.Bytes())
+	w.putIntoTable(HEAD_HASH, EMPTY, h.Bytes())
 }
 
 func (w *Writer) PutHeadNumber(bn uint64) {
-	w.putWithSuffix(NUMBER, GIDLID, common.EncodeUint64ToBytes(bn))
+	w.putIntoTable(HEAD_NUMBER, EMPTY, common.EncodeUint64ToBytes(bn))
 }
 
 func (w *Writer) PutTxLookup(hash types.Hash, bn uint64) {
-	w.putWithSuffix(hash.Bytes(), GIDLID, common.EncodeUint64ToBytes(bn))
+	w.putIntoTable(TX_LOOKUP, hash.Bytes(), common.EncodeUint64ToBytes(bn))
 }
 
 func (w *Writer) PutBlockLookup(hash types.Hash, bn uint64) {
-	w.putWithSuffix(hash.Bytes(), GIDLID, common.EncodeUint64ToBytes(bn))
+	w.putIntoTable(BLOCK_LOOKUP, hash.Bytes(), common.EncodeUint64ToBytes(bn))
 }
 
 func (w *Writer) PutReceipts(bn uint64, receipts []*types.Receipt) {
 	rs := types.Receipts(receipts)
-	w.putRlp(common.EncodeUint64ToBytes(bn), RECEIPTS, &rs)
+	w.putRlp(RECEIPTS, common.EncodeUint64ToBytes(bn), &rs)
 }
 
 func (w *Writer) PutCanonicalHeader(h *types.Header, diff *big.Int) {
@@ -45,19 +45,19 @@ func (w *Writer) PutCanonicalHeader(h *types.Header, diff *big.Int) {
 }
 
 func (w *Writer) PutCanonicalHash(bn uint64, hash types.Hash) {
-	w.putWithSuffix(common.EncodeUint64ToBytes(bn), CANONICAL, hash.Bytes())
+	w.putIntoTable(CANONICAL, common.EncodeUint64ToBytes(bn), hash.Bytes())
 }
 
 func (w *Writer) PutTotalDifficulty(bn uint64, diff *big.Int) {
-	w.putWithSuffix(common.EncodeUint64ToBytes(bn), DIFFICULTY, diff.Bytes())
+	w.putIntoTable(DIFFICULTY, common.EncodeUint64ToBytes(bn), diff.Bytes())
 }
 
 func (w *Writer) PutForks(forks []types.Hash) {
 	fs := Forks(forks)
-	w.putRlp(FORK, GIDLID, &fs)
+	w.putRlp(FORK, EMPTY, &fs)
 }
 
-func (w *Writer) putRlp(k, mc []byte, raw types.RLPMarshaler) {
+func (w *Writer) putRlp(t uint8, k []byte, raw types.RLPMarshaler) {
 	var data []byte
 
 	if obj, ok := raw.(types.RLPStoreMarshaler); ok {
@@ -66,13 +66,11 @@ func (w *Writer) putRlp(k, mc []byte, raw types.RLPMarshaler) {
 		data = raw.MarshalRLPTo(nil)
 	}
 
-	w.putWithSuffix(k, mc, data)
+	w.putIntoTable(t, k, data)
 }
 
-func (w *Writer) putWithSuffix(k, mc, data []byte) {
-	fullKey := append(append(make([]byte, 0, len(k)+len(mc)), k...), mc...)
-
-	w.getBatch(mc).Put(fullKey, data)
+func (w *Writer) putIntoTable(t uint8, k []byte, data []byte) {
+	w.getBatch(t).Put(t, k, data)
 }
 
 func (w *Writer) WriteBatch() error {
@@ -90,8 +88,8 @@ func (w *Writer) WriteBatch() error {
 	return nil
 }
 
-func (w *Writer) getBatch(mc []byte) Batch {
-	i := getIndex(mc)
+func (w *Writer) getBatch(t uint8) Batch {
+	i := getIndex(t)
 	if w.batch[i] != nil {
 		return w.batch[i]
 	}

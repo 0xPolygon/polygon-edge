@@ -13,7 +13,7 @@ import (
 
 // ReadCanonicalHash gets the hash from the number of the canonical chain
 func (s *Storage) ReadCanonicalHash(n uint64) (types.Hash, error) {
-	data, err := s.get(common.EncodeUint64ToBytes(n), CANONICAL)
+	data, err := s.get(CANONICAL, common.EncodeUint64ToBytes(n))
 	if err != nil {
 		return types.Hash{}, err
 	}
@@ -25,7 +25,7 @@ func (s *Storage) ReadCanonicalHash(n uint64) (types.Hash, error) {
 
 // ReadHeadHash returns the hash of the head
 func (s *Storage) ReadHeadHash() (types.Hash, error) {
-	data, err := s.get(HASH, GIDLID)
+	data, err := s.get(HEAD_HASH, EMPTY)
 	if err != nil {
 		return types.Hash{}, err
 	}
@@ -35,7 +35,7 @@ func (s *Storage) ReadHeadHash() (types.Hash, error) {
 
 // ReadHeadNumber returns the number of the head
 func (s *Storage) ReadHeadNumber() (uint64, error) {
-	data, err := s.get(NUMBER, GIDLID)
+	data, err := s.get(HEAD_NUMBER, EMPTY)
 	if err != nil {
 		return 0, err
 	}
@@ -52,7 +52,7 @@ func (s *Storage) ReadHeadNumber() (uint64, error) {
 // ReadForks read the current forks
 func (s *Storage) ReadForks() ([]types.Hash, error) {
 	forks := &Forks{}
-	err := s.readRLP(FORK, GIDLID, forks)
+	err := s.readRLP(FORK, EMPTY, forks)
 
 	return *forks, err
 }
@@ -61,7 +61,7 @@ func (s *Storage) ReadForks() ([]types.Hash, error) {
 
 // ReadTotalDifficulty reads the difficulty
 func (s *Storage) ReadTotalDifficulty(bn uint64) (*big.Int, error) {
-	v, err := s.get(common.EncodeUint64ToBytes(bn), DIFFICULTY)
+	v, err := s.get(DIFFICULTY, common.EncodeUint64ToBytes(bn))
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +74,7 @@ func (s *Storage) ReadTotalDifficulty(bn uint64) (*big.Int, error) {
 // ReadHeader reads the header
 func (s *Storage) ReadHeader(bn uint64) (*types.Header, error) {
 	header := &types.Header{}
-	err := s.readRLP(common.EncodeUint64ToBytes(bn), HEADER, header)
+	err := s.readRLP(HEADER, common.EncodeUint64ToBytes(bn), header)
 
 	return header, err
 }
@@ -84,13 +84,13 @@ func (s *Storage) ReadHeader(bn uint64) (*types.Header, error) {
 // ReadBody reads the body
 func (s *Storage) ReadBody(bn uint64) (*types.Body, error) {
 	body := &types.Body{}
-	if err := s.readRLP(common.EncodeUint64ToBytes(bn), BODY, body); err != nil {
+	if err := s.readRLP(BODY, common.EncodeUint64ToBytes(bn), body); err != nil {
 		return nil, err
 	}
 
 	// must read header because block number is needed in order to calculate each tx hash
 	header := &types.Header{}
-	if err := s.readRLP(common.EncodeUint64ToBytes(bn), HEADER, header); err != nil {
+	if err := s.readRLP(HEADER, common.EncodeUint64ToBytes(bn), header); err != nil {
 		return nil, err
 	}
 
@@ -106,7 +106,7 @@ func (s *Storage) ReadBody(bn uint64) (*types.Body, error) {
 // ReadReceipts reads the receipts
 func (s *Storage) ReadReceipts(bn uint64) ([]*types.Receipt, error) {
 	receipts := &types.Receipts{}
-	err := s.readRLP(common.EncodeUint64ToBytes(bn), RECEIPTS, receipts)
+	err := s.readRLP(RECEIPTS, common.EncodeUint64ToBytes(bn), receipts)
 
 	return *receipts, err
 }
@@ -115,18 +115,18 @@ func (s *Storage) ReadReceipts(bn uint64) ([]*types.Receipt, error) {
 
 // ReadTxLookup reads the block number using the transaction hash
 func (s *Storage) ReadTxLookup(hash types.Hash) (uint64, error) {
-	return s.readLookup(hash)
+	return s.readLookup(TX_LOOKUP, hash)
 }
 
 // BLOCK LOOKUP //
 
 // ReadBlockLookup reads the block number using the block hash
 func (s *Storage) ReadBlockLookup(hash types.Hash) (uint64, error) {
-	return s.readLookup(hash)
+	return s.readLookup(BLOCK_LOOKUP, hash)
 }
 
-func (s *Storage) readLookup(hash types.Hash) (uint64, error) {
-	data, err := s.get(hash.Bytes(), GIDLID)
+func (s *Storage) readLookup(t uint8, hash types.Hash) (uint64, error) {
+	data, err := s.get(t, hash.Bytes())
 	if err != nil {
 		return 0, err
 	}
@@ -138,9 +138,8 @@ func (s *Storage) readLookup(hash types.Hash) (uint64, error) {
 	return common.EncodeBytesToUint64(data), nil
 }
 
-func (s *Storage) readRLP(k, mc []byte, raw types.RLPUnmarshaler) error {
-	k = append(k, mc...)
-	data, err := s.getDB(mc).Get(k)
+func (s *Storage) readRLP(t uint8, k []byte, raw types.RLPUnmarshaler) error {
+	data, err := s.getDB(t).Get(t, k)
 
 	if err != nil {
 		return err
@@ -161,9 +160,8 @@ func (s *Storage) readRLP(k, mc []byte, raw types.RLPUnmarshaler) error {
 	return nil
 }
 
-func (s *Storage) get(k, mc []byte) ([]byte, error) {
-	k = append(k, mc...)
-	data, err := s.getDB(mc).Get(k)
+func (s *Storage) get(t uint8, k []byte) ([]byte, error) {
+	data, err := s.getDB(t).Get(t, k)
 
 	if err != nil {
 		return nil, err
@@ -172,8 +170,8 @@ func (s *Storage) get(k, mc []byte) ([]byte, error) {
 	return data, nil
 }
 
-func (s *Storage) getDB(mc []byte) Database {
-	i := getIndex(mc)
+func (s *Storage) getDB(t uint8) Database {
+	i := getIndex(t)
 	if s.db[i] != nil {
 		return s.db[i]
 	}

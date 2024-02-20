@@ -1,22 +1,20 @@
 package storageV2
 
 import (
-	"bytes"
-
 	"github.com/hashicorp/go-hclog"
 )
 
 // Database interface.
 type Database interface {
 	Close() error
-	Get(p []byte) ([]byte, error)
+	Get(t uint8, k []byte) ([]byte, error)
 	NewBatch() Batch
 }
 
 // Database transaction/batch interface
 type Batch interface {
 	Write() error
-	Put(k []byte, v []byte)
+	Put(t uint8, k []byte, v []byte)
 }
 
 type Storage struct {
@@ -28,43 +26,32 @@ type Writer struct {
 	batch [2]Batch
 }
 
-// MCs for the key-value store
-var (
-	// DIFFICULTY is the difficulty prefix
-	DIFFICULTY = []byte("d")
-
-	// HEADER is the header prefix
-	HEADER = []byte("h")
-
-	// CANONICAL is the prefix for the canonical chain numbers
-	CANONICAL = []byte("c")
-
-	// BODY is the prefix for bodies
-	BODY = []byte("b")
-
-	// RECEIPTS is the prefix for receipts
-	RECEIPTS = []byte("r")
+// Tables
+const (
+	BODY       = uint8(0)
+	CANONICAL  = uint8(2)
+	DIFFICULTY = uint8(4)
+	HEADER     = uint8(6)
+	RECEIPTS   = uint8(8)
 )
 
-// GidLid database MCs
-var (
-	// FORK is the entry to store forks
-	FORK = []byte("0000000f")
-
-	// HASH is the entry for head hash
-	HASH = []byte("0000000h")
-
-	// NUMBER is the entry for head number
-	NUMBER = []byte("0000000n")
-
-	// GIDLID is added to the model code as sufix
-	GIDLID = []byte{}
+// GidLid tables
+const (
+	FORK         = uint8(0) | GIDLID_INDEX
+	HEAD_HASH    = uint8(2) | GIDLID_INDEX
+	HEAD_NUMBER  = uint8(4) | GIDLID_INDEX
+	BLOCK_LOOKUP = uint8(6) | GIDLID_INDEX
+	TX_LOOKUP    = uint8(8) | GIDLID_INDEX
 )
 
+// Database indexes
 const (
 	MAINDB_INDEX = uint8(0)
 	GIDLID_INDEX = uint8(1)
 )
+
+// Empty key
+var EMPTY = []byte{}
 
 func Open(logger hclog.Logger, db [2]Database) (*Storage, error) {
 	return &Storage{logger: logger, db: db}, nil
@@ -93,8 +80,8 @@ func (s *Storage) NewWriter() *Writer {
 	return &Writer{batch: batch}
 }
 
-func getIndex(mc []byte) uint8 {
-	if bytes.Equal(mc, GIDLID) {
+func getIndex(t uint8) uint8 {
+	if t&GIDLID_INDEX != 0 {
 		return GIDLID_INDEX
 	}
 

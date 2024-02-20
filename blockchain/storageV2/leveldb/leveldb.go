@@ -12,6 +12,20 @@ type levelDB struct {
 	db *leveldb.DB
 }
 
+// DB key = k + mapper
+var tableMapper = map[uint8][]byte{
+	storageV2.BODY:         []byte("b"),        // DB key = block number + mapper
+	storageV2.CANONICAL:    []byte("c"),        // DB key = block number + mapper
+	storageV2.DIFFICULTY:   []byte("d"),        // DB key = block number + mapper
+	storageV2.HEADER:       []byte("h"),        // DB key = block number + mapper
+	storageV2.RECEIPTS:     []byte("r"),        // DB key = block number + mapper
+	storageV2.FORK:         []byte("0000000f"), // DB key = empty + mapper
+	storageV2.HEAD_HASH:    []byte("0000000h"), // DB key = empty + mapper
+	storageV2.HEAD_NUMBER:  []byte("0000000n"), // DB key = empty + mapper
+	storageV2.BLOCK_LOOKUP: []byte{},           // DB key = block hash + mapper, value = block number
+	storageV2.TX_LOOKUP:    []byte{},           // DB key = tx hash + mapper, value = block number
+}
+
 // NewLevelDBStorage creates the new storage reference with leveldb default options
 func NewLevelDBStorage(path string, logger hclog.Logger) (*storageV2.Storage, error) {
 	var ldbs [2]storageV2.Database
@@ -54,7 +68,9 @@ func openLevelDBStorage(path string, options *opt.Options) (*leveldb.DB, error) 
 }
 
 // Get retrieves the key-value pair in leveldb storage
-func (l *levelDB) Get(k []byte) ([]byte, error) {
+func (l *levelDB) Get(t uint8, k []byte) ([]byte, error) {
+	mc := tableMapper[t]
+	k = append(k, mc...)
 	data, err := l.db.Get(k, nil)
 	if err != nil {
 		return nil, err

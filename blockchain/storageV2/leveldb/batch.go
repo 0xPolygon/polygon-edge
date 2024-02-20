@@ -16,7 +16,9 @@ func newBatchLevelDB(db *leveldb.DB) *batchLevelDB {
 	}
 }
 
-func (b *batchLevelDB) Put(k []byte, v []byte) {
+func (b *batchLevelDB) Put(t uint8, k []byte, v []byte) {
+	mc := tableMapper[t]
+	k = append(append(make([]byte, 0, len(k)+len(mc)), k...), mc...)
 	b.b.Put(k, v)
 }
 
