@@ -214,10 +214,12 @@ func TestAccountSet_ApplyDelta(t *testing.T) {
 				if step.added != nil {
 					addedValidators = vals.GetPublicIdentities(step.added...)
 				}
+
 				delta := &ValidatorSetDelta{
 					Added:   addedValidators,
 					Removed: bitmap.Bitmap{},
 				}
+
 				for _, i := range step.removed {
 					delta.Removed.Set(i)
 				}
@@ -228,16 +230,19 @@ func TestAccountSet_ApplyDelta(t *testing.T) {
 				// apply delta
 				var err error
 				snapshot, err = snapshot.ApplyDelta(delta)
+
 				if step.errMsg != "" {
 					require.ErrorContains(t, err, step.errMsg)
 					require.Nil(t, snapshot)
 
 					return
 				}
+
 				require.NoError(t, err)
 
 				// validate validator set
 				require.Equal(t, len(step.expected), snapshot.Len())
+
 				for validatorAlias, votingPower := range step.expected {
 					v := vals.GetValidator(validatorAlias).ValidatorMetadata()
 					require.True(t, snapshot.ContainsAddress(v.Address), "validator '%s' not found in snapshot", validatorAlias)

@@ -225,6 +225,7 @@ func TestState_GetNestedBucketInEpoch(t *testing.T) {
 
 			s := newTestState(t)
 			require.NoError(t, s.EpochStore.insertEpoch(c.epochNumber, nil))
+
 			err = s.db.View(func(tx *bbolt.Tx) error {
 				nestedBucket, err = getNestedBucketInEpoch(tx, c.epochNumber, c.bucketName)
 

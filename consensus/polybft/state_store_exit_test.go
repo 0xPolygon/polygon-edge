@@ -194,6 +194,7 @@ func insertTestExitEvents(t *testing.T, state *State,
 					}
 				index++
 			}
+
 			block++
 		}
 	}

@@ -54,7 +54,7 @@ func generateTxs(t *testing.T, startNonce, count int, from types.Address, to *ty
 	txs := make([]*types.Transaction, count)
 
 	for i := range txs {
-		tx := &types.Transaction{
+		tx := types.NewTx(&types.MixedTxn{
 			Gas:       types.StateTransactionGasLimit,
 			Nonce:     uint64(startNonce + i),
 			From:      from,
@@ -63,7 +63,7 @@ func generateTxs(t *testing.T, startNonce, count int, from types.Address, to *ty
 			Type:      types.DynamicFeeTx,
 			GasFeeCap: big.NewInt(100),
 			GasTipCap: big.NewInt(10),
-		}
+		})
 
 		input := make([]byte, 1000)
 		_, err := rand.Read(input)
@@ -110,7 +110,7 @@ func generateBlock(t *testing.T, num uint64) *types.FullBlock {
 
 	for i := 0; i < len(b.Block.Transactions); i++ {
 		b.Receipts[i] = &types.Receipt{
-			TxHash:            b.Block.Transactions[i].Hash,
+			TxHash:            b.Block.Transactions[i].Hash(),
 			Root:              types.StringToHash("mockhashstring"),
 			TransactionType:   types.LegacyTx,
 			GasUsed:           uint64(100000),
@@ -191,6 +191,7 @@ func dirSize(t *testing.T, path string) int64 {
 		if err != nil {
 			t.Fail()
 		}
+
 		if !info.IsDir() {
 			size += info.Size()
 		}
@@ -233,7 +234,7 @@ insertloop:
 			batchWriter.PutBody(b.Block.Hash(), b.Block.Body())
 
 			for _, tx := range b.Block.Transactions {
-				batchWriter.PutTxLookup(tx.Hash, b.Block.Hash())
+				batchWriter.PutTxLookup(tx.Hash(), b.Block.Hash())
 			}
 
 			batchWriter.PutHeader(b.Block.Header)

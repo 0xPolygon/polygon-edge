@@ -513,6 +513,8 @@ func TestE2E_Consensus_CustomRewardToken(t *testing.T) {
 // and check if balance of sender, receiver, burn contract and miner is updates correctly
 // in accordance with EIP-1559 specifications
 func TestE2E_Consensus_EIP1559Check(t *testing.T) {
+	t.Skip("TODO - since we removed burn from evm, this should be fixed after the burn solution")
+
 	sender, err := wallet.GenerateKey()
 	require.NoError(t, err)
 

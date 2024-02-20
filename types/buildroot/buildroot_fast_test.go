@@ -90,3 +90,39 @@ func buildRandomInput(num int) func(i int) []byte {
 		return res[i]
 	}
 }
+
+func TestAcquireFastHasher(t *testing.T) {
+	// Test when fastHasherPool returns a value
+	t.Run("FastHasherPoolReturnsValue", func(t *testing.T) {
+		// Create a mock FastHasher object
+		mockHasher := &FastHasher{k: keccak.NewKeccak256()}
+
+		fastHasherPool.New = func() interface{} {
+			return mockHasher
+		}
+
+		// Call the acquireFastHasher function
+		hasher := acquireFastHasher()
+
+		// Check if the returned hasher is the same as the mockHasher
+		if hasher != mockHasher {
+			t.Error("Expected acquireFastHasher to return the mockHasher")
+		}
+	})
+
+	// Test when fastHasherPool returns nil
+	t.Run("FastHasherPoolReturnsNil", func(t *testing.T) {
+		// Mock the Get function of fastHasherPool to return nil
+		fastHasherPool.New = func() interface{} {
+			return nil
+		}
+
+		// Call the acquireFastHasher function
+		hasher := acquireFastHasher()
+
+		// Check if the returned hasher is not nil
+		if hasher == nil {
+			t.Error("Expected acquireFastHasher to return a non-nil hasher")
+		}
+	})
+}

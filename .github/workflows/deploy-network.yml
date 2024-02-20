@@ -1,0 +1,201 @@
+---
+concurrency: ci-$ # Only a single workflow can be executed concurrently
+name: Deploy Network
+on: # yamllint disable-line rule:truthy
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: The environment to run against
+        type: choice
+        options: [dev, test] # nightly should not be initiated manually
+      block_gas_limit:
+        description: Block Gas Limit
+        type: string
+        default: "200000000"
+        required: true
+      block_time:
+        description: Block Time
+        type: string
+        default: "2"
+        required: true
+      is_london_fork_active:
+        description: EIP-1559
+        type: boolean
+        default: true
+      is_bridge_active:
+        description: With Bridge
+        type: boolean
+        default: true
+      notification:
+        description: Notification
+        type: boolean
+        default: true
+  workflow_call:
+    inputs:
+      environment:
+        description: The environment to run against
+        type: string
+        required: true
+      block_gas_limit:
+        description: Block Gas Limit
+        type: string
+        required: true
+      block_time:
+        description: Block Time
+        type: string
+        required: true
+      is_london_fork_active:
+        description: EIP-1559
+        type: boolean
+        required: true
+      is_bridge_active:
+        description: With Bridge
+        type: boolean
+        required: true
+      notification:
+        description: Notification
+        type: boolean
+        required: true
+    outputs:
+      terraform_output:
+        description: "Terraform output"
+        value: ${{ jobs.deploy_network.outputs.terraform_output }}
+      ansible_output:
+        description: "Ansible output"
+        value: ${{ jobs.deploy_network.outputs.ansible_output }}
+    secrets:
+      AWS_ROLE_ARN:
+        required: true
+      AWS_S3_BLADE_BUCKET:
+        required: true
+      VAULT_PASSWORD:
+        required: true
+
+permissions:
+  id-token: write
+  contents: read
+  security-events: write
+
+jobs:
+  check_network:
+    name: Check if the network is already deployed
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    outputs:
+      check_output: ${{ steps.check_state_file.outputs.resources }}
+      rpc_url: ${{ steps.rpc_url.outputs.url }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4.1.1
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4.0.1
+        with:
+          aws-region: ${{ vars.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+      - name: Retrieve state file from s3
+        id: retrieve_state
+        run: echo "retrieve_state_output=$(aws s3 cp s3://${{ secrets.AWS_S3_BLADE_BUCKET }}/states/${{ inputs.environment }} state.json)" >> $GITHUB_OUTPUT
+      - name: Check state file
+        id: check_state_file
+        if: contains(steps.retrieve_state.outputs.retrieve_state_output, 'download')
+        run: echo "resources=$(cat state.json | jq -r ".resources" | jq length)" >> $GITHUB_OUTPUT
+      - name: Set RPC URL
+        id: rpc_url
+        if: contains(steps.retrieve_state.outputs.retrieve_state_output, 'download')
+        run: echo "url=$(cat state.json | jq -r '.outputs.aws_lb_ext_domain.value // empty')" >> $GITHUB_OUTPUT
+  deploy_network:
+    name: Deploy the network
+    runs-on: ubuntu-latest
+    needs: check_network
+    if: needs.check_network.outputs.check_output == 0
+    environment: ${{ inputs.environment }}
+    outputs:
+      terraform_output: ${{ steps.terraform_failure.outputs.terraform_output }}
+      ansible_output: ${{ steps.ansible_failure.outputs.ansible_output }}
+      rpc_url: ${{ steps.rpc_url.outputs.url }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4.1.1
+        with:
+          repository: Ethernal-Tech/blade-deployment
+          ref: main
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4.0.1
+        with:
+          aws-region: ${{ vars.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3.0.0
+        with:
+          terraform_version: 1.4.5
+      - name: Configure Terraform
+        run: sed 's/# backend "s3" {}/backend "s3" {}/' main.tf > main.tf.tmp && mv main.tf.tmp main.tf
+      - name: Terraform Init
+        run: terraform init -backend-config="bucket=${{ secrets.AWS_S3_BLADE_BUCKET }}" -backend-config="key=states/${{ inputs.environment }}" -backend-config="region=${{ vars.AWS_REGION }}"
+      - name: Terraform Validate
+        run: terraform validate -no-color
+        continue-on-error: true
+      - name: Terraform Apply
+        run: terraform apply -auto-approve
+        env:
+          TF_VAR_deployment_name: ${{ inputs.environment }}
+          TF_VAR_base_instance_type: ${{ vars.AWS_INSTANCE_TYPE }}
+          TF_VAR_geth_count: ${{ vars.GETH_COUNT }}
+          TF_VAR_fullnode_count: ${{ vars.FULLNODE_COUNT }}
+          TF_VAR_validator_count: ${{ vars.VALIDATOR_COUNT }}
+      - name: Terraform Failed
+        if: failure()
+        id: terraform_failure
+        run: echo "terraform_output=false" >> $GITHUB_OUTPUT
+      - name: Configure private keys
+        run: |
+          terraform output pk_ansible > ~/private.key
+          chmod 600 ~/private.key 
+          eval "$(ssh-agent)"
+          ssh-add ~/private.key
+      - name: Install Ansible / botocore / boto3
+        run: |
+          python3 -m pip install --user ansible
+          python3 -m pip install boto3 botocore
+      - name: Configure Ansible
+        working-directory: ansible
+        run: |
+          echo "${{ secrets.VAULT_PASSWORD }}" > password.txt
+          sed 's/devnet/${{ inputs.environment }}/g' inventory/aws_ec2.yml > inventory/aws_ec2.yml.tmp && mv inventory/aws_ec2.yml.tmp inventory/aws_ec2.yml
+          sed 's/blade_tag: .*/blade_tag: ${{ github.sha }}/g' group_vars/all.yml > group_vars/all.yml.tmp && mv group_vars/all.yml.tmp group_vars/all.yml
+          sed 's/INFO/${{ vars.LOG_LEVEL }}/g' roles/blade/templates/blade.service > roles/blade/templates/blade.service.tmp && mv roles/blade/templates/blade.service.tmp roles/blade/templates/blade.service
+      - name: Setup Ansible
+        working-directory: ansible
+        run: |
+          ansible-inventory --graph
+          ansible-galaxy install -r requirements.yml
+      - name: Check previous blade data
+        id: previous_data
+        run: echo "previous_data_output=$(aws s3 cp s3://${{ secrets.AWS_S3_BLADE_BUCKET }}/states/${{ inputs.environment }}.data.tar.gz .)" >> $GITHUB_OUTPUT
+      - name: Run Ansible (Bootstrap blade)
+        if: (steps.previous_data.outputs.previous_data_output == '' || contains(steps.previous_data.outputs.previous_data_output, 'error'))
+        working-directory: ansible
+        run: ansible-playbook site.yml --extra-vars "clean_deploy_title=${{ inputs.environment }} blade_repository=${{ github.repository }} block_gas_limit=${{ inputs.block_gas_limit }} block_time=${{ inputs.block_time }} is_london_fork_active=${{ inputs.is_london_fork_active }} is_bridge_active=${{ inputs.is_bridge_active }}"
+      - name: Run Ansible (Restore data)
+        if: contains(steps.previous_data.outputs.previous_data_output, 'download')
+        working-directory: ansible
+        run: ansible-playbook site.yml --extra-vars "clean_deploy_title=${{ inputs.environment }} blade_repository=${{ github.repository }} block_gas_limit=${{ inputs.block_gas_limit }} block_time=${{ inputs.block_time }} s3_bucket=${{ secrets.AWS_S3_BLADE_BUCKET }} restore_data=true"
+      - name: Ansible Failed
+        if: failure()
+        id: ansible_failure
+        run: echo "ansible_output=false" >> $GITHUB_OUTPUT
+      - name: Set RPC URL
+        id: rpc_url
+        run: echo "url=$(terraform output -raw aws_lb_ext_domain | grep -o -E '^ext[^:]*')" >> $GITHUB_OUTPUT
+  notification:
+    name: Deploy Notification
+    needs: [check_network, deploy_network]
+    uses: ./.github/workflows/notification-deploy-network.yml
+    if: (always() && inputs.notification)
+    with:
+      environment: ${{ inputs.environment }}
+      deploy_network_terraform_output: ${{ needs.deploy_network.outputs.terraform_output }}
+      deploy_network_ansible_output: ${{ needs.deploy_network.outputs.ansible_output }}
+      rpc_url: ${{ needs.check_network.outputs.rpc_url || needs.deploy_network.outputs.rpc_url }}
+    secrets:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

@@ -29,8 +29,14 @@ func (b *Body) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 
 	// transactions
 	if err = unmarshalRLPFrom(p, tuple[0], func(txType TxType, p *fastrlp.Parser, v *fastrlp.Value) error {
-		bTxn := &Transaction{
-			Type: txType,
+		var bTxn *Transaction
+		switch txType {
+		case AccessListTx:
+			bTxn = NewTx(&AccessListTxn{})
+		case DynamicFeeTx, StateTx, LegacyTx:
+			bTxn = NewTx(&MixedTxn{
+				Type: txType,
+			})
 		}
 
 		if err = bTxn.unmarshalStoreRLPFrom(p, v); err != nil {
@@ -64,16 +70,22 @@ func (b *Body) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 
 // UnmarshalStoreRLP unmarshals transaction from byte slice. Hash must be computed manually after!
 func (t *Transaction) UnmarshalStoreRLP(input []byte) error {
-	t.Type = LegacyTx
+	t.SetTransactionType(LegacyTx)
+
+	offset := 0
 
 	if len(input) > 0 && input[0] <= RLPSingleByteUpperLimit {
-		var err error
-		if t.Type, err = txTypeFromByte(input[0]); err != nil {
+		tType, err := txTypeFromByte(input[0])
+		if err != nil {
 			return err
 		}
+
+		t.SetTransactionType(tType)
+
+		offset = 1
 	}
 
-	return UnmarshalRlp(t.unmarshalStoreRLPFrom, input)
+	return UnmarshalRlp(t.unmarshalStoreRLPFrom, input[offset:])
 }
 
 func (t *Transaction) unmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
@@ -88,9 +100,12 @@ func (t *Transaction) unmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value)
 	}
 
 	if len(elems) == 3 {
-		if err = t.Type.unmarshalRLPFrom(p, elems[0]); err != nil {
+		tType := t.Type()
+		if err = tType.unmarshalRLPFrom(p, elems[0]); err != nil {
 			return err
 		}
+
+		t.SetTransactionType(tType)
 
 		elems = elems[1:]
 	}
@@ -101,7 +116,7 @@ func (t *Transaction) unmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value)
 	}
 
 	// context part
-	if err = elems[1].GetAddr(t.From[:]); err != nil {
+	if err = elems[1].GetAddr(t.From().Bytes()); err != nil {
 		return err
 	}
 
@@ -130,15 +145,18 @@ func (r *Receipts) unmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) er
 
 func (r *Receipt) UnmarshalStoreRLP(input []byte) error {
 	r.TransactionType = LegacyTx
+	offset := 0
 
 	if len(input) > 0 && input[0] <= RLPSingleByteUpperLimit {
 		var err error
 		if r.TransactionType, err = txTypeFromByte(input[0]); err != nil {
 			return err
 		}
+
+		offset = 1
 	}
 
-	return UnmarshalRlp(r.unmarshalStoreRLPFrom, input)
+	return UnmarshalRlp(r.unmarshalStoreRLPFrom, input[offset:])
 }
 
 func (r *Receipt) unmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {

@@ -1,8 +1,9 @@
 package precompiled
 
 import (
-	"bytes"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -17,8 +18,7 @@ func TestBlake2f(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !bytes.Equal(c.Expected, out) {
-			t.Fatal("bad")
-		}
+
+		require.Equal(t, c.Expected, out)
 	})
 }

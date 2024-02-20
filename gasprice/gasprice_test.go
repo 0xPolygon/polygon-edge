@@ -84,14 +84,14 @@ func TestGasHelper_MaxPriorityFeePerGas(t *testing.T) {
 					b.Header.Miner = sender.Bytes()
 
 					for i := 0; i < 3; i++ {
-						tx := &types.Transaction{
+						tx := types.NewTx(&types.MixedTxn{
 							From:      sender,
 							Value:     ethgo.Ether(1),
 							To:        &types.ZeroAddress,
 							Type:      types.DynamicFeeTx,
 							GasTipCap: ethgo.Gwei(uint64(rand.Intn(200))),
 							GasFeeCap: ethgo.Gwei(uint64(rand.Intn(200) + 200)),
-						}
+						})
 
 						tx, err := signer.SignTx(tx, senderKey)
 						require.NoError(t, err)
@@ -219,14 +219,14 @@ func createTestTxs(t *testing.T, backend *backendMock, numOfTxsPerBlock, txCap i
 		for i := 0; i < numOfTxsPerBlock; i++ {
 			senderKey, sender := tests.GenerateKeyAndAddr(t)
 
-			tx := &types.Transaction{
+			tx := types.NewTx(&types.MixedTxn{
 				From:      sender,
 				Value:     ethgo.Ether(1),
 				To:        &types.ZeroAddress,
 				Type:      types.DynamicFeeTx,
 				GasTipCap: ethgo.Gwei(uint64(rand.Intn(txCap))),
 				GasFeeCap: ethgo.Gwei(uint64(rand.Intn(txCap) + txCap)),
-			}
+			})
 
 			tx, err := signer.SignTx(tx, senderKey)
 			require.NoError(t, err)

@@ -45,31 +45,31 @@ func TestContentEndpoint(t *testing.T) {
 		assert.Equal(t, 0, len(response.Queued))
 		assert.Equal(t, 2, len(response.Pending[address1]))
 
-		txData := response.Pending[address1][testTx1.Nonce]
+		txData := response.Pending[address1][testTx1.Nonce()]
 		assert.NotNil(t, txData)
-		assert.Equal(t, testTx1.Gas, uint64(txData.Gas))
-		assert.Equal(t, *testTx1.GasPrice, big.Int(*txData.GasPrice))
+		assert.Equal(t, testTx1.Gas(), uint64(txData.Gas))
+		assert.Equal(t, *(testTx1.GasPrice()), big.Int(*txData.GasPrice))
 		assert.Equal(t, (*argBig)(nil), txData.GasFeeCap)
 		assert.Equal(t, (*argBig)(nil), txData.GasTipCap)
-		assert.Equal(t, testTx1.To, txData.To)
-		assert.Equal(t, testTx1.From, txData.From)
-		assert.Equal(t, *testTx1.Value, big.Int(txData.Value))
-		assert.Equal(t, testTx1.Input, []byte(txData.Input))
+		assert.Equal(t, testTx1.To(), txData.To)
+		assert.Equal(t, testTx1.From(), txData.From)
+		assert.Equal(t, *(testTx1.Value()), big.Int(txData.Value))
+		assert.Equal(t, testTx1.Input(), []byte(txData.Input))
 		assert.Equal(t, (*argUint64)(nil), txData.BlockNumber)
 		assert.Equal(t, (*argUint64)(nil), txData.TxIndex)
 
-		txData = response.Pending[address1][testTx2.Nonce]
+		txData = response.Pending[address1][testTx2.Nonce()]
 		assert.NotNil(t, txData)
 		assert.Equal(t, (argUint64)(types.DynamicFeeTx), txData.Type)
-		assert.Equal(t, testTx2.Gas, uint64(txData.Gas))
+		assert.Equal(t, testTx2.Gas(), uint64(txData.Gas))
 		assert.Equal(t, (*argBig)(nil), txData.GasPrice)
-		assert.Equal(t, *testTx2.GasFeeCap, big.Int(*txData.GasFeeCap))
-		assert.Equal(t, *testTx2.GasTipCap, big.Int(*txData.GasTipCap))
-		assert.Equal(t, testTx2.To, txData.To)
-		assert.Equal(t, testTx2.From, txData.From)
-		assert.Equal(t, *testTx2.ChainID, big.Int(*txData.ChainID))
-		assert.Equal(t, *testTx2.Value, big.Int(txData.Value))
-		assert.Equal(t, testTx2.Input, []byte(txData.Input))
+		assert.Equal(t, *(testTx2.GasFeeCap()), big.Int(*txData.GasFeeCap))
+		assert.Equal(t, *(testTx2.GasTipCap()), big.Int(*txData.GasTipCap))
+		assert.Equal(t, testTx2.To(), txData.To)
+		assert.Equal(t, testTx2.From(), txData.From)
+		assert.Equal(t, *(testTx2.ChainID()), big.Int(*txData.ChainID))
+		assert.Equal(t, *(testTx2.Value()), big.Int(txData.Value))
+		assert.Equal(t, testTx2.Input(), []byte(txData.Input))
 		assert.Equal(t, (*argUint64)(nil), txData.BlockNumber)
 		assert.Equal(t, (*argUint64)(nil), txData.TxIndex)
 	})
@@ -94,31 +94,31 @@ func TestContentEndpoint(t *testing.T) {
 		assert.Equal(t, 1, len(response.Queued[address1]))
 		assert.Equal(t, 1, len(response.Queued[address2]))
 
-		txData := response.Queued[address1][testTx1.Nonce]
+		txData := response.Queued[address1][testTx1.Nonce()]
 		assert.NotNil(t, txData)
-		assert.Equal(t, testTx1.Gas, uint64(txData.Gas))
-		assert.Equal(t, *testTx1.GasPrice, big.Int(*txData.GasPrice))
+		assert.Equal(t, testTx1.Gas(), uint64(txData.Gas))
+		assert.Equal(t, *(testTx1.GasPrice()), big.Int(*txData.GasPrice))
 		assert.Equal(t, (*argBig)(nil), txData.GasFeeCap)
 		assert.Equal(t, (*argBig)(nil), txData.GasTipCap)
-		assert.Equal(t, testTx1.To, txData.To)
-		assert.Equal(t, testTx1.From, txData.From)
-		assert.Equal(t, *testTx1.Value, big.Int(txData.Value))
-		assert.Equal(t, testTx1.Input, []byte(txData.Input))
+		assert.Equal(t, testTx1.To(), txData.To)
+		assert.Equal(t, testTx1.From(), txData.From)
+		assert.Equal(t, *(testTx1.Value()), big.Int(txData.Value))
+		assert.Equal(t, testTx1.Input(), []byte(txData.Input))
 		assert.Equal(t, (*argUint64)(nil), txData.BlockNumber)
 		assert.Equal(t, (*argUint64)(nil), txData.TxIndex)
 
-		txData = response.Queued[address2][testTx2.Nonce]
+		txData = response.Queued[address2][testTx2.Nonce()]
 		assert.NotNil(t, txData)
 		assert.Equal(t, (argUint64)(types.DynamicFeeTx), txData.Type)
-		assert.Equal(t, testTx2.Gas, uint64(txData.Gas))
+		assert.Equal(t, testTx2.Gas(), uint64(txData.Gas))
 		assert.Equal(t, (*argBig)(nil), txData.GasPrice)
-		assert.Equal(t, *testTx2.GasFeeCap, big.Int(*txData.GasFeeCap))
-		assert.Equal(t, *testTx2.GasTipCap, big.Int(*txData.GasTipCap))
-		assert.Equal(t, testTx2.To, txData.To)
-		assert.Equal(t, testTx2.From, txData.From)
-		assert.Equal(t, *testTx2.ChainID, big.Int(*txData.ChainID))
-		assert.Equal(t, *testTx2.Value, big.Int(txData.Value))
-		assert.Equal(t, testTx2.Input, []byte(txData.Input))
+		assert.Equal(t, *(testTx2.GasFeeCap()), big.Int(*txData.GasFeeCap))
+		assert.Equal(t, *(testTx2.GasTipCap()), big.Int(*txData.GasTipCap))
+		assert.Equal(t, testTx2.To(), txData.To)
+		assert.Equal(t, testTx2.From(), txData.From)
+		assert.Equal(t, *(testTx2.ChainID()), big.Int(*txData.ChainID))
+		assert.Equal(t, *(testTx2.Value()), big.Int(txData.Value))
+		assert.Equal(t, testTx2.Input(), []byte(txData.Input))
 		assert.Equal(t, (*argUint64)(nil), txData.BlockNumber)
 		assert.Equal(t, (*argUint64)(nil), txData.TxIndex)
 	})
@@ -190,9 +190,9 @@ func TestInspectEndpoint(t *testing.T) {
 		assert.Equal(t, 0, len(response.Pending))
 		assert.Equal(t, 1, len(response.Queued))
 		assert.Equal(t, uint64(1), response.CurrentCapacity)
-		transactionInfo := response.Queued[testTx.From.String()]
+		transactionInfo := response.Queued[testTx.From().String()]
 		assert.NotNil(t, transactionInfo)
-		assert.NotNil(t, transactionInfo[strconv.FormatUint(testTx.Nonce, 10)])
+		assert.NotNil(t, transactionInfo[strconv.FormatUint(testTx.Nonce(), 10)])
 	})
 
 	t.Run("returns correct data for pending transactions", func(t *testing.T) {
@@ -213,10 +213,10 @@ func TestInspectEndpoint(t *testing.T) {
 		assert.Equal(t, 1, len(response.Pending))
 		assert.Equal(t, 0, len(response.Queued))
 		assert.Equal(t, uint64(2), response.CurrentCapacity)
-		transactionInfo := response.Pending[testTx.From.String()]
+		transactionInfo := response.Pending[testTx.From().String()]
 		assert.NotNil(t, transactionInfo)
-		assert.NotNil(t, transactionInfo[strconv.FormatUint(testTx.Nonce, 10)])
-		assert.NotNil(t, transactionInfo[strconv.FormatUint(testTx2.Nonce, 10)])
+		assert.NotNil(t, transactionInfo[strconv.FormatUint(testTx.Nonce(), 10)])
+		assert.NotNil(t, transactionInfo[strconv.FormatUint(testTx2.Nonce(), 10)])
 	})
 }
 
@@ -294,7 +294,7 @@ func (s *mockTxPoolStore) GetBaseFee() uint64 {
 }
 
 func newTestTransaction(nonce uint64, from types.Address) *types.Transaction {
-	txn := &types.Transaction{
+	txn := types.NewTx(&types.MixedTxn{
 		Nonce:    nonce,
 		GasPrice: big.NewInt(1),
 		Gas:      nonce * 100,
@@ -305,7 +305,7 @@ func newTestTransaction(nonce uint64, from types.Address) *types.Transaction {
 		V:        big.NewInt(1),
 		R:        big.NewInt(1),
 		S:        big.NewInt(1),
-	}
+	})
 
 	txn.ComputeHash()
 
@@ -313,7 +313,7 @@ func newTestTransaction(nonce uint64, from types.Address) *types.Transaction {
 }
 
 func newTestDynamicFeeTransaction(nonce uint64, from types.Address) *types.Transaction {
-	txn := &types.Transaction{
+	txn := types.NewTx(&types.MixedTxn{
 		Type:      types.DynamicFeeTx,
 		Nonce:     nonce,
 		GasTipCap: big.NewInt(2),
@@ -327,7 +327,7 @@ func newTestDynamicFeeTransaction(nonce uint64, from types.Address) *types.Trans
 		V:         big.NewInt(1),
 		R:         big.NewInt(1),
 		S:         big.NewInt(1),
-	}
+	})
 
 	txn.ComputeHash()
 

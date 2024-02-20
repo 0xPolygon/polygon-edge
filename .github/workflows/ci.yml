@@ -1,19 +1,146 @@
 ---
 name: CI
-on:  # yamllint disable-line rule:truthy
+on: # yamllint disable-line rule:truthy
   push:
     branches:
       - main
       - develop
   pull_request:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      build-blade:
+        description: Build Blade
+        type: boolean
+        default: true
+      lint:
+        description: Lint
+        type: boolean
+        default: true
+      unit-test:
+        description: Unit Tests
+        type: boolean
+        default: true
+      e2e-polybft-test:
+        description: E2E PolyBFT Tests
+        type: boolean
+        default: true
+      e2e-legacy-test:
+        description: E2E Legacy Tests
+        type: boolean
+        default: true
+      property-polybft-test:
+        description: Property PolyBFT Tests
+        type: boolean
+        default: true
+      fuzz-test:
+        description: Fuzz Tests
+        type: boolean
+        default: true
+  workflow_call:
+    inputs:
+      build-blade:
+        description: Build Blade
+        type: boolean
+      lint:
+        description: Lint
+        type: boolean
+        required: true
+      unit-test:
+        description: Unit Tests
+        type: boolean
+        required: true
+      e2e-polybft-test:
+        description: E2E PolyBFT Tests
+        type: boolean
+        required: true
+      e2e-legacy-test:
+        description: E2E Legacy Tests
+        type: boolean
+        required: true
+      property-polybft-test:
+        description: Property PolyBFT Tests
+        type: boolean
+        required: true
+      fuzz-test:
+        description: Fuzz Tests
+        type: boolean
+        required: true
+    outputs:
+      build-blade:
+        description: Build Blade output
+        value: ${{ jobs.build-blade.outputs.workflow_output }}
+      lint:
+        description: Lint output
+        value: ${{ jobs.lint.outputs.workflow_output }}
+      unit-test:
+        description: Unit Tests output
+        value: ${{ jobs.unit-test.outputs.workflow_output }}
+      e2e-polybft-test:
+        description: E2E PolyBFT Tests output
+        value: ${{ jobs.e2e-polybft-test.outputs.workflow_output }}
+      e2e-legacy-test:
+        description: E2E Legacy Tests output
+        value: ${{ jobs.e2e-legacy-test.outputs.workflow_output }}
+      property-polybft-test:
+        description: Property PolyBFT Tests output
+        value: ${{ jobs.property-polybft-test.outputs.workflow_output }}
+      fuzz-test:
+        description: Fuzz Tests output
+        value: ${{ jobs.fuzz-test.outputs.workflow_output }}
 
 jobs:
-  build:
-    name: Build
+  build-blade:
+    name: Build Blade
     uses: ./.github/workflows/build.yml
-
-  test:
-    name: Test
-    uses: ./.github/workflows/test.yml
-    needs: build
+    if: |
+      inputs.build-blade || 
+      github.event_name == 'pull_request' || 
+      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'))
+  lint:
+    name: Lint
+    uses: ./.github/workflows/lint.yml
+    needs: build-blade
+    if: |
+      inputs.lint || 
+      github.event_name == 'pull_request' || 
+      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'))
+  unit-test:
+    name: Unit Tests
+    uses: ./.github/workflows/unit-test.yml
+    needs: build-blade
+    if: |
+      inputs.unit-test || 
+      github.event_name == 'pull_request' || 
+      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'))
+  e2e-polybft-test:
+    name: E2E PolyBFT Tests
+    uses: ./.github/workflows/e2e-polybft-test.yml
+    needs: build-blade
+    if: |
+      inputs.e2e-polybft-test || 
+      github.event_name == 'pull_request' || 
+      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'))
+  e2e-legacy-test:
+    name: E2E Legacy Tests
+    uses: ./.github/workflows/e2e-legacy-test.yml
+    needs: build-blade
+    if: |
+      inputs.e2e-legacy-test || 
+      github.event_name == 'pull_request' || 
+      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'))
+  property-polybft-test:
+    name: Property PolyBFT Tests
+    uses: ./.github/workflows/property-polybft-test.yml
+    needs: build-blade
+    if: |
+      inputs.property-polybft-test || 
+      github.event_name == 'pull_request' || 
+      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'))
+  fuzz-test:
+    name: Fuzz Tests
+    uses: ./.github/workflows/fuzz-test.yml
+    needs: build-blade
+    if: |
+      inputs.fuzz-test || 
+      github.event_name == 'pull_request' || 
+      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'))

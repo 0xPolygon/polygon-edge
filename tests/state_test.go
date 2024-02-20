@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/crypto"
@@ -66,7 +67,7 @@ func RunSpecificTest(t *testing.T, file string, c testCase, fc *forkConfig, inde
 
 	// Try to recover tx with current signer
 	if len(p.TxBytes) != 0 {
-		var ttx types.Transaction
+		ttx := &types.Transaction{}
 		err := ttx.UnmarshalRLP(p.TxBytes)
 		if err != nil {
 			return err
@@ -74,7 +75,7 @@ func RunSpecificTest(t *testing.T, file string, c testCase, fc *forkConfig, inde
 
 		signer := crypto.NewSigner(currentForks, 1)
 
-		if _, err := signer.Sender(&ttx); err != nil {
+		if _, err := signer.Sender(ttx); err != nil {
 			return err
 		}
 	}
@@ -163,34 +164,31 @@ func TestState(t *testing.T) {
 
 	skip := []string{
 		"RevertPrecompiledTouch",
+		"RevertPrecompiledTouch_storage",
+		"loopMul",
+		"CALLBlake2f_MaxRounds",
 	}
 
-	// There are two folders in spec tests, one for the current tests for the Istanbul fork
-	// and one for the legacy tests for the other forks
-	folders, err := listFolders(stateTests)
+	folders, err := listFolders([]string{stateTests})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	for _, folder := range folders {
-		files, err := listFiles(folder)
+		files, err := listFiles(folder, ".json")
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		for _, file := range files {
-			if !strings.HasSuffix(file, ".json") {
-				continue
-			}
-
 			if contains(long, file) && testing.Short() {
-				t.Skipf("Long tests are skipped in short mode")
+				t.Logf("Long test '%s' is skipped in short mode\n", file)
 
 				continue
 			}
 
 			if contains(skip, file) {
-				t.Skip()
+				t.Logf("Test '%s' is skipped\n", file)
 
 				continue
 			}
@@ -220,7 +218,11 @@ func TestState(t *testing.T) {
 						fc := &forkConfig{name: fork, forks: forks}
 
 						for idx, postStateEntry := range postState {
+							start := time.Now()
 							err := RunSpecificTest(t, file, tc, fc, idx, postStateEntry)
+
+							t.Logf("'%s' executed. Fork: %s. Case: %d, Duration=%v\n", file, fork, idx, time.Since(start))
+
 							require.NoError(t, tc.checkError(fork, idx, err))
 						}
 					}

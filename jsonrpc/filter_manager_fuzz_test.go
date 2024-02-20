@@ -34,13 +34,19 @@ func FuzzGetLogsForQuery(f *testing.F) {
 			},
 			Transactions: []*types.Transaction{
 				{
-					Value: big.NewInt(10),
+					Inner: &types.MixedTxn{
+						Value: big.NewInt(10),
+					},
 				},
 				{
-					Value: big.NewInt(11),
+					Inner: &types.MixedTxn{
+						Value: big.NewInt(11),
+					},
 				},
 				{
-					Value: big.NewInt(12),
+					Inner: &types.MixedTxn{
+						Value: big.NewInt(12),
+					},
 				},
 			},
 		}

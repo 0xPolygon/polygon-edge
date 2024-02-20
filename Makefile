@@ -56,16 +56,16 @@ lint: check-lint
 generate-bsd-licenses: check-git
 	./generate_dependency_licenses.sh BSD-3-Clause,BSD-2-Clause > ./licenses/bsd_licenses.json
 
-.PHONY: test
-test: check-go
+.PHONY: unit-test
+unit-test: check-go
 	go test -race -shuffle=on -coverprofile coverage.out -timeout 20m `go list ./... | grep -v e2e`
 
 .PHONY: fuzz-test
 fuzz-test: check-go
 	./scripts/fuzzAll
 
-.PHONY: test-e2e
-test-e2e: check-go
+.PHONY: test-e2e-legacy
+test-e2e-legacy: check-go
 	go build -race -o artifacts/blade .
 	env EDGE_BINARY=${PWD}/artifacts/blade go test -v -timeout=30m ./e2e/...
 
@@ -112,9 +112,9 @@ help:
 	@printf "  %-35s - %s\n" "build" "Build the project"
 	@printf "  %-35s - %s\n" "lint" "Run linters on the codebase"
 	@printf "  %-35s - %s\n" "generate-bsd-licenses" "Generate BSD licenses"
-	@printf "  %-35s - %s\n" "test" "Run unit tests"
+	@printf "  %-35s - %s\n" "unit-test" "Run unit tests"
 	@printf "  %-35s - %s\n" "fuzz-test" "Run fuzz tests"
-	@printf "  %-35s - %s\n" "test-e2e" "Run end-to-end tests"
+	@printf "  %-35s - %s\n" "test-e2e-legacy" "Run end-to-end Legacy tests"
 	@printf "  %-35s - %s\n" "test-e2e-polybft" "Run end-to-end tests for PolyBFT"
 	@printf "  %-35s - %s\n" "test-property-polybft" "Run property tests for PolyBFT"
 	@printf "  %-35s - %s\n" "compile-blade-contracts" "Compile blade contracts"

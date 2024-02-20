@@ -18,24 +18,25 @@ type transactionOrHash interface {
 }
 
 type transaction struct {
-	Nonce       argUint64      `json:"nonce"`
-	GasPrice    *argBig        `json:"gasPrice,omitempty"`
-	GasTipCap   *argBig        `json:"maxPriorityFeePerGas,omitempty"`
-	GasFeeCap   *argBig        `json:"maxFeePerGas,omitempty"`
-	Gas         argUint64      `json:"gas"`
-	To          *types.Address `json:"to"`
-	Value       argBig         `json:"value"`
-	Input       argBytes       `json:"input"`
-	V           argBig         `json:"v"`
-	R           argBig         `json:"r"`
-	S           argBig         `json:"s"`
-	Hash        types.Hash     `json:"hash"`
-	From        types.Address  `json:"from"`
-	BlockHash   *types.Hash    `json:"blockHash"`
-	BlockNumber *argUint64     `json:"blockNumber"`
-	TxIndex     *argUint64     `json:"transactionIndex"`
-	ChainID     *argBig        `json:"chainId,omitempty"`
-	Type        argUint64      `json:"type"`
+	Nonce       argUint64          `json:"nonce"`
+	GasPrice    *argBig            `json:"gasPrice,omitempty"`
+	GasTipCap   *argBig            `json:"maxPriorityFeePerGas,omitempty"`
+	GasFeeCap   *argBig            `json:"maxFeePerGas,omitempty"`
+	Gas         argUint64          `json:"gas"`
+	To          *types.Address     `json:"to"`
+	Value       argBig             `json:"value"`
+	Input       argBytes           `json:"input"`
+	V           argBig             `json:"v"`
+	R           argBig             `json:"r"`
+	S           argBig             `json:"s"`
+	Hash        types.Hash         `json:"hash"`
+	From        types.Address      `json:"from"`
+	BlockHash   *types.Hash        `json:"blockHash"`
+	BlockNumber *argUint64         `json:"blockNumber"`
+	TxIndex     *argUint64         `json:"transactionIndex"`
+	ChainID     *argBig            `json:"chainId,omitempty"`
+	Type        argUint64          `json:"type"`
+	AccessList  types.TxAccessList `json:"accessList,omitempty"`
 }
 
 func (t transaction) getHash() types.Hash { return t.Hash }
@@ -59,44 +60,49 @@ func toTransaction(
 	blockHash *types.Hash,
 	txIndex *int,
 ) *transaction {
+	v, r, s := t.RawSignatureValues()
 	res := &transaction{
-		Nonce:       argUint64(t.Nonce),
-		Gas:         argUint64(t.Gas),
-		To:          t.To,
-		Value:       argBig(*t.Value),
-		Input:       t.Input,
-		V:           argBig(*t.V),
-		R:           argBig(*t.R),
-		S:           argBig(*t.S),
-		Hash:        t.Hash,
-		From:        t.From,
-		Type:        argUint64(t.Type),
+		Nonce:       argUint64(t.Nonce()),
+		Gas:         argUint64(t.Gas()),
+		To:          t.To(),
+		Value:       argBig(*t.Value()),
+		Input:       t.Input(),
+		V:           argBig(*v),
+		R:           argBig(*r),
+		S:           argBig(*s),
+		Hash:        t.Hash(),
+		From:        t.From(),
+		Type:        argUint64(t.Type()),
 		BlockNumber: blockNumber,
 		BlockHash:   blockHash,
 	}
 
-	if t.GasPrice != nil {
-		gasPrice := argBig(*t.GasPrice)
+	if t.GasPrice() != nil {
+		gasPrice := argBig(*(t.GasPrice()))
 		res.GasPrice = &gasPrice
 	}
 
-	if t.GasTipCap != nil {
-		gasTipCap := argBig(*t.GasTipCap)
+	if t.GasTipCap() != nil {
+		gasTipCap := argBig(*(t.GasTipCap()))
 		res.GasTipCap = &gasTipCap
 	}
 
-	if t.GasFeeCap != nil {
-		gasFeeCap := argBig(*t.GasFeeCap)
+	if t.GasFeeCap() != nil {
+		gasFeeCap := argBig(*(t.GasFeeCap()))
 		res.GasFeeCap = &gasFeeCap
 	}
 
-	if t.ChainID != nil {
-		chainID := argBig(*t.ChainID)
+	if t.ChainID() != nil {
+		chainID := argBig(*(t.ChainID()))
 		res.ChainID = &chainID
 	}
 
 	if txIndex != nil {
 		res.TxIndex = argUintPtr(uint64(*txIndex))
+	}
+
+	if t.AccessList() != nil {
+		res.AccessList = t.AccessList()
 	}
 
 	return res
@@ -167,7 +173,7 @@ func toBlock(b *types.Block, fullTx bool) *block {
 
 	for idx, txn := range b.Transactions {
 		if fullTx {
-			txn.GasPrice = txn.GetGasPrice(b.Header.BaseFee)
+			txn.SetGasPrice(txn.GetGasPrice(b.Header.BaseFee))
 			res.Transactions = append(
 				res.Transactions,
 				toTransaction(
@@ -180,7 +186,7 @@ func toBlock(b *types.Block, fullTx bool) *block {
 		} else {
 			res.Transactions = append(
 				res.Transactions,
-				transactionHash(txn.Hash),
+				transactionHash(txn.Hash()),
 			)
 		}
 	}
@@ -215,14 +221,14 @@ func toReceipt(src *types.Receipt, tx *types.Transaction,
 		CumulativeGasUsed: argUint64(src.CumulativeGasUsed),
 		LogsBloom:         src.LogsBloom,
 		Status:            argUint64(*src.Status),
-		TxHash:            tx.Hash,
+		TxHash:            tx.Hash(),
 		TxIndex:           argUint64(txIndex),
 		BlockHash:         header.Hash,
 		BlockNumber:       argUint64(header.Number),
 		GasUsed:           argUint64(src.GasUsed),
 		ContractAddress:   src.ContractAddress,
-		FromAddr:          tx.From,
-		ToAddr:            tx.To,
+		FromAddr:          tx.From(),
+		ToAddr:            tx.To(),
 		Logs:              logs,
 	}
 }
@@ -376,17 +382,18 @@ func encodeToHex(b []byte) []byte {
 
 // txnArgs is the transaction argument for the rpc endpoints
 type txnArgs struct {
-	From      *types.Address
-	To        *types.Address
-	Gas       *argUint64
-	GasPrice  *argBytes
-	GasTipCap *argBytes
-	GasFeeCap *argBytes
-	Value     *argBytes
-	Data      *argBytes
-	Input     *argBytes
-	Nonce     *argUint64
-	Type      *argUint64
+	From       *types.Address
+	To         *types.Address
+	Gas        *argUint64
+	GasPrice   *argBytes
+	GasTipCap  *argBytes
+	GasFeeCap  *argBytes
+	Value      *argBytes
+	Data       *argBytes
+	Input      *argBytes
+	Nonce      *argUint64
+	Type       *argUint64
+	AccessList *types.TxAccessList
 }
 
 type progression struct {

@@ -155,6 +155,7 @@ func WaitUntilPeerConnects(ctx context.Context, srv *TestServer, requiredNum int
 	res, err := tests.RetryUntilTimeout(ctx, func() (interface{}, bool) {
 		subCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
+
 		res, _ := clt.PeersList(subCtx, &empty.Empty{})
 		if res != nil && len(res.Peers) >= requiredNum {
 			return res, false
@@ -186,6 +187,7 @@ func WaitUntilTxPoolFilled(
 	res, err := tests.RetryUntilTimeout(ctx, func() (interface{}, bool) {
 		subCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
+
 		res, _ := clt.Status(subCtx, &empty.Empty{})
 		if res != nil && res.Length >= requiredNum {
 			return res, false
@@ -321,6 +323,7 @@ func NewTestServers(t *testing.T, num int, conf func(*TestServerConfig)) []*Test
 	t.Cleanup(func() {
 		for _, srv := range srvs {
 			srv.Stop()
+
 			if err := os.RemoveAll(srv.Config.RootDir); err != nil {
 				t.Log(err)
 			}

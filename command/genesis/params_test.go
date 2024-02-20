@@ -152,6 +152,7 @@ func Test_validatePremineInfo(t *testing.T) {
 
 			p := &genesisParams{premine: c.premineRaw, nativeTokenConfig: &polybft.TokenConfig{IsMintable: c.isTokenMintable}}
 			err := p.parsePremineInfo()
+
 			if c.expectedParseErrMsg != "" {
 				require.ErrorContains(t, err, c.expectedParseErrMsg)
 

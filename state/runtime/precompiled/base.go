@@ -39,7 +39,11 @@ func (e *ecrecover) run(input []byte, caller types.Address, _ runtime.Host) ([]b
 		return nil, nil
 	}
 
-	pubKey, err := crypto.Ecrecover(input[:32], append(input[64:128], v))
+	sig := make([]byte, 65)
+	copy(sig, input[64:128])
+	sig[64] = v
+
+	pubKey, err := crypto.Ecrecover(input[:32], sig)
 	if err != nil {
 		return nil, nil
 	}

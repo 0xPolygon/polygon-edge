@@ -65,7 +65,7 @@ func (k *Key) SignIBFTMessage(msg *proto.Message) (*proto.Message, error) {
 // RecoverAddressFromSignature calculates keccak256 hash of provided rawContent
 // and recovers signer address from given signature and hash
 func RecoverAddressFromSignature(sig, rawContent []byte) (types.Address, error) {
-	pub, err := crypto.RecoverPubkey(sig, crypto.Keccak256(rawContent))
+	pub, err := crypto.RecoverPubKey(sig, crypto.Keccak256(rawContent))
 	if err != nil {
 		return types.Address{}, fmt.Errorf("cannot recover address from signature: %w", err)
 	}

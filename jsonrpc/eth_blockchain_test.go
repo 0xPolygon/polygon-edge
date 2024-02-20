@@ -88,7 +88,8 @@ func TestEth_Block_GetBlockTransactionCountByNumber(t *testing.T) {
 	block := newTestBlock(1, hash1)
 
 	for i := 0; i < 10; i++ {
-		block.Transactions = append(block.Transactions, []*types.Transaction{{Nonce: 0, From: addr0}}...)
+		block.Transactions = append(block.Transactions, []*types.Transaction{
+			types.NewTx(&types.MixedTxn{Nonce: 0, From: addr0})}...)
 	}
 	store.add(block)
 
@@ -120,12 +121,12 @@ func TestEth_GetTransactionByHash(t *testing.T) {
 		testTxnIndex := 5
 		testTxn := block.Transactions[testTxnIndex]
 
-		res, err := eth.GetTransactionByHash(testTxn.Hash)
+		res, err := eth.GetTransactionByHash(testTxn.Hash())
 		assert.NoError(t, err)
 		assert.NotNil(t, res)
 
 		foundTxn := res.(*transaction)
-		assert.Equal(t, argUint64(testTxn.Nonce), foundTxn.Nonce)
+		assert.Equal(t, argUint64(testTxn.Nonce()), foundTxn.Nonce)
 		assert.Equal(t, argUint64(block.Number()), *foundTxn.BlockNumber)
 		assert.Equal(t, block.Hash(), *foundTxn.BlockHash)
 		assert.Equal(t, argUint64(testTxnIndex), *foundTxn.TxIndex)
@@ -144,12 +145,12 @@ func TestEth_GetTransactionByHash(t *testing.T) {
 
 		testTxn := store.pendingTxns[5]
 
-		res, err := eth.GetTransactionByHash(testTxn.Hash)
+		res, err := eth.GetTransactionByHash(testTxn.Hash())
 		assert.NoError(t, err)
 		assert.NotNil(t, res)
 
 		foundTxn := res.(*transaction)
-		assert.Equal(t, argUint64(testTxn.Nonce), foundTxn.Nonce)
+		assert.Equal(t, argUint64(testTxn.Nonce()), foundTxn.Nonce)
 		assert.Nil(t, foundTxn.BlockNumber)
 		assert.Nil(t, foundTxn.BlockHash)
 		assert.Nil(t, foundTxn.TxIndex)
@@ -228,13 +229,13 @@ func TestEth_GetTransactionReceipt(t *testing.T) {
 		receipt2.SetStatus(types.ReceiptSuccess)
 		store.receipts[hash4] = []*types.Receipt{receipt1, receipt2}
 
-		res, err := eth.GetTransactionReceipt(txn1.Hash)
+		res, err := eth.GetTransactionReceipt(txn1.Hash())
 
 		assert.NoError(t, err)
 		assert.NotNil(t, res)
 
 		response := res.(*receipt)
-		assert.Equal(t, txn1.Hash, response.TxHash)
+		assert.Equal(t, txn1.Hash(), response.TxHash)
 		assert.Equal(t, block.Hash(), response.BlockHash)
 		assert.NotNil(t, response.Logs)
 		assert.Len(t, response.Logs, 1)
@@ -588,7 +589,7 @@ func (m *mockBlockStore) Header() *types.Header {
 func (m *mockBlockStore) ReadTxLookup(txnHash types.Hash) (types.Hash, bool) {
 	for _, block := range m.blocks {
 		for _, txn := range block.Transactions {
-			if txn.Hash == txnHash {
+			if txn.Hash() == txnHash {
 				return block.Hash(), true
 			}
 		}
@@ -599,7 +600,7 @@ func (m *mockBlockStore) ReadTxLookup(txnHash types.Hash) (types.Hash, bool) {
 
 func (m *mockBlockStore) GetPendingTx(txHash types.Hash) (*types.Transaction, bool) {
 	for _, txn := range m.pendingTxns {
-		if txn.Hash == txHash {
+		if txn.Hash() == txHash {
 			return txn, true
 		}
 	}

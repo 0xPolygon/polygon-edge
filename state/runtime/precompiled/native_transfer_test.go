@@ -171,6 +171,34 @@ func (d dummyHost) GetNonce(addr types.Address) uint64 {
 	return 0
 }
 
+func (d *dummyHost) AddSlotToAccessList(addr types.Address, slot types.Hash) {
+	d.t.Fatalf("AddSlotToAccessList is not implemented")
+}
+
+func (d *dummyHost) AddAddressToAccessList(addr types.Address) {
+	d.t.Fatalf("AddAddressToAccessList is not implemented")
+}
+
+func (d *dummyHost) ContainsAccessListAddress(addr types.Address) bool {
+	d.t.Fatalf("ContainsAccessListAddress is not implemented")
+
+	return false
+}
+
+func (d *dummyHost) ContainsAccessListSlot(addr types.Address, slot types.Hash) (bool, bool) {
+	d.t.Fatalf("ContainsAccessListSlot is not implemented")
+
+	return false, false
+}
+
+func (d *dummyHost) DeleteAccessListAddress(addr types.Address) {
+	d.t.Fatalf("DeleteAccessListAddress is not implemented")
+}
+
+func (d *dummyHost) DeleteAccessListSlot(addr types.Address, slot types.Hash) {
+	d.t.Fatalf("DeleteAccessListSlot is not implemented")
+}
+
 func (d dummyHost) Transfer(from types.Address, to types.Address, amount *big.Int) error {
 	if d.balances == nil {
 		d.balances = map[types.Address]*big.Int{}

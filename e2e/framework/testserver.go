@@ -520,7 +520,7 @@ func (t *TestServer) SendRawTx(
 		return nil, err
 	}
 
-	signedTx, err := t.SignTx(&types.Transaction{
+	signedTx, err := t.SignTx(types.NewTx(&types.MixedTxn{
 		From:     tx.From,
 		GasPrice: tx.GasPrice,
 		Gas:      tx.Gas,
@@ -528,7 +528,7 @@ func (t *TestServer) SendRawTx(
 		Value:    tx.Value,
 		Input:    tx.Input,
 		Nonce:    nextNonce,
-	}, signerKey)
+	}), signerKey)
 	if err != nil {
 		return nil, err
 	}
@@ -551,9 +551,11 @@ func (t *TestServer) WaitForReceipt(ctx context.Context, hash ethgo.Hash) (*ethg
 
 	res, err := tests.RetryUntilTimeout(ctx, func() (interface{}, bool) {
 		receipt, err := client.Eth().GetTransactionReceipt(hash)
+
 		if err != nil && err.Error() != "not found" {
 			return result{receipt, err}, false
 		}
+
 		if receipt != nil {
 			return result{receipt, nil}, false
 		}

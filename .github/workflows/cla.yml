@@ -1,5 +1,5 @@
 ---
-name: "CLA Assistant"
+name: CLA Assistant
 on: # yamllint disable-line rule:truthy
   issue_comment:
     types:
@@ -10,7 +10,7 @@ on: # yamllint disable-line rule:truthy
       - synchronize
 
 jobs:
-  CLAssistant:
+  cla-assistant:
     runs-on: ubuntu-latest
     steps:
       - name: "Check CLA"
@@ -22,6 +22,6 @@ jobs:
           PERSONAL_ACCESS_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
         with:
           path-to-signatures: "cla.json"
-          path-to-document: "https://github.com/Ethernal-Tech/blade/blob/develop/CLA.md"
+          path-to-document: "https://github.com/${GITHUB_REPOSITORY}/blob/develop/CLA.md"
           branch: "cla-signatures"
           allowlist: dependabot[bot],dependabot-preview[bot]

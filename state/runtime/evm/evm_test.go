@@ -29,7 +29,8 @@ func newMockContract(value *big.Int, gas uint64, code []byte) *runtime.Contract 
 type mockHost struct {
 	mock.Mock
 
-	tracer runtime.VMTracer
+	tracer     runtime.VMTracer
+	accessList *runtime.AccessList
 }
 
 func (m *mockHost) AccountExists(addr types.Address) bool {
@@ -133,6 +134,30 @@ func (m *mockHost) GetTracer() runtime.VMTracer {
 
 func (m *mockHost) GetRefund() uint64 {
 	panic("Not implemented in tests") //nolint:gocritic
+}
+
+func (m *mockHost) AddSlotToAccessList(addr types.Address, slot types.Hash) {
+	m.accessList.AddSlot(addr, slot)
+}
+
+func (m *mockHost) AddAddressToAccessList(addr types.Address) {
+	m.accessList.AddAddress(addr)
+}
+
+func (m *mockHost) ContainsAccessListAddress(addr types.Address) bool {
+	return m.accessList.ContainsAddress(addr)
+}
+
+func (m *mockHost) ContainsAccessListSlot(addr types.Address, slot types.Hash) (bool, bool) {
+	return m.accessList.Contains(addr, slot)
+}
+
+func (m *mockHost) DeleteAccessListAddress(addr types.Address) {
+	m.accessList.DeleteAddress(addr)
+}
+
+func (m *mockHost) DeleteAccessListSlot(addr types.Address, slot types.Hash) {
+	m.accessList.DeleteSlot(addr, slot)
 }
 
 func TestRun(t *testing.T) {

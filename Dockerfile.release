@@ -8,9 +8,9 @@ COPY blade /usr/local/bin/
 
 EXPOSE 8545 9632 1478
 
-RUN addgroup -S edge \
-    && adduser -S edge -G edge
+RUN addgroup -S blade-group \
+    && adduser -S blade -G blade-group
 
-USER edge
+USER blade
 
 ENTRYPOINT ["blade"]

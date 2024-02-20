@@ -16,9 +16,10 @@ func newTestTransition(preState map[types.Address]*PreState) *Transition {
 	}
 
 	return &Transition{
-		logger: hclog.NewNullLogger(),
-		state:  newTestTxn(preState),
-		ctx:    runtime.TxContext{BaseFee: big.NewInt(0)},
+		logger:  hclog.NewNullLogger(),
+		state:   newTestTxn(preState),
+		ctx:     runtime.TxContext{BaseFee: big.NewInt(0)},
+		journal: &runtime.Journal{},
 	}
 }
 
@@ -47,7 +48,7 @@ func TestSubGasLimitPrice(t *testing.T) {
 			expectedErr: nil,
 		},
 		{
-			name: "should fail by ErrNotEnoughFunds",
+			name: "should fail by ErrInsufficientFunds",
 			preState: map[types.Address]*PreState{
 				addr1: {
 					Nonce:   0,
@@ -58,8 +59,8 @@ func TestSubGasLimitPrice(t *testing.T) {
 			from:     addr1,
 			gas:      10,
 			gasPrice: 10,
-			// should return ErrNotEnoughFundsForGas when state.SubBalance returns ErrNotEnoughFunds
-			expectedErr: ErrNotEnoughFundsForGas,
+			// should return ErrInsufficientFunds when state.SubBalance returns ErrNotEnoughFunds
+			expectedErr: ErrInsufficientFunds,
 		},
 	}
 
@@ -69,20 +70,25 @@ func TestSubGasLimitPrice(t *testing.T) {
 			t.Parallel()
 
 			transition := newTestTransition(tt.preState)
-			msg := &types.Transaction{
+			msg := types.NewTx(&types.MixedTxn{
 				From:     tt.from,
 				Gas:      tt.gas,
 				GasPrice: big.NewInt(tt.gasPrice),
-			}
+			})
 
 			err := transition.subGasLimitPrice(msg)
 
-			assert.Equal(t, tt.expectedErr, err)
+			if tt.expectedErr != nil {
+				assert.ErrorContains(t, err, tt.expectedErr.Error())
+			} else {
+				assert.NoError(t, err)
+			}
+
 			if err == nil {
 				// should reduce cost for gas from balance
-				reducedAmount := new(big.Int).Mul(msg.GasPrice, big.NewInt(int64(msg.Gas)))
-				newBalance := transition.GetBalance(msg.From)
-				diff := new(big.Int).Sub(big.NewInt(int64(tt.preState[msg.From].Balance)), newBalance)
+				reducedAmount := new(big.Int).Mul(msg.GasPrice(), big.NewInt(int64(msg.Gas())))
+				newBalance := transition.GetBalance(msg.From())
+				diff := new(big.Int).Sub(big.NewInt(int64(tt.preState[msg.From()].Balance)), newBalance)
 				assert.Zero(t, diff.Cmp(reducedAmount))
 			}
 		})

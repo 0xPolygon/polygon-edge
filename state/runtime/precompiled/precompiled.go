@@ -45,6 +45,7 @@ type contract interface {
 type Precompiled struct {
 	buf       []byte
 	contracts map[types.Address]contract
+	Addrs     []types.Address
 }
 
 // NewPrecompiled creates a new runtime for the precompiled contracts
@@ -80,12 +81,14 @@ func (p *Precompiled) setupContracts() {
 	p.register(contracts.BLSAggSigsVerificationPrecompile.String(), &blsAggSignsVerification{})
 }
 
-func (p *Precompiled) register(addrStr string, b contract) {
+func (p *Precompiled) register(precompileAddrRaw string, b contract) {
 	if len(p.contracts) == 0 {
 		p.contracts = map[types.Address]contract{}
 	}
 
-	p.contracts[types.StringToAddress(addrStr)] = b
+	precompileAddr := types.StringToAddress(precompileAddrRaw)
+	p.contracts[precompileAddr] = b
+	p.Addrs = append(p.Addrs, precompileAddr)
 }
 
 var (

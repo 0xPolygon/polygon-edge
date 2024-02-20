@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/mock"
@@ -111,7 +110,6 @@ func FuzzTestStakeManagerPostBlock(f *testing.F) {
 		stakeManager, err := newStakeManager(
 			hclog.NewNullLogger(),
 			state,
-			wallet.NewEcdsaSigner(validators.GetValidator("A").Key()),
 			types.StringToAddress("0x0002"),
 			bcMock,
 			nil,
@@ -154,7 +152,6 @@ func FuzzTestStakeManagerUpdateValidatorSet(f *testing.F) {
 	stakeManager, err := newStakeManager(
 		hclog.NewNullLogger(),
 		state,
-		wallet.NewEcdsaSigner(validators.GetValidator("A").Key()),
 		types.StringToAddress("0x0001"),
 		bcMock,
 		nil,

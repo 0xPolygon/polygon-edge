@@ -7,6 +7,11 @@ import (
 	"fmt"
 	"math/big"
 
+	dockertypes "github.com/docker/docker/api/types"
+	"github.com/docker/docker/client"
+	"github.com/umbracle/ethgo"
+	"github.com/umbracle/ethgo/wallet"
+
 	polybftsecrets "github.com/0xPolygon/polygon-edge/command/secrets/init"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
@@ -16,10 +21,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
-	dockertypes "github.com/docker/docker/api/types"
-	"github.com/docker/docker/client"
-	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/wallet"
 )
 
 //nolint:gosec

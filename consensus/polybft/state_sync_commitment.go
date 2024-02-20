@@ -165,15 +165,15 @@ func getCommitmentMessageSignedTx(txs []*types.Transaction) (*CommitmentMessageS
 	var commitFn contractsapi.CommitStateReceiverFn
 	for _, tx := range txs {
 		// skip non state CommitmentMessageSigned transactions
-		if tx.Type != types.StateTx ||
-			len(tx.Input) < abiMethodIDLength ||
-			!bytes.Equal(tx.Input[:abiMethodIDLength], commitFn.Sig()) {
+		if tx.Type() != types.StateTx ||
+			len(tx.Input()) < abiMethodIDLength ||
+			!bytes.Equal(tx.Input()[:abiMethodIDLength], commitFn.Sig()) {
 			continue
 		}
 
 		obj := &CommitmentMessageSigned{}
 
-		if err := obj.DecodeAbi(tx.Input); err != nil {
+		if err := obj.DecodeAbi(tx.Input()); err != nil {
 			return nil, fmt.Errorf("get commitment message signed tx error: %w", err)
 		}
 

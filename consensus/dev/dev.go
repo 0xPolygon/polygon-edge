@@ -121,7 +121,7 @@ func (d *Dev) writeTransactions(gasLimit uint64, transition transitionInterface)
 			break
 		}
 
-		if tx.Gas > gasLimit {
+		if tx.Gas() > gasLimit {
 			d.txpool.Drop(tx)
 
 			continue

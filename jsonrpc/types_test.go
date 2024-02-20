@@ -103,7 +103,7 @@ func TestToTransaction_Returns_V_R_S_ValuesWithoutLeading0(t *testing.T) {
 	v, _ := hex.DecodeHex(hexWithLeading0)
 	r, _ := hex.DecodeHex(hexWithLeading0)
 	s, _ := hex.DecodeHex(hexWithLeading0)
-	txn := &types.Transaction{
+	txn := types.NewTx(&types.MixedTxn{
 		Nonce:    0,
 		GasPrice: big.NewInt(0),
 		Gas:      0,
@@ -115,7 +115,7 @@ func TestToTransaction_Returns_V_R_S_ValuesWithoutLeading0(t *testing.T) {
 		S:        new(big.Int).SetBytes(s),
 		Hash:     types.Hash{},
 		From:     types.Address{},
-	}
+	})
 
 	jsonTx := toTransaction(txn, nil, nil, nil)
 
@@ -134,7 +134,7 @@ func TestToTransaction_EIP1559(t *testing.T) {
 	v, _ := hex.DecodeHex(hexWithLeading0)
 	r, _ := hex.DecodeHex(hexWithLeading0)
 	s, _ := hex.DecodeHex(hexWithLeading0)
-	txn := &types.Transaction{
+	txn := types.NewTx(&types.MixedTxn{
 		Nonce:     0,
 		GasPrice:  nil,
 		GasTipCap: big.NewInt(10),
@@ -148,7 +148,7 @@ func TestToTransaction_EIP1559(t *testing.T) {
 		S:         new(big.Int).SetBytes(s),
 		Hash:      types.Hash{},
 		From:      types.Address{},
-	}
+	})
 
 	jsonTx := toTransaction(txn, nil, nil, nil)
 
@@ -311,21 +311,21 @@ func Test_toReceipt(t *testing.T) {
 	t.Run("no logs", func(t *testing.T) {
 		tx := createTestTransaction(types.StringToHash("tx1"))
 		recipient := types.StringToAddress("2")
-		tx.From = types.StringToAddress("1")
-		tx.To = &recipient
+		tx.SetFrom(types.StringToAddress("1"))
+		tx.SetTo(&recipient)
 
 		header := createTestHeader(15, nil)
-		rec := createTestReceipt(nil, cumulativeGasUsed, gasUsed, tx.Hash)
+		rec := createTestReceipt(nil, cumulativeGasUsed, gasUsed, tx.Hash())
 		testReceipt("testsuite/receipt-no-logs.json", toReceipt(rec, tx, 0, header, nil))
 	})
 
 	t.Run("with contract address", func(t *testing.T) {
 		tx := createTestTransaction(types.StringToHash("tx1"))
-		tx.To = nil
+		tx.SetTo(nil)
 
 		contractAddr := types.StringToAddress("3")
 		header := createTestHeader(20, nil)
-		rec := createTestReceipt(nil, cumulativeGasUsed, gasUsed, tx.Hash)
+		rec := createTestReceipt(nil, cumulativeGasUsed, gasUsed, tx.Hash())
 		rec.ContractAddress = &contractAddr
 		testReceipt("testsuite/receipt-contract-deployment.json", toReceipt(rec, tx, 0, header, nil))
 	})
@@ -333,14 +333,14 @@ func Test_toReceipt(t *testing.T) {
 	t.Run("with logs", func(t *testing.T) {
 		tx := createTestTransaction(types.StringToHash("tx1"))
 		recipient := types.StringToAddress("2")
-		tx.From = types.StringToAddress("1")
-		tx.To = &recipient
+		tx.SetFrom(types.StringToAddress("1"))
+		tx.SetTo(&recipient)
 
 		header := createTestHeader(30, nil)
 		logs := createTestLogs(2, recipient)
-		originReceipt := createTestReceipt(logs, cumulativeGasUsed, gasUsed, tx.Hash)
+		originReceipt := createTestReceipt(logs, cumulativeGasUsed, gasUsed, tx.Hash())
 		txIdx := uint64(1)
-		receipt := toReceipt(originReceipt, tx, txIdx, header, toLogs(logs, 0, txIdx, header, tx.Hash))
+		receipt := toReceipt(originReceipt, tx, txIdx, header, toLogs(logs, 0, txIdx, header, tx.Hash()))
 		testReceipt("testsuite/receipt-with-logs.json", receipt)
 	})
 }

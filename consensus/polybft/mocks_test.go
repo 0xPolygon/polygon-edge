@@ -247,6 +247,7 @@ func (m *systemStateMock) GetEpoch() (uint64, error) {
 		return epochNumber, nil
 	} else if len(args) == 2 {
 		epochNumber, _ := args.Get(0).(uint64)
+
 		err, ok := args.Get(1).(error)
 		if ok {
 			return epochNumber, err

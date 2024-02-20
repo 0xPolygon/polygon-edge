@@ -162,6 +162,7 @@ func Test_determineTo(t *testing.T) {
 
 			resTo, resToHash, err := determineTo(context.Background(), tt.systemClientMock, tt.targetTo)
 			assert.Equal(t, tt.err, err)
+
 			if tt.err == nil {
 				assert.Equal(t, tt.resTo, resTo)
 				assert.Equal(t, tt.resToHash, resToHash)
@@ -255,6 +256,7 @@ func Test_processExportStream(t *testing.T) {
 			from, to, err := processExportStream(tt.mockSystemExportClient, hclog.NewNullLogger(), &buffer, 0, 0)
 
 			assert.Equal(t, tt.err, err)
+
 			if err != nil {
 				return
 			}
@@ -264,12 +266,15 @@ func Test_processExportStream(t *testing.T) {
 
 			// create expected data
 			expectedData := make([]byte, 0)
+
 			for _, rv := range tt.mockSystemExportClient.recvs {
 				if rv.err != nil {
 					break
 				}
+
 				expectedData = append(expectedData, rv.event.Data...)
 			}
+
 			assert.Equal(t, expectedData, buffer.Bytes())
 		})
 	}

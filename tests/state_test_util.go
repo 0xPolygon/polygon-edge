@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -202,10 +203,7 @@ func buildState(allocs map[types.Address]*chain.GenesisAccount) (state.State, st
 		txn.CreateAccount(addr)
 		txn.SetNonce(addr, alloc.Nonce)
 		txn.SetBalance(addr, alloc.Balance)
-
-		if len(alloc.Code) != 0 {
-			txn.SetCode(addr, alloc.Code)
-		}
+		txn.SetCode(addr, alloc.Code)
 
 		for k, v := range alloc.Storage {
 			txn.SetState(addr, k, v)
@@ -266,15 +264,16 @@ type postState []postEntry
 //
 //nolint:godox
 type stTransaction struct {
-	Data                 []string       `json:"data"`
-	Value                []string       `json:"value"`
-	Nonce                uint64         `json:"nonce"`
-	To                   *types.Address `json:"to"`
-	GasLimit             []uint64       `json:"gasLimit"`
-	GasPrice             *big.Int       `json:"gasPrice"`
-	MaxFeePerGas         *big.Int       `json:"maxFeePerGas"`
-	MaxPriorityFeePerGas *big.Int       `json:"maxPriorityFeePerGas"`
-	From                 types.Address  // derived field
+	Data                 []string              `json:"data"`
+	Value                []string              `json:"value"`
+	Nonce                uint64                `json:"nonce"`
+	To                   *types.Address        `json:"to"`
+	GasLimit             []uint64              `json:"gasLimit"`
+	GasPrice             *big.Int              `json:"gasPrice"`
+	MaxFeePerGas         *big.Int              `json:"maxFeePerGas"`
+	MaxPriorityFeePerGas *big.Int              `json:"maxPriorityFeePerGas"`
+	From                 types.Address         // derived field
+	AccessLists          []*types.TxAccessList `json:"accessLists,omitempty"`
 }
 
 func (t *stTransaction) At(i indexes, baseFee *big.Int) (*types.Transaction, error) {
@@ -290,8 +289,14 @@ func (t *stTransaction) At(i indexes, baseFee *big.Int) (*types.Transaction, err
 		return nil, fmt.Errorf("value index %d out of bounds (%d)", i.Value, len(t.Value))
 	}
 
+	var accessList types.TxAccessList
+	if t.AccessLists != nil && t.AccessLists[i.Data] != nil {
+		accessList = *t.AccessLists[i.Data]
+	}
+
 	gasPrice := t.GasPrice
 
+	isDynamiFeeTx := false
 	// If baseFee provided, set gasPrice to effectiveGasPrice.
 	if baseFee != nil {
 		if t.MaxFeePerGas == nil {
@@ -300,10 +305,14 @@ func (t *stTransaction) At(i indexes, baseFee *big.Int) (*types.Transaction, err
 
 		if t.MaxFeePerGas == nil {
 			t.MaxFeePerGas = new(big.Int)
+		} else {
+			isDynamiFeeTx = true
 		}
 
 		if t.MaxPriorityFeePerGas == nil {
 			t.MaxPriorityFeePerGas = t.MaxFeePerGas
+		} else {
+			isDynamiFeeTx = true
 		}
 
 		gasPrice = common.BigMin(new(big.Int).Add(t.MaxPriorityFeePerGas, baseFee), t.MaxFeePerGas)
@@ -325,31 +334,53 @@ func (t *stTransaction) At(i indexes, baseFee *big.Int) (*types.Transaction, err
 		value = v
 	}
 
-	return &types.Transaction{
-		From:      t.From,
-		To:        t.To,
-		Nonce:     t.Nonce,
-		Value:     value,
-		Gas:       t.GasLimit[i.Gas],
-		GasPrice:  gasPrice,
-		GasFeeCap: t.MaxFeePerGas,
-		GasTipCap: t.MaxPriorityFeePerGas,
-		Input:     hex.MustDecodeHex(t.Data[i.Data]),
-	}, nil
+	// if tx is not dynamic and accessList is not nil, create an access list transaction
+	if !isDynamiFeeTx && accessList != nil {
+		return types.NewTx(&types.AccessListTxn{
+			From:       t.From,
+			To:         t.To,
+			Nonce:      t.Nonce,
+			Value:      value,
+			Gas:        t.GasLimit[i.Gas],
+			GasPrice:   gasPrice,
+			Input:      hex.MustDecodeHex(t.Data[i.Data]),
+			AccessList: accessList,
+		}), nil
+	}
+
+	txType := types.LegacyTx
+	if isDynamiFeeTx {
+		txType = types.DynamicFeeTx
+	}
+
+	return types.NewTx(&types.MixedTxn{
+		Type:       txType,
+		From:       t.From,
+		To:         t.To,
+		Nonce:      t.Nonce,
+		Value:      value,
+		Gas:        t.GasLimit[i.Gas],
+		GasPrice:   gasPrice,
+		GasFeeCap:  t.MaxFeePerGas,
+		GasTipCap:  t.MaxPriorityFeePerGas,
+		Input:      hex.MustDecodeHex(t.Data[i.Data]),
+		AccessList: accessList,
+	}), nil
 }
 
 func (t *stTransaction) UnmarshalJSON(input []byte) error {
 	type txUnmarshall struct {
-		Data                 []string `json:"data,omitempty"`
-		GasLimit             []string `json:"gasLimit,omitempty"`
-		Value                []string `json:"value,omitempty"`
-		GasPrice             string   `json:"gasPrice,omitempty"`
-		MaxFeePerGas         string   `json:"maxFeePerGas,omitempty"`
-		MaxPriorityFeePerGas string   `json:"maxPriorityFeePerGas,omitempty"`
-		Nonce                string   `json:"nonce,omitempty"`
-		PrivateKey           string   `json:"secretKey,omitempty"`
-		Sender               string   `json:"sender"`
-		To                   string   `json:"to,omitempty"`
+		Data                 []string              `json:"data,omitempty"`
+		GasLimit             []string              `json:"gasLimit,omitempty"`
+		Value                []string              `json:"value,omitempty"`
+		GasPrice             string                `json:"gasPrice,omitempty"`
+		MaxFeePerGas         string                `json:"maxFeePerGas,omitempty"`
+		MaxPriorityFeePerGas string                `json:"maxPriorityFeePerGas,omitempty"`
+		Nonce                string                `json:"nonce,omitempty"`
+		PrivateKey           string                `json:"secretKey,omitempty"`
+		Sender               string                `json:"sender"`
+		To                   string                `json:"to,omitempty"`
+		AccessLists          []*types.TxAccessList `json:"accessLists,omitempty"`
 	}
 
 	var dec txUnmarshall
@@ -359,6 +390,7 @@ func (t *stTransaction) UnmarshalJSON(input []byte) error {
 
 	t.Data = dec.Data
 	t.Value = dec.Value
+	t.AccessLists = dec.AccessLists
 
 	for _, i := range dec.GasLimit {
 		j, err := stringToUint64(i)
@@ -421,21 +453,27 @@ func (t *stTransaction) UnmarshalJSON(input []byte) error {
 
 // forks
 var Forks = map[string]*chain.Forks{
-	"Frontier": {},
+	"Frontier": {
+		chain.EIP3607: chain.NewFork(0),
+	},
 	"Homestead": {
+		chain.EIP3607:   chain.NewFork(0),
 		chain.Homestead: chain.NewFork(0),
 	},
 	"EIP150": {
+		chain.EIP3607:   chain.NewFork(0),
 		chain.Homestead: chain.NewFork(0),
 		chain.EIP150:    chain.NewFork(0),
 	},
 	"EIP158": {
+		chain.EIP3607:   chain.NewFork(0),
 		chain.Homestead: chain.NewFork(0),
 		chain.EIP150:    chain.NewFork(0),
 		chain.EIP155:    chain.NewFork(0),
 		chain.EIP158:    chain.NewFork(0),
 	},
 	"Byzantium": {
+		chain.EIP3607:   chain.NewFork(0),
 		chain.Homestead: chain.NewFork(0),
 		chain.EIP150:    chain.NewFork(0),
 		chain.EIP155:    chain.NewFork(0),
@@ -443,6 +481,7 @@ var Forks = map[string]*chain.Forks{
 		chain.Byzantium: chain.NewFork(0),
 	},
 	"Constantinople": {
+		chain.EIP3607:        chain.NewFork(0),
 		chain.Homestead:      chain.NewFork(0),
 		chain.EIP150:         chain.NewFork(0),
 		chain.EIP155:         chain.NewFork(0),
@@ -451,6 +490,7 @@ var Forks = map[string]*chain.Forks{
 		chain.Constantinople: chain.NewFork(0),
 	},
 	"ConstantinopleFix": {
+		chain.EIP3607:        chain.NewFork(0),
 		chain.Homestead:      chain.NewFork(0),
 		chain.EIP150:         chain.NewFork(0),
 		chain.EIP155:         chain.NewFork(0),
@@ -460,6 +500,7 @@ var Forks = map[string]*chain.Forks{
 		chain.Petersburg:     chain.NewFork(0),
 	},
 	"Istanbul": {
+		chain.EIP3607:        chain.NewFork(0),
 		chain.Homestead:      chain.NewFork(0),
 		chain.EIP150:         chain.NewFork(0),
 		chain.EIP155:         chain.NewFork(0),
@@ -470,16 +511,16 @@ var Forks = map[string]*chain.Forks{
 		chain.Istanbul:       chain.NewFork(0),
 	},
 	"FrontierToHomesteadAt5": {
+		chain.EIP3607:   chain.NewFork(0),
 		chain.Homestead: chain.NewFork(5),
 	},
 	"HomesteadToEIP150At5": {
+		chain.EIP3607:   chain.NewFork(0),
 		chain.Homestead: chain.NewFork(0),
 		chain.EIP150:    chain.NewFork(5),
 	},
-	"HomesteadToDaoAt5": {
-		chain.Homestead: chain.NewFork(0),
-	},
 	"EIP158ToByzantiumAt5": {
+		chain.EIP3607:   chain.NewFork(0),
 		chain.Homestead: chain.NewFork(0),
 		chain.EIP150:    chain.NewFork(0),
 		chain.EIP155:    chain.NewFork(0),
@@ -487,6 +528,7 @@ var Forks = map[string]*chain.Forks{
 		chain.Byzantium: chain.NewFork(5),
 	},
 	"ByzantiumToConstantinopleAt5": {
+		chain.EIP3607:        chain.NewFork(0),
 		chain.Homestead:      chain.NewFork(0),
 		chain.EIP150:         chain.NewFork(0),
 		chain.EIP155:         chain.NewFork(0),
@@ -495,6 +537,7 @@ var Forks = map[string]*chain.Forks{
 		chain.Constantinople: chain.NewFork(5),
 	},
 	"ByzantiumToConstantinopleFixAt5": {
+		chain.EIP3607:        chain.NewFork(0),
 		chain.Homestead:      chain.NewFork(0),
 		chain.EIP150:         chain.NewFork(0),
 		chain.EIP155:         chain.NewFork(0),
@@ -504,6 +547,7 @@ var Forks = map[string]*chain.Forks{
 		chain.Petersburg:     chain.NewFork(5),
 	},
 	"ConstantinopleFixToIstanbulAt5": {
+		chain.EIP3607:        chain.NewFork(0),
 		chain.Homestead:      chain.NewFork(0),
 		chain.EIP150:         chain.NewFork(0),
 		chain.EIP155:         chain.NewFork(0),
@@ -513,17 +557,44 @@ var Forks = map[string]*chain.Forks{
 		chain.Petersburg:     chain.NewFork(0),
 		chain.Istanbul:       chain.NewFork(5),
 	},
-	// "London": {
-	// 	chain.Homestead:      chain.NewFork(0),
-	// 	chain.EIP150:         chain.NewFork(0),
-	// 	chain.EIP155:         chain.NewFork(0),
-	// 	chain.EIP158:         chain.NewFork(0),
-	// 	chain.Byzantium:      chain.NewFork(0),
-	// 	chain.Constantinople: chain.NewFork(0),
-	// 	chain.Petersburg:     chain.NewFork(0),
-	// 	chain.Istanbul:       chain.NewFork(0),
-	// 	chain.London:         chain.NewFork(0),
-	// },
+	"Berlin": {
+		chain.EIP3607:        chain.NewFork(0),
+		chain.Homestead:      chain.NewFork(0),
+		chain.EIP150:         chain.NewFork(0),
+		chain.EIP155:         chain.NewFork(0),
+		chain.EIP158:         chain.NewFork(0),
+		chain.Byzantium:      chain.NewFork(0),
+		chain.Constantinople: chain.NewFork(0),
+		chain.Petersburg:     chain.NewFork(0),
+		chain.Istanbul:       chain.NewFork(0),
+		chain.Berlin:         chain.NewFork(0),
+	},
+	"BerlinToLondonAt5": {
+		chain.EIP3607:        chain.NewFork(0),
+		chain.Homestead:      chain.NewFork(0),
+		chain.EIP150:         chain.NewFork(0),
+		chain.EIP155:         chain.NewFork(0),
+		chain.EIP158:         chain.NewFork(0),
+		chain.Byzantium:      chain.NewFork(0),
+		chain.Constantinople: chain.NewFork(0),
+		chain.Petersburg:     chain.NewFork(0),
+		chain.Istanbul:       chain.NewFork(0),
+		chain.Berlin:         chain.NewFork(0),
+		chain.London:         chain.NewFork(5),
+	},
+	"London": {
+		chain.EIP3607:        chain.NewFork(0),
+		chain.Homestead:      chain.NewFork(0),
+		chain.EIP150:         chain.NewFork(0),
+		chain.EIP155:         chain.NewFork(0),
+		chain.EIP158:         chain.NewFork(0),
+		chain.Byzantium:      chain.NewFork(0),
+		chain.Constantinople: chain.NewFork(0),
+		chain.Petersburg:     chain.NewFork(0),
+		chain.Istanbul:       chain.NewFork(0),
+		chain.Berlin:         chain.NewFork(0),
+		chain.London:         chain.NewFork(0),
+	},
 }
 
 func contains(l []string, name string) bool {
@@ -536,41 +607,57 @@ func contains(l []string, name string) bool {
 	return false
 }
 
-func listFolders(tests ...string) ([]string, error) {
+func listFolders(paths []string) ([]string, error) {
 	var folders []string
 
-	for _, t := range tests {
-		dir, err := os.Open(t)
-		if err != nil {
-			return nil, err
-		}
-		defer dir.Close()
-
-		fileInfos, err := dir.Readdir(-1)
-		if err != nil {
-			return nil, err
-		}
-
-		for _, fileInfo := range fileInfos {
-			if fileInfo.IsDir() && t != "path" {
-				folders = append(folders, filepath.Join(t, fileInfo.Name()))
+	for _, rootPath := range paths {
+		err := filepath.WalkDir(rootPath, func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
 			}
+
+			if d.IsDir() {
+				files, err := os.ReadDir(path)
+				if err != nil {
+					return err
+				}
+
+				if len(files) > 0 {
+					folders = append(folders, path)
+				}
+			}
+
+			return nil
+		})
+
+		if err != nil {
+			return nil, err
 		}
 	}
 
 	return folders, nil
 }
 
-func listFiles(folder string) ([]string, error) {
+func listFiles(folder string, extensions ...string) ([]string, error) {
 	var files []string
 
-	err := filepath.Walk(folder, func(path string, info os.FileInfo, err error) error {
+	err := filepath.WalkDir(folder, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 
-		if !info.IsDir() {
-			files = append(files, path)
+		if !d.IsDir() {
+			if len(extensions) > 0 {
+				// filter files by extensions
+				for _, ext := range extensions {
+					if strings.HasSuffix(path, ext) {
+						files = append(files, path)
+					}
+				}
+			} else {
+				// if no extensions filter is provided, add all files
+				files = append(files, path)
+			}
 		}
 
 		return nil

@@ -187,6 +187,7 @@ func TestPeerEvent_EmitAndSubscribe(t *testing.T) {
 			id, event := getIDAndEventType(i)
 			server.emitEvent(id, event)
 		}
+
 		for i := 0; i < count; i++ {
 			received := <-receiver
 			id, event := getIDAndEventType(i)
@@ -1099,6 +1100,7 @@ func TestPeerAdditionDeletion(t *testing.T) {
 		prunedPeers := 0
 		for i := 0; i < len(randomPeers); i += 2 {
 			prunedPeers++
+
 			server.removePeer(randomPeers[i].peerID)
 
 			assert.False(t, server.hasPeer(randomPeers[i].peerID))

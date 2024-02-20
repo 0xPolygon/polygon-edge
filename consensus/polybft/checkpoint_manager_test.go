@@ -67,6 +67,7 @@ func TestCheckpointManager_SubmitCheckpoint(t *testing.T) {
 
 		validators.IterAcct(aliases, func(t *validator.TestValidator) {
 			bitmap.Set(idx)
+
 			signatures = append(signatures, t.MustSign(dummyMsg, signer.DomainCheckpointManager))
 			idx++
 		})
@@ -172,7 +173,9 @@ func TestCheckpointManager_abiEncodeCheckpointBlock(t *testing.T) {
 
 	currentValidators.IterAcct(nil, func(v *validator.TestValidator) {
 		signatures = append(signatures, v.MustSign(proposalHash, signer.DomainCheckpointManager))
+
 		bmp.Set(i)
+
 		i++
 	})
 
@@ -245,6 +248,7 @@ func TestCheckpointManager_getCurrentCheckpointID(t *testing.T) {
 			txRelayerMock.On("Call", mock.Anything, mock.Anything, mock.Anything).
 				Return(c.checkpointID, c.returnError).
 				Once()
+
 			acc, err := wallet.GenerateAccount()
 			require.NoError(t, err)
 
@@ -253,6 +257,7 @@ func TestCheckpointManager_getCurrentCheckpointID(t *testing.T) {
 				key:              acc.Ecdsa,
 				logger:           hclog.NewNullLogger(),
 			}
+
 			actualCheckpointID, err := getCurrentCheckpointBlock(checkpointMgr.rootChainRelayer,
 				checkpointMgr.checkpointManagerAddr)
 			if c.errSubstring == "" {
@@ -417,7 +422,9 @@ func TestCheckpointManager_GenerateExitProof(t *testing.T) {
 
 		// copy and make proof invalid
 		invalidProof := make([]types.Hash, len(proof.Data))
+
 		copy(invalidProof, proof.Data)
+
 		invalidProof[0][0]++
 
 		// verify generated proof on desired tree

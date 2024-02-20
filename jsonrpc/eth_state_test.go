@@ -672,7 +672,7 @@ func TestEth_EstimateGas_GasLimit(t *testing.T) {
 					header *types.Header,
 					txn *types.Transaction,
 				) (*runtime.ExecutionResult, error) {
-					if txn.Gas < testCase.intrinsicGasCost {
+					if txn.Gas() < testCase.intrinsicGasCost {
 						return &runtime.ExecutionResult{}, state.ErrNotEnoughIntrinsicGas
 					}
 
