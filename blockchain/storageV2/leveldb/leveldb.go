@@ -22,8 +22,8 @@ var tableMapper = map[uint8][]byte{
 	storageV2.FORK:         []byte("0000000f"), // DB key = empty + mapper
 	storageV2.HEAD_HASH:    []byte("0000000h"), // DB key = empty + mapper
 	storageV2.HEAD_NUMBER:  []byte("0000000n"), // DB key = empty + mapper
-	storageV2.BLOCK_LOOKUP: []byte{},           // DB key = block hash + mapper, value = block number
-	storageV2.TX_LOOKUP:    []byte{},           // DB key = tx hash + mapper, value = block number
+	storageV2.BLOCK_LOOKUP: {},                 // DB key = block hash + mapper, value = block number
+	storageV2.TX_LOOKUP:    {},                 // DB key = tx hash + mapper, value = block number
 }
 
 // NewLevelDBStorage creates the new storage reference with leveldb default options
