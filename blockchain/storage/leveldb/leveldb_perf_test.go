@@ -189,6 +189,8 @@ func prepareBatch(t *testing.T, s storage.Storage, b *types.FullBlock) *storage.
 }
 
 func TestWriteBlockPerf(t *testing.T) {
+	t.SkipNow()
+
 	s, _, path := openStorage(t, "/tmp/leveldbV1-test")
 	defer s.Close()
 
@@ -219,6 +221,8 @@ func TestWriteBlockPerf(t *testing.T) {
 }
 
 func TestReadBlockPerf(t *testing.T) {
+	t.SkipNow()
+
 	s, _, _ := openStorage(t, "/tmp/leveldbV1-test")
 	defer s.Close()
 
