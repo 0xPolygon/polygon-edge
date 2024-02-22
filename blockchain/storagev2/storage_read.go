@@ -25,7 +25,7 @@ func (s *Storage) ReadCanonicalHash(n uint64) (types.Hash, error) {
 
 // ReadHeadHash returns the hash of the head
 func (s *Storage) ReadHeadHash() (types.Hash, error) {
-	data, err := s.get(HEAD_HASH, EMPTY)
+	data, err := s.get(HEAD_HASH, HEAD_HASH_KEY)
 	if err != nil {
 		return types.Hash{}, err
 	}
@@ -35,7 +35,7 @@ func (s *Storage) ReadHeadHash() (types.Hash, error) {
 
 // ReadHeadNumber returns the number of the head
 func (s *Storage) ReadHeadNumber() (uint64, error) {
-	data, err := s.get(HEAD_NUMBER, EMPTY)
+	data, err := s.get(HEAD_NUMBER, HEAD_NUMBER_KEY)
 	if err != nil {
 		return 0, err
 	}
@@ -52,7 +52,7 @@ func (s *Storage) ReadHeadNumber() (uint64, error) {
 // ReadForks read the current forks
 func (s *Storage) ReadForks() ([]types.Hash, error) {
 	forks := &Forks{}
-	err := s.readRLP(FORK, EMPTY, forks)
+	err := s.readRLP(FORK, FORK_KEY, forks)
 
 	return *forks, err
 }

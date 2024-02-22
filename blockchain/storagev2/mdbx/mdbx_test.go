@@ -1,4 +1,4 @@
-package leveldb
+package mdbx
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -26,7 +27,7 @@ func newStorage(t *testing.T) (*storagev2.Storage, func()) {
 		t.Fatal(err)
 	}
 
-	s, err := NewLevelDBStorage(path, hclog.NewNullLogger())
+	s, err := NewMdbxStorage(path, hclog.NewNullLogger())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,12 +132,12 @@ func generateBlock(t *testing.T, num uint64) *types.FullBlock {
 func newStorageP(t *testing.T) (*storagev2.Storage, func(), string) {
 	t.Helper()
 
-	p, err := os.MkdirTemp("", "leveldbV2-test")
+	p, err := os.MkdirTemp("", "mdbx-test")
 	require.NoError(t, err)
 
 	require.NoError(t, os.MkdirAll(p, 0755))
 
-	s, err := NewLevelDBStorage(p, hclog.NewNullLogger())
+	s, err := NewMdbxStorage(p, hclog.NewNullLogger())
 	require.NoError(t, err)
 
 	closeFn := func() {
@@ -150,17 +151,6 @@ func newStorageP(t *testing.T) (*storagev2.Storage, func(), string) {
 	}
 
 	return s, closeFn, p
-}
-
-func countLdbFilesInPath(path string) int {
-	pattern := filepath.Join(path, "*.ldb")
-
-	files, err := filepath.Glob(pattern)
-	if err != nil {
-		return -1
-	}
-
-	return len(files)
 }
 
 func generateBlocks(t *testing.T, count int, ch chan *types.FullBlock, ctx context.Context) {
@@ -182,7 +172,7 @@ func generateBlocks(t *testing.T, count int, ch chan *types.FullBlock, ctx conte
 	}
 }
 
-func dirSize(t *testing.T, path string) int64 {
+func dbSize(t *testing.T, path string) int64 {
 	t.Helper()
 
 	var size int64
@@ -192,7 +182,7 @@ func dirSize(t *testing.T, path string) int64 {
 			t.Fail()
 		}
 
-		if !info.IsDir() {
+		if info != nil && !info.IsDir() && strings.Contains(info.Name(), ".dat") {
 			size += info.Size()
 		}
 
@@ -249,8 +239,7 @@ insertloop:
 
 			t.Logf("writing block %d", i)
 
-			size := dirSize(t, path)
-			t.Logf("\tldb file count: %d", countLdbFilesInPath(path))
+			size := dbSize(t, path)
 			t.Logf("\tdir size %d MBs", size/1_000_000)
 		}
 	}

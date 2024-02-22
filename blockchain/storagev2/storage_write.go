@@ -16,11 +16,11 @@ func (w *Writer) PutBody(bn uint64, body *types.Body) {
 }
 
 func (w *Writer) PutHeadHash(h types.Hash) {
-	w.putIntoTable(HEAD_HASH, EMPTY, h.Bytes())
+	w.putIntoTable(HEAD_HASH, HEAD_HASH_KEY, h.Bytes())
 }
 
 func (w *Writer) PutHeadNumber(bn uint64) {
-	w.putIntoTable(HEAD_NUMBER, EMPTY, common.EncodeUint64ToBytes(bn))
+	w.putIntoTable(HEAD_NUMBER, HEAD_NUMBER_KEY, common.EncodeUint64ToBytes(bn))
 }
 
 func (w *Writer) PutTxLookup(hash types.Hash, bn uint64) {
@@ -54,7 +54,7 @@ func (w *Writer) PutTotalDifficulty(bn uint64, diff *big.Int) {
 
 func (w *Writer) PutForks(forks []types.Hash) {
 	fs := Forks(forks)
-	w.putRlp(FORK, EMPTY, &fs)
+	w.putRlp(FORK, FORK_KEY, &fs)
 }
 
 func (w *Writer) putRlp(t uint8, k []byte, raw types.RLPMarshaler) {

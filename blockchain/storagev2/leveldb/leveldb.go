@@ -14,16 +14,16 @@ type levelDB struct {
 
 // DB key = k + mapper
 var tableMapper = map[uint8][]byte{
-	storagev2.BODY:         []byte("b"),        // DB key = block number + mapper
-	storagev2.CANONICAL:    []byte("c"),        // DB key = block number + mapper
-	storagev2.DIFFICULTY:   []byte("d"),        // DB key = block number + mapper
-	storagev2.HEADER:       []byte("h"),        // DB key = block number + mapper
-	storagev2.RECEIPTS:     []byte("r"),        // DB key = block number + mapper
-	storagev2.FORK:         []byte("0000000f"), // DB key = empty + mapper
-	storagev2.HEAD_HASH:    []byte("0000000h"), // DB key = empty + mapper
-	storagev2.HEAD_NUMBER:  []byte("0000000n"), // DB key = empty + mapper
-	storagev2.BLOCK_LOOKUP: {},                 // DB key = block hash + mapper, value = block number
-	storagev2.TX_LOOKUP:    {},                 // DB key = tx hash + mapper, value = block number
+	storagev2.BODY:         []byte("b"), // DB key = block number + mapper
+	storagev2.CANONICAL:    []byte("c"), // DB key = block number + mapper
+	storagev2.DIFFICULTY:   []byte("d"), // DB key = block number + mapper
+	storagev2.HEADER:       []byte("h"), // DB key = block number + mapper
+	storagev2.RECEIPTS:     []byte("r"), // DB key = block number + mapper
+	storagev2.FORK:         {},          // DB key = FORK_KEY + mapper
+	storagev2.HEAD_HASH:    {},          // DB key = HEAD_HASH_KEY + mapper
+	storagev2.HEAD_NUMBER:  {},          // DB key = HEAD_NUMBER_KEY + mapper
+	storagev2.BLOCK_LOOKUP: {},          // DB key = block hash + mapper, value = block number
+	storagev2.TX_LOOKUP:    {},          // DB key = tx hash + mapper, value = block number
 }
 
 // NewLevelDBStorage creates the new storage reference with leveldb default options

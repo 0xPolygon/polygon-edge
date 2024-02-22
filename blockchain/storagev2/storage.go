@@ -45,13 +45,17 @@ const (
 	TX_LOOKUP    = uint8(8) | GIDLID_INDEX
 )
 
+const MAX_TABLES = uint8(20)
+
 // Database indexes
 const (
 	MAINDB_INDEX = uint8(0)
 	GIDLID_INDEX = uint8(1)
 )
 
-var EMPTY = []byte{} // Empty key
+var FORK_KEY = []byte("0000000f")
+var HEAD_HASH_KEY = []byte("0000000h")
+var HEAD_NUMBER_KEY = []byte("0000000n")
 
 func Open(logger hclog.Logger, db [2]Database) (*Storage, error) {
 	return &Storage{logger: logger, db: db}, nil
