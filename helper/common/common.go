@@ -375,3 +375,43 @@ func EncodeUint64ToBytes(value uint64) []byte {
 func EncodeBytesToUint64(b []byte) uint64 {
 	return binary.BigEndian.Uint64(b)
 }
+
+// Generic object pool implementation intended to be used in single-threaded
+// manner and avoid synchronization overhead. It could be probably additionally
+// be improved by using circular buffer as oposed to stack.
+type UnsafePool[T any] struct {
+	stack []T
+}
+
+// Creates new instance of UnsafePool. Depending on observed usage, pool size
+// should be set on creation to avoid pool resizing
+func NewUnsafePool[T any]() *UnsafePool[T] {
+	return &UnsafePool[T]{}
+}
+
+// Get retrieves an object from the unsafepool, or allocates a new one if the pool
+// is empty. The allocation logic (i.e., creating a new object of type T) needs to
+// be provided externally, as Go's type system does not allow calling constructors
+// or functions specific to T without an interface.
+func (f *UnsafePool[T]) Get(newFunc func() T) T {
+	n := len(f.stack)
+	if n == 0 {
+		// Allocate a new T instance using the provided newFunc if the stack is empty.
+		return newFunc()
+	}
+
+	obj := f.stack[n-1]
+	f.stack = f.stack[:n-1]
+
+	return obj
+}
+
+// Put returns an object to the pool and executes reset function if provided. Reset
+// function is used to return the T instance to initial state.
+func (f *UnsafePool[T]) Put(resetFunc func(T) T, obj T) {
+	if resetFunc != nil {
+		obj = resetFunc(obj)
+	}
+
+	f.stack = append(f.stack, obj)
+}

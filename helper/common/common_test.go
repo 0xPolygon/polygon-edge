@@ -168,3 +168,56 @@ func Test_SafeAddUint64(t *testing.T) {
 		})
 	}
 }
+
+func TestNewUnsafePool(t *testing.T) {
+	pool := NewUnsafePool[int]()
+
+	require.NotNilf(t, pool, "NewUnsafePool returned nil")
+
+	require.Empty(t, pool.stack, "Expected empty pool.")
+}
+
+func TestUnsafePoolGetWhenEmpty(t *testing.T) {
+	pool := NewUnsafePool[int]()
+	newInt := func() int {
+		return 1
+	}
+
+	obj := pool.Get(newInt)
+
+	require.Equal(t, 1, obj, "Expected 1 from newFunc, got %v", obj)
+}
+
+func TestUnsafePoolGetPut(t *testing.T) {
+	pool := NewUnsafePool[int]()
+	resetInt := func(i int) int {
+		return 0
+	}
+
+	// Initially put an object into the pool.
+	pool.Put(resetInt, 2)
+
+	// Retrieve the object, which should now be the reset value.
+	obj := pool.Get(func() int { return 3 })
+
+	// Expecting the original object, not the one from newFunc
+	require.Equal(t, 0, obj, "Expected 0 from the pool, got %v", obj)
+
+	// Test if Get correctly uses newFunc when pool is empty again.
+	obj = pool.Get(func() int { return 3 })
+
+	require.Equal(t, 3, obj, "Expected 3 from newFunc, got %v", obj)
+}
+
+func TestUnsafePoolPutWithReset(t *testing.T) {
+	pool := NewUnsafePool[int]()
+	resetInt := func(i int) int {
+		return 0
+	}
+
+	// Put an object into the pool with a reset function.
+	pool.Put(resetInt, 5)
+
+	// Directly check if the object was reset.
+	require.Equal(t, 0, pool.stack[0], "Expected object to be reset to 0, got %v", pool.stack[0])
+}
