@@ -71,16 +71,20 @@ func openLevelDBStorage(path string, options *opt.Options) (*leveldb.DB, error) 
 }
 
 // Get retrieves the key-value pair in leveldb storage
-func (l *levelDB) Get(t uint8, k []byte) ([]byte, error) {
+func (l *levelDB) Get(t uint8, k []byte) ([]byte, bool, error) {
 	mc := tableMapper[t]
 	k = append(k, mc...)
 
 	data, err := l.db.Get(k, nil)
 	if err != nil {
-		return nil, err
+		if err.Error() == "leveldb: not found" {
+			return nil, false, nil
+		}
+
+		return nil, false, err
 	}
 
-	return data, nil
+	return data, true, nil
 }
 
 // Close closes the leveldb storage instance

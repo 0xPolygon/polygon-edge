@@ -162,20 +162,24 @@ func (db *MdbxDB) openDBI(flags uint) error {
 }
 
 // Get retrieves the key-value pair in mdbx storage
-func (db *MdbxDB) Get(t uint8, k []byte) ([]byte, error) {
+func (db *MdbxDB) Get(t uint8, k []byte) ([]byte, bool, error) {
 	tx, err := db.env.BeginTxn(nil, mdbx.Readonly)
 	defer tx.Abort()
 
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
-	v, err := tx.Get(db.dbi[t], k)
+	data, err := tx.Get(db.dbi[t], k)
 	if err != nil {
-		return nil, err
+		if err.Error() == "key not found" {
+			return nil, false, nil
+		}
+
+		return nil, false, err
 	}
 
-	return v, nil
+	return data, true, nil
 }
 
 // Close closes the mdbx storage instance

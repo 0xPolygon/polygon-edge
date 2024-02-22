@@ -92,8 +92,8 @@ func testCanonicalChain(t *testing.T, m PlaceholderStorage) {
 
 		require.NoError(t, batch.WriteBatch())
 
-		data, err := s.ReadCanonicalHash(cc.Number)
-		assert.NoError(t, err)
+		data, ok := s.ReadCanonicalHash(cc.Number)
+		assert.True(t, ok)
 
 		if !reflect.DeepEqual(data, hash) {
 			t.Fatal("not match")
@@ -134,8 +134,8 @@ func testDifficulty(t *testing.T, m PlaceholderStorage) {
 
 		require.NoError(t, batch.WriteBatch())
 
-		diff, err := s.ReadTotalDifficulty(h.Number)
-		assert.NoError(t, err)
+		diff, ok := s.ReadTotalDifficulty(h.Number)
+		assert.True(t, ok)
 
 		if !reflect.DeepEqual(cc.Diff, diff) {
 			t.Fatal("bad")
@@ -164,15 +164,15 @@ func testHead(t *testing.T, m PlaceholderStorage) {
 
 		require.NoError(t, batch.WriteBatch())
 
-		n2, err := s.ReadHeadNumber()
-		assert.NoError(t, err)
+		n2, ok := s.ReadHeadNumber()
+		assert.True(t, ok)
 
 		if n2 != i {
 			t.Fatal("bad")
 		}
 
-		hash1, err := s.ReadHeadHash()
-		assert.NoError(t, err)
+		hash1, ok := s.ReadHeadHash()
+		assert.True(t, ok)
 
 		if !reflect.DeepEqual(hash1, hash) {
 			t.Fatal("bad")
@@ -407,22 +407,22 @@ func testWriteCanonicalHeader(t *testing.T, m PlaceholderStorage) {
 		t.Fatal("bad header")
 	}
 
-	headHash, err := s.ReadHeadHash()
-	assert.NoError(t, err)
+	headHash, ok := s.ReadHeadHash()
+	assert.True(t, ok)
 
 	if headHash != h.Hash {
 		t.Fatal("head hash not correct")
 	}
 
-	headNum, err := s.ReadHeadNumber()
-	assert.NoError(t, err)
+	headNum, ok := s.ReadHeadNumber()
+	assert.True(t, ok)
 
 	if headNum != h.Number {
 		t.Fatal("head num not correct")
 	}
 
-	canHash, err := s.ReadCanonicalHash(h.Number)
-	assert.NoError(t, err)
+	canHash, ok := s.ReadCanonicalHash(h.Number)
+	assert.True(t, ok)
 
 	if canHash != h.Hash {
 		t.Fatal("canonical hash not correct")

@@ -1,8 +1,6 @@
-//nolint:stylecheck
 package storagev2
 
 import (
-	"errors"
 	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/helper/common"
@@ -12,39 +10,39 @@ import (
 // -- canonical hash --
 
 // ReadCanonicalHash gets the hash from the number of the canonical chain
-func (s *Storage) ReadCanonicalHash(n uint64) (types.Hash, error) {
-	data, err := s.get(CANONICAL, common.EncodeUint64ToBytes(n))
-	if err != nil {
-		return types.Hash{}, err
+func (s *Storage) ReadCanonicalHash(n uint64) (types.Hash, bool) {
+	data, ok := s.get(CANONICAL, common.EncodeUint64ToBytes(n))
+	if !ok {
+		return types.Hash{}, false
 	}
 
-	return types.BytesToHash(data), nil
+	return types.BytesToHash(data), true
 }
 
 // HEAD //
 
 // ReadHeadHash returns the hash of the head
-func (s *Storage) ReadHeadHash() (types.Hash, error) {
-	data, err := s.get(HEAD_HASH, HEAD_HASH_KEY)
-	if err != nil {
-		return types.Hash{}, err
+func (s *Storage) ReadHeadHash() (types.Hash, bool) {
+	data, ok := s.get(HEAD_HASH, HEAD_HASH_KEY)
+	if !ok {
+		return types.Hash{}, false
 	}
 
-	return types.BytesToHash(data), nil
+	return types.BytesToHash(data), true
 }
 
 // ReadHeadNumber returns the number of the head
-func (s *Storage) ReadHeadNumber() (uint64, error) {
-	data, err := s.get(HEAD_NUMBER, HEAD_NUMBER_KEY)
-	if err != nil {
-		return 0, err
+func (s *Storage) ReadHeadNumber() (uint64, bool) {
+	data, ok := s.get(HEAD_NUMBER, HEAD_NUMBER_KEY)
+	if !ok {
+		return 0, false
 	}
 
 	if len(data) != 8 {
-		return 0, errors.New("Invalid data")
+		return 0, false
 	}
 
-	return common.EncodeBytesToUint64(data), nil
+	return common.EncodeBytesToUint64(data), true
 }
 
 // FORK //
@@ -60,13 +58,13 @@ func (s *Storage) ReadForks() ([]types.Hash, error) {
 // DIFFICULTY //
 
 // ReadTotalDifficulty reads the difficulty
-func (s *Storage) ReadTotalDifficulty(bn uint64) (*big.Int, error) {
-	v, err := s.get(DIFFICULTY, common.EncodeUint64ToBytes(bn))
-	if err != nil {
-		return nil, err
+func (s *Storage) ReadTotalDifficulty(bn uint64) (*big.Int, bool) {
+	v, ok := s.get(DIFFICULTY, common.EncodeUint64ToBytes(bn))
+	if !ok {
+		return nil, false
 	}
 
-	return big.NewInt(0).SetBytes(v), nil
+	return big.NewInt(0).SetBytes(v), true
 }
 
 // HEADER //
@@ -126,23 +124,27 @@ func (s *Storage) ReadBlockLookup(hash types.Hash) (uint64, error) {
 }
 
 func (s *Storage) readLookup(t uint8, hash types.Hash) (uint64, error) {
-	data, err := s.get(t, hash.Bytes())
-	if err != nil {
-		return 0, err
+	data, ok := s.get(t, hash.Bytes())
+	if !ok {
+		return 0, ErrNotFound
 	}
 
 	if len(data) != 8 {
-		return 0, errors.New("Invalid data")
+		return 0, ErrInvalidData
 	}
 
 	return common.EncodeBytesToUint64(data), nil
 }
 
 func (s *Storage) readRLP(t uint8, k []byte, raw types.RLPUnmarshaler) error {
-	data, err := s.getDB(t).Get(t, k)
+	data, ok, err := s.getDB(t).Get(t, k)
 
 	if err != nil {
 		return err
+	}
+
+	if !ok {
+		return ErrNotFound
 	}
 
 	if obj, ok := raw.(types.RLPStoreUnmarshaler); ok {
@@ -160,14 +162,14 @@ func (s *Storage) readRLP(t uint8, k []byte, raw types.RLPUnmarshaler) error {
 	return nil
 }
 
-func (s *Storage) get(t uint8, k []byte) ([]byte, error) {
-	data, err := s.getDB(t).Get(t, k)
+func (s *Storage) get(t uint8, k []byte) ([]byte, bool) {
+	data, ok, err := s.getDB(t).Get(t, k)
 
 	if err != nil {
-		return nil, err
+		return nil, false
 	}
 
-	return data, nil
+	return data, ok
 }
 
 func (s *Storage) getDB(t uint8) Database {

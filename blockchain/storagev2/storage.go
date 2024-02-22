@@ -2,13 +2,15 @@
 package storagev2
 
 import (
+	"fmt"
+
 	"github.com/hashicorp/go-hclog"
 )
 
 // Database interface.
 type Database interface {
 	Close() error
-	Get(t uint8, k []byte) ([]byte, error)
+	Get(t uint8, k []byte) ([]byte, bool, error)
 	NewBatch() Batch
 }
 
@@ -56,6 +58,9 @@ const (
 var FORK_KEY = []byte("0000000f")
 var HEAD_HASH_KEY = []byte("0000000h")
 var HEAD_NUMBER_KEY = []byte("0000000n")
+
+var ErrNotFound = fmt.Errorf("not found")
+var ErrInvalidData = fmt.Errorf("invalid data")
 
 func Open(logger hclog.Logger, db [2]Database) (*Storage, error) {
 	return &Storage{logger: logger, db: db}, nil

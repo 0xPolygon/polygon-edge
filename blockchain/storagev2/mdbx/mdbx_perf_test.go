@@ -211,7 +211,7 @@ func TestReadBlockPerf(t *testing.T) {
 
 		watch := stopwatch.Start()
 		_, err1 := s.ReadBody(n)
-		h, err2 := s.ReadCanonicalHash(n)
+		h, ok := s.ReadCanonicalHash(n)
 		_, err3 := s.ReadHeader(n)
 		_, err4 := s.ReadReceipts(n)
 		b, err5 := s.ReadBlockLookup(h)
@@ -219,7 +219,7 @@ func TestReadBlockPerf(t *testing.T) {
 		watch.Stop()
 		watchTime = watchTime + int(watch.Milliseconds())
 
-		if err1 != nil || err2 != nil || err3 != nil || err4 != nil || err5 != nil {
+		if err1 != nil || !ok || err3 != nil || err4 != nil || err5 != nil {
 			t.Logf("\terror")
 		}
 
