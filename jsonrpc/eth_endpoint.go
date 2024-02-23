@@ -57,7 +57,7 @@ type ethBlockchainStore interface {
 	GetBlockByNumber(num uint64, full bool) (*types.Block, bool)
 
 	// ReadTxLookup returns a block hash in which a given txn was mined
-	ReadTxLookup(txnHash types.Hash) (types.Hash, bool)
+	ReadTxLookup(txnHash types.Hash) (uint64, bool)
 
 	// GetReceiptsByHash returns the receipts for a block hash
 	GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, error)
@@ -230,13 +230,13 @@ func (e *Eth) GetTransactionByHash(hash types.Hash) (interface{}, error) {
 	// for the transaction with the provided hash
 	findSealedTx := func() *transaction {
 		// Check the chain state for the transaction
-		blockHash, ok := e.store.ReadTxLookup(hash)
+		blockNum, ok := e.store.ReadTxLookup(hash)
 		if !ok {
 			// Block not found in storage
 			return nil
 		}
 
-		block, ok := e.store.GetBlockByHash(blockHash, true)
+		block, ok := e.store.GetBlockByNumber(blockNum, true)
 		if !ok {
 			// Block receipts not found in storage
 			return nil
@@ -289,27 +289,27 @@ func (e *Eth) GetTransactionByHash(hash types.Hash) (interface{}, error) {
 
 // GetTransactionReceipt returns a transaction receipt by his hash
 func (e *Eth) GetTransactionReceipt(hash types.Hash) (interface{}, error) {
-	blockHash, ok := e.store.ReadTxLookup(hash)
+	blockNum, ok := e.store.ReadTxLookup(hash)
 	if !ok {
 		// txn not found
 		return nil, nil
 	}
 
-	block, ok := e.store.GetBlockByHash(blockHash, true)
+	block, ok := e.store.GetBlockByNumber(blockNum, true)
 	if !ok {
 		// block not found
 		e.logger.Warn(
-			fmt.Sprintf("Block with hash [%s] not found", blockHash.String()),
+			fmt.Sprintf("Block with number [%d] not found", blockNum),
 		)
 
 		return nil, nil
 	}
 
-	receipts, err := e.store.GetReceiptsByHash(blockHash)
+	receipts, err := e.store.GetReceiptsByHash(block.Hash())
 	if err != nil {
 		// block receipts not found
 		e.logger.Warn(
-			fmt.Sprintf("Receipts for block with hash [%s] not found", blockHash.String()),
+			fmt.Sprintf("Receipts for block with hash [%s] not found", block.Hash().String()),
 		)
 
 		return nil, nil
@@ -318,7 +318,7 @@ func (e *Eth) GetTransactionReceipt(hash types.Hash) (interface{}, error) {
 	if len(receipts) == 0 {
 		// Receipts not written yet on the db
 		e.logger.Warn(
-			fmt.Sprintf("No receipts found for block with hash [%s]", blockHash.String()),
+			fmt.Sprintf("No receipts found for block with hash [%s]", block.Hash().String()),
 		)
 
 		return nil, nil

@@ -6,8 +6,8 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/blockchain/storage"
-	"github.com/0xPolygon/polygon-edge/blockchain/storage/memory"
+	"github.com/0xPolygon/polygon-edge/blockchain/storagev2"
+	"github.com/0xPolygon/polygon-edge/blockchain/storagev2/memory"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/state"
@@ -117,7 +117,7 @@ func NewTestBlockchain(t *testing.T, headers []*types.Header) *Blockchain {
 	}
 
 	if len(headers) > 0 {
-		batchWriter := storage.NewBatchWriter(b.db)
+		batchWriter := b.db.NewWriter()
 		td := new(big.Int).SetUint64(headers[0].Difficulty)
 
 		batchWriter.PutCanonicalHeader(headers[0], td)
@@ -159,7 +159,7 @@ func NewMockBlockchain(
 				Forks: chain.AllForksEnabled,
 			},
 		}
-		mockStorage = storage.NewMockStorage()
+		mockStorage, _ = memory.NewMemoryStorage()
 	)
 
 	// Set up the mocks and callbacks
@@ -196,7 +196,7 @@ func NewMockBlockchain(
 
 		// Execute the storage callback
 		if storageCallback, ok := callbackMap[StorageCallback]; ok {
-			callback, ok := storageCallback.(func(storage *storage.MockStorage))
+			callback, ok := storageCallback.(func(storage *storagev2.Storage))
 			if !ok {
 				return nil, errInvalidTypeAssertion
 			}
@@ -358,7 +358,7 @@ func newBlockChain(config *chain.Chain, executor Executor) (*Blockchain, error) 
 		executor = &mockExecutor{}
 	}
 
-	db, err := memory.NewMemoryStorage(nil)
+	db, err := memory.NewMemoryStorage()
 	if err != nil {
 		return nil, err
 	}

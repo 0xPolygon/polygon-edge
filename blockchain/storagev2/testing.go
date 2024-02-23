@@ -130,6 +130,7 @@ func testDifficulty(t *testing.T, m PlaceholderStorage) {
 		}
 
 		batch.PutHeader(h)
+		batch.PutBlockLookup(h.Hash, h.Number)
 		batch.PutTotalDifficulty(h.Number, cc.Diff)
 
 		require.NoError(t, batch.WriteBatch())

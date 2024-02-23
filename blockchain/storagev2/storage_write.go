@@ -40,6 +40,7 @@ func (w *Writer) PutCanonicalHeader(h *types.Header, diff *big.Int) {
 	w.PutHeader(h)
 	w.PutHeadHash(h.Hash)
 	w.PutHeadNumber(h.Number)
+	w.PutBlockLookup(h.Hash, h.Number)
 	w.PutCanonicalHash(h.Number, h.Hash)
 	w.PutTotalDifficulty(h.Number, diff)
 }

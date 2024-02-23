@@ -12,9 +12,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/blockchain/storage"
-	"github.com/0xPolygon/polygon-edge/blockchain/storage/leveldb"
-	"github.com/0xPolygon/polygon-edge/blockchain/storage/memory"
+	"github.com/0xPolygon/polygon-edge/blockchain/storagev2"
+	"github.com/0xPolygon/polygon-edge/blockchain/storagev2/leveldb"
+	"github.com/0xPolygon/polygon-edge/blockchain/storagev2/memory"
 	consensusPolyBFT "github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/forkmanager"
 	"github.com/0xPolygon/polygon-edge/gasprice"
@@ -294,10 +294,10 @@ func NewServer(config *Config) (*Server, error) {
 	)
 
 	// create storage instance for blockchain
-	var db storage.Storage
+	var db *storagev2.Storage
 	{
 		if m.config.DataDir == "" {
-			db, err = memory.NewMemoryStorage(nil)
+			db, err = memory.NewMemoryStorage()
 			if err != nil {
 				return nil, err
 			}

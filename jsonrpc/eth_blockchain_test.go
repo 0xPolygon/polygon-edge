@@ -586,16 +586,16 @@ func (m *mockBlockStore) Header() *types.Header {
 	return m.blocks[len(m.blocks)-1].Header
 }
 
-func (m *mockBlockStore) ReadTxLookup(txnHash types.Hash) (types.Hash, bool) {
+func (m *mockBlockStore) ReadTxLookup(txnHash types.Hash) (uint64, bool) {
 	for _, block := range m.blocks {
 		for _, txn := range block.Transactions {
 			if txn.Hash() == txnHash {
-				return block.Hash(), true
+				return block.Number(), true
 			}
 		}
 	}
 
-	return types.ZeroHash, false
+	return 0, false
 }
 
 func (m *mockBlockStore) GetPendingTx(txHash types.Hash) (*types.Transaction, bool) {
