@@ -40,11 +40,11 @@ func (b *Block) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 		v0 := ar.NewArray()
 
 		for _, tx := range b.Transactions {
-			if tx.Type() != LegacyTx {
+			if tx.Type() != LegacyTxType {
 				v0.Set(ar.NewCopyBytes([]byte{byte(tx.Type())}))
 			}
 
-			v0.Set(tx.MarshalRLPWith(ar))
+			v0.Set(tx.Inner.marshalRLPWith(ar))
 		}
 
 		vv.Set(v0)
@@ -183,118 +183,9 @@ func (t *Transaction) MarshalRLP() []byte {
 }
 
 func (t *Transaction) MarshalRLPTo(dst []byte) []byte {
-	if t.Type() != LegacyTx {
+	if t.Type() != LegacyTxType {
 		dst = append(dst, byte(t.Type()))
 	}
 
 	return MarshalRLPTo(t.MarshalRLPWith, dst)
-}
-
-// MarshalRLPWith marshals the transaction to RLP with a specific fastrlp.Arena
-// Be careful! This function does not serialize tx type as a first byte.
-// Use MarshalRLP/MarshalRLPTo in most cases
-func (t *Transaction) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
-	vv := arena.NewArray()
-
-	switch t.Inner.(type) {
-	case *MixedTxn:
-		// Check Transaction1559Payload there https://eips.ethereum.org/EIPS/eip-1559#specification
-		if t.Type() == DynamicFeeTx {
-			vv.Set(arena.NewBigInt(t.ChainID()))
-		}
-
-		vv.Set(arena.NewUint(t.Nonce()))
-
-		if t.Type() == DynamicFeeTx {
-			// Add EIP-1559 related fields.
-			// For non-dynamic-fee-tx gas price is used.
-			vv.Set(arena.NewBigInt(t.GasTipCap()))
-			vv.Set(arena.NewBigInt(t.GasFeeCap()))
-		} else {
-			vv.Set(arena.NewBigInt(t.GasPrice()))
-		}
-
-		vv.Set(arena.NewUint(t.Gas()))
-
-		// Address may be empty
-		if t.To() != nil {
-			vv.Set(arena.NewCopyBytes(t.To().Bytes()))
-		} else {
-			vv.Set(arena.NewNull())
-		}
-
-		vv.Set(arena.NewBigInt(t.Value()))
-		vv.Set(arena.NewCopyBytes(t.Input()))
-
-		// Specify access list as per spec.
-		if t.Type() == DynamicFeeTx {
-			// Convert TxAccessList to RLP format and add it to the vv array.
-			accessListVV := arena.NewArray()
-
-			for _, accessTuple := range t.AccessList() {
-				accessTupleVV := arena.NewArray()
-				accessTupleVV.Set(arena.NewCopyBytes(accessTuple.Address.Bytes()))
-
-				storageKeysVV := arena.NewArray()
-				for _, storageKey := range accessTuple.StorageKeys {
-					storageKeysVV.Set(arena.NewCopyBytes(storageKey.Bytes()))
-				}
-
-				accessTupleVV.Set(storageKeysVV)
-				accessListVV.Set(accessTupleVV)
-			}
-
-			vv.Set(accessListVV)
-		}
-
-		// signature values
-		v, r, s := t.RawSignatureValues()
-		vv.Set(arena.NewBigInt(v))
-		vv.Set(arena.NewBigInt(r))
-		vv.Set(arena.NewBigInt(s))
-
-		if t.Type() == StateTx {
-			vv.Set(arena.NewCopyBytes(t.From().Bytes()))
-		}
-	case *AccessListTxn:
-		vv.Set(arena.NewBigInt(t.ChainID()))
-		vv.Set(arena.NewUint(t.Nonce()))
-		vv.Set(arena.NewBigInt(t.GasPrice()))
-		vv.Set(arena.NewUint(t.Gas()))
-
-		// Address may be empty
-		if t.To() != nil {
-			vv.Set(arena.NewCopyBytes(t.To().Bytes()))
-		} else {
-			vv.Set(arena.NewNull())
-		}
-
-		vv.Set(arena.NewBigInt(t.Value()))
-		vv.Set(arena.NewCopyBytes(t.Input()))
-
-		// add accessList
-		accessListVV := arena.NewArray()
-
-		for _, accessTuple := range t.AccessList() {
-			accessTupleVV := arena.NewArray()
-			accessTupleVV.Set(arena.NewCopyBytes(accessTuple.Address.Bytes()))
-
-			storageKeysVV := arena.NewArray()
-			for _, storageKey := range accessTuple.StorageKeys {
-				storageKeysVV.Set(arena.NewCopyBytes(storageKey.Bytes()))
-			}
-
-			accessTupleVV.Set(storageKeysVV)
-			accessListVV.Set(accessTupleVV)
-		}
-
-		vv.Set(accessListVV)
-
-		v, r, s := t.RawSignatureValues()
-		vv.Set(arena.NewBigInt(v))
-		vv.Set(arena.NewBigInt(r))
-		vv.Set(arena.NewBigInt(s))
-	}
-
-	return vv
 }

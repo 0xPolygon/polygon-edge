@@ -408,7 +408,7 @@ func (e *Eth) fillTransactionGasPrice(tx *types.Transaction) error {
 		return err
 	}
 
-	if tx.Type() == types.DynamicFeeTx {
+	if tx.Type() == types.DynamicFeeTxType {
 		tx.SetGasFeeCap(new(big.Int).SetUint64(estimatedGasPrice))
 	} else {
 		tx.SetGasPrice(new(big.Int).SetUint64(estimatedGasPrice))

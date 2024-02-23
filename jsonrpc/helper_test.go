@@ -14,7 +14,7 @@ import (
 func createTestTransaction(hash types.Hash) *types.Transaction {
 	recipient := types.StringToAddress("2")
 
-	return types.NewTx(&types.MixedTxn{
+	return types.NewTx(&types.LegacyTx{
 		Hash:     hash,
 		From:     types.StringToAddress("1"),
 		To:       &recipient,
@@ -51,7 +51,7 @@ func createTestReceipt(logs []*types.Log, cumulativeGasUsed, gasUsed uint64, txH
 		Logs:              logs,
 		GasUsed:           gasUsed,
 		TxHash:            txHash,
-		TransactionType:   types.DynamicFeeTx,
+		TransactionType:   types.DynamicFeeTxType,
 	}
 }
 
@@ -705,13 +705,13 @@ func TestDecodeTxn(t *testing.T) {
 				Value:     &value,
 				Input:     &input,
 				Nonce:     &nonce,
+				Type:      toArgUint64Ptr(uint64(types.DynamicFeeTxType)),
 			},
 			store: &debugEndpointMockStore{},
-			expected: types.NewTx(&types.MixedTxn{
+			expected: types.NewTx(&types.DynamicFeeTx{
 				From:      from,
 				To:        &to,
 				Gas:       uint64(gas),
-				GasPrice:  new(big.Int).SetBytes([]byte(gasPrice)),
 				GasTipCap: new(big.Int).SetBytes([]byte(gasTipCap)),
 				GasFeeCap: new(big.Int).SetBytes([]byte(gasFeeCap)),
 				Value:     new(big.Int).SetBytes([]byte(value)),
@@ -731,16 +731,14 @@ func TestDecodeTxn(t *testing.T) {
 				Nonce:    &nonce,
 			},
 			store: &debugEndpointMockStore{},
-			expected: types.NewTx(&types.MixedTxn{
-				From:      types.ZeroAddress,
-				To:        &to,
-				Gas:       uint64(gas),
-				GasPrice:  new(big.Int).SetBytes([]byte(gasPrice)),
-				GasTipCap: new(big.Int),
-				GasFeeCap: new(big.Int),
-				Value:     new(big.Int).SetBytes([]byte(value)),
-				Input:     input,
-				Nonce:     uint64(0),
+			expected: types.NewTx(&types.LegacyTx{
+				From:     types.ZeroAddress,
+				To:       &to,
+				Gas:      uint64(gas),
+				Value:    new(big.Int).SetBytes([]byte(value)),
+				GasPrice: new(big.Int).SetBytes([]byte(gasPrice)),
+				Input:    input,
+				Nonce:    uint64(0),
 			}),
 			err: false,
 		},
@@ -766,16 +764,14 @@ func TestDecodeTxn(t *testing.T) {
 					}, nil
 				},
 			},
-			expected: types.NewTx(&types.MixedTxn{
-				From:      from,
-				To:        &to,
-				Gas:       uint64(gas),
-				GasPrice:  new(big.Int).SetBytes([]byte(gasPrice)),
-				GasTipCap: new(big.Int),
-				GasFeeCap: new(big.Int),
-				Value:     new(big.Int).SetBytes([]byte(value)),
-				Input:     input,
-				Nonce:     uint64(stateNonce),
+			expected: types.NewTx(&types.LegacyTx{
+				From:     from,
+				To:       &to,
+				Gas:      uint64(gas),
+				Value:    new(big.Int).SetBytes([]byte(value)),
+				GasPrice: new(big.Int).SetBytes([]byte(gasPrice)),
+				Input:    input,
+				Nonce:    uint64(stateNonce),
 			}),
 			err: false,
 		},
@@ -792,16 +788,14 @@ func TestDecodeTxn(t *testing.T) {
 				Nonce:    &nonce,
 			},
 			store: &debugEndpointMockStore{},
-			expected: types.NewTx(&types.MixedTxn{
-				From:      from,
-				To:        &to,
-				Gas:       uint64(gas),
-				GasPrice:  new(big.Int).SetBytes([]byte(gasPrice)),
-				GasTipCap: new(big.Int),
-				GasFeeCap: new(big.Int),
-				Value:     new(big.Int).SetBytes([]byte(value)),
-				Input:     data,
-				Nonce:     uint64(nonce),
+			expected: types.NewTx(&types.LegacyTx{
+				From:     from,
+				To:       &to,
+				Gas:      uint64(gas),
+				Value:    new(big.Int).SetBytes([]byte(value)),
+				GasPrice: new(big.Int).SetBytes([]byte(gasPrice)),
+				Input:    data,
+				Nonce:    uint64(nonce),
 			}),
 			err: false,
 		},
@@ -813,16 +807,14 @@ func TestDecodeTxn(t *testing.T) {
 				Nonce: &nonce,
 			},
 			store: &debugEndpointMockStore{},
-			expected: types.NewTx(&types.MixedTxn{
-				From:      from,
-				To:        &to,
-				Gas:       uint64(0),
-				GasPrice:  new(big.Int),
-				GasTipCap: new(big.Int),
-				GasFeeCap: new(big.Int),
-				Value:     new(big.Int),
-				Input:     []byte{},
-				Nonce:     uint64(nonce),
+			expected: types.NewTx(&types.LegacyTx{
+				From:     from,
+				To:       &to,
+				Gas:      uint64(0),
+				Value:    new(big.Int),
+				GasPrice: new(big.Int),
+				Input:    []byte{},
+				Nonce:    uint64(nonce),
 			}),
 			err: false,
 		},

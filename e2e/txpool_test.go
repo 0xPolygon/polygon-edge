@@ -42,20 +42,25 @@ type generateTxReqParams struct {
 }
 
 func generateTx(params generateTxReqParams) *types.Transaction {
-	unsignedTx := types.NewTx(&types.MixedTxn{
-		Nonce: params.nonce,
-		From:  params.referenceAddr,
-		To:    &params.toAddress,
-		Gas:   1000000,
-		Value: params.value,
-		V:     big.NewInt(27), // it is necessary to encode in rlp
-	})
+	var unsignedTx *types.Transaction
 
 	if params.gasPrice != nil {
-		unsignedTx.SetTransactionType(types.LegacyTx)
+		unsignedTx = types.NewTx(&types.LegacyTx{
+			Nonce: params.nonce,
+			To:    &params.toAddress,
+			Gas:   1000000,
+			Value: params.value,
+			V:     big.NewInt(27), // it is necessary to encode in rlp
+		})
 		unsignedTx.SetGasPrice(params.gasPrice)
 	} else {
-		unsignedTx.SetTransactionType(types.DynamicFeeTx)
+		unsignedTx = types.NewTx(&types.DynamicFeeTx{
+			Nonce: params.nonce,
+			To:    &params.toAddress,
+			Gas:   1000000,
+			Value: params.value,
+			V:     big.NewInt(27), // it is necessary to encode in rlp
+		})
 		unsignedTx.SetGasFeeCap(params.gasFeeCap)
 		unsignedTx.SetGasTipCap(params.gasTipCap)
 	}
@@ -236,7 +241,7 @@ func TestTxPool_RecoverableError(t *testing.T) {
 	_, receiverAddress := tests.GenerateKeyAndAddr(t)
 
 	transactions := []*types.Transaction{
-		types.NewTx(&types.MixedTxn{
+		types.NewTx(&types.LegacyTx{
 			Nonce:    0,
 			GasPrice: big.NewInt(framework.DefaultGasPrice),
 			Gas:      22000,
@@ -245,17 +250,15 @@ func TestTxPool_RecoverableError(t *testing.T) {
 			V:        big.NewInt(27),
 			From:     senderAddress,
 		}),
-		types.NewTx(&types.MixedTxn{
+		types.NewTx(&types.LegacyTx{
 			Nonce:    1,
 			GasPrice: big.NewInt(framework.DefaultGasPrice),
 			Gas:      22000,
 			To:       &receiverAddress,
 			Value:    oneEth,
 			V:        big.NewInt(27),
-			From:     senderAddress,
 		}),
-		types.NewTx(&types.MixedTxn{
-			Type:      types.DynamicFeeTx,
+		types.NewTx(&types.DynamicFeeTx{
 			Nonce:     2,
 			GasFeeCap: big.NewInt(framework.DefaultGasPrice),
 			GasTipCap: big.NewInt(1000000000),
@@ -263,7 +266,6 @@ func TestTxPool_RecoverableError(t *testing.T) {
 			To:        &receiverAddress,
 			Value:     oneEth,
 			V:         big.NewInt(27),
-			From:      senderAddress,
 		}),
 	}
 
@@ -346,7 +348,7 @@ func TestTxPool_GetPendingTx(t *testing.T) {
 	operator := server.TxnPoolOperator()
 	client := server.JSONRPC()
 
-	signedTx, err := signer.SignTx(types.NewTx(&types.MixedTxn{
+	signedTx, err := signer.SignTx(types.NewTx(&types.LegacyTx{
 		Nonce:    0,
 		GasPrice: big.NewInt(1000000000),
 		Gas:      framework.DefaultGasLimit - 1,

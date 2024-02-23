@@ -54,13 +54,11 @@ func generateTxs(t *testing.T, startNonce, count int, from types.Address, to *ty
 	txs := make([]*types.Transaction, count)
 
 	for i := range txs {
-		tx := types.NewTx(&types.MixedTxn{
+		tx := types.NewTx(&types.DynamicFeeTx{
 			Gas:       types.StateTransactionGasLimit,
 			Nonce:     uint64(startNonce + i),
-			From:      from,
 			To:        to,
 			Value:     big.NewInt(2000),
-			Type:      types.DynamicFeeTx,
 			GasFeeCap: big.NewInt(100),
 			GasTipCap: big.NewInt(10),
 		})
@@ -112,7 +110,7 @@ func generateBlock(t *testing.T, num uint64) *types.FullBlock {
 		b.Receipts[i] = &types.Receipt{
 			TxHash:            b.Block.Transactions[i].Hash(),
 			Root:              types.StringToHash("mockhashstring"),
-			TransactionType:   types.LegacyTx,
+			TransactionType:   types.LegacyTxType,
 			GasUsed:           uint64(100000),
 			Status:            &status,
 			Logs:              logs,

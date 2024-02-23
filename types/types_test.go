@@ -68,11 +68,10 @@ func TestEIP55(t *testing.T) {
 
 func TestTransactionCopy(t *testing.T) {
 	addrTo := StringToAddress("11")
-	txn := NewTx(&MixedTxn{
+	txn := NewTx(&DynamicFeeTx{
 		Nonce:     0,
 		GasTipCap: big.NewInt(11),
 		GasFeeCap: big.NewInt(11),
-		GasPrice:  big.NewInt(11),
 		Gas:       11,
 		To:        &addrTo,
 		Value:     big.NewInt(1),

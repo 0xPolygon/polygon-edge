@@ -70,7 +70,7 @@ func TestEIP155Signer_Sender(t *testing.T) {
 				t.Fatalf("Unable to generate key")
 			}
 
-			txn := types.NewTx(&types.MixedTxn{
+			txn := types.NewTx(&types.LegacyTx{
 				To:       &toAddress,
 				Value:    big.NewInt(1),
 				GasPrice: big.NewInt(0),
@@ -106,7 +106,7 @@ func TestEIP155Signer_ChainIDMismatch(t *testing.T) {
 			t.Fatalf("Unable to generate key")
 		}
 
-		txn := types.NewTx(&types.MixedTxn{
+		txn := types.NewTx(&types.LegacyTx{
 			To:       &toAddress,
 			Value:    big.NewInt(1),
 			GasPrice: big.NewInt(0),

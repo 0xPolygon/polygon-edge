@@ -214,22 +214,26 @@ func DecodeTxn(arg *txnArgs, blockNumber uint64, store nonceGetter, forceSetNonc
 		arg.Gas = argUintPtr(0)
 	}
 
-	txType := types.LegacyTx
+	txType := types.LegacyTxType
 	if arg.Type != nil {
 		txType = types.TxType(*arg.Type)
 	}
 
-	txn := types.NewTx(&types.MixedTxn{
-		From:      *arg.From,
-		Gas:       uint64(*arg.Gas),
-		GasPrice:  new(big.Int).SetBytes(*arg.GasPrice),
-		GasTipCap: new(big.Int).SetBytes(*arg.GasTipCap),
-		GasFeeCap: new(big.Int).SetBytes(*arg.GasFeeCap),
-		Value:     new(big.Int).SetBytes(*arg.Value),
-		Input:     input,
-		Nonce:     uint64(*arg.Nonce),
-		Type:      txType,
-	})
+	txn := types.NewTxWithType(txType)
+
+	switch txType {
+	case types.LegacyTxType:
+		txn.SetGasPrice(new(big.Int).SetBytes(*arg.GasPrice))
+	case types.DynamicFeeTxType:
+		txn.SetGasTipCap(new(big.Int).SetBytes(*arg.GasTipCap))
+		txn.SetGasFeeCap(new(big.Int).SetBytes(*arg.GasFeeCap))
+	}
+
+	txn.SetFrom(*arg.From)
+	txn.SetGas(uint64(*arg.Gas))
+	txn.SetValue(new(big.Int).SetBytes(*arg.Value))
+	txn.SetInput(input)
+	txn.SetNonce(uint64(*arg.Nonce))
 
 	if arg.To != nil {
 		txn.SetTo(arg.To)

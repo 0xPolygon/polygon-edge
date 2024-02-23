@@ -433,7 +433,7 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 	)
 
 	for _, tx := range transactions {
-		if tx.Type() != types.StateTx {
+		if tx.Type() != types.StateTxType {
 			continue
 		}
 
@@ -716,10 +716,9 @@ func validateHeaderFields(parent *types.Header, header *types.Header, blockTimeD
 // createStateTransactionWithData creates a state transaction
 // with provided target address and inputData parameter which is ABI encoded byte array.
 func createStateTransactionWithData(target types.Address, inputData []byte) *types.Transaction {
-	tx := types.NewTx(&types.MixedTxn{
+	tx := types.NewTx(&types.StateTx{
 		From:     contracts.SystemCaller,
 		To:       &target,
-		Type:     types.StateTx,
 		Input:    inputData,
 		Gas:      types.StateTransactionGasLimit,
 		GasPrice: big.NewInt(0),

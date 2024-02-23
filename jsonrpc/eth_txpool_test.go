@@ -11,7 +11,7 @@ import (
 func TestEth_TxnPool_SendRawTransaction(t *testing.T) {
 	store := &mockStoreTxn{}
 	eth := newTestEthEndpoint(store)
-	txn := types.NewTx(&types.MixedTxn{
+	txn := types.NewTx(&types.LegacyTx{
 		From: addr0,
 		V:    big.NewInt(1),
 	})
@@ -32,7 +32,7 @@ func TestEth_TxnPool_SendTransaction(t *testing.T) {
 	store := &mockStoreTxn{}
 	store.AddAccount(addr0)
 	eth := newTestEthEndpoint(store)
-	txToSend := types.NewTx(&types.MixedTxn{
+	txToSend := types.NewTx(&types.LegacyTx{
 		From:     addr0,
 		To:       argAddrPtr(addr0),
 		Nonce:    uint64(0),

@@ -34,7 +34,7 @@ func (e *LondonOrBerlinSigner) Hash(tx *types.Transaction) types.Hash {
 
 // Sender returns the transaction sender
 func (e *LondonOrBerlinSigner) Sender(tx *types.Transaction) (types.Address, error) {
-	if tx.Type() != types.DynamicFeeTx && tx.Type() != types.AccessListTx {
+	if tx.Type() != types.DynamicFeeTxType && tx.Type() != types.AccessListTxType {
 		return e.fallbackSigner.Sender(tx)
 	}
 
@@ -45,7 +45,7 @@ func (e *LondonOrBerlinSigner) Sender(tx *types.Transaction) (types.Address, err
 
 // SignTx signs the transaction using the passed in private key
 func (e *LondonOrBerlinSigner) SignTx(tx *types.Transaction, pk *ecdsa.PrivateKey) (*types.Transaction, error) {
-	if tx.Type() != types.DynamicFeeTx && tx.Type() != types.AccessListTx {
+	if tx.Type() != types.DynamicFeeTxType && tx.Type() != types.AccessListTxType {
 		return e.fallbackSigner.SignTx(tx, pk)
 	}
 

@@ -97,7 +97,7 @@ func calcTxHash(tx *types.Transaction, chainID uint64) types.Hash {
 	var hash []byte
 
 	switch tx.Type() {
-	case types.AccessListTx:
+	case types.AccessListTxType:
 		a := signerPool.Get()
 		v := a.NewArray()
 
@@ -141,9 +141,9 @@ func calcTxHash(tx *types.Transaction, chainID uint64) types.Hash {
 
 		return types.BytesToHash(hash)
 
-	case types.DynamicFeeTx, types.LegacyTx, types.StateTx:
+	case types.DynamicFeeTxType, types.LegacyTxType, types.StateTxType:
 		a := signerPool.Get()
-		isDynamicFeeTx := tx.Type() == types.DynamicFeeTx
+		isDynamicFeeTx := tx.Type() == types.DynamicFeeTxType
 
 		v := a.NewArray()
 

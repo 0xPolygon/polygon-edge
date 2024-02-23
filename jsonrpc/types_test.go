@@ -103,7 +103,7 @@ func TestToTransaction_Returns_V_R_S_ValuesWithoutLeading0(t *testing.T) {
 	v, _ := hex.DecodeHex(hexWithLeading0)
 	r, _ := hex.DecodeHex(hexWithLeading0)
 	s, _ := hex.DecodeHex(hexWithLeading0)
-	txn := types.NewTx(&types.MixedTxn{
+	txn := types.NewTx(&types.LegacyTx{
 		Nonce:    0,
 		GasPrice: big.NewInt(0),
 		Gas:      0,
@@ -134,9 +134,8 @@ func TestToTransaction_EIP1559(t *testing.T) {
 	v, _ := hex.DecodeHex(hexWithLeading0)
 	r, _ := hex.DecodeHex(hexWithLeading0)
 	s, _ := hex.DecodeHex(hexWithLeading0)
-	txn := types.NewTx(&types.MixedTxn{
+	txn := types.NewTx(&types.DynamicFeeTx{
 		Nonce:     0,
-		GasPrice:  nil,
 		GasTipCap: big.NewInt(10),
 		GasFeeCap: big.NewInt(10),
 		Gas:       0,
@@ -251,7 +250,7 @@ func mockTxn() *transaction {
 		BlockHash:   &types.ZeroHash,
 		BlockNumber: argUintPtr(1),
 		TxIndex:     argUintPtr(2),
-		Type:        argUint64(types.LegacyTx),
+		Type:        argUint64(types.LegacyTxType),
 	}
 
 	return tt
@@ -288,7 +287,7 @@ func TestTransaction_Encoding(t *testing.T) {
 		tt := mockTxn()
 		tt.GasTipCap = &gasTipCap
 		tt.GasFeeCap = &gasFeeCap
-		tt.Type = argUint64(types.DynamicFeeTx)
+		tt.Type = argUint64(types.DynamicFeeTxType)
 
 		testTransaction("testsuite/transaction-eip1559.json", tt)
 	})
@@ -366,7 +365,8 @@ func Test_toBlock(t *testing.T) {
 	require.NoError(t, err)
 
 	expectedJSON := loadTestData(t, "testsuite/block-with-txn-full.json")
-	require.JSONEq(t, expectedJSON, string(res))
+	str := string(res)
+	require.JSONEq(t, expectedJSON, str)
 }
 
 func loadTestData(t *testing.T, name string) string {
