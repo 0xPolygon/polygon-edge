@@ -1097,16 +1097,18 @@ func TestBlockchain_VerifyBlockParent(t *testing.T) {
 		assert.ErrorIs(t, blockchain.verifyBlockParent(block), ErrParentNotFound)
 	})
 
-	t.Run("Parent hash mismatch", func(t *testing.T) {
+	t.Run("Invalid parent hash", func(t *testing.T) {
 		t.Parallel()
 
 		// Set up the storage callback
 		storageCallback := func(storage *storagev2.Storage) {
-			h := emptyHeader
+			h := &types.Header{
+				Hash: types.ZeroHash,
+			}
 
 			w := storage.NewWriter()
 
-			w.PutBlockLookup(types.ZeroHash, h.Number)
+			w.PutBlockLookup(h.Hash, h.Number)
 			w.PutHeader(h)
 			err := w.WriteBatch()
 			require.NoError(t, err)
@@ -1123,38 +1125,6 @@ func TestBlockchain_VerifyBlockParent(t *testing.T) {
 		// not match the computed parent hash
 		block := &types.Block{
 			Header: emptyHeader.Copy(),
-		}
-
-		assert.ErrorIs(t, blockchain.verifyBlockParent(block), ErrParentHashMismatch)
-	})
-
-	t.Run("Invalid block sequence", func(t *testing.T) {
-		t.Parallel()
-
-		// Set up the storage callback
-		storageCallback := func(storage *storagev2.Storage) {
-			h := emptyHeader
-
-			w := storage.NewWriter()
-
-			w.PutBlockLookup(types.ZeroHash, h.Number)
-			w.PutHeader(h)
-			err := w.WriteBatch()
-			require.NoError(t, err)
-		}
-
-		blockchain, err := NewMockBlockchain(map[TestCallbackType]interface{}{
-			StorageCallback: storageCallback,
-		})
-		if err != nil {
-			t.Fatalf("unable to instantiate new blockchain, %v", err)
-		}
-
-		// Create a dummy block with a number much higher than the parent
-		block := &types.Block{
-			Header: &types.Header{
-				Number: 10,
-			},
 		}
 
 		assert.ErrorIs(t, blockchain.verifyBlockParent(block), ErrParentHashMismatch)
@@ -1205,7 +1175,7 @@ func TestBlockchain_VerifyBlockParent(t *testing.T) {
 
 			w := storage.NewWriter()
 
-			w.PutBlockLookup(types.ZeroHash, h.Number)
+			w.PutBlockLookup(h.Hash, h.Number)
 			w.PutHeader(h)
 			err := w.WriteBatch()
 			require.NoError(t, err)
@@ -1664,7 +1634,7 @@ func TestBlockchain_WriteFullBlock(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, header.Number, n)
 
-	b, err := bc.db.ReadBody(header.Number)
+	b, err := bc.db.ReadBody(header.Number, header.Hash)
 	require.NoError(t, err)
 	require.NotNil(t, b)
 
@@ -1672,7 +1642,7 @@ func TestBlockchain_WriteFullBlock(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, header.Number, l)
 
-	h, err := bc.db.ReadHeader(header.Number)
+	h, err := bc.db.ReadHeader(header.Number, header.Hash)
 	require.NoError(t, err)
 	require.NotNil(t, h)
 
@@ -1684,11 +1654,11 @@ func TestBlockchain_WriteFullBlock(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, header.Hash, ch)
 
-	td, ok := bc.db.ReadTotalDifficulty(header.Number)
+	td, ok := bc.db.ReadTotalDifficulty(header.Number, header.Hash)
 	require.True(t, ok)
 	require.NotNil(t, td)
 
-	r, err := bc.db.ReadReceipts(header.Number)
+	r, err := bc.db.ReadReceipts(header.Number, header.Hash)
 	require.NoError(t, err)
 	require.NotNil(t, r)
 }
@@ -1810,9 +1780,9 @@ func blockWriter(tb testing.TB, numberOfBlocks uint64, blockTime, checkInterval 
 		}
 
 		batchWriter.PutHeader(block.Block.Header)
-		batchWriter.PutBody(block.Block.Number(), block.Block.Body())
+		batchWriter.PutBody(block.Block.Number(), block.Block.Hash(), block.Block.Body())
 
-		batchWriter.PutReceipts(block.Block.Number(), receipts)
+		batchWriter.PutReceipts(block.Block.Number(), block.Block.Hash(), receipts)
 
 		require.NoError(tb, blockchain.writeBatchAndUpdate(batchWriter, block.Block.Header, big.NewInt(0), false))
 

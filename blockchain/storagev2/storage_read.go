@@ -9,7 +9,7 @@ import (
 
 // -- canonical hash --
 
-// ReadCanonicalHash gets the hash from the number of the canonical chain
+// ReadCanonicalHash gets the hash from the number of the canonical block
 func (s *Storage) ReadCanonicalHash(n uint64) (types.Hash, bool) {
 	data, ok := s.get(CANONICAL, common.EncodeUint64ToBytes(n))
 	if !ok {
@@ -58,8 +58,8 @@ func (s *Storage) ReadForks() ([]types.Hash, error) {
 // DIFFICULTY //
 
 // ReadTotalDifficulty reads the difficulty
-func (s *Storage) ReadTotalDifficulty(bn uint64) (*big.Int, bool) {
-	v, ok := s.get(DIFFICULTY, common.EncodeUint64ToBytes(bn))
+func (s *Storage) ReadTotalDifficulty(bn uint64, bh types.Hash) (*big.Int, bool) {
+	v, ok := s.get(DIFFICULTY, getKey(bn, bh))
 	if !ok {
 		return nil, false
 	}
@@ -70,9 +70,9 @@ func (s *Storage) ReadTotalDifficulty(bn uint64) (*big.Int, bool) {
 // HEADER //
 
 // ReadHeader reads the header
-func (s *Storage) ReadHeader(bn uint64) (*types.Header, error) {
+func (s *Storage) ReadHeader(bn uint64, bh types.Hash) (*types.Header, error) {
 	header := &types.Header{}
-	err := s.readRLP(HEADER, common.EncodeUint64ToBytes(bn), header)
+	err := s.readRLP(HEADER, getKey(bn, bh), header)
 
 	return header, err
 }
@@ -80,15 +80,15 @@ func (s *Storage) ReadHeader(bn uint64) (*types.Header, error) {
 // BODY //
 
 // ReadBody reads the body
-func (s *Storage) ReadBody(bn uint64) (*types.Body, error) {
+func (s *Storage) ReadBody(bn uint64, bh types.Hash) (*types.Body, error) {
 	body := &types.Body{}
-	if err := s.readRLP(BODY, common.EncodeUint64ToBytes(bn), body); err != nil {
+	if err := s.readRLP(BODY, getKey(bn, bh), body); err != nil {
 		return nil, err
 	}
 
 	// must read header because block number is needed in order to calculate each tx hash
 	header := &types.Header{}
-	if err := s.readRLP(HEADER, common.EncodeUint64ToBytes(bn), header); err != nil {
+	if err := s.readRLP(HEADER, getKey(bn, bh), header); err != nil {
 		return nil, err
 	}
 
@@ -102,9 +102,9 @@ func (s *Storage) ReadBody(bn uint64) (*types.Body, error) {
 // RECEIPTS //
 
 // ReadReceipts reads the receipts
-func (s *Storage) ReadReceipts(bn uint64) ([]*types.Receipt, error) {
+func (s *Storage) ReadReceipts(bn uint64, bh types.Hash) ([]*types.Receipt, error) {
 	receipts := &types.Receipts{}
-	err := s.readRLP(RECEIPTS, common.EncodeUint64ToBytes(bn), receipts)
+	err := s.readRLP(RECEIPTS, getKey(bn, bh), receipts)
 
 	return *receipts, err
 }

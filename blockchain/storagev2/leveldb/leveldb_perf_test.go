@@ -177,10 +177,10 @@ func prepareBatch(t *testing.T, s *storagev2.Storage, b *types.FullBlock) *stora
 	}
 
 	// Main DB sorted
-	batchWriter.PutBody(b.Block.Number(), b.Block.Body())
+	batchWriter.PutBody(b.Block.Number(), b.Block.Hash(), b.Block.Body())
 	batchWriter.PutCanonicalHash(b.Block.Number(), b.Block.Hash())
 	batchWriter.PutHeader(b.Block.Header)
-	batchWriter.PutReceipts(b.Block.Number(), b.Receipts)
+	batchWriter.PutReceipts(b.Block.Number(), b.Block.Hash(), b.Receipts)
 
 	return batchWriter
 }
@@ -230,16 +230,16 @@ func TestReadBlockPerf(t *testing.T) {
 		n := uint64(1 + rand.Intn(10000))
 
 		tn := time.Now().UTC()
-		_, err1 := s.ReadBody(n)
 		h, ok := s.ReadCanonicalHash(n)
-		_, err3 := s.ReadHeader(n)
-		_, err4 := s.ReadReceipts(n)
+		_, err1 := s.ReadBody(n, h)
+		_, err3 := s.ReadHeader(n, h)
+		_, err4 := s.ReadReceipts(n, h)
 		b, err5 := s.ReadBlockLookup(h)
 		d := time.Since(tn)
 
 		watchTime = watchTime + d.Milliseconds()
 
-		if err1 != nil || !ok || err3 != nil || err4 != nil || err5 != nil {
+		if !ok || err1 != nil || err3 != nil || err4 != nil || err5 != nil {
 			t.Logf("\terror")
 		}
 

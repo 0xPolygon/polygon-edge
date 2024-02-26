@@ -128,14 +128,15 @@ func testDifficulty(t *testing.T, m PlaceholderStorage) {
 			Number:    uint64(indx),
 			ExtraData: []byte{},
 		}
+		h.ComputeHash()
 
 		batch.PutHeader(h)
 		batch.PutBlockLookup(h.Hash, h.Number)
-		batch.PutTotalDifficulty(h.Number, cc.Diff)
+		batch.PutTotalDifficulty(h.Number, h.Hash, cc.Diff)
 
 		require.NoError(t, batch.WriteBatch())
 
-		diff, ok := s.ReadTotalDifficulty(h.Number)
+		diff, ok := s.ReadTotalDifficulty(h.Number, h.Hash)
 		assert.True(t, ok)
 
 		if !reflect.DeepEqual(cc.Diff, diff) {
@@ -232,7 +233,7 @@ func testHeader(t *testing.T, m PlaceholderStorage) {
 
 	require.NoError(t, batch.WriteBatch())
 
-	header1, err := s.ReadHeader(header.Number)
+	header1, err := s.ReadHeader(header.Number, header.Hash)
 	assert.NoError(t, err)
 
 	if !reflect.DeepEqual(header, header1) {
@@ -253,6 +254,8 @@ func testBody(t *testing.T, m PlaceholderStorage) {
 		Timestamp:  10,
 		ExtraData:  []byte{}, // if not set it will fail
 	}
+
+	header.ComputeHash()
 
 	batch := s.NewWriter()
 
@@ -292,11 +295,11 @@ func testBody(t *testing.T, m PlaceholderStorage) {
 	batch2 := s.NewWriter()
 	body0 := block.Body()
 
-	batch2.PutBody(header.Number, body0)
+	batch2.PutBody(header.Number, header.Hash, body0)
 
 	require.NoError(t, batch2.WriteBatch())
 
-	body1, err := s.ReadBody(header.Number)
+	body1, err := s.ReadBody(header.Number, header.Hash)
 	assert.NoError(t, err)
 
 	// NOTE: reflect.DeepEqual does not seem to work, check the hash of the transactions
@@ -372,12 +375,12 @@ func testReceipts(t *testing.T, m PlaceholderStorage) {
 	}
 
 	batch.PutHeader(h)
-	batch.PutBody(h.Number, body)
-	batch.PutReceipts(h.Number, receipts)
+	batch.PutBody(h.Number, h.Hash, body)
+	batch.PutReceipts(h.Number, h.Hash, receipts)
 
 	require.NoError(t, batch.WriteBatch())
 
-	found, err := s.ReadReceipts(h.Number)
+	found, err := s.ReadReceipts(h.Number, h.Hash)
 	assert.NoError(t, err)
 	assert.True(t, reflect.DeepEqual(receipts, found))
 }
@@ -401,7 +404,7 @@ func testWriteCanonicalHeader(t *testing.T, m PlaceholderStorage) {
 
 	require.NoError(t, batch.WriteBatch())
 
-	hh, err := s.ReadHeader(h.Number)
+	hh, err := s.ReadHeader(h.Number, h.Hash)
 	assert.NoError(t, err)
 
 	if !reflect.DeepEqual(h, hh) {

@@ -90,7 +90,7 @@ func HistoryTestCmd() *cobra.Command {
 				return
 			}
 
-			header, err := st.ReadHeader(bn)
+			header, err := st.ReadHeader(bn, canonicalHash)
 			if !ok {
 				outputter.SetError(fmt.Errorf("can't read header %w", err))
 

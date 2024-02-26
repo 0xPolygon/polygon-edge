@@ -445,7 +445,7 @@ func (b *Blockchain) GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, error
 		return nil, err
 	}
 
-	return b.db.ReadReceipts(n)
+	return b.db.ReadReceipts(n, hash)
 }
 
 // GetBodyByHash returns the body by their hash
@@ -478,7 +478,7 @@ func (b *Blockchain) readHeader(hash types.Hash) (*types.Header, bool) {
 		return nil, false
 	}
 
-	hh, err := b.db.ReadHeader(n)
+	hh, err := b.db.ReadHeader(n, hash)
 	if err != nil {
 		return nil, false
 	}
@@ -497,7 +497,7 @@ func (b *Blockchain) readBody(hash types.Hash) (*types.Body, bool) {
 		return nil, false
 	}
 
-	bb, err := b.db.ReadBody(n)
+	bb, err := b.db.ReadBody(n, hash)
 	if err != nil {
 		b.logger.Error("failed to read body", "err", err)
 
@@ -508,7 +508,7 @@ func (b *Blockchain) readBody(hash types.Hash) (*types.Body, bool) {
 	if updated := b.recoverFromFieldsInTransactions(bb.Transactions); updated {
 		batchWriter := b.db.NewWriter()
 
-		batchWriter.PutBody(n, bb)
+		batchWriter.PutBody(n, hash, bb)
 
 		if err := batchWriter.WriteBatch(); err != nil {
 			b.logger.Warn("failed to write body into storage", "hash", hash, "err", err)
@@ -538,7 +538,7 @@ func (b *Blockchain) readTotalDifficulty(headerHash types.Hash) (*big.Int, bool)
 		return nil, false
 	}
 
-	dbDifficulty, ok := b.db.ReadTotalDifficulty(n)
+	dbDifficulty, ok := b.db.ReadTotalDifficulty(n, headerHash)
 	if !ok {
 		return nil, false
 	}
@@ -848,7 +848,7 @@ func (b *Blockchain) WriteFullBlock(fblock *types.FullBlock, source string) erro
 	// write the receipts, do it only after the header has been written.
 	// Otherwise, a client might ask for a header once the receipt is valid,
 	// but before it is written into the storage
-	batchWriter.PutReceipts(block.Number(), fblock.Receipts)
+	batchWriter.PutReceipts(block.Number(), block.Hash(), fblock.Receipts)
 
 	// update snapshot
 	if err := b.consensus.ProcessHeaders([]*types.Header{header}); err != nil {
@@ -919,7 +919,7 @@ func (b *Blockchain) WriteBlock(block *types.Block, source string) error {
 	// write the receipts, do it only after the header has been written.
 	// Otherwise, a client might ask for a header once the receipt is valid,
 	// but before it is written into the storage
-	batchWriter.PutReceipts(block.Number(), blockReceipts)
+	batchWriter.PutReceipts(block.Number(), block.Hash(), blockReceipts)
 
 	// update snapshot
 	if err := b.consensus.ProcessHeaders([]*types.Header{header}); err != nil {
@@ -1019,7 +1019,7 @@ func (b *Blockchain) writeBody(batchWriter *storagev2.Writer, block *types.Block
 	}
 
 	// Write the full body (txns + receipts)
-	batchWriter.PutBody(block.Number(), block.Body())
+	batchWriter.PutBody(block.Number(), block.Hash(), block.Body())
 
 	// Write txn lookups (txHash -> block number)
 	for _, txn := range block.Transactions {
@@ -1211,7 +1211,7 @@ func (b *Blockchain) writeHeaderImpl(
 	}
 
 	batchWriter.PutHeader(header)
-	batchWriter.PutTotalDifficulty(header.Number, incomingTD)
+	batchWriter.PutTotalDifficulty(header.Number, header.Hash, incomingTD)
 	batchWriter.PutForks(forks)
 	batchWriter.PutBlockLookup(header.Hash, header.Number)
 

@@ -8,11 +8,13 @@ import (
 )
 
 func (w *Writer) PutHeader(h *types.Header) {
-	w.putRlp(HEADER, common.EncodeUint64ToBytes(h.Number), h)
+	// block_num_u64 + hash -> header (RLP)
+	w.putRlp(HEADER, getKey(h.Number, h.Hash), h)
 }
 
-func (w *Writer) PutBody(bn uint64, body *types.Body) {
-	w.putRlp(BODY, common.EncodeUint64ToBytes(bn), body)
+func (w *Writer) PutBody(bn uint64, bh types.Hash, body *types.Body) {
+	// block_num_u64 + hash -> body (RLP)
+	w.putRlp(BODY, getKey(bn, bh), body)
 }
 
 func (w *Writer) PutHeadHash(h types.Hash) {
@@ -31,9 +33,9 @@ func (w *Writer) PutBlockLookup(hash types.Hash, bn uint64) {
 	w.putIntoTable(BLOCK_LOOKUP, hash.Bytes(), common.EncodeUint64ToBytes(bn))
 }
 
-func (w *Writer) PutReceipts(bn uint64, receipts []*types.Receipt) {
+func (w *Writer) PutReceipts(bn uint64, bh types.Hash, receipts []*types.Receipt) {
 	rs := types.Receipts(receipts)
-	w.putRlp(RECEIPTS, common.EncodeUint64ToBytes(bn), &rs)
+	w.putRlp(RECEIPTS, getKey(bn, bh), &rs)
 }
 
 func (w *Writer) PutCanonicalHeader(h *types.Header, diff *big.Int) {
@@ -42,15 +44,15 @@ func (w *Writer) PutCanonicalHeader(h *types.Header, diff *big.Int) {
 	w.PutHeadNumber(h.Number)
 	w.PutBlockLookup(h.Hash, h.Number)
 	w.PutCanonicalHash(h.Number, h.Hash)
-	w.PutTotalDifficulty(h.Number, diff)
+	w.PutTotalDifficulty(h.Number, h.Hash, diff)
 }
 
 func (w *Writer) PutCanonicalHash(bn uint64, hash types.Hash) {
 	w.putIntoTable(CANONICAL, common.EncodeUint64ToBytes(bn), hash.Bytes())
 }
 
-func (w *Writer) PutTotalDifficulty(bn uint64, diff *big.Int) {
-	w.putIntoTable(DIFFICULTY, common.EncodeUint64ToBytes(bn), diff.Bytes())
+func (w *Writer) PutTotalDifficulty(bn uint64, bh types.Hash, diff *big.Int) {
+	w.putIntoTable(DIFFICULTY, getKey(bn, bh), diff.Bytes())
 }
 
 func (w *Writer) PutForks(forks []types.Hash) {
@@ -96,4 +98,8 @@ func (w *Writer) getBatch(t uint8) Batch {
 	}
 
 	return w.batch[MAINDB_INDEX]
+}
+
+func getKey(n uint64, h types.Hash) []byte {
+	return append(append(make([]byte, 0, 40), common.EncodeUint64ToBytes(n)...), h.Bytes()...)
 }

@@ -230,7 +230,7 @@ insertloop:
 		case b := <-blockchain:
 			batchWriter := s.NewWriter()
 
-			batchWriter.PutBody(b.Block.Number(), b.Block.Body())
+			batchWriter.PutBody(b.Block.Number(), b.Block.Hash(), b.Block.Body())
 
 			for _, tx := range b.Block.Transactions {
 				batchWriter.PutTxLookup(tx.Hash(), b.Block.Number())
@@ -239,7 +239,7 @@ insertloop:
 			batchWriter.PutHeader(b.Block.Header)
 			batchWriter.PutHeadNumber(uint64(i))
 			batchWriter.PutHeadHash(b.Block.Header.Hash)
-			batchWriter.PutReceipts(b.Block.Number(), b.Receipts)
+			batchWriter.PutReceipts(b.Block.Number(), b.Block.Hash(), b.Receipts)
 			batchWriter.PutCanonicalHash(uint64(i), b.Block.Hash())
 
 			if err := batchWriter.WriteBatch(); err != nil {
