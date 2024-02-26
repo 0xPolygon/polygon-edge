@@ -3,7 +3,6 @@ package e2e
 import (
 	"math/big"
 	"reflect"
-	"sync"
 	"testing"
 	"time"
 
@@ -17,12 +16,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
 	"github.com/0xPolygon/polygon-edge/types"
 )
-
-type txObject struct {
-	bNumber uint64
-	txHash  ethgo.Hash
-	to      ethgo.Address
-}
 
 func TestE2E_Storage(t *testing.T) {
 	// premine an account in the genesis file
@@ -50,16 +43,10 @@ func TestE2E_Storage(t *testing.T) {
 		receivers = append(receivers, key.Address())
 	}
 
-	var wg sync.WaitGroup
-
-	txs := []txObject{}
+	txs := []*framework.TestTxn{}
 
 	for i := 0; i < num; i++ {
-		wg.Add(1)
-
 		func(i int, to ethgo.Address) {
-			defer wg.Done()
-
 			txn := &ethgo.Transaction{
 				From:  sender.Address(),
 				To:    &to,
@@ -73,17 +60,23 @@ func TestE2E_Storage(t *testing.T) {
 				txn.Type = ethgo.TransactionDynamicFee
 				txn.MaxFeePerGas = big.NewInt(1000000000)
 				txn.MaxPriorityFeePerGas = big.NewInt(100000000)
+
+				chainID, err := client.ChainID()
+				require.NoError(t, err)
+
+				txn.ChainID = chainID
 			} else {
 				txn.Type = ethgo.TransactionLegacy
 				txn.GasPrice = ethgo.Gwei(2).Uint64()
 			}
 
-			bn, th := sendTx(t, client, sender, txn)
-			txs = append(txs, txObject{bNumber: bn, txHash: th, to: to})
+			tx := cluster.SendTxn(t, sender, txn)
+			err = tx.Wait()
+			require.NoError(t, err)
+
+			txs = append(txs, tx)
 		}(i, receivers[i])
 	}
-
-	wg.Wait()
 
 	err = cluster.WaitUntil(2*time.Minute, 2*time.Second, func() bool {
 		for i, receiver := range receivers {
@@ -106,38 +99,11 @@ func TestE2E_Storage(t *testing.T) {
 	checkStorage(t, txs, client)
 }
 
-// sendTx is a helper function which signs transaction with provided private key and sends it
-func sendTx(t *testing.T, client *jsonrpc.Eth, sender *wallet.Key, txn *ethgo.Transaction) (uint64, ethgo.Hash) {
-	t.Helper()
-
-	chainID, err := client.ChainID()
-	require.NoError(t, err)
-
-	if txn.Type == ethgo.TransactionDynamicFee {
-		txn.ChainID = chainID
-	}
-
-	signer := wallet.NewEIP155Signer(chainID.Uint64())
-	signedTxn, err := signer.SignTx(txn, sender)
-	require.NoError(t, err)
-
-	txnRaw, err := signedTxn.MarshalRLPTo(nil)
-	require.NoError(t, err)
-
-	h, err := client.SendRawTransaction(txnRaw)
-	require.NoError(t, err)
-
-	bn, err := client.BlockNumber()
-	require.NoError(t, err)
-
-	return bn, h
-}
-
-func checkStorage(t *testing.T, txs []txObject, client *jsonrpc.Eth) {
+func checkStorage(t *testing.T, txs []*framework.TestTxn, client *jsonrpc.Eth) {
 	t.Helper()
 
 	for i, tx := range txs {
-		bn, err := client.GetBlockByNumber(ethgo.BlockNumber(tx.bNumber), true)
+		bn, err := client.GetBlockByNumber(ethgo.BlockNumber(tx.Receipt().BlockNumber), true)
 		require.NoError(t, err)
 		assert.NotNil(t, bn)
 
@@ -149,20 +115,18 @@ func checkStorage(t *testing.T, txs []txObject, client *jsonrpc.Eth) {
 			t.Fatal("blocks dont match")
 		}
 
-		bt, err := client.GetTransactionByHash(tx.txHash)
+		bt, err := client.GetTransactionByHash(tx.Receipt().TransactionHash)
 		require.NoError(t, err)
 		assert.NotNil(t, bt)
-		assert.Equal(t, uint64(i), bt.Value.Uint64())
-		assert.Equal(t, uint64(30000), bt.Gas)
-		assert.Equal(t, uint64(i), bt.Nonce)
-		assert.Equal(t, uint64(i), bt.TxnIndex)
+		assert.Equal(t, tx.Txn().Value.Uint64(), bt.Value.Uint64())
+		assert.Equal(t, tx.Txn().Gas, bt.Gas)
+		assert.Equal(t, tx.Txn().Nonce, bt.Nonce)
+		assert.Equal(t, tx.Receipt().TransactionIndex, bt.TxnIndex)
 		assert.NotEmpty(t, bt.V)
 		assert.NotEmpty(t, bt.R)
 		assert.NotEmpty(t, bt.S)
-
-		if !reflect.DeepEqual(tx.to, *bt.To) {
-			t.Fatal("tx to dont match")
-		}
+		assert.Equal(t, tx.Txn().From, bt.From)
+		assert.Equal(t, tx.Txn().To, bt.To)
 
 		if i%2 == 0 {
 			assert.Equal(t, ethgo.TransactionDynamicFee, bt.Type)
@@ -173,7 +137,7 @@ func checkStorage(t *testing.T, txs []txObject, client *jsonrpc.Eth) {
 			assert.Equal(t, ethgo.Gwei(2).Uint64(), bt.GasPrice)
 		}
 
-		r, err := client.GetTransactionReceipt(tx.txHash)
+		r, err := client.GetTransactionReceipt(tx.Receipt().TransactionHash)
 		require.NoError(t, err)
 		assert.NotNil(t, r)
 		assert.Equal(t, bt.TxnIndex, r.TransactionIndex)
@@ -181,9 +145,6 @@ func checkStorage(t *testing.T, txs []txObject, client *jsonrpc.Eth) {
 		assert.Equal(t, bt.BlockHash, r.BlockHash)
 		assert.Equal(t, bt.BlockNumber, r.BlockNumber)
 		assert.NotEmpty(t, r.LogsBloom)
-
-		if !reflect.DeepEqual(*bt.To, *r.To) {
-			t.Fatal("receipt to dont match")
-		}
+		assert.Equal(t, bt.To, r.To)
 	}
 }
