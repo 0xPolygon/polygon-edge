@@ -78,7 +78,6 @@ func TestEIP155Signer_Sender(t *testing.T) {
 
 			signer := NewEIP155Signer(
 				testCase.chainID.Uint64(),
-				testCase.isHomestead,
 			)
 
 			signedTx, signErr := signer.SignTx(txn, key)
@@ -112,7 +111,7 @@ func TestEIP155Signer_ChainIDMismatch(t *testing.T) {
 			GasPrice: big.NewInt(0),
 		})
 
-		signer := NewEIP155Signer(chainIDTop, true)
+		signer := NewEIP155Signer(chainIDTop)
 
 		signedTx, signErr := signer.SignTx(txn, key)
 		if signErr != nil {
@@ -120,7 +119,7 @@ func TestEIP155Signer_ChainIDMismatch(t *testing.T) {
 		}
 
 		for _, chainIDBottom := range chainIDS {
-			signerBottom := NewEIP155Signer(chainIDBottom, true)
+			signerBottom := NewEIP155Signer(chainIDBottom)
 
 			recoveredSender, recoverErr := signerBottom.Sender(signedTx)
 			if chainIDTop == chainIDBottom {

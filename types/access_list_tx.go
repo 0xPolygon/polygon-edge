@@ -45,7 +45,7 @@ func (al TxAccessList) Copy() TxAccessList {
 	return newAccessList
 }
 
-func (al TxAccessList) unmarshallRLPFrom(p *fastrlp.Parser, accessListVV []*fastrlp.Value) error {
+func (al TxAccessList) UnmarshallRLPFrom(p *fastrlp.Parser, accessListVV []*fastrlp.Value) error {
 	for i, accessTupleVV := range accessListVV {
 		accessTupleElems, err := accessTupleVV.GetElems()
 		if err != nil {
@@ -85,7 +85,7 @@ func (al TxAccessList) unmarshallRLPFrom(p *fastrlp.Parser, accessListVV []*fast
 	return nil
 }
 
-func (al TxAccessList) marshallRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
+func (al TxAccessList) MarshallRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 	accessListVV := arena.NewArray()
 
 	for _, accessTuple := range al {
@@ -290,7 +290,7 @@ func (tx *AccessListTxn) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) e
 		txAccessList = make(TxAccessList, len(accessListVV))
 	}
 
-	if err = txAccessList.unmarshallRLPFrom(p, accessListVV); err != nil {
+	if err = txAccessList.UnmarshallRLPFrom(p, accessListVV); err != nil {
 		return err
 	}
 
@@ -341,7 +341,7 @@ func (tx *AccessListTxn) marshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 	vv.Set(arena.NewCopyBytes(tx.input()))
 
 	// Convert TxAccessList to RLP format and add it to the vv array.
-	vv.Set(tx.accessList().marshallRLPWith(arena))
+	vv.Set(tx.accessList().MarshallRLPWith(arena))
 
 	v, r, s := tx.rawSignatureValues()
 	vv.Set(arena.NewBigInt(v))

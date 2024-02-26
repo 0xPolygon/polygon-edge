@@ -20,7 +20,7 @@ type LegacyTx struct {
 }
 
 func (tx *LegacyTx) transactionType() TxType { return LegacyTxType }
-func (tx *LegacyTx) chainID() *big.Int       { return nil }
+func (tx *LegacyTx) chainID() *big.Int       { return deriveChainID(tx.V) }
 func (tx *LegacyTx) input() []byte           { return tx.Input }
 func (tx *LegacyTx) gas() uint64             { return tx.Gas }
 func (tx *LegacyTx) gasPrice() *big.Int      { return tx.GasPrice }
@@ -264,4 +264,20 @@ func (tx *LegacyTx) copy() TxData { //nolint:dupl
 	cpy.setFrom(tx.from())
 
 	return cpy
+}
+
+// deriveChainID derives the chain id from the given v parameter
+func deriveChainID(v *big.Int) *big.Int {
+	if v != nil && v.BitLen() <= 64 {
+		v := v.Uint64()
+		if v == 27 || v == 28 {
+			return new(big.Int)
+		}
+
+		return new(big.Int).SetUint64((v - 35) / 2)
+	}
+
+	v = new(big.Int).Sub(v, big.NewInt(35))
+
+	return v.Div(v, big.NewInt(2))
 }

@@ -572,7 +572,7 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 	if signerErr != nil {
 		metrics.IncrCounter([]string{txPoolMetrics, "invalid_signature_txs"}, 1)
 
-		return ErrExtractSignature
+		return fmt.Errorf("%w. %w", ErrExtractSignature, signerErr)
 	}
 
 	// If the from field is set, check that

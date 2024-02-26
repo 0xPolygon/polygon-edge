@@ -20,7 +20,7 @@ type StateTx struct {
 }
 
 func (tx *StateTx) transactionType() TxType { return StateTxType }
-func (tx *StateTx) chainID() *big.Int       { return nil }
+func (tx *StateTx) chainID() *big.Int       { return deriveChainID(tx.V) }
 func (tx *StateTx) input() []byte           { return tx.Input }
 func (tx *StateTx) gas() uint64             { return tx.Gas }
 func (tx *StateTx) gasPrice() *big.Int      { return tx.GasPrice }

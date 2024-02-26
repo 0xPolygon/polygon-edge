@@ -189,7 +189,7 @@ func (tx *DynamicFeeTx) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) er
 		txAccessList = make(TxAccessList, len(accessListVV))
 	}
 
-	if err = txAccessList.unmarshallRLPFrom(p, accessListVV); err != nil {
+	if err = txAccessList.UnmarshallRLPFrom(p, accessListVV); err != nil {
 		return err
 	}
 
@@ -243,7 +243,7 @@ func (tx *DynamicFeeTx) marshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 	vv.Set(arena.NewCopyBytes(tx.input()))
 
 	// Convert TxAccessList to RLP format and add it to the vv array.
-	vv.Set(tx.accessList().marshallRLPWith(arena))
+	vv.Set(tx.accessList().MarshallRLPWith(arena))
 
 	// signature values
 	v, r, s := tx.rawSignatureValues()
