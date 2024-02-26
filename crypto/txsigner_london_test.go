@@ -23,42 +23,42 @@ func TestLondonSignerSender(t *testing.T) {
 		{
 			"mainnet",
 			big.NewInt(1),
-			types.LegacyTx,
+			types.LegacyTxType,
 		},
 		{
 			"expanse mainnet",
 			big.NewInt(2),
-			types.DynamicFeeTx,
+			types.DynamicFeeTxType,
 		},
 		{
 			"ropsten",
 			big.NewInt(3),
-			types.DynamicFeeTx,
+			types.DynamicFeeTxType,
 		},
 		{
 			"rinkeby",
 			big.NewInt(4),
-			types.AccessListTx,
+			types.AccessListTxType,
 		},
 		{
 			"goerli",
 			big.NewInt(5),
-			types.AccessListTx,
+			types.AccessListTxType,
 		},
 		{
 			"kovan",
 			big.NewInt(42),
-			types.StateTx,
+			types.StateTxType,
 		},
 		{
 			"geth private",
 			big.NewInt(1337),
-			types.StateTx,
+			types.StateTxType,
 		},
 		{
 			"mega large",
 			big.NewInt(0).Exp(big.NewInt(2), big.NewInt(20), nil), // 2**20
-			types.AccessListTx,
+			types.AccessListTxType,
 		},
 	}
 
@@ -73,22 +73,35 @@ func TestLondonSignerSender(t *testing.T) {
 			var txn *types.Transaction
 
 			switch tc.txType {
-			case types.AccessListTx:
+			case types.AccessListTxType:
 				txn = types.NewTx(&types.AccessListTxn{
 					To:       &recipient,
 					Value:    big.NewInt(1),
 					GasPrice: big.NewInt(5),
+					ChainID:  tc.chainID,
 				})
-			case types.DynamicFeeTx, types.LegacyTx, types.StateTx:
-				txn = types.NewTx(&types.MixedTxn{
+			case types.LegacyTxType:
+				txn = types.NewTx(&types.LegacyTx{
 					To:       &recipient,
 					Value:    big.NewInt(1),
 					GasPrice: big.NewInt(5),
 				})
+			case types.StateTxType:
+				txn = types.NewTx(&types.StateTx{
+					To:       &recipient,
+					Value:    big.NewInt(1),
+					GasPrice: big.NewInt(5),
+				})
+			case types.DynamicFeeTxType:
+				txn = types.NewTx(&types.DynamicFeeTx{
+					To:      &recipient,
+					Value:   big.NewInt(1),
+					ChainID: tc.chainID,
+				})
 			}
 
 			chainID := tc.chainID.Uint64()
-			signer := NewLondonOrBerlinSigner(chainID, true, NewEIP155Signer(chainID, true))
+			signer := NewLondonSigner(chainID)
 
 			signedTx, err := signer.SignTx(txn, key)
 			require.NoError(t, err, "unable to sign transaction")
@@ -104,7 +117,8 @@ func TestLondonSignerSender(t *testing.T) {
 func Test_LondonSigner_Sender(t *testing.T) {
 	t.Parallel()
 
-	signer := NewLondonOrBerlinSigner(100, true, NewEIP155Signer(100, true))
+	signer := NewLondonSigner(100)
+
 	to := types.StringToAddress("0xDeaDbeefdEAdbeefdEadbEEFdeadbeEFdEaDbeeF")
 
 	r, ok := big.NewInt(0).SetString("102623819621514684481463796449525884981685455700611671612296611353030973716382", 10)
@@ -120,9 +134,7 @@ func Test_LondonSigner_Sender(t *testing.T) {
 	}{
 		{
 			name: "sender is 0x85dA99c8a7C2C95964c8EfD687E95E632Fc533D6",
-			tx: types.NewTx(&types.MixedTxn{
-				Type:      types.DynamicFeeTx,
-				GasPrice:  big.NewInt(1000000402),
+			tx: types.NewTx(&types.DynamicFeeTx{
 				GasTipCap: ethgo.Gwei(1),
 				GasFeeCap: ethgo.Gwei(10),
 				Gas:       21000,
@@ -131,6 +143,7 @@ func Test_LondonSigner_Sender(t *testing.T) {
 				V:         big.NewInt(0),
 				R:         r,
 				S:         s,
+				ChainID:   big.NewInt(100),
 			}),
 			sender: types.StringToAddress("0x85dA99c8a7C2C95964c8EfD687E95E632Fc533D6"),
 		},

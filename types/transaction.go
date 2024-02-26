@@ -7,6 +7,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/keccak"
+	"github.com/umbracle/fastrlp"
 )
 
 const (
@@ -19,17 +20,17 @@ type TxType byte
 
 // List of supported transaction types
 const (
-	LegacyTx     TxType = 0x0
-	AccessListTx TxType = 0x01
-	DynamicFeeTx TxType = 0x02
-	StateTx      TxType = 0x7f
+	LegacyTxType     TxType = 0x0
+	AccessListTxType TxType = 0x01
+	DynamicFeeTxType TxType = 0x02
+	StateTxType      TxType = 0x7f
 )
 
 func txTypeFromByte(b byte) (TxType, error) {
 	tt := TxType(b)
 
 	switch tt {
-	case LegacyTx, StateTx, DynamicFeeTx, AccessListTx:
+	case LegacyTxType, StateTxType, DynamicFeeTxType, AccessListTxType:
 		return tt, nil
 	default:
 		return tt, fmt.Errorf("unknown transaction type: %d", b)
@@ -39,13 +40,13 @@ func txTypeFromByte(b byte) (TxType, error) {
 // String returns string representation of the transaction type.
 func (t TxType) String() (s string) {
 	switch t {
-	case LegacyTx:
+	case LegacyTxType:
 		return "LegacyTx"
-	case StateTx:
+	case StateTxType:
 		return "StateTx"
-	case DynamicFeeTx:
+	case DynamicFeeTxType:
 		return "DynamicFeeTx"
-	case AccessListTx:
+	case AccessListTxType:
 		return "AccessListTx"
 	}
 
@@ -72,13 +73,15 @@ func NewTx(inner TxData) *Transaction {
 // depending on the value of txType.
 func (t *Transaction) InitInnerData(txType TxType) {
 	switch txType {
-	case AccessListTx:
+	case AccessListTxType:
 		t.Inner = &AccessListTxn{}
+	case StateTxType:
+		t.Inner = &StateTx{}
+	case LegacyTxType:
+		t.Inner = &LegacyTx{}
 	default:
-		t.Inner = &MixedTxn{}
+		t.Inner = &DynamicFeeTx{}
 	}
-
-	t.Inner.setTransactionType(txType)
 }
 
 type TxData interface {
@@ -105,13 +108,15 @@ type TxData interface {
 	setGasPrice(*big.Int)
 	setGasFeeCap(*big.Int)
 	setGasTipCap(*big.Int)
-	setTransactionType(TxType)
 	setValue(*big.Int)
 	setInput([]byte)
 	setTo(address *Address)
 	setNonce(uint64)
 	setAccessList(TxAccessList)
 	setHash(Hash)
+	unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error
+	marshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value
+	copy() TxData
 }
 
 func (t *Transaction) Type() TxType {
@@ -199,10 +204,6 @@ func (t *Transaction) SetGasTipCap(gas *big.Int) {
 	t.Inner.setGasTipCap(gas)
 }
 
-func (t *Transaction) SetTransactionType(tType TxType) {
-	t.Inner.setTransactionType(tType)
-}
-
 func (t *Transaction) SetValue(value *big.Int) {
 	t.Inner.setValue(value)
 }
@@ -225,6 +226,14 @@ func (t *Transaction) SetAccessList(accessList TxAccessList) {
 
 func (t *Transaction) SetHash(h Hash) {
 	t.Inner.setHash(h)
+}
+
+func (t *Transaction) MarshalRLPWith(a *fastrlp.Arena) *fastrlp.Value {
+	return t.Inner.marshalRLPWith(a)
+}
+
+func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
+	return t.Inner.unmarshalRLPFrom(p, v)
 }
 
 // IsContractCreation checks if tx is contract creation
@@ -258,100 +267,10 @@ func (t *Transaction) Copy() *Transaction {
 	}
 
 	newTx := new(Transaction)
-	innerCopy := CopyTxData(t.Inner)
+	innerCopy := t.Inner.copy()
 	newTx.Inner = innerCopy
 
 	return newTx
-}
-
-// CopyTxData creates a deep copy of the provided TxData
-func CopyTxData(data TxData) TxData {
-	if data == nil {
-		return nil
-	}
-
-	var copyData TxData
-	switch data.(type) {
-	case *MixedTxn:
-		copyData = &MixedTxn{}
-	case *AccessListTxn:
-		copyData = &AccessListTxn{}
-	}
-
-	if copyData == nil {
-		return nil
-	}
-
-	copyData.setNonce(data.nonce())
-	copyData.setFrom(data.from())
-	copyData.setTo(data.to())
-	copyData.setHash(data.hash())
-	copyData.setTransactionType(data.transactionType())
-	copyData.setGas(data.gas())
-
-	if data.chainID() != nil {
-		chainID := new(big.Int)
-		chainID.Set(data.chainID())
-
-		copyData.setChainID(chainID)
-	}
-
-	if data.gasPrice() != nil {
-		gasPrice := new(big.Int)
-		gasPrice.Set(data.gasPrice())
-
-		copyData.setGasPrice(gasPrice)
-	}
-
-	if data.gasTipCap() != nil {
-		gasTipCap := new(big.Int)
-		gasTipCap.Set(data.gasTipCap())
-
-		copyData.setGasTipCap(gasTipCap)
-	}
-
-	if data.gasFeeCap() != nil {
-		gasFeeCap := new(big.Int)
-		gasFeeCap.Set(data.gasFeeCap())
-
-		copyData.setGasFeeCap(gasFeeCap)
-	}
-
-	if data.value() != nil {
-		value := new(big.Int)
-		value.Set(data.value())
-
-		copyData.setValue(value)
-	}
-
-	v, r, s := data.rawSignatureValues()
-
-	var vCopy, rCopy, sCopy *big.Int
-
-	if v != nil {
-		vCopy = new(big.Int)
-		vCopy.Set(v)
-	}
-
-	if r != nil {
-		rCopy = new(big.Int)
-		rCopy.Set(r)
-	}
-
-	if s != nil {
-		sCopy = new(big.Int)
-		sCopy.Set(s)
-	}
-
-	copyData.setSignatureValues(vCopy, rCopy, sCopy)
-
-	inputCopy := make([]byte, len(data.input()))
-	copy(inputCopy, data.input()[:])
-
-	copyData.setInput(inputCopy)
-	copyData.setAccessList(data.accessList().Copy())
-
-	return copyData
 }
 
 // Cost returns gas * gasPrice + value
@@ -435,7 +354,7 @@ func (t *Transaction) EffectiveGasTip(baseFee *big.Int) *big.Int {
 // Spec: https://eips.ethereum.org/EIPS/eip-1559#specification
 func (t *Transaction) GetGasTipCap() *big.Int {
 	switch t.Type() {
-	case DynamicFeeTx:
+	case DynamicFeeTxType:
 		return t.GasTipCap()
 	default:
 		return t.GasPrice()
@@ -446,7 +365,7 @@ func (t *Transaction) GetGasTipCap() *big.Int {
 // Spec: https://eips.ethereum.org/EIPS/eip-1559#specification
 func (t *Transaction) GetGasFeeCap() *big.Int {
 	switch t.Type() {
-	case DynamicFeeTx:
+	case DynamicFeeTxType:
 		return t.GasFeeCap()
 	default:
 		return t.GasPrice()
@@ -462,4 +381,12 @@ func FindTxByHash(txs []*Transaction, hash Hash) (*Transaction, int) {
 	}
 
 	return nil, -1
+}
+
+func NewTxWithType(txType TxType) *Transaction {
+	tx := &Transaction{}
+
+	tx.InitInnerData(txType)
+
+	return tx
 }

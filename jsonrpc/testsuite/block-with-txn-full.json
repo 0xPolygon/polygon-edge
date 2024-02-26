@@ -33,7 +33,8 @@
             "blockHash": "0x7935c790bdff1ec20912f28c9f7722eed41837c478a1f9ce0dc49f5d4a2d7c88",
             "blockNumber": "0x14",
             "transactionIndex": "0x0",
-            "type": "0x0"
+            "type": "0x0",
+            "chainId": "0x7fffffffffffffef"
         },
         {
             "nonce": "0x0",
@@ -50,7 +51,8 @@
             "blockHash": "0x7935c790bdff1ec20912f28c9f7722eed41837c478a1f9ce0dc49f5d4a2d7c88",
             "blockNumber": "0x14",
             "transactionIndex": "0x1",
-            "type": "0x0"
+            "type": "0x0",
+            "chainId": "0x7fffffffffffffef"
         }
     ],
     "uncles": [],

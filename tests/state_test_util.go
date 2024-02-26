@@ -334,9 +334,11 @@ func (t *stTransaction) At(i indexes, baseFee *big.Int) (*types.Transaction, err
 		value = v
 	}
 
+	var txData types.TxData
+
 	// if tx is not dynamic and accessList is not nil, create an access list transaction
 	if !isDynamiFeeTx && accessList != nil {
-		return types.NewTx(&types.AccessListTxn{
+		txData = &types.AccessListTxn{
 			From:       t.From,
 			To:         t.To,
 			Nonce:      t.Nonce,
@@ -345,27 +347,36 @@ func (t *stTransaction) At(i indexes, baseFee *big.Int) (*types.Transaction, err
 			GasPrice:   gasPrice,
 			Input:      hex.MustDecodeHex(t.Data[i.Data]),
 			AccessList: accessList,
-		}), nil
+		}
 	}
 
-	txType := types.LegacyTx
-	if isDynamiFeeTx {
-		txType = types.DynamicFeeTx
+	if txData == nil {
+		if isDynamiFeeTx {
+			txData = &types.DynamicFeeTx{
+				From:       t.From,
+				To:         t.To,
+				Nonce:      t.Nonce,
+				Value:      value,
+				Gas:        t.GasLimit[i.Gas],
+				GasFeeCap:  t.MaxFeePerGas,
+				GasTipCap:  t.MaxPriorityFeePerGas,
+				Input:      hex.MustDecodeHex(t.Data[i.Data]),
+				AccessList: accessList,
+			}
+		} else {
+			txData = &types.LegacyTx{
+				From:     t.From,
+				To:       t.To,
+				Nonce:    t.Nonce,
+				Value:    value,
+				Gas:      t.GasLimit[i.Gas],
+				GasPrice: gasPrice,
+				Input:    hex.MustDecodeHex(t.Data[i.Data]),
+			}
+		}
 	}
 
-	return types.NewTx(&types.MixedTxn{
-		Type:       txType,
-		From:       t.From,
-		To:         t.To,
-		Nonce:      t.Nonce,
-		Value:      value,
-		Gas:        t.GasLimit[i.Gas],
-		GasPrice:   gasPrice,
-		GasFeeCap:  t.MaxFeePerGas,
-		GasTipCap:  t.MaxPriorityFeePerGas,
-		Input:      hex.MustDecodeHex(t.Data[i.Data]),
-		AccessList: accessList,
-	}), nil
+	return types.NewTx(txData), nil
 }
 
 func (t *stTransaction) UnmarshalJSON(input []byte) error {

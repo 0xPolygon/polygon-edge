@@ -589,7 +589,7 @@ func TestBlockchainWriteBody(t *testing.T) {
 	t.Run("should succeed if tx has from field", func(t *testing.T) {
 		t.Parallel()
 
-		tx := types.NewTx(&types.MixedTxn{
+		tx := types.NewTx(&types.LegacyTx{
 			Value: big.NewInt(10),
 			V:     big.NewInt(1),
 			From:  addr,
@@ -621,7 +621,7 @@ func TestBlockchainWriteBody(t *testing.T) {
 	t.Run("should return error if tx doesn't have from and recovering address fails", func(t *testing.T) {
 		t.Parallel()
 
-		tx := types.NewTx(&types.MixedTxn{
+		tx := types.NewTx(&types.LegacyTx{
 			Value: big.NewInt(10),
 			V:     big.NewInt(1),
 		})
@@ -653,7 +653,7 @@ func TestBlockchainWriteBody(t *testing.T) {
 	t.Run("should recover from address and store to storage", func(t *testing.T) {
 		t.Parallel()
 
-		tx := types.NewTx(&types.MixedTxn{
+		tx := types.NewTx(&types.LegacyTx{
 			Value: big.NewInt(10),
 			V:     big.NewInt(1),
 		})
@@ -715,8 +715,8 @@ func Test_recoverFromFieldsInBlock(t *testing.T) {
 			},
 		}
 
-		tx1 := types.NewTx(&types.MixedTxn{Nonce: 0, From: addr1})
-		tx2 := types.NewTx(&types.MixedTxn{Nonce: 1, From: types.ZeroAddress})
+		tx1 := types.NewTx(&types.LegacyTx{Nonce: 0, From: addr1})
+		tx2 := types.NewTx(&types.LegacyTx{Nonce: 1, From: types.ZeroAddress})
 
 		computeTxHashes(tx1, tx2)
 
@@ -745,9 +745,9 @@ func Test_recoverFromFieldsInBlock(t *testing.T) {
 			},
 		}
 
-		tx1 := types.NewTx(&types.MixedTxn{Nonce: 0, From: types.ZeroAddress})
-		tx2 := types.NewTx(&types.MixedTxn{Nonce: 1, From: types.ZeroAddress})
-		tx3 := types.NewTx(&types.MixedTxn{Nonce: 2, From: types.ZeroAddress})
+		tx1 := types.NewTx(&types.LegacyTx{Nonce: 0, From: types.ZeroAddress})
+		tx2 := types.NewTx(&types.LegacyTx{Nonce: 1, From: types.ZeroAddress})
+		tx3 := types.NewTx(&types.LegacyTx{Nonce: 2, From: types.ZeroAddress})
 
 		computeTxHashes(tx1, tx2, tx3)
 
@@ -801,8 +801,8 @@ func Test_recoverFromFieldsInTransactions(t *testing.T) {
 			},
 		}
 
-		tx1 := types.NewTx(&types.MixedTxn{Nonce: 0, From: addr1})
-		tx2 := types.NewTx(&types.MixedTxn{Nonce: 1, From: types.ZeroAddress})
+		tx1 := types.NewTx(&types.LegacyTx{Nonce: 0, From: addr1})
+		tx2 := types.NewTx(&types.LegacyTx{Nonce: 1, From: types.ZeroAddress})
 
 		computeTxHashes(tx1, tx2)
 
@@ -830,9 +830,9 @@ func Test_recoverFromFieldsInTransactions(t *testing.T) {
 			},
 		}
 
-		tx1 := types.NewTx(&types.MixedTxn{Nonce: 0, From: types.ZeroAddress})
-		tx2 := types.NewTx(&types.MixedTxn{Nonce: 1, From: types.ZeroAddress})
-		tx3 := types.NewTx(&types.MixedTxn{Nonce: 2, From: types.ZeroAddress})
+		tx1 := types.NewTx(&types.LegacyTx{Nonce: 0, From: types.ZeroAddress})
+		tx2 := types.NewTx(&types.LegacyTx{Nonce: 1, From: types.ZeroAddress})
+		tx3 := types.NewTx(&types.LegacyTx{Nonce: 2, From: types.ZeroAddress})
 
 		computeTxHashes(tx1, tx2, tx3)
 
@@ -864,8 +864,8 @@ func Test_recoverFromFieldsInTransactions(t *testing.T) {
 			},
 		}
 
-		tx1 := types.NewTx(&types.MixedTxn{Nonce: 0, From: addr1})
-		tx2 := types.NewTx(&types.MixedTxn{Nonce: 1, From: addr2})
+		tx1 := types.NewTx(&types.LegacyTx{Nonce: 0, From: addr1})
+		tx2 := types.NewTx(&types.LegacyTx{Nonce: 1, From: addr2})
 
 		computeTxHashes(tx1, tx2)
 
@@ -900,7 +900,7 @@ func TestBlockchainReadBody(t *testing.T) {
 
 	batchWriter := b.db.NewWriter()
 
-	tx := types.NewTx(&types.MixedTxn{
+	tx := types.NewTx(&types.LegacyTx{
 		Value: big.NewInt(10),
 		V:     big.NewInt(1),
 	})
@@ -1612,7 +1612,7 @@ func TestBlockchain_WriteFullBlock(t *testing.T) {
 		{GasUsed: 100},
 		{GasUsed: 200},
 	}
-	tx := types.NewTx(&types.MixedTxn{
+	tx := types.NewTx(&types.LegacyTx{
 		Value: big.NewInt(1),
 	})
 
@@ -1907,7 +1907,15 @@ func customJSONBlockUnmarshall(tb testing.TB, jsonData []byte) (*types.FullBlock
 
 	for _, transactionJSON := range transactionsJSON {
 		tr := transactionJSON.(map[string]interface{})
-		transaction := types.NewTx(&types.MixedTxn{})
+
+		txType := tr["type"].(string)
+
+		txTypeNumber, err := common.ParseUint64orHex(&txType)
+		if err != nil {
+			return nil, err
+		}
+
+		transaction := types.NewTxWithType(types.TxType(txTypeNumber))
 		transaction.SetHash(types.StringToHash(tr["hash"].(string)))
 		nonce := tr["nonce"].(string)
 
@@ -1973,15 +1981,6 @@ func customJSONBlockUnmarshall(tb testing.TB, jsonData []byte) (*types.FullBlock
 		}
 
 		transaction.SetChainID(chainIDNumber)
-
-		txType := tr["type"].(string)
-
-		txTypeNumber, err := common.ParseUint64orHex(&txType)
-		if err != nil {
-			return nil, err
-		}
-
-		transaction.SetTransactionType(types.TxType(txTypeNumber))
 
 		gasFeeCapGeneric, ok := tr["maxFeePerGas"]
 		if ok {

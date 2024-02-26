@@ -3,7 +3,6 @@ package jsonrpc
 import (
 	"encoding/json"
 	"fmt"
-	"math/big"
 	"reflect"
 	"testing"
 	"time"
@@ -13,12 +12,11 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/umbracle/ethgo"
 )
 
 var (
-	oneEther = new(big.Int).Mul(
-		big.NewInt(1),
-		new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil))
+	oneEther = ethgo.Ether(1)
 )
 
 func toArgUint64Ptr(value uint64) *argUint64 {

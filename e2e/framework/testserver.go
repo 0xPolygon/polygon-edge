@@ -520,7 +520,7 @@ func (t *TestServer) SendRawTx(
 		return nil, err
 	}
 
-	signedTx, err := t.SignTx(types.NewTx(&types.MixedTxn{
+	signedTx, err := t.SignTx(types.NewTx(&types.LegacyTx{
 		From:     tx.From,
 		GasPrice: tx.GasPrice,
 		Gas:      tx.Gas,

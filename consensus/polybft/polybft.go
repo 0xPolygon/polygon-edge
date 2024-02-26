@@ -781,7 +781,7 @@ func (p *Polybft) PreCommitState(block *types.Block, _ *state.Transition) error 
 
 	// validate commitment state transactions
 	for _, tx := range block.Transactions {
-		if tx.Type() != types.StateTx {
+		if tx.Type() != types.StateTxType {
 			continue
 		}
 

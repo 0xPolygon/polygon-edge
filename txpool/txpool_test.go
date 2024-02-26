@@ -44,7 +44,7 @@ var (
 )
 
 // returns a new valid tx of slots size with the given nonce
-func newTx(addr types.Address, nonce, slots uint64) *types.Transaction {
+func newTx(addr types.Address, nonce, slots uint64, txType types.TxType) *types.Transaction {
 	// base field should take 1 slot at least
 	size := txSlotSize * (slots - 1)
 	if size <= 0 {
@@ -56,14 +56,24 @@ func newTx(addr types.Address, nonce, slots uint64) *types.Transaction {
 		return nil
 	}
 
-	return types.NewTx(&types.MixedTxn{
-		From:     addr,
-		Nonce:    nonce,
-		Value:    big.NewInt(1),
-		GasPrice: big.NewInt(0).SetUint64(defaultPriceLimit),
-		Gas:      validGasLimit,
-		Input:    input,
-	})
+	tx := types.NewTxWithType(txType)
+
+	switch txType {
+	case types.DynamicFeeTxType:
+		tx.SetGasFeeCap(big.NewInt(100))
+		tx.SetGasTipCap(big.NewInt(100))
+
+	default:
+		tx.SetGasPrice(big.NewInt(0).SetUint64(defaultPriceLimit))
+	}
+
+	tx.SetFrom(addr)
+	tx.SetNonce(nonce)
+	tx.SetValue(big.NewInt(1))
+	tx.SetGas(validGasLimit)
+	tx.SetInput(input)
+
+	return tx
 }
 
 // returns a new txpool with default test config
@@ -111,7 +121,7 @@ type result struct {
 func TestAddTxErrors(t *testing.T) {
 	t.Parallel()
 
-	poolSigner := crypto.NewEIP155Signer(100, true)
+	poolSigner := crypto.NewLondonSigner(100)
 
 	// Generate a private key and address
 	defaultKey, defaultAddr := tests.GenerateKeyAndAddr(t)
@@ -128,7 +138,10 @@ func TestAddTxErrors(t *testing.T) {
 	}
 
 	signTx := func(transaction *types.Transaction) *types.Transaction {
+		transaction.SetChainID(big.NewInt(100))
+
 		signedTx, signErr := poolSigner.SignTx(transaction, defaultKey)
+
 		if signErr != nil {
 			t.Fatalf("Unable to sign transaction, %v", signErr)
 		}
@@ -140,8 +153,7 @@ func TestAddTxErrors(t *testing.T) {
 		t.Parallel()
 		pool := setupPool()
 
-		tx := newTx(defaultAddr, 0, 1)
-		tx.SetTransactionType(types.StateTx)
+		tx := newTx(defaultAddr, 0, 1, types.StateTxType)
 
 		err := pool.addTx(local, signTx(tx))
 
@@ -160,9 +172,7 @@ func TestAddTxErrors(t *testing.T) {
 		pool := setupPool()
 		pool.forks.RemoveFork(chain.London)
 
-		tx := newTx(defaultAddr, 0, 1)
-		tx.SetTransactionType(types.DynamicFeeTx)
-
+		tx := newTx(defaultAddr, 0, 1, types.DynamicFeeTxType)
 		err := pool.addTx(local, signTx(tx))
 
 		assert.ErrorContains(t,
@@ -179,7 +189,7 @@ func TestAddTxErrors(t *testing.T) {
 		t.Parallel()
 		pool := setupPool()
 
-		tx := newTx(defaultAddr, 0, 1)
+		tx := newTx(defaultAddr, 0, 1, types.LegacyTxType)
 		tx.SetValue(big.NewInt(-5))
 
 		assert.ErrorIs(t,
@@ -192,7 +202,7 @@ func TestAddTxErrors(t *testing.T) {
 		t.Parallel()
 		pool := setupPool()
 
-		tx := newTx(defaultAddr, 0, 1)
+		tx := newTx(defaultAddr, 0, 1, types.LegacyTxType)
 		tx.SetValue(big.NewInt(1))
 		tx.SetGas(10000000000001)
 
@@ -208,7 +218,9 @@ func TestAddTxErrors(t *testing.T) {
 		t.Parallel()
 		pool := setupPool()
 
-		tx := newTx(defaultAddr, 0, 1)
+		tx := newTx(defaultAddr, 0, 1, types.LegacyTxType)
+
+		tx.SetChainID(big.NewInt(0))
 
 		assert.ErrorIs(t,
 			pool.addTx(local, tx),
@@ -220,7 +232,7 @@ func TestAddTxErrors(t *testing.T) {
 		t.Parallel()
 		pool := setupPool()
 
-		tx := newTx(addr1, 0, 1)
+		tx := newTx(addr1, 0, 1, types.LegacyTxType)
 
 		// Sign with a private key that corresponds
 		// to a different address
@@ -237,7 +249,7 @@ func TestAddTxErrors(t *testing.T) {
 		pool := setupPool()
 		pool.priceLimit = 1000000
 
-		tx := newTx(defaultAddr, 0, 1) // gasPrice == 1
+		tx := newTx(defaultAddr, 0, 1, types.LegacyTxType) // gasPrice == 1
 		tx = signTx(tx)
 
 		assert.ErrorIs(t,
@@ -253,7 +265,7 @@ func TestAddTxErrors(t *testing.T) {
 
 		// nonce is 1000000 so ErrNonceTooLow
 		// doesn't get triggered
-		tx := newTx(defaultAddr, 1000000, 1)
+		tx := newTx(defaultAddr, 1000000, 1, types.LegacyTxType)
 		tx = signTx(tx)
 
 		assert.ErrorIs(t,
@@ -269,7 +281,7 @@ func TestAddTxErrors(t *testing.T) {
 		// fill the pool
 		pool.gauge.increase(defaultMaxSlots)
 
-		tx := newTx(defaultAddr, 0, 1)
+		tx := newTx(defaultAddr, 0, 1, types.LegacyTxType)
 		tx = signTx(tx)
 
 		assert.ErrorIs(t,
@@ -286,7 +298,7 @@ func TestAddTxErrors(t *testing.T) {
 		pool.gauge.increase(defaultMaxSlots - 1)
 
 		// create tx requiring 1 slot
-		tx := newTx(defaultAddr, 0, 1)
+		tx := newTx(defaultAddr, 0, 1, types.LegacyTxType)
 		tx = signTx(tx)
 
 		//	enqueue tx
@@ -298,7 +310,7 @@ func TestAddTxErrors(t *testing.T) {
 		t.Parallel()
 		pool := setupPool()
 
-		tx := newTx(defaultAddr, 0, 1)
+		tx := newTx(defaultAddr, 0, 1, types.LegacyTxType)
 		tx.SetGas(1)
 		tx = signTx(tx)
 
@@ -312,7 +324,7 @@ func TestAddTxErrors(t *testing.T) {
 		t.Parallel()
 		pool := setupPool()
 
-		tx := newTx(defaultAddr, 0, 1)
+		tx := newTx(defaultAddr, 0, 1, types.LegacyTxType)
 		tx = signTx(tx)
 
 		// send the tx beforehand
@@ -329,7 +341,7 @@ func TestAddTxErrors(t *testing.T) {
 		t.Parallel()
 		pool := setupPool()
 
-		tx := newTx(defaultAddr, 0, 1)
+		tx := newTx(defaultAddr, 0, 1, types.LegacyTxType)
 		tx.SetGasPrice(big.NewInt(200))
 		tx = signTx(tx)
 
@@ -337,7 +349,7 @@ func TestAddTxErrors(t *testing.T) {
 		assert.NoError(t, pool.addTx(local, tx))
 		<-pool.promoteReqCh
 
-		tx = newTx(defaultAddr, 0, 1)
+		tx = newTx(defaultAddr, 0, 1, types.LegacyTxType)
 		tx.SetGasPrice(big.NewInt(100))
 		tx = signTx(tx)
 
@@ -351,7 +363,7 @@ func TestAddTxErrors(t *testing.T) {
 		t.Parallel()
 		pool := setupPool()
 
-		tx := newTx(defaultAddr, 0, 1)
+		tx := newTx(defaultAddr, 0, 1, types.LegacyTxType)
 
 		// set oversized Input field
 		data := make([]byte, 989898)
@@ -373,7 +385,7 @@ func TestAddTxErrors(t *testing.T) {
 
 		// faultyMockStore.GetNonce() == 99999
 		pool.store = faultyMockStore{}
-		tx := newTx(defaultAddr, 0, 1)
+		tx := newTx(defaultAddr, 0, 1, types.LegacyTxType)
 		tx = signTx(tx)
 
 		assert.ErrorIs(t,
@@ -386,7 +398,7 @@ func TestAddTxErrors(t *testing.T) {
 		t.Parallel()
 		pool := setupPool()
 
-		tx := newTx(defaultAddr, 0, 1)
+		tx := newTx(defaultAddr, 0, 1, types.LegacyTxType)
 		tx.GasPrice().SetUint64(1000000000000)
 		tx = signTx(tx)
 
@@ -432,7 +444,7 @@ func TestPruneAccountsWithNonceHoles(t *testing.T) {
 			assert.NoError(t, err)
 			pool.SetSigner(&mockSigner{})
 
-			tx := newTx(addr1, 0, 1)
+			tx := newTx(addr1, 0, 1, types.LegacyTxType)
 
 			// enqueue tx
 			assert.NoError(t, pool.addTx(local, tx))
@@ -466,7 +478,7 @@ func TestPruneAccountsWithNonceHoles(t *testing.T) {
 			assert.NoError(t, err)
 			pool.SetSigner(&mockSigner{})
 
-			tx := newTx(addr1, 5, 1)
+			tx := newTx(addr1, 5, 1, types.LegacyTxType)
 
 			//	enqueue tx
 			assert.NoError(t, pool.addTx(local, tx))
@@ -510,7 +522,7 @@ func TestAddTxHighPressure(t *testing.T) {
 			//	enqueue tx
 			go func() {
 				assert.NoError(t,
-					pool.addTx(local, newTx(addr1, 0, 1)),
+					pool.addTx(local, newTx(addr1, 0, 1, types.LegacyTxType)),
 				)
 			}()
 
@@ -538,7 +550,7 @@ func TestAddTxHighPressure(t *testing.T) {
 
 			assert.ErrorIs(t,
 				ErrRejectFutureTx,
-				pool.addTx(local, newTx(addr1, 8, 1)),
+				pool.addTx(local, newTx(addr1, 8, 1, types.LegacyTxType)),
 			)
 
 			acc := pool.accounts.get(addr1)
@@ -564,7 +576,7 @@ func TestAddTxHighPressure(t *testing.T) {
 			println("slots", slots, "max", pool.gauge.max)
 			pool.gauge.increase(slots)
 
-			tx := newTx(addr1, 5, 1)
+			tx := newTx(addr1, 5, 1, types.LegacyTxType)
 			assert.NoError(t, pool.addTx(local, tx))
 
 			_, exists := pool.index.get(tx.Hash())
@@ -581,8 +593,8 @@ func TestAddGossipTx(t *testing.T) {
 	t.Parallel()
 
 	key, sender := tests.GenerateKeyAndAddr(t)
-	signer := crypto.NewEIP155Signer(100, true)
-	tx := newTx(types.ZeroAddress, 1, 1)
+	signer := crypto.NewEIP155Signer(100)
+	tx := newTx(types.ZeroAddress, 1, 1, types.LegacyTxType)
 
 	t.Run("node is a validator", func(t *testing.T) {
 		t.Parallel()
@@ -604,6 +616,7 @@ func TestAddGossipTx(t *testing.T) {
 				Value: signedTx.MarshalRLP(),
 			},
 		}
+
 		pool.addGossipTx(protoTx, "")
 
 		assert.Equal(t, uint64(1), pool.accounts.get(sender).enqueued.length())
@@ -611,6 +624,8 @@ func TestAddGossipTx(t *testing.T) {
 
 	t.Run("node is a non validator", func(t *testing.T) {
 		t.Parallel()
+
+		tx.SetChainID(big.NewInt(0))
 
 		pool, err := newTestPool()
 		assert.NoError(t, err)
@@ -631,6 +646,7 @@ func TestAddGossipTx(t *testing.T) {
 				Value: signedTx.MarshalRLP(),
 			},
 		}
+
 		pool.addGossipTx(protoTx, "")
 
 		assert.Equal(t, uint64(0), pool.accounts.get(sender).enqueued.length())
@@ -644,7 +660,7 @@ func TestDropKnownGossipTx(t *testing.T) {
 	assert.NoError(t, err)
 	pool.SetSigner(&mockSigner{})
 
-	tx := newTx(addr1, 1, 1)
+	tx := newTx(addr1, 1, 1, types.LegacyTxType)
 
 	// send tx as local
 	assert.NoError(t, pool.addTx(local, tx))
@@ -676,7 +692,7 @@ func TestEnqueueHandler(t *testing.T) {
 			pool.SetSigner(&mockSigner{})
 
 			// send higher nonce tx
-			err = pool.addTx(local, newTx(addr1, 10, 1)) // 10 > 0
+			err = pool.addTx(local, newTx(addr1, 10, 1, types.LegacyTxType)) // 10 > 0
 			assert.NoError(t, err)
 
 			assert.Equal(t, uint64(1), pool.gauge.read())
@@ -699,7 +715,7 @@ func TestEnqueueHandler(t *testing.T) {
 
 			// send tx
 			go func() {
-				err := pool.addTx(local, newTx(addr1, 10, 1)) // 10 < 20
+				err := pool.addTx(local, newTx(addr1, 10, 1, types.LegacyTxType)) // 10 < 20
 				assert.EqualError(t, err, "nonce too low")
 			}()
 
@@ -722,7 +738,7 @@ func TestEnqueueHandler(t *testing.T) {
 			pool.SetSigner(&mockSigner{})
 
 			// send tx
-			err = pool.addTx(local, newTx(addr1, 0, 1)) // 0 == 0
+			err = pool.addTx(local, newTx(addr1, 0, 1, types.LegacyTxType)) // 0 == 0
 			assert.NoError(t, err)
 
 			// catch pending promotion
@@ -747,14 +763,14 @@ func TestEnqueueHandler(t *testing.T) {
 			fillEnqueued := func(pool *TxPool, num uint64) {
 				//	first tx will signal promotion, grab the signal
 				//	but don't execute the handler
-				err := pool.addTx(local, newTx(addr1, 0, 1))
+				err := pool.addTx(local, newTx(addr1, 0, 1, types.LegacyTxType))
 				assert.NoError(t, err)
 
 				// catch pending promotion
 				<-pool.promoteReqCh
 
 				for i := uint64(1); i < num; i++ {
-					err := pool.addTx(local, newTx(addr1, i, 1))
+					err := pool.addTx(local, newTx(addr1, i, 1, types.LegacyTxType))
 					assert.NoError(t, err)
 				}
 			}
@@ -773,7 +789,7 @@ func TestEnqueueHandler(t *testing.T) {
 
 			//	send next expected tx
 			go func() {
-				err := pool.addTx(local, newTx(addr1, 1, 1))
+				err := pool.addTx(local, newTx(addr1, 1, 1, types.LegacyTxType))
 				assert.True(t, errors.Is(err, ErrMaxEnqueuedLimitReached))
 			}()
 
@@ -803,7 +819,7 @@ func TestEnqueueHandler(t *testing.T) {
 
 			// add 10 transaction in txpool i.e. max enqueued transactions
 			for i := uint64(1); i <= 10; i++ {
-				err := pool.addTx(local, newTx(addr1, i, 1))
+				err := pool.addTx(local, newTx(addr1, i, 1, types.LegacyTxType))
 				assert.NoError(t, err)
 			}
 
@@ -811,11 +827,11 @@ func TestEnqueueHandler(t *testing.T) {
 			assert.Equal(t, uint64(0), pool.accounts.get(addr1).promoted.length())
 			assert.Equal(t, uint64(0), pool.accounts.get(addr1).getNonce())
 
-			err = pool.addTx(local, newTx(addr1, 11, 1))
+			err = pool.addTx(local, newTx(addr1, 11, 1, types.LegacyTxType))
 			assert.True(t, errors.Is(err, ErrMaxEnqueuedLimitReached))
 
 			// add the transaction with nextNonce i.e. nonce=0
-			err = pool.addTx(local, newTx(addr1, uint64(0), 1))
+			err = pool.addTx(local, newTx(addr1, uint64(0), 1, types.LegacyTxType))
 			assert.NoError(t, err)
 
 			pool.handlePromoteRequest(<-pool.promoteReqCh)
@@ -842,7 +858,7 @@ func TestAddTx(t *testing.T) {
 				gasPrice,
 				slots uint64,
 			) *types.Transaction {
-				tx := newTx(addr, nonce, slots)
+				tx := newTx(addr, nonce, slots, types.LegacyTxType)
 				tx.GasPrice().SetUint64(gasPrice)
 
 				return tx
@@ -903,7 +919,7 @@ func TestAddTx(t *testing.T) {
 				gasPrice,
 				slots uint64,
 			) *types.Transaction {
-				tx := newTx(addr, nonce, slots)
+				tx := newTx(addr, nonce, slots, types.LegacyTxType)
 				tx.GasPrice().SetUint64(gasPrice)
 
 				return tx
@@ -959,7 +975,7 @@ func TestAddTx(t *testing.T) {
 				gasPrice,
 				slots uint64,
 			) *types.Transaction {
-				tx := newTx(addr, nonce, slots)
+				tx := newTx(addr, nonce, slots, types.LegacyTxType)
 				tx.GasPrice().SetUint64(gasPrice)
 
 				return tx
@@ -1060,7 +1076,7 @@ func TestAddTx(t *testing.T) {
 				gasPrice,
 				slots uint64,
 			) *types.Transaction {
-				tx := newTx(addr, nonce, slots)
+				tx := newTx(addr, nonce, slots, types.LegacyTxType)
 				tx.GasPrice().SetUint64(gasPrice)
 
 				return tx
@@ -1119,7 +1135,7 @@ func TestAddTx(t *testing.T) {
 				gasPrice,
 				slots uint64,
 			) *types.Transaction {
-				tx := newTx(addr, nonce, slots)
+				tx := newTx(addr, nonce, slots, types.LegacyTxType)
 				tx.GasPrice().SetUint64(gasPrice)
 
 				return tx
@@ -1218,7 +1234,7 @@ func TestPromoteHandler(t *testing.T) {
 		assert.Equal(t, uint64(0), pool.accounts.get(addr1).promoted.length())
 
 		// enqueue higher nonce tx
-		tx := newTx(addr1, 10, 1)
+		tx := newTx(addr1, 10, 1, types.LegacyTxType)
 		err = pool.addTx(local, tx)
 		assert.NoError(t, err)
 
@@ -1251,7 +1267,7 @@ func TestPromoteHandler(t *testing.T) {
 		assert.NoError(t, err)
 		pool.SetSigner(&mockSigner{})
 
-		tx := newTx(addr1, 0, 1)
+		tx := newTx(addr1, 0, 1, types.LegacyTxType)
 		err = pool.addTx(local, tx)
 		assert.NoError(t, err)
 
@@ -1294,7 +1310,7 @@ func TestPromoteHandler(t *testing.T) {
 		txs := make([]*types.Transaction, 10)
 
 		for i := 0; i < 10; i++ {
-			txs[i] = newTx(addr1, uint64(i), 1)
+			txs[i] = newTx(addr1, uint64(i), 1, types.LegacyTxType)
 		}
 
 		// send the first (expected) tx -> signals promotion
@@ -1352,7 +1368,7 @@ func TestPromoteHandler(t *testing.T) {
 		txs := make([]*types.Transaction, 20)
 
 		for i := 0; i < 20; i++ {
-			txs[i] = newTx(addr1, uint64(i), 1)
+			txs[i] = newTx(addr1, uint64(i), 1, types.LegacyTxType)
 		}
 
 		for _, tx := range txs {
@@ -1393,11 +1409,11 @@ func TestResetAccount(t *testing.T) {
 			{
 				name: "prune all txs with low nonce",
 				txs: []*types.Transaction{
-					newTx(addr1, 0, 1),
-					newTx(addr1, 1, 1),
-					newTx(addr1, 2, 1),
-					newTx(addr1, 3, 1),
-					newTx(addr1, 4, 1),
+					newTx(addr1, 0, 1, types.LegacyTxType),
+					newTx(addr1, 1, 1, types.LegacyTxType),
+					newTx(addr1, 2, 1, types.LegacyTxType),
+					newTx(addr1, 3, 1, types.LegacyTxType),
+					newTx(addr1, 4, 1, types.LegacyTxType),
 				},
 				newNonce: 5,
 				expected: result{
@@ -1412,9 +1428,9 @@ func TestResetAccount(t *testing.T) {
 			{
 				name: "no low nonce txs to prune",
 				txs: []*types.Transaction{
-					newTx(addr1, 2, 1),
-					newTx(addr1, 3, 1),
-					newTx(addr1, 4, 1),
+					newTx(addr1, 2, 1, types.LegacyTxType),
+					newTx(addr1, 3, 1, types.LegacyTxType),
+					newTx(addr1, 4, 1, types.LegacyTxType),
 				},
 				newNonce: 1,
 				expected: result{
@@ -1429,9 +1445,9 @@ func TestResetAccount(t *testing.T) {
 			{
 				name: "prune some txs with low nonce",
 				txs: []*types.Transaction{
-					newTx(addr1, 7, 1),
-					newTx(addr1, 8, 1),
-					newTx(addr1, 9, 1),
+					newTx(addr1, 7, 1, types.LegacyTxType),
+					newTx(addr1, 8, 1, types.LegacyTxType),
+					newTx(addr1, 9, 1, types.LegacyTxType),
 				},
 				newNonce: 8,
 				expected: result{
@@ -1512,10 +1528,10 @@ func TestResetAccount(t *testing.T) {
 			{
 				name: "prune all txs with low nonce",
 				txs: []*types.Transaction{
-					newTx(addr1, 5, 1),
-					newTx(addr1, 6, 1),
-					newTx(addr1, 7, 1),
-					newTx(addr1, 8, 1),
+					newTx(addr1, 5, 1, types.LegacyTxType),
+					newTx(addr1, 6, 1, types.LegacyTxType),
+					newTx(addr1, 7, 1, types.LegacyTxType),
+					newTx(addr1, 8, 1, types.LegacyTxType),
 				},
 				newNonce: 10,
 				expected: result{
@@ -1530,9 +1546,9 @@ func TestResetAccount(t *testing.T) {
 			{
 				name: "no low nonce txs to prune",
 				txs: []*types.Transaction{
-					newTx(addr1, 2, 1),
-					newTx(addr1, 3, 1),
-					newTx(addr1, 4, 1),
+					newTx(addr1, 2, 1, types.LegacyTxType),
+					newTx(addr1, 3, 1, types.LegacyTxType),
+					newTx(addr1, 4, 1, types.LegacyTxType),
 				},
 				newNonce: 1,
 				expected: result{
@@ -1547,10 +1563,10 @@ func TestResetAccount(t *testing.T) {
 			{
 				name: "prune some txs with low nonce",
 				txs: []*types.Transaction{
-					newTx(addr1, 4, 1),
-					newTx(addr1, 5, 1),
-					newTx(addr1, 8, 1),
-					newTx(addr1, 9, 1),
+					newTx(addr1, 4, 1, types.LegacyTxType),
+					newTx(addr1, 5, 1, types.LegacyTxType),
+					newTx(addr1, 8, 1, types.LegacyTxType),
+					newTx(addr1, 9, 1, types.LegacyTxType),
 				},
 				newNonce: 6,
 				expected: result{
@@ -1566,9 +1582,9 @@ func TestResetAccount(t *testing.T) {
 				name:   "pruning low nonce signals promotion",
 				signal: true,
 				txs: []*types.Transaction{
-					newTx(addr1, 8, 1),
-					newTx(addr1, 9, 1),
-					newTx(addr1, 10, 1),
+					newTx(addr1, 8, 1, types.LegacyTxType),
+					newTx(addr1, 9, 1, types.LegacyTxType),
+					newTx(addr1, 10, 1, types.LegacyTxType),
 				},
 				newNonce: 9,
 				expected: result{
@@ -1649,14 +1665,14 @@ func TestResetAccount(t *testing.T) {
 				name: "prune all txs with low nonce",
 				txs: []*types.Transaction{
 					// promoted
-					newTx(addr1, 0, 1),
-					newTx(addr1, 1, 1),
-					newTx(addr1, 2, 1),
-					newTx(addr1, 3, 1),
+					newTx(addr1, 0, 1, types.LegacyTxType),
+					newTx(addr1, 1, 1, types.LegacyTxType),
+					newTx(addr1, 2, 1, types.LegacyTxType),
+					newTx(addr1, 3, 1, types.LegacyTxType),
 					// enqueued
-					newTx(addr1, 5, 1),
-					newTx(addr1, 6, 1),
-					newTx(addr1, 8, 1),
+					newTx(addr1, 5, 1, types.LegacyTxType),
+					newTx(addr1, 6, 1, types.LegacyTxType),
+					newTx(addr1, 8, 1, types.LegacyTxType),
 				},
 				newNonce: 10,
 				expected: result{
@@ -1673,11 +1689,11 @@ func TestResetAccount(t *testing.T) {
 				name: "no low nonce txs to prune",
 				txs: []*types.Transaction{
 					// promoted
-					newTx(addr1, 5, 1),
-					newTx(addr1, 6, 1),
+					newTx(addr1, 5, 1, types.LegacyTxType),
+					newTx(addr1, 6, 1, types.LegacyTxType),
 					// enqueued
-					newTx(addr1, 9, 1),
-					newTx(addr1, 10, 1),
+					newTx(addr1, 9, 1, types.LegacyTxType),
+					newTx(addr1, 10, 1, types.LegacyTxType),
 				},
 				newNonce: 3,
 				expected: result{
@@ -1694,13 +1710,13 @@ func TestResetAccount(t *testing.T) {
 				name: "prune all promoted and 1 enqueued",
 				txs: []*types.Transaction{
 					// promoted
-					newTx(addr1, 1, 1),
-					newTx(addr1, 2, 1),
-					newTx(addr1, 3, 1),
+					newTx(addr1, 1, 1, types.LegacyTxType),
+					newTx(addr1, 2, 1, types.LegacyTxType),
+					newTx(addr1, 3, 1, types.LegacyTxType),
 					// enqueued
-					newTx(addr1, 5, 1),
-					newTx(addr1, 8, 1),
-					newTx(addr1, 9, 1),
+					newTx(addr1, 5, 1, types.LegacyTxType),
+					newTx(addr1, 8, 1, types.LegacyTxType),
+					newTx(addr1, 9, 1, types.LegacyTxType),
 				},
 				newNonce: 6,
 				expected: result{
@@ -1718,14 +1734,14 @@ func TestResetAccount(t *testing.T) {
 				signal: true,
 				txs: []*types.Transaction{
 					// promoted
-					newTx(addr1, 2, 1),
-					newTx(addr1, 3, 1),
-					newTx(addr1, 4, 1),
-					newTx(addr1, 5, 1),
+					newTx(addr1, 2, 1, types.LegacyTxType),
+					newTx(addr1, 3, 1, types.LegacyTxType),
+					newTx(addr1, 4, 1, types.LegacyTxType),
+					newTx(addr1, 5, 1, types.LegacyTxType),
 					// enqueued
-					newTx(addr1, 8, 1),
-					newTx(addr1, 9, 1),
-					newTx(addr1, 10, 1),
+					newTx(addr1, 8, 1, types.LegacyTxType),
+					newTx(addr1, 9, 1, types.LegacyTxType),
+					newTx(addr1, 10, 1, types.LegacyTxType),
 				},
 				newNonce: 8,
 				expected: result{
@@ -1811,7 +1827,7 @@ func TestPop(t *testing.T) {
 	pool.SetSigner(&mockSigner{})
 
 	// send 1 tx and promote it
-	tx1 := newTx(addr1, 0, 1)
+	tx1 := newTx(addr1, 0, 1, types.LegacyTxType)
 	err = pool.addTx(local, tx1)
 	assert.NoError(t, err)
 
@@ -1847,7 +1863,7 @@ func TestDrop(t *testing.T) {
 	pool.SetSigner(&mockSigner{})
 
 	// send 1 tx and promote it
-	tx1 := newTx(addr1, 0, 1)
+	tx1 := newTx(addr1, 0, 1, types.LegacyTxType)
 	err = pool.addTx(local, tx1)
 	assert.NoError(t, err)
 
@@ -1884,7 +1900,7 @@ func TestDemote(t *testing.T) {
 		pool.SetSigner(&mockSigner{})
 
 		// send tx
-		err = pool.addTx(local, newTx(addr1, 0, 1))
+		err = pool.addTx(local, newTx(addr1, 0, 1, types.LegacyTxType))
 		assert.NoError(t, err)
 
 		pool.handlePromoteRequest(<-pool.promoteReqCh)
@@ -1916,7 +1932,7 @@ func TestDemote(t *testing.T) {
 		pool.SetSigner(&mockSigner{})
 
 		// send tx
-		err = pool.addTx(local, newTx(addr1, 0, 1))
+		err = pool.addTx(local, newTx(addr1, 0, 1, types.LegacyTxType))
 		assert.NoError(t, err)
 
 		pool.handlePromoteRequest(<-pool.promoteReqCh)
@@ -1978,7 +1994,7 @@ func Test_updateAccountSkipsCounts(t *testing.T) {
 
 		pool.SetSigner(&mockSigner{})
 
-		tx := newTx(addr1, 0, 1)
+		tx := newTx(addr1, 0, 1, types.LegacyTxType)
 		sendTx(t, pool, tx, true)
 
 		accountMap := pool.accounts.get(addr1)
@@ -2013,7 +2029,7 @@ func Test_updateAccountSkipsCounts(t *testing.T) {
 
 		pool.SetSigner(&mockSigner{})
 
-		tx := newTx(addr1, 1, 1) // set non-zero nonce to prevent the tx from being added
+		tx := newTx(addr1, 1, 1, types.LegacyTxType) // set non-zero nonce to prevent the tx from being added
 		sendTx(t, pool, tx, false)
 
 		accountMap := pool.accounts.get(addr1)
@@ -2048,7 +2064,7 @@ func Test_updateAccountSkipsCounts(t *testing.T) {
 
 		pool.SetSigner(&mockSigner{})
 
-		tx := newTx(addr1, 0, 1)
+		tx := newTx(addr1, 0, 1, types.LegacyTxType)
 		sendTx(t, pool, tx, true)
 
 		accountMap := pool.accounts.get(addr1)
@@ -2093,25 +2109,25 @@ func Test_updateAccountSkipsCounts(t *testing.T) {
 
 		accountMap := pool.accounts.initOnce(addr1, storeNonce)
 		accountMap.enqueued.push(&types.Transaction{
-			Inner: &types.MixedTxn{
+			Inner: &types.LegacyTx{
 				Nonce: storeNonce + 2,
 				Hash:  types.StringToHash("0xffa"),
 			},
 		})
 		accountMap.enqueued.push(&types.Transaction{
-			Inner: &types.MixedTxn{
+			Inner: &types.LegacyTx{
 				Nonce: storeNonce + 4,
 				Hash:  types.StringToHash("0xff1"),
 			},
 		})
 		accountMap.promoted.push(&types.Transaction{
-			Inner: &types.MixedTxn{
+			Inner: &types.LegacyTx{
 				Nonce: storeNonce,
 				Hash:  types.StringToHash("0xff2"),
 			},
 		})
 		accountMap.promoted.push(&types.Transaction{
-			Inner: &types.MixedTxn{
+			Inner: &types.LegacyTx{
 				Nonce: storeNonce + 1,
 				Hash:  types.StringToHash("0xff3"),
 			},
@@ -2132,7 +2148,7 @@ func Test_updateAccountSkipsCounts(t *testing.T) {
 func Test_TxPool_validateTx(t *testing.T) {
 	t.Parallel()
 
-	signer := crypto.NewEIP155Signer(100, true)
+	signer := crypto.NewLondonSigner(100)
 	// Generate a private key and address
 	defaultKey, defaultAddr := tests.GenerateKeyAndAddr(t)
 
@@ -2152,7 +2168,10 @@ func Test_TxPool_validateTx(t *testing.T) {
 	}
 
 	signTx := func(transaction *types.Transaction) *types.Transaction {
+		transaction.SetChainID(big.NewInt(100))
+
 		signedTx, signErr := signer.SignTx(transaction, defaultKey)
+
 		if signErr != nil {
 			t.Fatalf("Unable to sign transaction, %v", signErr)
 		}
@@ -2169,7 +2188,7 @@ func Test_TxPool_validateTx(t *testing.T) {
 		_, err := rand.Read(input)
 		require.NoError(t, err)
 
-		tx := newTx(defaultAddr, 0, 1)
+		tx := newTx(defaultAddr, 0, 1, types.LegacyTxType)
 		tx.SetTo(nil)
 		tx.SetInput(input)
 
@@ -2188,7 +2207,7 @@ func Test_TxPool_validateTx(t *testing.T) {
 		_, err := rand.Read(input)
 		require.NoError(t, err)
 
-		tx := newTx(defaultAddr, 0, 1)
+		tx := newTx(defaultAddr, 0, 1, types.LegacyTxType)
 		tx.SetTo(nil)
 		tx.SetInput(input)
 		tx.SetGasPrice(new(big.Int).SetUint64(pool.GetBaseFee()))
@@ -2204,8 +2223,7 @@ func Test_TxPool_validateTx(t *testing.T) {
 
 		pool := setupPool()
 
-		tx := newTx(defaultAddr, 0, 1)
-		tx.SetTransactionType(types.DynamicFeeTx)
+		tx := newTx(defaultAddr, 0, 1, types.DynamicFeeTxType)
 		tx.SetGasFeeCap(big.NewInt(1100))
 		tx.SetGasTipCap(big.NewInt(10))
 
@@ -2217,8 +2235,7 @@ func Test_TxPool_validateTx(t *testing.T) {
 
 		pool := setupPool()
 
-		tx := newTx(defaultAddr, 0, 1)
-		tx.SetTransactionType(types.DynamicFeeTx)
+		tx := newTx(defaultAddr, 0, 1, types.DynamicFeeTxType)
 		tx.SetGasFeeCap(big.NewInt(100))
 		tx.SetGasTipCap(big.NewInt(10))
 
@@ -2233,8 +2250,7 @@ func Test_TxPool_validateTx(t *testing.T) {
 
 		pool := setupPool()
 
-		tx := newTx(defaultAddr, 0, 1)
-		tx.SetTransactionType(types.DynamicFeeTx)
+		tx := newTx(defaultAddr, 0, 1, types.DynamicFeeTxType)
 		tx.SetGasFeeCap(big.NewInt(10000))
 		tx.SetGasTipCap(big.NewInt(100000))
 
@@ -2250,8 +2266,7 @@ func Test_TxPool_validateTx(t *testing.T) {
 		pool := setupPool()
 
 		// undefined gas tip cap
-		tx := newTx(defaultAddr, 0, 1)
-		tx.SetTransactionType(types.DynamicFeeTx)
+		tx := newTx(defaultAddr, 0, 1, types.LegacyTxType)
 		tx.SetGasFeeCap(big.NewInt(10000))
 
 		signedTx := signTx(tx)
@@ -2263,8 +2278,7 @@ func Test_TxPool_validateTx(t *testing.T) {
 		)
 
 		// undefined gas fee cap
-		tx = newTx(defaultAddr, 1, 1)
-		tx.SetTransactionType(types.DynamicFeeTx)
+		tx = newTx(defaultAddr, 1, 1, types.LegacyTxType)
 		tx.SetGasTipCap(big.NewInt(1000))
 
 		signedTx = signTx(tx)
@@ -2284,8 +2298,7 @@ func Test_TxPool_validateTx(t *testing.T) {
 		pool := setupPool()
 
 		// very high gas fee cap
-		tx := newTx(defaultAddr, 0, 1)
-		tx.SetTransactionType(types.DynamicFeeTx)
+		tx := newTx(defaultAddr, 0, 1, types.DynamicFeeTxType)
 		tx.SetGasFeeCap(new(big.Int).SetBit(new(big.Int), bitLength, 1))
 		tx.SetGasTipCap(new(big.Int))
 
@@ -2295,8 +2308,7 @@ func Test_TxPool_validateTx(t *testing.T) {
 		)
 
 		// very high gas tip cap
-		tx = newTx(defaultAddr, 1, 1)
-		tx.SetTransactionType(types.DynamicFeeTx)
+		tx = newTx(defaultAddr, 1, 1, types.DynamicFeeTxType)
 		tx.SetGasTipCap(new(big.Int).SetBit(new(big.Int), bitLength, 1))
 		tx.SetGasFeeCap(new(big.Int))
 
@@ -2312,8 +2324,7 @@ func Test_TxPool_validateTx(t *testing.T) {
 		pool.forks = chain.AllForksEnabled.Copy()
 		pool.forks.RemoveFork(chain.London)
 
-		tx := newTx(defaultAddr, 0, 1)
-		tx.SetTransactionType(types.DynamicFeeTx)
+		tx := newTx(defaultAddr, 0, 1, types.DynamicFeeTxType)
 		tx.SetGasFeeCap(big.NewInt(10000))
 		tx.SetGasTipCap(big.NewInt(100000))
 
@@ -2377,7 +2388,7 @@ func (e *eoa) signTx(t *testing.T, tx *types.Transaction, signer crypto.TxSigner
 	return signedTx
 }
 
-var signerEIP155 = crypto.NewEIP155Signer(100, true)
+var signerLondon = crypto.NewLondonSigner(100)
 
 func TestResetAccounts_Promoted(t *testing.T) {
 	t.Parallel()
@@ -2397,30 +2408,30 @@ func TestResetAccounts_Promoted(t *testing.T) {
 	allTxs :=
 		map[types.Address][]*types.Transaction{
 			addr1: {
-				eoa1.signTx(t, newTx(addr1, 0, 1), signerEIP155), // will be pruned
-				eoa1.signTx(t, newTx(addr1, 1, 1), signerEIP155), // will be pruned
-				eoa1.signTx(t, newTx(addr1, 2, 1), signerEIP155), // will be pruned
-				eoa1.signTx(t, newTx(addr1, 3, 1), signerEIP155), // will be pruned
+				eoa1.signTx(t, newTx(addr1, 0, 1, types.LegacyTxType), signerLondon), // will be pruned
+				eoa1.signTx(t, newTx(addr1, 1, 1, types.LegacyTxType), signerLondon), // will be pruned
+				eoa1.signTx(t, newTx(addr1, 2, 1, types.LegacyTxType), signerLondon), // will be pruned
+				eoa1.signTx(t, newTx(addr1, 3, 1, types.LegacyTxType), signerLondon), // will be pruned
 			},
 
 			addr2: {
-				eoa2.signTx(t, newTx(addr2, 0, 1), signerEIP155), // will be pruned
-				eoa2.signTx(t, newTx(addr2, 1, 1), signerEIP155), // will be pruned
+				eoa2.signTx(t, newTx(addr2, 0, 1, types.LegacyTxType), signerLondon), // will be pruned
+				eoa2.signTx(t, newTx(addr2, 1, 1, types.LegacyTxType), signerLondon), // will be pruned
 			},
 
 			addr3: {
-				eoa3.signTx(t, newTx(addr3, 0, 1), signerEIP155), // will be pruned
-				eoa3.signTx(t, newTx(addr3, 1, 1), signerEIP155), // will be pruned
-				eoa3.signTx(t, newTx(addr3, 2, 1), signerEIP155), // will be pruned
+				eoa3.signTx(t, newTx(addr3, 0, 1, types.LegacyTxType), signerLondon), // will be pruned
+				eoa3.signTx(t, newTx(addr3, 1, 1, types.LegacyTxType), signerLondon), // will be pruned
+				eoa3.signTx(t, newTx(addr3, 2, 1, types.LegacyTxType), signerLondon), // will be pruned
 			},
 
 			addr4: {
 				// all txs will be pruned
-				eoa4.signTx(t, newTx(addr4, 0, 1), signerEIP155), // will be pruned
-				eoa4.signTx(t, newTx(addr4, 1, 1), signerEIP155), // will be pruned
-				eoa4.signTx(t, newTx(addr4, 2, 1), signerEIP155), // will be pruned
-				eoa4.signTx(t, newTx(addr4, 3, 1), signerEIP155), // will be pruned
-				eoa4.signTx(t, newTx(addr4, 4, 1), signerEIP155), // will be pruned
+				eoa4.signTx(t, newTx(addr4, 0, 1, types.LegacyTxType), signerLondon), // will be pruned
+				eoa4.signTx(t, newTx(addr4, 1, 1, types.LegacyTxType), signerLondon), // will be pruned
+				eoa4.signTx(t, newTx(addr4, 2, 1, types.LegacyTxType), signerLondon), // will be pruned
+				eoa4.signTx(t, newTx(addr4, 3, 1, types.LegacyTxType), signerLondon), // will be pruned
+				eoa4.signTx(t, newTx(addr4, 4, 1, types.LegacyTxType), signerLondon), // will be pruned
 			},
 		}
 
@@ -2443,7 +2454,7 @@ func TestResetAccounts_Promoted(t *testing.T) {
 
 	pool, err := newTestPool()
 	assert.NoError(t, err)
-	pool.SetSigner(signerEIP155)
+	pool.SetSigner(signerLondon)
 
 	pool.Start()
 	defer pool.Close()
@@ -2535,22 +2546,22 @@ func TestResetAccounts_Enqueued(t *testing.T) {
 
 		allTxs := map[types.Address][]*types.Transaction{
 			addr1: {
-				eoa1.signTx(t, newTx(addr1, 3, 1), signerEIP155),
-				eoa1.signTx(t, newTx(addr1, 4, 1), signerEIP155),
-				eoa1.signTx(t, newTx(addr1, 5, 1), signerEIP155),
+				eoa1.signTx(t, newTx(addr1, 3, 1, types.LegacyTxType), signerLondon),
+				eoa1.signTx(t, newTx(addr1, 4, 1, types.LegacyTxType), signerLondon),
+				eoa1.signTx(t, newTx(addr1, 5, 1, types.LegacyTxType), signerLondon),
 			},
 			addr2: {
-				eoa2.signTx(t, newTx(addr2, 2, 1), signerEIP155),
-				eoa2.signTx(t, newTx(addr2, 3, 1), signerEIP155),
-				eoa2.signTx(t, newTx(addr2, 4, 1), signerEIP155),
-				eoa2.signTx(t, newTx(addr2, 5, 1), signerEIP155),
-				eoa2.signTx(t, newTx(addr2, 6, 1), signerEIP155),
-				eoa2.signTx(t, newTx(addr2, 7, 1), signerEIP155),
+				eoa2.signTx(t, newTx(addr2, 2, 1, types.LegacyTxType), signerLondon),
+				eoa2.signTx(t, newTx(addr2, 3, 1, types.LegacyTxType), signerLondon),
+				eoa2.signTx(t, newTx(addr2, 4, 1, types.LegacyTxType), signerLondon),
+				eoa2.signTx(t, newTx(addr2, 5, 1, types.LegacyTxType), signerLondon),
+				eoa2.signTx(t, newTx(addr2, 6, 1, types.LegacyTxType), signerLondon),
+				eoa2.signTx(t, newTx(addr2, 7, 1, types.LegacyTxType), signerLondon),
 			},
 			addr3: {
-				eoa3.signTx(t, newTx(addr3, 7, 1), signerEIP155),
-				eoa3.signTx(t, newTx(addr3, 8, 1), signerEIP155),
-				eoa3.signTx(t, newTx(addr3, 9, 1), signerEIP155),
+				eoa3.signTx(t, newTx(addr3, 7, 1, types.LegacyTxType), signerLondon),
+				eoa3.signTx(t, newTx(addr3, 8, 1, types.LegacyTxType), signerLondon),
+				eoa3.signTx(t, newTx(addr3, 9, 1, types.LegacyTxType), signerLondon),
 			},
 		}
 		newNonces := map[types.Address]uint64{
@@ -2578,7 +2589,7 @@ func TestResetAccounts_Enqueued(t *testing.T) {
 
 		pool, err := newTestPool()
 		assert.NoError(t, err)
-		pool.SetSigner(signerEIP155)
+		pool.SetSigner(signerLondon)
 
 		pool.Start()
 		defer pool.Close()
@@ -2637,21 +2648,21 @@ func TestResetAccounts_Enqueued(t *testing.T) {
 
 		allTxs := map[types.Address][]*types.Transaction{
 			addr1: {
-				newTx(addr1, 1, 1),
-				newTx(addr1, 2, 1),
-				newTx(addr1, 3, 1),
-				newTx(addr1, 4, 1),
+				newTx(addr1, 1, 1, types.LegacyTxType),
+				newTx(addr1, 2, 1, types.LegacyTxType),
+				newTx(addr1, 3, 1, types.LegacyTxType),
+				newTx(addr1, 4, 1, types.LegacyTxType),
 			},
 			addr2: {
-				newTx(addr2, 3, 3),
-				newTx(addr2, 4, 3),
-				newTx(addr2, 5, 3),
-				newTx(addr2, 6, 3),
+				newTx(addr2, 3, 3, types.LegacyTxType),
+				newTx(addr2, 4, 3, types.LegacyTxType),
+				newTx(addr2, 5, 3, types.LegacyTxType),
+				newTx(addr2, 6, 3, types.LegacyTxType),
 			},
 			addr3: {
-				newTx(addr3, 7, 1),
-				newTx(addr3, 8, 1),
-				newTx(addr3, 9, 1),
+				newTx(addr3, 7, 1, types.LegacyTxType),
+				newTx(addr3, 8, 1, types.LegacyTxType),
+				newTx(addr3, 9, 1, types.LegacyTxType),
 			},
 		}
 		newNonces := map[types.Address]uint64{
@@ -2728,18 +2739,18 @@ func TestExecutablesOrder(t *testing.T) {
 
 	newPricedTx := func(
 		addr types.Address, nonce, gasPrice uint64, gasFeeCap uint64, value uint64) *types.Transaction {
-		tx := newTx(addr, nonce, 1)
-		tx.SetValue(new(big.Int).SetUint64(value))
+		var tx *types.Transaction
 
 		if gasPrice == 0 {
-			tx.SetTransactionType(types.DynamicFeeTx)
+			tx = newTx(addr, nonce, 1, types.DynamicFeeTxType)
 			tx.SetGasFeeCap(new(big.Int).SetUint64(gasFeeCap))
 			tx.SetGasTipCap(new(big.Int).SetUint64(2))
-			tx.SetGasPrice(big.NewInt(0))
 		} else {
-			tx.SetTransactionType(types.LegacyTx)
+			tx = newTx(addr, nonce, 1, types.LegacyTxType)
 			tx.SetGasPrice(new(big.Int).SetUint64(gasPrice))
 		}
+
+		tx.SetValue(new(big.Int).SetUint64(value))
 
 		return tx
 	}
@@ -2915,8 +2926,10 @@ func TestExecutablesOrder(t *testing.T) {
 			// verify the highest priced transactions
 			// were processed first
 			for i, tx := range successful {
-				require.Equal(t, test.expectedPriceOrder[i][0], tx.GasPrice().Uint64())
-				require.Equal(t, test.expectedPriceOrder[i][1], tx.Value().Uint64())
+				if tx.Type() != types.DynamicFeeTxType {
+					require.Equal(t, test.expectedPriceOrder[i][0], tx.GasPrice().Uint64())
+					require.Equal(t, test.expectedPriceOrder[i][1], tx.Value().Uint64())
+				}
 			}
 		})
 	}
@@ -2972,23 +2985,23 @@ func TestRecovery(t *testing.T) {
 			name: "unrecoverable drops account",
 			allTxs: map[types.Address][]statusTx{
 				addr1: {
-					{newTx(addr1, 0, 1), ok},
-					{newTx(addr1, 1, 1), unrecoverable},
-					{newTx(addr1, 2, 1), recoverable},
-					{newTx(addr1, 3, 1), recoverable},
-					{newTx(addr1, 4, 1), recoverable},
+					{newTx(addr1, 0, 1, types.LegacyTxType), ok},
+					{newTx(addr1, 1, 1, types.LegacyTxType), unrecoverable},
+					{newTx(addr1, 2, 1, types.LegacyTxType), recoverable},
+					{newTx(addr1, 3, 1, types.LegacyTxType), recoverable},
+					{newTx(addr1, 4, 1, types.LegacyTxType), recoverable},
 				},
 
 				addr2: {
-					{newTx(addr2, 9, 1), unrecoverable},
-					{newTx(addr2, 10, 1), recoverable},
+					{newTx(addr2, 9, 1, types.LegacyTxType), unrecoverable},
+					{newTx(addr2, 10, 1, types.LegacyTxType), recoverable},
 				},
 
 				addr3: {
-					{newTx(addr3, 5, 1), ok},
-					{newTx(addr3, 6, 1), recoverable},
-					{newTx(addr3, 7, 1), recoverable},
-					{newTx(addr3, 8, 1), recoverable},
+					{newTx(addr3, 5, 1, types.LegacyTxType), ok},
+					{newTx(addr3, 6, 1, types.LegacyTxType), recoverable},
+					{newTx(addr3, 7, 1, types.LegacyTxType), recoverable},
+					{newTx(addr3, 8, 1, types.LegacyTxType), recoverable},
 				},
 			},
 			expected: result{
@@ -3018,15 +3031,15 @@ func TestRecovery(t *testing.T) {
 			name: "recoverable remains in account",
 			allTxs: map[types.Address][]statusTx{
 				addr1: {
-					{newTx(addr1, 0, 1), ok},
-					{newTx(addr1, 1, 1), ok},
-					{newTx(addr1, 2, 1), ok},
-					{newTx(addr1, 3, 1), recoverable},
-					{newTx(addr1, 4, 1), recoverable},
+					{newTx(addr1, 0, 1, types.LegacyTxType), ok},
+					{newTx(addr1, 1, 1, types.LegacyTxType), ok},
+					{newTx(addr1, 2, 1, types.LegacyTxType), ok},
+					{newTx(addr1, 3, 1, types.LegacyTxType), recoverable},
+					{newTx(addr1, 4, 1, types.LegacyTxType), recoverable},
 				},
 				addr2: {
-					{newTx(addr2, 9, 1), recoverable},
-					{newTx(addr2, 10, 1), recoverable},
+					{newTx(addr2, 9, 1, types.LegacyTxType), recoverable},
+					{newTx(addr2, 10, 1, types.LegacyTxType), recoverable},
 				},
 			},
 			expected: result{
@@ -3147,40 +3160,40 @@ func TestGetTxs(t *testing.T) {
 			name: "get promoted txs",
 			allTxs: map[types.Address][]*types.Transaction{
 				addr1: {
-					eoa1.signTx(t, newTx(addr1, 0, 1), signerEIP155),
-					eoa1.signTx(t, newTx(addr1, 1, 1), signerEIP155),
-					eoa1.signTx(t, newTx(addr1, 2, 1), signerEIP155),
+					eoa1.signTx(t, newTx(addr1, 0, 1, types.LegacyTxType), signerLondon),
+					eoa1.signTx(t, newTx(addr1, 1, 1, types.LegacyTxType), signerLondon),
+					eoa1.signTx(t, newTx(addr1, 2, 1, types.LegacyTxType), signerLondon),
 				},
 
 				addr2: {
-					eoa2.signTx(t, newTx(addr2, 0, 1), signerEIP155),
-					eoa2.signTx(t, newTx(addr2, 1, 1), signerEIP155),
-					eoa2.signTx(t, newTx(addr2, 2, 1), signerEIP155),
+					eoa2.signTx(t, newTx(addr2, 0, 1, types.LegacyTxType), signerLondon),
+					eoa2.signTx(t, newTx(addr2, 1, 1, types.LegacyTxType), signerLondon),
+					eoa2.signTx(t, newTx(addr2, 2, 1, types.LegacyTxType), signerLondon),
 				},
 
 				addr3: {
-					eoa3.signTx(t, newTx(addr3, 0, 1), signerEIP155),
-					eoa3.signTx(t, newTx(addr3, 1, 1), signerEIP155),
-					eoa3.signTx(t, newTx(addr3, 2, 1), signerEIP155),
+					eoa3.signTx(t, newTx(addr3, 0, 1, types.LegacyTxType), signerLondon),
+					eoa3.signTx(t, newTx(addr3, 1, 1, types.LegacyTxType), signerLondon),
+					eoa3.signTx(t, newTx(addr3, 2, 1, types.LegacyTxType), signerLondon),
 				},
 			},
 			expectedPromoted: map[types.Address][]*types.Transaction{
 				addr1: {
-					eoa1.signTx(t, newTx(addr1, 0, 1), signerEIP155),
-					eoa1.signTx(t, newTx(addr1, 1, 1), signerEIP155),
-					eoa1.signTx(t, newTx(addr1, 2, 1), signerEIP155),
+					eoa1.signTx(t, newTx(addr1, 0, 1, types.LegacyTxType), signerLondon),
+					eoa1.signTx(t, newTx(addr1, 1, 1, types.LegacyTxType), signerLondon),
+					eoa1.signTx(t, newTx(addr1, 2, 1, types.LegacyTxType), signerLondon),
 				},
 
 				addr2: {
-					eoa2.signTx(t, newTx(addr2, 0, 1), signerEIP155),
-					eoa2.signTx(t, newTx(addr2, 1, 1), signerEIP155),
-					eoa2.signTx(t, newTx(addr2, 2, 1), signerEIP155),
+					eoa2.signTx(t, newTx(addr2, 0, 1, types.LegacyTxType), signerLondon),
+					eoa2.signTx(t, newTx(addr2, 1, 1, types.LegacyTxType), signerLondon),
+					eoa2.signTx(t, newTx(addr2, 2, 1, types.LegacyTxType), signerLondon),
 				},
 
 				addr3: {
-					eoa3.signTx(t, newTx(addr3, 0, 1), signerEIP155),
-					eoa3.signTx(t, newTx(addr3, 1, 1), signerEIP155),
-					eoa3.signTx(t, newTx(addr3, 2, 1), signerEIP155),
+					eoa3.signTx(t, newTx(addr3, 0, 1, types.LegacyTxType), signerLondon),
+					eoa3.signTx(t, newTx(addr3, 1, 1, types.LegacyTxType), signerLondon),
+					eoa3.signTx(t, newTx(addr3, 2, 1, types.LegacyTxType), signerLondon),
 				},
 			},
 		},
@@ -3188,73 +3201,73 @@ func TestGetTxs(t *testing.T) {
 			name: "get all txs",
 			allTxs: map[types.Address][]*types.Transaction{
 				addr1: {
-					eoa1.signTx(t, newTx(addr1, 0, 1), signerEIP155),
-					eoa1.signTx(t, newTx(addr1, 1, 1), signerEIP155),
-					eoa1.signTx(t, newTx(addr1, 2, 1), signerEIP155),
+					eoa1.signTx(t, newTx(addr1, 0, 1, types.LegacyTxType), signerLondon),
+					eoa1.signTx(t, newTx(addr1, 1, 1, types.LegacyTxType), signerLondon),
+					eoa1.signTx(t, newTx(addr1, 2, 1, types.LegacyTxType), signerLondon),
 					// enqueued
-					eoa1.signTx(t, newTx(addr1, 10, 1), signerEIP155),
-					eoa1.signTx(t, newTx(addr1, 11, 1), signerEIP155),
-					eoa1.signTx(t, newTx(addr1, 12, 1), signerEIP155),
+					eoa1.signTx(t, newTx(addr1, 10, 1, types.LegacyTxType), signerLondon),
+					eoa1.signTx(t, newTx(addr1, 11, 1, types.LegacyTxType), signerLondon),
+					eoa1.signTx(t, newTx(addr1, 12, 1, types.LegacyTxType), signerLondon),
 				},
 
 				addr2: {
-					eoa2.signTx(t, newTx(addr2, 0, 1), signerEIP155),
-					eoa2.signTx(t, newTx(addr2, 1, 1), signerEIP155),
-					eoa2.signTx(t, newTx(addr2, 2, 1), signerEIP155),
+					eoa2.signTx(t, newTx(addr2, 0, 1, types.LegacyTxType), signerLondon),
+					eoa2.signTx(t, newTx(addr2, 1, 1, types.LegacyTxType), signerLondon),
+					eoa2.signTx(t, newTx(addr2, 2, 1, types.LegacyTxType), signerLondon),
 
 					// enqueued
-					eoa2.signTx(t, newTx(addr2, 10, 1), signerEIP155),
-					eoa2.signTx(t, newTx(addr2, 11, 1), signerEIP155),
-					eoa2.signTx(t, newTx(addr2, 12, 1), signerEIP155),
+					eoa2.signTx(t, newTx(addr2, 10, 1, types.LegacyTxType), signerLondon),
+					eoa2.signTx(t, newTx(addr2, 11, 1, types.LegacyTxType), signerLondon),
+					eoa2.signTx(t, newTx(addr2, 12, 1, types.LegacyTxType), signerLondon),
 				},
 
 				addr3: {
-					eoa3.signTx(t, newTx(addr3, 0, 1), signerEIP155),
-					eoa3.signTx(t, newTx(addr3, 1, 1), signerEIP155),
-					eoa3.signTx(t, newTx(addr3, 2, 1), signerEIP155),
+					eoa3.signTx(t, newTx(addr3, 0, 1, types.LegacyTxType), signerLondon),
+					eoa3.signTx(t, newTx(addr3, 1, 1, types.LegacyTxType), signerLondon),
+					eoa3.signTx(t, newTx(addr3, 2, 1, types.LegacyTxType), signerLondon),
 
 					// enqueued
-					eoa3.signTx(t, newTx(addr3, 10, 1), signerEIP155),
-					eoa3.signTx(t, newTx(addr3, 11, 1), signerEIP155),
-					eoa3.signTx(t, newTx(addr3, 12, 1), signerEIP155),
+					eoa3.signTx(t, newTx(addr3, 10, 1, types.LegacyTxType), signerLondon),
+					eoa3.signTx(t, newTx(addr3, 11, 1, types.LegacyTxType), signerLondon),
+					eoa3.signTx(t, newTx(addr3, 12, 1, types.LegacyTxType), signerLondon),
 				},
 			},
 			expectedPromoted: map[types.Address][]*types.Transaction{
 				addr1: {
-					eoa1.signTx(t, newTx(addr1, 0, 1), signerEIP155),
-					eoa1.signTx(t, newTx(addr1, 1, 1), signerEIP155),
-					eoa1.signTx(t, newTx(addr1, 2, 1), signerEIP155),
+					eoa1.signTx(t, newTx(addr1, 0, 1, types.LegacyTxType), signerLondon),
+					eoa1.signTx(t, newTx(addr1, 1, 1, types.LegacyTxType), signerLondon),
+					eoa1.signTx(t, newTx(addr1, 2, 1, types.LegacyTxType), signerLondon),
 				},
 
 				addr2: {
-					eoa2.signTx(t, newTx(addr2, 0, 1), signerEIP155),
-					eoa2.signTx(t, newTx(addr2, 1, 1), signerEIP155),
-					eoa2.signTx(t, newTx(addr2, 2, 1), signerEIP155),
+					eoa2.signTx(t, newTx(addr2, 0, 1, types.LegacyTxType), signerLondon),
+					eoa2.signTx(t, newTx(addr2, 1, 1, types.LegacyTxType), signerLondon),
+					eoa2.signTx(t, newTx(addr2, 2, 1, types.LegacyTxType), signerLondon),
 				},
 
 				addr3: {
-					eoa3.signTx(t, newTx(addr3, 0, 1), signerEIP155),
-					eoa3.signTx(t, newTx(addr3, 1, 1), signerEIP155),
-					eoa3.signTx(t, newTx(addr3, 2, 1), signerEIP155),
+					eoa3.signTx(t, newTx(addr3, 0, 1, types.LegacyTxType), signerLondon),
+					eoa3.signTx(t, newTx(addr3, 1, 1, types.LegacyTxType), signerLondon),
+					eoa3.signTx(t, newTx(addr3, 2, 1, types.LegacyTxType), signerLondon),
 				},
 			},
 			expectedEnqueued: map[types.Address][]*types.Transaction{
 				addr1: {
-					eoa1.signTx(t, newTx(addr1, 10, 1), signerEIP155),
-					eoa1.signTx(t, newTx(addr1, 11, 1), signerEIP155),
-					eoa1.signTx(t, newTx(addr1, 12, 1), signerEIP155),
+					eoa1.signTx(t, newTx(addr1, 10, 1, types.LegacyTxType), signerLondon),
+					eoa1.signTx(t, newTx(addr1, 11, 1, types.LegacyTxType), signerLondon),
+					eoa1.signTx(t, newTx(addr1, 12, 1, types.LegacyTxType), signerLondon),
 				},
 
 				addr2: {
-					eoa2.signTx(t, newTx(addr2, 10, 1), signerEIP155),
-					eoa2.signTx(t, newTx(addr2, 11, 1), signerEIP155),
-					eoa2.signTx(t, newTx(addr2, 12, 1), signerEIP155),
+					eoa2.signTx(t, newTx(addr2, 10, 1, types.LegacyTxType), signerLondon),
+					eoa2.signTx(t, newTx(addr2, 11, 1, types.LegacyTxType), signerLondon),
+					eoa2.signTx(t, newTx(addr2, 12, 1, types.LegacyTxType), signerLondon),
 				},
 
 				addr3: {
-					eoa3.signTx(t, newTx(addr3, 10, 1), signerEIP155),
-					eoa3.signTx(t, newTx(addr3, 11, 1), signerEIP155),
-					eoa3.signTx(t, newTx(addr3, 12, 1), signerEIP155),
+					eoa3.signTx(t, newTx(addr3, 10, 1, types.LegacyTxType), signerLondon),
+					eoa3.signTx(t, newTx(addr3, 11, 1, types.LegacyTxType), signerLondon),
+					eoa3.signTx(t, newTx(addr3, 12, 1, types.LegacyTxType), signerLondon),
 				},
 			},
 		},
@@ -3280,7 +3293,7 @@ func TestGetTxs(t *testing.T) {
 
 			pool, err := newTestPool()
 			assert.NoError(t, err)
-			pool.SetSigner(signerEIP155)
+			pool.SetSigner(signerLondon)
 
 			pool.Start()
 			defer pool.Close()
@@ -3438,7 +3451,7 @@ func TestBatchTx_SingleAccount(t *testing.T) {
 	// run max number of addTx concurrently
 	for i := 0; i < int(defaultMaxAccountEnqueued); i++ {
 		go func(i uint64) {
-			tx := newTx(addr, i, 1)
+			tx := newTx(addr, i, 1, types.LegacyTxType)
 
 			tx.ComputeHash()
 
@@ -3524,14 +3537,14 @@ func TestAddTxsInOrder(t *testing.T) {
 		}
 
 		for j := uint64(0); j < defaultMaxAccountEnqueued; j++ {
-			addrsTxs[i].txs[j] = newTx(addrsTxs[i].addr, j, uint64(1))
+			addrsTxs[i].txs[j] = newTx(addrsTxs[i].addr, j, uint64(1), types.LegacyTxType)
 		}
 	}
 
 	pool, err := newTestPool()
 	require.NoError(t, err)
 
-	signer := crypto.NewEIP155Signer(100, true)
+	signer := crypto.NewEIP155Signer(100)
 
 	pool.SetSigner(signer)
 	pool.Start()
@@ -3634,7 +3647,7 @@ func TestAddTx_TxReplacement(t *testing.T) {
 		secondAccountNonce = 2
 	)
 
-	poolSigner := crypto.NewEIP155Signer(100, true)
+	poolSigner := crypto.NewLondonSigner(100)
 	firstKey, firstKeyAddr := tests.GenerateKeyAndAddr(t)
 	secondKey, secondKeyAddr := tests.GenerateKeyAndAddr(t)
 
@@ -3643,12 +3656,12 @@ func TestAddTx_TxReplacement(t *testing.T) {
 		key *ecdsa.PrivateKey, addr types.Address) *types.Transaction {
 		t.Helper()
 
-		tx := newTx(addr, nonce, 1)
-		tx.SetTransactionType(types.DynamicFeeTx)
+		tx := newTx(addr, nonce, 1, types.DynamicFeeTxType)
 		tx.SetInput(nil)
 		tx.SetGasPrice(nil)
 		tx.SetGasTipCap(new(big.Int).SetUint64(gasTipCap))
 		tx.SetGasFeeCap(new(big.Int).SetUint64(gasFeeCap))
+		tx.SetChainID(big.NewInt(100))
 
 		singedTx, err := poolSigner.SignTx(tx, key)
 		require.NoError(t, err)
@@ -3663,7 +3676,7 @@ func TestAddTx_TxReplacement(t *testing.T) {
 		key *ecdsa.PrivateKey, addr types.Address) *types.Transaction {
 		t.Helper()
 
-		tx := newTx(addr, nonce, 1)
+		tx := newTx(addr, nonce, 1, types.LegacyTxType)
 		tx.SetInput(nil)
 		tx.SetGasPrice(new(big.Int).SetUint64(gasPrice))
 
@@ -3676,6 +3689,7 @@ func TestAddTx_TxReplacement(t *testing.T) {
 	}
 
 	pool, err := newTestPool()
+	pool.chainID = big.NewInt(100)
 	require.NoError(t, err)
 
 	pool.baseFee = 100
@@ -3748,14 +3762,14 @@ func getDefaultEnabledForks() *chain.Forks {
 
 func BenchmarkAddTxTime(b *testing.B) {
 	b.Run("benchmark add one tx", func(b *testing.B) {
-		signer := crypto.NewEIP155Signer(100, true)
+		signer := crypto.NewEIP155Signer(100)
 
 		key, err := crypto.GenerateECDSAKey()
 		if err != nil {
 			b.Fatal(err)
 		}
 
-		signedTx, err := signer.SignTx(newTx(crypto.PubKeyToAddress(&key.PublicKey), 0, 1), key)
+		signedTx, err := signer.SignTx(newTx(crypto.PubKeyToAddress(&key.PublicKey), 0, 1, types.LegacyTxType), key)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -3776,7 +3790,7 @@ func BenchmarkAddTxTime(b *testing.B) {
 	})
 
 	b.Run("benchmark fill account", func(b *testing.B) {
-		signer := crypto.NewEIP155Signer(100, true)
+		signer := crypto.NewEIP155Signer(100)
 
 		key, err := crypto.GenerateECDSAKey()
 		if err != nil {
@@ -3787,7 +3801,7 @@ func BenchmarkAddTxTime(b *testing.B) {
 		txs := make([]*types.Transaction, defaultMaxAccountEnqueued)
 
 		for i := range txs {
-			txs[i], err = signer.SignTx(newTx(addr, uint64(i), uint64(1)), key)
+			txs[i], err = signer.SignTx(newTx(addr, uint64(i), uint64(1), types.LegacyTxType), key)
 			if err != nil {
 				b.Fatal(err)
 			}

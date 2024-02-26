@@ -44,7 +44,7 @@ func (t *Transaction) MarshalStoreRLPTo(dst []byte) []byte {
 func (t *Transaction) marshalStoreRLPWith(a *fastrlp.Arena) *fastrlp.Value {
 	vv := a.NewArray()
 
-	if t.Type() != LegacyTx {
+	if t.Type() != LegacyTxType {
 		vv.Set(a.NewBytes([]byte{byte(t.Type())}))
 	}
 

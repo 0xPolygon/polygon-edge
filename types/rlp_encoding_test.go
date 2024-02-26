@@ -41,9 +41,9 @@ func TestRLPEncoding(t *testing.T) {
 	}
 }
 
-func TestRLPMarshall_And_Unmarshall_Transaction(t *testing.T) {
+func TestRLPMarshall_And_Unmarshall_Legacy_Transaction(t *testing.T) {
 	addrTo := StringToAddress("11")
-	txn := NewTx(&MixedTxn{
+	txn := NewTx(&LegacyTx{
 		Nonce:    0,
 		GasPrice: big.NewInt(11),
 		Gas:      11,
@@ -57,7 +57,7 @@ func TestRLPMarshall_And_Unmarshall_Transaction(t *testing.T) {
 
 	txn.ComputeHash()
 
-	unmarshalledTxn := NewTx(&MixedTxn{})
+	unmarshalledTxn := NewTx(&LegacyTx{})
 	marshaledRlp := txn.MarshalRLP()
 
 	if err := unmarshalledTxn.UnmarshalRLP(marshaledRlp); err != nil {
@@ -152,35 +152,56 @@ func TestRLPUnmarshal_Header_ComputeHash(t *testing.T) {
 func TestRLPMarshall_And_Unmarshall_TypedTransaction(t *testing.T) {
 	addrTo := StringToAddress("11")
 	addrFrom := StringToAddress("22")
-	originalTx := NewTx(&MixedTxn{
-		Nonce:     0,
-		GasPrice:  big.NewInt(11),
-		GasFeeCap: big.NewInt(12),
-		GasTipCap: big.NewInt(13),
-		Gas:       11,
-		To:        &addrTo,
-		From:      addrFrom,
-		Value:     big.NewInt(1),
-		Input:     []byte{1, 2},
-		V:         big.NewInt(25),
-		S:         big.NewInt(26),
-		R:         big.NewInt(27),
-	})
 
-	txTypes := []TxType{
-		StateTx,
-		LegacyTx,
-		DynamicFeeTx,
+	originalTxs := []*Transaction{
+		NewTx(&StateTx{
+			Nonce:    0,
+			GasPrice: big.NewInt(11),
+			Gas:      11,
+			To:       &addrTo,
+			From:     addrFrom,
+			Value:    big.NewInt(1),
+			Input:    []byte{1, 2},
+			V:        big.NewInt(25),
+			S:        big.NewInt(26),
+			R:        big.NewInt(27),
+		}),
+		NewTx(&LegacyTx{
+			Nonce:    0,
+			GasPrice: big.NewInt(11),
+			Gas:      11,
+			To:       &addrTo,
+			From:     addrFrom,
+			Value:    big.NewInt(1),
+			Input:    []byte{1, 2},
+			V:        big.NewInt(25),
+			S:        big.NewInt(26),
+			R:        big.NewInt(27),
+		}),
+		NewTx(&DynamicFeeTx{
+			Nonce:     0,
+			GasFeeCap: big.NewInt(12),
+			GasTipCap: big.NewInt(13),
+			Gas:       11,
+			To:        &addrTo,
+			From:      addrFrom,
+			Value:     big.NewInt(1),
+			Input:     []byte{1, 2},
+			V:         big.NewInt(25),
+			S:         big.NewInt(26),
+			R:         big.NewInt(27),
+		}),
 	}
 
-	for _, v := range txTypes {
-		t.Run(v.String(), func(t *testing.T) {
-			originalTx.SetTransactionType(v)
+	for _, originalTx := range originalTxs {
+		t.Run(originalTx.Type().String(), func(t *testing.T) {
 			originalTx.ComputeHash()
+
+			unmarshalledTx := &Transaction{}
+			unmarshalledTx.InitInnerData(originalTx.Type())
 
 			txRLP := originalTx.MarshalRLP()
 
-			unmarshalledTx := NewTx(&MixedTxn{})
 			assert.NoError(t, unmarshalledTx.UnmarshalRLP(txRLP))
 
 			unmarshalledTx.ComputeHash()
@@ -194,9 +215,9 @@ func TestRLPMarshall_Unmarshall_Missing_Data(t *testing.T) {
 	t.Parallel()
 
 	txTypes := []TxType{
-		StateTx,
-		LegacyTx,
-		DynamicFeeTx,
+		StateTxType,
+		LegacyTxType,
+		DynamicFeeTxType,
 	}
 
 	for _, txType := range txTypes {
@@ -219,27 +240,27 @@ func TestRLPMarshall_Unmarshall_Missing_Data(t *testing.T) {
 				name:        fmt.Sprintf("[%s] Missing From", txType),
 				expectedErr: false,
 				omittedValues: map[string]bool{
-					"ChainID":    txType != DynamicFeeTx,
-					"GasTipCap":  txType != DynamicFeeTx,
-					"GasFeeCap":  txType != DynamicFeeTx,
-					"GasPrice":   txType == DynamicFeeTx,
-					"AccessList": txType != DynamicFeeTx,
-					"From":       txType != StateTx,
+					"ChainID":    txType != DynamicFeeTxType,
+					"GasTipCap":  txType != DynamicFeeTxType,
+					"GasFeeCap":  txType != DynamicFeeTxType,
+					"GasPrice":   txType == DynamicFeeTxType,
+					"AccessList": txType != DynamicFeeTxType,
+					"From":       txType != StateTxType,
 				},
-				fromAddrSet: txType == StateTx,
+				fromAddrSet: txType == StateTxType,
 			},
 			{
 				name:        fmt.Sprintf("[%s] Address set for state tx only", txType),
 				expectedErr: false,
 				omittedValues: map[string]bool{
-					"ChainID":    txType != DynamicFeeTx,
-					"GasTipCap":  txType != DynamicFeeTx,
-					"GasFeeCap":  txType != DynamicFeeTx,
-					"GasPrice":   txType == DynamicFeeTx,
-					"AccessList": txType != DynamicFeeTx,
-					"From":       txType != StateTx,
+					"ChainID":    txType != DynamicFeeTxType,
+					"GasTipCap":  txType != DynamicFeeTxType,
+					"GasFeeCap":  txType != DynamicFeeTxType,
+					"GasPrice":   txType == DynamicFeeTxType,
+					"AccessList": txType != DynamicFeeTxType,
+					"From":       txType != StateTxType,
 				},
-				fromAddrSet: txType == StateTx,
+				fromAddrSet: txType == StateTxType,
 			},
 		}
 
@@ -255,14 +276,12 @@ func TestRLPMarshall_Unmarshall_Missing_Data(t *testing.T) {
 				v, err := parser.Parse(testData)
 				assert.Nil(t, err)
 
-				unmarshalledTx := NewTx(&MixedTxn{
-					Type: txType,
-				})
+				unmarshalledTx := NewTxWithType(txType)
 
 				if tt.expectedErr {
-					assert.Error(t, unmarshalledTx.unmarshalRLPFrom(parser, v), tt.name)
+					assert.Error(t, unmarshalledTx.Inner.unmarshalRLPFrom(parser, v), tt.name)
 				} else {
-					assert.NoError(t, unmarshalledTx.unmarshalRLPFrom(parser, v), tt.name)
+					assert.NoError(t, unmarshalledTx.Inner.unmarshalRLPFrom(parser, v), tt.name)
 					assert.Equal(t, tt.fromAddrSet, len(unmarshalledTx.From()) != 0 && unmarshalledTx.From() != ZeroAddress, unmarshalledTx.Type().String(), unmarshalledTx.From())
 				}
 
@@ -281,15 +300,15 @@ func TestRLPMarshall_And_Unmarshall_TxType(t *testing.T) {
 	}{
 		{
 			name:   "StateTx",
-			txType: StateTx,
+			txType: StateTxType,
 		},
 		{
 			name:   "LegacyTx",
-			txType: LegacyTx,
+			txType: LegacyTxType,
 		},
 		{
 			name:   "DynamicFeeTx",
-			txType: DynamicFeeTx,
+			txType: DynamicFeeTxType,
 		},
 		{
 			name:        "undefined type",

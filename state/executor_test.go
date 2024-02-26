@@ -80,8 +80,7 @@ func Test_Transition_checkDynamicFees(t *testing.T) {
 		{
 			name:    "happy path",
 			baseFee: big.NewInt(100),
-			tx: types.NewTx(&types.MixedTxn{
-				Type:      types.DynamicFeeTx,
+			tx: types.NewTx(&types.DynamicFeeTx{
 				GasFeeCap: big.NewInt(100),
 				GasTipCap: big.NewInt(100),
 			}),
@@ -94,8 +93,7 @@ func Test_Transition_checkDynamicFees(t *testing.T) {
 		{
 			name:    "happy path with empty values",
 			baseFee: big.NewInt(0),
-			tx: types.NewTx(&types.MixedTxn{
-				Type:      types.DynamicFeeTx,
+			tx: types.NewTx(&types.DynamicFeeTx{
 				GasFeeCap: big.NewInt(0),
 				GasTipCap: big.NewInt(0),
 			}),
@@ -108,8 +106,7 @@ func Test_Transition_checkDynamicFees(t *testing.T) {
 		{
 			name:    "gas fee cap less than base fee",
 			baseFee: big.NewInt(20),
-			tx: types.NewTx(&types.MixedTxn{
-				Type:      types.DynamicFeeTx,
+			tx: types.NewTx(&types.DynamicFeeTx{
 				GasFeeCap: big.NewInt(10),
 				GasTipCap: big.NewInt(0),
 			}),
@@ -124,8 +121,7 @@ func Test_Transition_checkDynamicFees(t *testing.T) {
 		{
 			name:    "gas fee cap less than tip cap",
 			baseFee: big.NewInt(5),
-			tx: types.NewTx(&types.MixedTxn{
-				Type:      types.DynamicFeeTx,
+			tx: types.NewTx(&types.DynamicFeeTx{
 				GasFeeCap: big.NewInt(10),
 				GasTipCap: big.NewInt(15),
 			}),

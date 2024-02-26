@@ -27,7 +27,7 @@ func TestCalculateReceiptsRoot(t *testing.T) {
 				CumulativeGasUsed: 100,
 				GasUsed:           70,
 				ContractAddress:   &contractAddr1,
-				TransactionType:   types.DynamicFeeTx,
+				TransactionType:   types.DynamicFeeTxType,
 				Logs: []*types.Log{
 					{
 						Address: contractAddr1,
@@ -47,7 +47,7 @@ func TestCalculateReceiptsRoot(t *testing.T) {
 				CumulativeGasUsed: 100,
 				GasUsed:           30,
 				ContractAddress:   &contractAddr2,
-				TransactionType:   types.LegacyTx,
+				TransactionType:   types.LegacyTxType,
 				Logs: []*types.Log{
 					{
 						Address: contractAddr1,
@@ -82,7 +82,7 @@ func TestCalculateReceiptsRoot(t *testing.T) {
 				CumulativeGasUsed: 100 + i,
 				GasUsed:           70 + i,
 				ContractAddress:   &contractAddr1,
-				TransactionType:   types.DynamicFeeTx,
+				TransactionType:   types.DynamicFeeTxType,
 				Logs: []*types.Log{
 					{
 						Address: contractAddr1,
@@ -128,7 +128,7 @@ func TestCalculateTransactionsRoot(t *testing.T) {
 
 		transactions := []*types.Transaction{
 			{
-				Inner: &types.MixedTxn{
+				Inner: &types.DynamicFeeTx{
 					Hash:      types.StringToHash("0x1"),
 					From:      types.StringToAddress("0x2"),
 					To:        &contractAddr1,
@@ -139,11 +139,10 @@ func TestCalculateTransactionsRoot(t *testing.T) {
 					Nonce:     1,
 					Gas:       100000,
 					ChainID:   big.NewInt(1),
-					Type:      types.DynamicFeeTx,
 				},
 			},
 			{
-				Inner: &types.MixedTxn{
+				Inner: &types.LegacyTx{
 					Hash:     types.StringToHash("0x4"),
 					From:     types.StringToAddress("0x5"),
 					To:       &contractAddr2,
@@ -152,7 +151,6 @@ func TestCalculateTransactionsRoot(t *testing.T) {
 					Gas:      200000,
 					Input:    []byte{0x4, 0x5, 0x6},
 					Nonce:    2,
-					Type:     types.LegacyTx,
 				},
 			},
 		}

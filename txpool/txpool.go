@@ -544,7 +544,7 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 // constraints before entering the pool.
 func (p *TxPool) validateTx(tx *types.Transaction) error {
 	// Check the transaction type. State transactions are not expected to be added to the pool
-	if tx.Type() == types.StateTx {
+	if tx.Type() == types.StateTxType {
 		metrics.IncrCounter([]string{txPoolMetrics, "invalid_tx_type"}, 1)
 
 		return fmt.Errorf("%w: type %d rejected, state transactions are not expected to be added to the pool",
@@ -572,7 +572,7 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 	if signerErr != nil {
 		metrics.IncrCounter([]string{txPoolMetrics, "invalid_signature_txs"}, 1)
 
-		return ErrExtractSignature
+		return fmt.Errorf("%w. %w", ErrExtractSignature, signerErr)
 	}
 
 	// If the from field is set, check that
@@ -608,7 +608,7 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 	latestBlockGasLimit := currentHeader.GasLimit
 	baseFee := p.GetBaseFee() // base fee is calculated for the next block
 
-	if tx.Type() == types.AccessListTx {
+	if tx.Type() == types.AccessListTxType {
 		// Reject access list tx if berlin hardfork(eip-2930) is not enabled
 		if !forks.Berlin {
 			metrics.IncrCounter([]string{txPoolMetrics, "invalid_tx_type"}, 1)
@@ -622,7 +622,7 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 
 			return ErrUnderpriced
 		}
-	} else if tx.Type() == types.DynamicFeeTx {
+	} else if tx.Type() == types.DynamicFeeTxType {
 		// Reject dynamic fee tx if london hardfork is not enabled
 		if !forks.London {
 			metrics.IncrCounter([]string{txPoolMetrics, "tx_type"}, 1)
@@ -670,8 +670,8 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 		}
 	}
 
-	// Check if the given tx is not underpriced
 	if tx.GetGasPrice(baseFee).Cmp(new(big.Int).SetUint64(p.priceLimit)) < 0 {
+		// Make sure that the transaction is not underpriced
 		metrics.IncrCounter([]string{txPoolMetrics, "underpriced_tx"}, 1)
 
 		return ErrUnderpriced
@@ -775,7 +775,7 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 	}
 
 	// add chainID to the tx - only dynamic fee tx
-	if tx.Type() == types.DynamicFeeTx {
+	if tx.Type() == types.DynamicFeeTxType {
 		tx.SetChainID(p.chainID)
 	}
 

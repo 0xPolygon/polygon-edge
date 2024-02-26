@@ -93,7 +93,7 @@ func TestBlockBuilder_BuildBlockTxOneFailedTxAndOneTakesTooMuchGas(t *testing.T)
 			gas = blockGasLimit - 1
 		}
 
-		tx := types.NewTx(&types.MixedTxn{
+		tx := types.NewTx(&types.LegacyTx{
 			Value:    big.NewInt(amount),
 			GasPrice: big.NewInt(gasPrice),
 			Gas:      gas,
