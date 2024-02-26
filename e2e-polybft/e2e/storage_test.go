@@ -39,9 +39,6 @@ func TestE2E_Storage(t *testing.T) {
 
 	client := cluster.Servers[0].JSONRPC().Eth()
 
-	chainID, err := client.ChainID()
-	require.NoError(t, err)
-
 	num := 20
 
 	receivers := []ethgo.Address{}
@@ -64,12 +61,11 @@ func TestE2E_Storage(t *testing.T) {
 			defer wg.Done()
 
 			txn := &ethgo.Transaction{
-				From:    sender.Address(),
-				To:      &to,
-				Gas:     30000, // enough to send a transfer
-				Value:   big.NewInt(int64(i)),
-				Nonce:   uint64(i),
-				ChainID: chainID,
+				From:  sender.Address(),
+				To:    &to,
+				Gas:   30000, // enough to send a transfer
+				Value: big.NewInt(int64(i)),
+				Nonce: uint64(i),
 			}
 
 			// Send every second transaction as a dynamic fees one
@@ -82,15 +78,8 @@ func TestE2E_Storage(t *testing.T) {
 				txn.GasPrice = ethgo.Gwei(2).Uint64()
 			}
 
-			tx := cluster.SendTxn(t, sender, txn)
-			require.NoError(t, tx.Wait())
-
-			txs = append(txs,
-				txObject{
-					bNumber: tx.Receipt().BlockNumber,
-					txHash:  tx.Receipt().TransactionHash,
-					to:      to,
-				})
+			bn, th := sendTx(t, client, sender, txn)
+			txs = append(txs, txObject{bNumber: bn, txHash: th, to: to})
 		}(i, receivers[i])
 	}
 
@@ -115,6 +104,33 @@ func TestE2E_Storage(t *testing.T) {
 	require.NoError(t, err)
 
 	checkStorage(t, txs, client)
+}
+
+// sendTx is a helper function which signs transaction with provided private key and sends it
+func sendTx(t *testing.T, client *jsonrpc.Eth, sender *wallet.Key, txn *ethgo.Transaction) (uint64, ethgo.Hash) {
+	t.Helper()
+
+	chainID, err := client.ChainID()
+	require.NoError(t, err)
+
+	if txn.Type == ethgo.TransactionDynamicFee {
+		txn.ChainID = chainID
+	}
+
+	signer := wallet.NewEIP155Signer(chainID.Uint64())
+	signedTxn, err := signer.SignTx(txn, sender)
+	require.NoError(t, err)
+
+	txnRaw, err := signedTxn.MarshalRLPTo(nil)
+	require.NoError(t, err)
+
+	h, err := client.SendRawTransaction(txnRaw)
+	require.NoError(t, err)
+
+	bn, err := client.BlockNumber()
+	require.NoError(t, err)
+
+	return bn, h
 }
 
 func checkStorage(t *testing.T, txs []txObject, client *jsonrpc.Eth) {
