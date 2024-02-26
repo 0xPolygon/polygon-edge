@@ -12,7 +12,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/blockchain/storage"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/bradhe/stopwatch"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
 )
@@ -156,9 +155,6 @@ func updateBlock(t *testing.T, num uint64, b *types.FullBlock) *types.FullBlock 
 		b.Block.Transactions[i].ComputeHash()
 		b.Receipts[i].TxHash = b.Block.Transactions[i].Hash()
 	}
-	// big := new(big.Int)
-	// big.SetInt64(int64(num))
-	// b.Block.Header.Hash = types.BytesToHash(big.Bytes())
 
 	b.Block.Header.ComputeHash()
 
@@ -193,7 +189,7 @@ func TestWriteBlockPerf(t *testing.T) {
 	s, _, path := openStorage(t, "/tmp/leveldbV1-test")
 	defer s.Close()
 
-	var watchTime int
+	var watchTime int64
 
 	count := 10000
 	b := createBlock(t)
@@ -202,14 +198,14 @@ func TestWriteBlockPerf(t *testing.T) {
 		updateBlock(t, uint64(i), b)
 		batchWriter := prepareBatch(t, s, b)
 
-		watch := stopwatch.Start()
+		tn := time.Now().UTC()
 
 		if err := batchWriter.WriteBatch(); err != nil {
 			require.NoError(t, err)
 		}
 
-		watch.Stop()
-		watchTime = watchTime + int(watch.Milliseconds())
+		d := time.Since(tn)
+		watchTime = watchTime + d.Milliseconds()
 	}
 
 	time.Sleep(time.Second)
@@ -225,20 +221,20 @@ func TestReadBlockPerf(t *testing.T) {
 	s, _, _ := openStorage(t, "/tmp/leveldbV1-test")
 	defer s.Close()
 
-	var watchTime int
+	var watchTime int64
 
 	count := 1000
 	for i := 1; i <= count; i++ {
 		n := uint64(1 + rand.Intn(10000))
 
-		watch := stopwatch.Start()
+		tn := time.Now().UTC()
 		h, ok := s.ReadCanonicalHash(n)
 		_, err2 := s.ReadBody(h)
 		_, err3 := s.ReadHeader(h)
 		_, err4 := s.ReadReceipts(h)
+		d := time.Since(tn)
 
-		watch.Stop()
-		watchTime = watchTime + int(watch.Milliseconds())
+		watchTime = watchTime + d.Milliseconds()
 
 		if !ok || err2 != nil || err3 != nil || err4 != nil {
 			t.Logf("\terror")

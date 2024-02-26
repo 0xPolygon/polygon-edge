@@ -9,22 +9,8 @@ import (
 )
 
 type MdbxOpts struct {
-	// must be in the range from 12.5% (almost empty) to 50% (half empty)
-	// which corresponds to the range from 8192 and to 32768 in units respectively
-
-	// log             log.Logger
-	// roTxsLimiter    *semaphore.Weighted
-	// bucketsCfg      TableCfgFunc
-	path string
-	// syncPeriod      time.Duration
-	// mapSize         datasize.ByteSize
-	// growthStep      datasize.ByteSize
-	// shrinkThreshold int
+	path  string
 	flags uint
-	// pageSize        uint64
-	// dirtySpace      uint64 // if exeed this space, modified pages will `spill` to disk
-	// mergeThreshold  uint64
-	// verbosity       kv.DBVerbosityLvl
 }
 
 // MdbxDB is the mdbx implementation of the kv storage

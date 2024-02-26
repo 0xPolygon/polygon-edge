@@ -9,7 +9,6 @@ require (
 	github.com/Ethernal-Tech/merkle-tree v0.0.0-20231213143318-4db9da419e04
 	github.com/armon/go-metrics v0.4.1
 	github.com/aws/aws-sdk-go v1.50.8
-	github.com/bradhe/stopwatch v0.0.0-20190618212248-a58cccc508ea
 	github.com/btcsuite/btcd/btcec/v2 v2.3.2
 	github.com/docker/docker v24.0.9+incompatible
 	github.com/docker/go-connections v0.5.0
