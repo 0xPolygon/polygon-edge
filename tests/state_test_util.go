@@ -259,10 +259,6 @@ func (p *postEntry) UnmarshalJSON(input []byte) error {
 
 type postState []postEntry
 
-// TODO: Check do we need access lists in the stTransaction
-// (we do not have them in the types.Transaction either)
-//
-//nolint:godox
 type stTransaction struct {
 	Data                 []string              `json:"data"`
 	Value                []string              `json:"value"`
