@@ -60,7 +60,7 @@ function initPolybftConsensus() {
 function createGenesis() {
   ./blade genesis $genesis_params \
     --block-gas-limit 10000000 \
-    --premine 0x85da99c8a7c2c95964c8efd687e95e632fc533d6:1000000000000000000000 \
+    --premine 0x85da99c8a7c2c95964c8efd687e95e632fc533d6 \
     --premine 0x0000000000000000000000000000000000000000 \
     --epoch-size 10 \
     --reward-wallet 0xDEADBEEF:1000000 \

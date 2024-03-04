@@ -102,6 +102,7 @@ type Config struct {
 	MaxSlots           uint64
 	MaxAccountEnqueued uint64
 	ChainID            *big.Int
+	PeerID             peer.ID
 }
 
 /* All requests are passed to the main loop
@@ -186,6 +187,9 @@ type TxPool struct {
 
 	// chain id
 	chainID *big.Int
+
+	// localPeerID is the peer ID of the local node that is running the txpool
+	localPeerID peer.ID
 }
 
 // NewTxPool returns a new pool for processing incoming transactions.
@@ -207,6 +211,7 @@ func NewTxPool(
 		gauge:       slotGauge{height: 0, max: config.MaxSlots},
 		priceLimit:  config.PriceLimit,
 		chainID:     config.ChainID,
+		localPeerID: config.PeerID,
 
 		//	main loop channels
 		promoteReqCh: make(chan promoteRequest),
@@ -919,8 +924,8 @@ func (p *TxPool) handlePromoteRequest(req promoteRequest) {
 
 // addGossipTx handles receiving transactions
 // gossiped by the network.
-func (p *TxPool) addGossipTx(obj interface{}, _ peer.ID) {
-	if !p.sealing.Load() {
+func (p *TxPool) addGossipTx(obj interface{}, peerID peer.ID) {
+	if !p.sealing.Load() || p.localPeerID == peerID {
 		return
 	}
 

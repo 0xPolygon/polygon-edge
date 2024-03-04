@@ -343,6 +343,7 @@ func NewServer(config *Config) (*Server, error) {
 				PriceLimit:         m.config.PriceLimit,
 				MaxAccountEnqueued: m.config.MaxAccountEnqueued,
 				ChainID:            big.NewInt(m.config.Chain.Params.ChainID),
+				PeerID:             m.network.AddrInfo().ID,
 			},
 		)
 		if err != nil {

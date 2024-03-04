@@ -14,6 +14,7 @@ import (
 
 	"github.com/golang/protobuf/ptypes/any"
 	"github.com/hashicorp/go-hclog"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -600,6 +601,7 @@ func TestAddGossipTx(t *testing.T) {
 		t.Parallel()
 
 		pool, err := newTestPool()
+		pool.localPeerID = peer.ID("test")
 		assert.NoError(t, err)
 		pool.SetSigner(signer)
 
