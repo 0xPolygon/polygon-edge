@@ -12,18 +12,20 @@ type levelDB struct {
 	db *leveldb.DB
 }
 
-// DB key = k + mapper
 var tableMapper = map[uint8][]byte{
-	storagev2.BODY:         []byte("b"), // DB key = block number + mapper
-	storagev2.CANONICAL:    []byte("c"), // DB key = block number + mapper
-	storagev2.DIFFICULTY:   []byte("d"), // DB key = block number + mapper
-	storagev2.HEADER:       []byte("h"), // DB key = block number + mapper
-	storagev2.RECEIPTS:     []byte("r"), // DB key = block number + mapper
-	storagev2.FORK:         {},          // DB key = FORK_KEY + mapper
-	storagev2.HEAD_HASH:    {},          // DB key = HEAD_HASH_KEY + mapper
-	storagev2.HEAD_NUMBER:  {},          // DB key = HEAD_NUMBER_KEY + mapper
-	storagev2.BLOCK_LOOKUP: {},          // DB key = block hash + mapper, value = block number
-	storagev2.TX_LOOKUP:    {},          // DB key = tx hash + mapper, value = block number
+	// Main DB
+	storagev2.BODY:       []byte("b"), // DB key = block number + block hash + mapper, value = block body
+	storagev2.DIFFICULTY: []byte("d"), // DB key = block number + block hash + mapper, value = block total diffculty
+	storagev2.HEADER:     []byte("h"), // DB key = block number + block hash + mapper, value = block header
+	storagev2.RECEIPTS:   []byte("r"), // DB key = block number + block hash + mapper, value = block receipts
+	storagev2.CANONICAL:  {},          // DB key = block number + mapper, value = block hash
+
+	// GidLid DB
+	storagev2.FORK:         {}, // DB key = FORK_KEY + mapper, value = fork hashes
+	storagev2.HEAD_HASH:    {}, // DB key = HEAD_HASH_KEY + mapper, value = head hash
+	storagev2.HEAD_NUMBER:  {}, // DB key = HEAD_NUMBER_KEY + mapper, value = head number
+	storagev2.BLOCK_LOOKUP: {}, // DB key = block hash + mapper, value = block number
+	storagev2.TX_LOOKUP:    {}, // DB key = tx hash + mapper, value = block number
 }
 
 // NewLevelDBStorage creates the new storage reference with leveldb default options
