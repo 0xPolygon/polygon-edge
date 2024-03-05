@@ -60,6 +60,10 @@ generate-bsd-licenses: check-git
 unit-test: check-go
 	go test -race -shuffle=on -coverprofile coverage.out -timeout 20m `go list ./... | grep -v e2e`
 
+.PHONY: benchmark-test
+benchmark-test: check-go
+	go test -bench=. -run=^$ `go list ./... | grep -v /e2e`
+
 .PHONY: fuzz-test
 fuzz-test: check-go
 	./scripts/fuzzAll

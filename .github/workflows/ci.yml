@@ -36,6 +36,10 @@ on: # yamllint disable-line rule:truthy
         description: Fuzz Tests
         type: boolean
         default: true
+      benchmark-test:
+        description: Benchmark Tests
+        type: boolean
+        default: true
   workflow_call:
     inputs:
       build-blade:
@@ -65,6 +69,10 @@ on: # yamllint disable-line rule:truthy
         description: Fuzz Tests
         type: boolean
         required: true
+      benchmark-test:
+        description: Benchmark Tests
+        type: boolean
+        default: true
     outputs:
       build-blade:
         description: Build Blade output
@@ -87,6 +95,9 @@ on: # yamllint disable-line rule:truthy
       fuzz-test:
         description: Fuzz Tests output
         value: ${{ jobs.fuzz-test.outputs.workflow_output }}
+      benchmark-test:
+        description: Benchmark Tests output
+        value: ${{ jobs.benchmark-test.outputs.workflow_output }}
 
 jobs:
   build-blade:
@@ -142,5 +153,13 @@ jobs:
     needs: build-blade
     if: |
       inputs.fuzz-test || 
+      github.event_name == 'pull_request' || 
+      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'))
+  benchmark-test:
+    name: Benchmark Tests
+    uses: ./.github/workflows/benchmark-test.yml
+    needs: build-blade
+    if: |
+      inputs.benchmark-test || 
       github.event_name == 'pull_request' || 
       (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'))

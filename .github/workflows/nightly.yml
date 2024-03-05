@@ -30,6 +30,7 @@ jobs:
       e2e-legacy-test: true
       property-polybft-test: true
       fuzz-test: true
+      benchmark-test: true
   deploy_network:
     name: Deploy Network
     uses: ./.github/workflows/deploy-network.yml
@@ -120,6 +121,7 @@ jobs:
       e2e_legacy_test_output: ${{ needs.ci.outputs.e2e-legacy-test }}
       property_polybft_test_output: ${{ needs.ci.outputs.property-polybft-test }}
       fuzz_test_output: ${{ needs.ci.outputs.fuzz-test }}
+      benchmark_test_output: ${{ needs.ci.outputs.benchmark-test }}
       deploy_network_terraform_output: ${{ needs.deploy_network.outputs.terraform_output }}
       deploy_network_ansible_output: ${{ needs.deploy_network.outputs.ansible_output }}
       load_test_multiple_eoa_output: ${{ needs.load_test_multiple_eoa.outputs.load_test_output }}

@@ -649,7 +649,8 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 
 	// set up initial access list
 	initialAccessList := runtime.NewAccessList()
-	if t.config.Berlin { // check if berlin fork is activated or not
+	if t.config.Berlin {
+		// populate access list in case Berlin fork is active
 		initialAccessList.PrepareAccessList(msg.From(), msg.To(), t.precompiles.Addrs, msg.AccessList())
 	}
 
@@ -1352,6 +1353,11 @@ func (t *Transition) RevertToSnapshot(snapshot int) error {
 	t.journalRevisions = t.journalRevisions[:idx]
 
 	return nil
+}
+
+// PopulateAccessList populates access list based on the provided access list
+func (t *Transition) PopulateAccessList(from types.Address, to *types.Address, acl types.TxAccessList) {
+	t.accessList.PrepareAccessList(from, to, t.precompiles.Addrs, acl)
 }
 
 func (t *Transition) AddSlotToAccessList(addr types.Address, slot types.Hash) {

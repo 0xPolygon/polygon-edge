@@ -5,3 +5,6 @@
 [submodule "blade-contracts"]
 	path = blade-contracts
 	url = https://github.com/Ethernal-Tech/blade-contracts
+[submodule "tests/evm-benchmarks"]
+	path = tests/evm-benchmarks
+	url = https://github.com/ipsilon/evm-benchmarks

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"github.com/umbracle/fastrlp"
 
 	"github.com/0xPolygon/polygon-edge/chain"
@@ -22,6 +23,10 @@ import (
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
+)
+
+const (
+	testGenesisBaseFee = 0xa
 )
 
 type testCase struct {
@@ -57,7 +62,7 @@ type env struct {
 	Timestamp  string `json:"currentTimestamp"`
 }
 
-func (e *env) ToHeader(t *testing.T) *types.Header {
+func (e *env) ToHeader(t testing.TB) *types.Header {
 	t.Helper()
 
 	baseFee := uint64(0)
@@ -75,7 +80,7 @@ func (e *env) ToHeader(t *testing.T) *types.Header {
 	}
 }
 
-func (e *env) ToEnv(t *testing.T) runtime.TxContext {
+func (e *env) ToEnv(t testing.TB) runtime.TxContext {
 	t.Helper()
 
 	baseFee := new(big.Int)
@@ -129,35 +134,29 @@ func stringToBigInt(str string) (*big.Int, error) {
 	return n, nil
 }
 
-func stringToBigIntT(t *testing.T, str string) *big.Int {
+func stringToBigIntT(t testing.TB, str string) *big.Int {
 	t.Helper()
 
 	number, err := stringToBigInt(str)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	return number
 }
 
-func stringToAddressT(t *testing.T, str string) types.Address {
+func stringToAddressT(t testing.TB, str string) types.Address {
 	t.Helper()
 
 	address, err := stringToAddress(str)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	return address
 }
 
-func stringToHashT(t *testing.T, str string) types.Hash {
+func stringToHashT(t testing.TB, str string) types.Hash {
 	t.Helper()
 
 	address, err := stringToHash(str)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	return address
 }
@@ -171,24 +170,20 @@ func stringToUint64(str string) (uint64, error) {
 	return n.Uint64(), nil
 }
 
-func stringToUint64T(t *testing.T, str string) uint64 {
+func stringToUint64T(t testing.TB, str string) uint64 {
 	t.Helper()
 
 	n, err := stringToUint64(str)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	return n
 }
 
-func stringToInt64T(t *testing.T, str string) int64 {
+func stringToInt64T(t testing.TB, str string) int64 {
 	t.Helper()
 
 	n, err := stringToUint64(str)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	return int64(n)
 }
@@ -688,4 +683,16 @@ func rlpHashLogs(logs []*types.Log) (res types.Hash) {
 
 func vmTestBlockHash(n uint64) types.Hash {
 	return types.BytesToHash(crypto.Keccak256([]byte(big.NewInt(int64(n)).String())))
+}
+
+// getTestName extracts test name from the test file path
+func getTestName(testFile string) string {
+	testName := filepath.Base(testFile)
+
+	return strings.TrimSuffix(testName, ".json")
+}
+
+type forkConfig struct {
+	name  string
+	forks *chain.Forks
 }

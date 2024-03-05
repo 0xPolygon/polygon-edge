@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"math/big"
 	"os"
-	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -25,8 +23,6 @@ import (
 
 const (
 	stateTestsDir = "tests/GeneralStateTests"
-
-	testGenesisBaseFee = 0xa
 )
 
 var (
@@ -116,8 +112,7 @@ func TestState(t *testing.T) {
 func runSpecificTestCase(t *testing.T, file string, c testCase, fc *forkConfig, index int, p postEntry) error {
 	t.Helper()
 
-	testName := filepath.Base(file)
-	testName = strings.TrimSuffix(testName, ".json")
+	testName := getTestName(file)
 
 	env := c.Env.ToEnv(t)
 	forks := fc.forks
@@ -230,9 +225,4 @@ func runSpecificTestCase(t *testing.T, file string, c testCase, fc *forkConfig, 
 	}
 
 	return nil
-}
-
-type forkConfig struct {
-	name  string
-	forks *chain.Forks
 }
