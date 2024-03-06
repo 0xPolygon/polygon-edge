@@ -100,10 +100,6 @@ type Eth struct {
 	priceLimit    uint64
 }
 
-var (
-	ErrInsufficientFunds = errors.New("insufficient funds for execution")
-)
-
 // ChainId returns the chain id of the client
 //
 //nolint:stylecheck
@@ -176,6 +172,16 @@ func (e *Eth) filterExtra(block *types.Block) error {
 	return nil
 }
 
+// GetBlockTransactionCountByHash returns the number of transactions in the block with the given hash.
+func (e *Eth) GetBlockTransactionCountByHash(blockHash types.Hash) (interface{}, error) {
+	block, ok := e.store.GetBlockByHash(blockHash, true)
+	if !ok {
+		return nil, nil
+	}
+
+	return *common.EncodeUint64(uint64(len(block.Transactions))), nil
+}
+
 func (e *Eth) GetBlockTransactionCountByNumber(number BlockNumber) (interface{}, error) {
 	num, err := GetNumericBlockNumber(number, e.store)
 	if err != nil {
@@ -189,6 +195,31 @@ func (e *Eth) GetBlockTransactionCountByNumber(number BlockNumber) (interface{},
 	}
 
 	return *common.EncodeUint64(uint64(len(block.Transactions))), nil
+}
+
+// GetTransactionByBlockNumberAndIndex returns the transaction for the given block number and index.
+func (e *Eth) GetTransactionByBlockNumberAndIndex(number BlockNumber, index argUint64) (interface{}, error) {
+	num, err := GetNumericBlockNumber(number, e.store)
+	if err != nil {
+		return nil, err
+	}
+
+	block, ok := e.store.GetBlockByNumber(num, true)
+	if !ok {
+		return nil, nil
+	}
+
+	return GetTransactionByBlockAndIndex(block, index)
+}
+
+// GetTransactionByBlockHashAndIndex returns the transaction for the given block hash and index.
+func (e *Eth) GetTransactionByBlockHashAndIndex(blockHash types.Hash, index argUint64) (interface{}, error) {
+	block, ok := e.store.GetBlockByHash(blockHash, true)
+	if !ok {
+		return nil, nil
+	}
+
+	return GetTransactionByBlockAndIndex(block, index)
 }
 
 // BlockNumber returns current block number

@@ -14,6 +14,8 @@ var (
 	ErrNegativeBlockNumber      = errors.New("invalid argument 0: block number must not be negative")
 	ErrFailedFetchGenesis       = errors.New("error fetching genesis block header")
 	ErrNoDataInContractCreation = errors.New("contract creation without data provided")
+	ErrIndexOutOfRange          = errors.New("the index is invalid, it is out of range of expected values")
+	ErrInsufficientFunds        = errors.New("insufficient funds for execution")
 )
 
 type latestHeaderGetter interface {
@@ -41,6 +43,23 @@ func GetNumericBlockNumber(number BlockNumber, store latestHeaderGetter) (uint64
 
 		return uint64(number), nil
 	}
+}
+
+// GetTransactionByBlockAndIndex returns the transaction for the given block and index.
+func GetTransactionByBlockAndIndex(block *types.Block, index argUint64) (interface{}, error) {
+	idx := int(index)
+	size := len(block.Transactions)
+
+	if size == 0 || size < idx {
+		return nil, ErrIndexOutOfRange
+	}
+
+	return toTransaction(
+		block.Transactions[index],
+		argUintPtr(block.Number()),
+		argHashPtr(block.Hash()),
+		&idx,
+	), nil
 }
 
 type headerGetter interface {
