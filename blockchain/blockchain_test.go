@@ -591,9 +591,11 @@ func TestBlockchainWriteBody(t *testing.T) {
 		t.Parallel()
 
 		tx := types.NewTx(&types.LegacyTx{
-			Value: big.NewInt(10),
-			V:     big.NewInt(1),
-			From:  addr,
+			BaseTx: &types.BaseTx{
+				Value: big.NewInt(10),
+				V:     big.NewInt(1),
+				From:  addr,
+			},
 		})
 
 		block := &types.Block{
@@ -623,8 +625,10 @@ func TestBlockchainWriteBody(t *testing.T) {
 		t.Parallel()
 
 		tx := types.NewTx(&types.LegacyTx{
-			Value: big.NewInt(10),
-			V:     big.NewInt(1),
+			BaseTx: &types.BaseTx{
+				Value: big.NewInt(10),
+				V:     big.NewInt(1),
+			},
 		})
 
 		block := &types.Block{
@@ -655,8 +659,10 @@ func TestBlockchainWriteBody(t *testing.T) {
 		t.Parallel()
 
 		tx := types.NewTx(&types.LegacyTx{
-			Value: big.NewInt(10),
-			V:     big.NewInt(1),
+			BaseTx: &types.BaseTx{
+				Value: big.NewInt(10),
+				V:     big.NewInt(1),
+			},
 		})
 
 		block := &types.Block{
@@ -715,8 +721,8 @@ func Test_recoverFromFieldsInBlock(t *testing.T) {
 			},
 		}
 
-		tx1 := types.NewTx(&types.LegacyTx{Nonce: 0, From: addr1})
-		tx2 := types.NewTx(&types.LegacyTx{Nonce: 1, From: types.ZeroAddress})
+		tx1 := types.NewTx(&types.LegacyTx{BaseTx: &types.BaseTx{Nonce: 0, From: addr1}})
+		tx2 := types.NewTx(&types.LegacyTx{BaseTx: &types.BaseTx{Nonce: 1, From: types.ZeroAddress}})
 
 		computeTxHashes(tx1, tx2)
 
@@ -745,9 +751,9 @@ func Test_recoverFromFieldsInBlock(t *testing.T) {
 			},
 		}
 
-		tx1 := types.NewTx(&types.LegacyTx{Nonce: 0, From: types.ZeroAddress})
-		tx2 := types.NewTx(&types.LegacyTx{Nonce: 1, From: types.ZeroAddress})
-		tx3 := types.NewTx(&types.LegacyTx{Nonce: 2, From: types.ZeroAddress})
+		tx1 := types.NewTx(&types.LegacyTx{BaseTx: &types.BaseTx{Nonce: 0, From: types.ZeroAddress}})
+		tx2 := types.NewTx(&types.LegacyTx{BaseTx: &types.BaseTx{Nonce: 1, From: types.ZeroAddress}})
+		tx3 := types.NewTx(&types.LegacyTx{BaseTx: &types.BaseTx{Nonce: 2, From: types.ZeroAddress}})
 
 		computeTxHashes(tx1, tx2, tx3)
 
@@ -801,8 +807,8 @@ func Test_recoverFromFieldsInTransactions(t *testing.T) {
 			},
 		}
 
-		tx1 := types.NewTx(&types.LegacyTx{Nonce: 0, From: addr1})
-		tx2 := types.NewTx(&types.LegacyTx{Nonce: 1, From: types.ZeroAddress})
+		tx1 := types.NewTx(&types.LegacyTx{BaseTx: &types.BaseTx{Nonce: 0, From: addr1}})
+		tx2 := types.NewTx(&types.LegacyTx{BaseTx: &types.BaseTx{Nonce: 1, From: types.ZeroAddress}})
 
 		computeTxHashes(tx1, tx2)
 
@@ -830,9 +836,9 @@ func Test_recoverFromFieldsInTransactions(t *testing.T) {
 			},
 		}
 
-		tx1 := types.NewTx(&types.LegacyTx{Nonce: 0, From: types.ZeroAddress})
-		tx2 := types.NewTx(&types.LegacyTx{Nonce: 1, From: types.ZeroAddress})
-		tx3 := types.NewTx(&types.LegacyTx{Nonce: 2, From: types.ZeroAddress})
+		tx1 := types.NewTx(&types.LegacyTx{BaseTx: &types.BaseTx{Nonce: 0, From: types.ZeroAddress}})
+		tx2 := types.NewTx(&types.LegacyTx{BaseTx: &types.BaseTx{Nonce: 1, From: types.ZeroAddress}})
+		tx3 := types.NewTx(&types.LegacyTx{BaseTx: &types.BaseTx{Nonce: 2, From: types.ZeroAddress}})
 
 		computeTxHashes(tx1, tx2, tx3)
 
@@ -864,8 +870,8 @@ func Test_recoverFromFieldsInTransactions(t *testing.T) {
 			},
 		}
 
-		tx1 := types.NewTx(&types.LegacyTx{Nonce: 0, From: addr1})
-		tx2 := types.NewTx(&types.LegacyTx{Nonce: 1, From: addr2})
+		tx1 := types.NewTx(&types.LegacyTx{BaseTx: &types.BaseTx{Nonce: 0, From: addr1}})
+		tx2 := types.NewTx(&types.LegacyTx{BaseTx: &types.BaseTx{Nonce: 1, From: addr2}})
 
 		computeTxHashes(tx1, tx2)
 
@@ -901,8 +907,10 @@ func TestBlockchainReadBody(t *testing.T) {
 	batchWriter := storage.NewBatchWriter(b.db)
 
 	tx := types.NewTx(&types.LegacyTx{
-		Value: big.NewInt(10),
-		V:     big.NewInt(1),
+		BaseTx: &types.BaseTx{
+			Value: big.NewInt(10),
+			V:     big.NewInt(1),
+		},
 	})
 
 	tx.ComputeHash()
@@ -1603,7 +1611,9 @@ func TestBlockchain_WriteFullBlock(t *testing.T) {
 		{GasUsed: 200},
 	}
 	tx := types.NewTx(&types.LegacyTx{
-		Value: big.NewInt(1),
+		BaseTx: &types.BaseTx{
+			Value: big.NewInt(1),
+		},
 	})
 
 	tx.ComputeHash()

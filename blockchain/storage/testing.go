@@ -271,25 +271,29 @@ func testBody(t *testing.T, m PlaceholderStorage) {
 
 	addr1 := types.StringToAddress("11")
 	t0 := types.NewTx(&types.LegacyTx{
-		Nonce:    0,
-		To:       &addr1,
-		Value:    big.NewInt(1),
-		Gas:      11,
 		GasPrice: big.NewInt(11),
-		Input:    []byte{1, 2},
-		V:        big.NewInt(1),
+		BaseTx: &types.BaseTx{
+			Nonce: 0,
+			To:    &addr1,
+			Value: big.NewInt(1),
+			Gas:   11,
+			Input: []byte{1, 2},
+			V:     big.NewInt(1),
+		},
 	})
 	t0.ComputeHash()
 
 	addr2 := types.StringToAddress("22")
 	t1 := types.NewTx(&types.LegacyTx{
-		Nonce:    0,
-		To:       &addr2,
-		Value:    big.NewInt(1),
-		Gas:      22,
 		GasPrice: big.NewInt(11),
-		Input:    []byte{4, 5},
-		V:        big.NewInt(2),
+		BaseTx: &types.BaseTx{
+			Nonce: 0,
+			To:    &addr2,
+			Value: big.NewInt(1),
+			Gas:   22,
+			Input: []byte{4, 5},
+			V:     big.NewInt(2),
+		},
 	})
 	t1.ComputeHash()
 
@@ -339,10 +343,12 @@ func testReceipts(t *testing.T, m PlaceholderStorage) {
 	body := &types.Body{
 		Transactions: []*types.Transaction{
 			types.NewTx(&types.StateTx{
-				Nonce:    1000,
-				Gas:      50,
 				GasPrice: new(big.Int).SetUint64(100),
-				V:        big.NewInt(11),
+				BaseTx: &types.BaseTx{
+					Nonce: 1000,
+					Gas:   50,
+					V:     big.NewInt(11),
+				},
 			}),
 		},
 	}

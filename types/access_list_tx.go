@@ -105,15 +105,8 @@ func (al TxAccessList) MarshallRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 }
 
 type AccessListTxn struct {
-	Nonce    uint64
+	*BaseTx
 	GasPrice *big.Int
-	Gas      uint64
-	To       *Address
-	Value    *big.Int
-	Input    []byte
-	V, R, S  *big.Int
-	Hash     Hash
-	From     Address
 
 	ChainID    *big.Int
 	AccessList TxAccessList
@@ -121,39 +114,15 @@ type AccessListTxn struct {
 
 func (tx *AccessListTxn) transactionType() TxType { return AccessListTxType }
 func (tx *AccessListTxn) chainID() *big.Int       { return tx.ChainID }
-func (tx *AccessListTxn) input() []byte           { return tx.Input }
-func (tx *AccessListTxn) gas() uint64             { return tx.Gas }
 func (tx *AccessListTxn) gasPrice() *big.Int      { return tx.GasPrice }
 func (tx *AccessListTxn) gasTipCap() *big.Int     { return tx.GasPrice }
 func (tx *AccessListTxn) gasFeeCap() *big.Int     { return tx.GasPrice }
-func (tx *AccessListTxn) value() *big.Int         { return tx.Value }
-func (tx *AccessListTxn) nonce() uint64           { return tx.Nonce }
-func (tx *AccessListTxn) to() *Address            { return tx.To }
-func (tx *AccessListTxn) from() Address           { return tx.From }
-
-func (tx *AccessListTxn) hash() Hash { return tx.Hash }
-
-func (tx *AccessListTxn) rawSignatureValues() (v, r, s *big.Int) {
-	return tx.V, tx.R, tx.S
-}
 
 func (tx *AccessListTxn) accessList() TxAccessList {
 	return tx.AccessList
 }
 
 // set methods for transaction fields
-func (tx *AccessListTxn) setSignatureValues(v, r, s *big.Int) {
-	tx.V, tx.R, tx.S = v, r, s
-}
-
-func (tx *AccessListTxn) setFrom(addr Address) {
-	tx.From = addr
-}
-
-func (tx *AccessListTxn) setGas(gas uint64) {
-	tx.Gas = gas
-}
-
 func (tx *AccessListTxn) setChainID(id *big.Int) {
 	tx.ChainID = id
 }
@@ -170,32 +139,8 @@ func (tx *AccessListTxn) setGasTipCap(gas *big.Int) {
 	tx.GasPrice = gas
 }
 
-func (tx *AccessListTxn) setTransactionType(t TxType) {
-	// no need to set a transaction type for access list type of transaction
-}
-
-func (tx *AccessListTxn) setValue(value *big.Int) {
-	tx.Value = value
-}
-
-func (tx *AccessListTxn) setInput(input []byte) {
-	tx.Input = input
-}
-
-func (tx *AccessListTxn) setTo(addeess *Address) {
-	tx.To = addeess
-}
-
-func (tx *AccessListTxn) setNonce(nonce uint64) {
-	tx.Nonce = nonce
-}
-
 func (tx *AccessListTxn) setAccessList(accessList TxAccessList) {
 	tx.AccessList = accessList
-}
-
-func (tx *AccessListTxn) setHash(h Hash) {
-	tx.Hash = h
 }
 
 // unmarshalRLPFrom unmarshals a Transaction in RLP format
@@ -361,8 +306,6 @@ func (tx *AccessListTxn) copy() TxData {
 		cpy.setChainID(chainID)
 	}
 
-	cpy.setNonce(tx.nonce())
-
 	if tx.gasPrice() != nil {
 		gasPrice := new(big.Int)
 		gasPrice.Set(tx.gasPrice())
@@ -370,49 +313,7 @@ func (tx *AccessListTxn) copy() TxData {
 		cpy.setGasPrice(gasPrice)
 	}
 
-	cpy.setGas(tx.gas())
-
-	cpy.setTo(tx.to())
-
-	if tx.value() != nil {
-		value := new(big.Int)
-		value.Set(tx.value())
-
-		cpy.setValue(value)
-	}
-
-	inputCopy := make([]byte, len(tx.input()))
-	copy(inputCopy, tx.input()[:])
-
-	cpy.setInput(inputCopy)
-
-	cpy.setInput(inputCopy)
-
-	v, r, s := tx.rawSignatureValues()
-
-	var vCopy, rCopy, sCopy *big.Int
-
-	if v != nil {
-		vCopy = new(big.Int)
-		vCopy.Set(v)
-	}
-
-	if r != nil {
-		rCopy = new(big.Int)
-		rCopy.Set(r)
-	}
-
-	if s != nil {
-		sCopy = new(big.Int)
-		sCopy.Set(s)
-	}
-
-	cpy.setHash(tx.hash())
-
-	cpy.setFrom(tx.from())
-
-	cpy.setSignatureValues(vCopy, rCopy, sCopy)
-
+	cpy.BaseTx = tx.BaseTx.copy()
 	cpy.setAccessList(tx.accessList().Copy())
 
 	return cpy

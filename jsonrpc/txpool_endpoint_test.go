@@ -295,16 +295,18 @@ func (s *mockTxPoolStore) GetBaseFee() uint64 {
 
 func newTestTransaction(nonce uint64, from types.Address) *types.Transaction {
 	txn := types.NewTx(&types.LegacyTx{
-		Nonce:    nonce,
 		GasPrice: big.NewInt(1),
-		Gas:      nonce * 100,
-		Value:    big.NewInt(200),
-		Input:    []byte{0xff},
-		From:     from,
-		To:       &addr1,
-		V:        big.NewInt(1),
-		R:        big.NewInt(1),
-		S:        big.NewInt(1),
+		BaseTx: &types.BaseTx{
+			Nonce: nonce,
+			Gas:   nonce * 100,
+			Value: big.NewInt(200),
+			Input: []byte{0xff},
+			From:  from,
+			To:    &addr1,
+			V:     big.NewInt(1),
+			R:     big.NewInt(1),
+			S:     big.NewInt(1),
+		},
 	})
 
 	txn.ComputeHash()
@@ -314,18 +316,20 @@ func newTestTransaction(nonce uint64, from types.Address) *types.Transaction {
 
 func newTestDynamicFeeTransaction(nonce uint64, from types.Address) *types.Transaction {
 	txn := types.NewTx(&types.DynamicFeeTx{
-		Nonce:     nonce,
 		GasTipCap: big.NewInt(2),
 		GasFeeCap: big.NewInt(4),
 		ChainID:   big.NewInt(100),
-		Gas:       nonce * 100,
-		Value:     big.NewInt(200),
-		Input:     []byte{0xff},
-		From:      from,
-		To:        &addr1,
-		V:         big.NewInt(1),
-		R:         big.NewInt(1),
-		S:         big.NewInt(1),
+		BaseTx: &types.BaseTx{
+			Nonce: nonce,
+			Gas:   nonce * 100,
+			Value: big.NewInt(200),
+			Input: []byte{0xff},
+			From:  from,
+			To:    &addr1,
+			V:     big.NewInt(1),
+			R:     big.NewInt(1),
+			S:     big.NewInt(1),
+		},
 	})
 
 	txn.ComputeHash()

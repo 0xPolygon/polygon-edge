@@ -101,9 +101,11 @@ func TestFSM_verifyCommitEpochTx(t *testing.T) {
 
 	// submit tampered commit epoch transaction to the epoch ending block
 	alteredCommitEpochTx := types.NewTx(&types.StateTx{
-		To:    &contracts.EpochManagerContract,
-		Input: []byte{},
-		Gas:   0,
+		BaseTx: &types.BaseTx{
+			To:    &contracts.EpochManagerContract,
+			Input: []byte{},
+			Gas:   0,
+		},
 	})
 	assert.ErrorContains(t, fsm.verifyCommitEpochTx(alteredCommitEpochTx), "invalid commit epoch transaction")
 

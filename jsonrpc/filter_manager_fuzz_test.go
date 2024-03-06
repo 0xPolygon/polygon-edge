@@ -35,17 +35,23 @@ func FuzzGetLogsForQuery(f *testing.F) {
 			Transactions: []*types.Transaction{
 				{
 					Inner: &types.LegacyTx{
-						Value: big.NewInt(10),
+						BaseTx: &types.BaseTx{
+							Value: big.NewInt(10),
+						},
 					},
 				},
 				{
 					Inner: &types.LegacyTx{
-						Value: big.NewInt(11),
+						BaseTx: &types.BaseTx{
+							Value: big.NewInt(11),
+						},
 					},
 				},
 				{
 					Inner: &types.LegacyTx{
-						Value: big.NewInt(12),
+						BaseTx: &types.BaseTx{
+							Value: big.NewInt(12),
+						},
 					},
 				},
 			},

@@ -16,9 +16,11 @@ func TestFrontierSigner(t *testing.T) {
 	assert.NoError(t, err)
 
 	txn := types.NewTx(&types.LegacyTx{
-		To:       &toAddress,
-		Value:    big.NewInt(10),
 		GasPrice: big.NewInt(0),
+		BaseTx: &types.BaseTx{
+			To:    &toAddress,
+			Value: big.NewInt(10),
+		},
 	})
 	signedTx, err := signer.SignTx(txn, key)
 	assert.NoError(t, err)

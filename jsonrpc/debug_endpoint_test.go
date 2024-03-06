@@ -606,14 +606,16 @@ func TestTraceCall(t *testing.T) {
 			Type:      toArgUint64Ptr(uint64(types.DynamicFeeTxType)),
 		}
 		decodedTx = types.NewTx(&types.DynamicFeeTx{
-			Nonce:     uint64(nonce),
 			GasTipCap: new(big.Int).SetBytes([]byte(gasTipCap)),
 			GasFeeCap: new(big.Int).SetBytes([]byte(gasFeeCap)),
-			Gas:       uint64(gas),
-			To:        &to,
-			Value:     new(big.Int).SetBytes([]byte(value)),
-			Input:     data,
-			From:      from,
+			BaseTx: &types.BaseTx{
+				Nonce: uint64(nonce),
+				Gas:   uint64(gas),
+				To:    &to,
+				Value: new(big.Int).SetBytes([]byte(value)),
+				Input: data,
+				From:  from,
+			},
 		})
 	)
 

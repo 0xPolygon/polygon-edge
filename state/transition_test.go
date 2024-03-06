@@ -71,9 +71,11 @@ func TestSubGasLimitPrice(t *testing.T) {
 
 			transition := newTestTransition(tt.preState)
 			msg := types.NewTx(&types.LegacyTx{
-				From:     tt.from,
-				Gas:      tt.gas,
 				GasPrice: big.NewInt(tt.gasPrice),
+				BaseTx: &types.BaseTx{
+					From: tt.from,
+					Gas:  tt.gas,
+				},
 			})
 
 			err := transition.subGasLimitPrice(msg)

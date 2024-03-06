@@ -94,11 +94,13 @@ func TestBlockBuilder_BuildBlockTxOneFailedTxAndOneTakesTooMuchGas(t *testing.T)
 		}
 
 		tx := types.NewTx(&types.LegacyTx{
-			Value:    big.NewInt(amount),
 			GasPrice: big.NewInt(gasPrice),
-			Gas:      gas,
-			Nonce:    0,
-			To:       &acc.address,
+			BaseTx: &types.BaseTx{
+				Value: big.NewInt(amount),
+				Gas:   gas,
+				Nonce: 0,
+				To:    &acc.address,
+			},
 		})
 
 		tx, err = signer.SignTx(tx, acc.privKey)

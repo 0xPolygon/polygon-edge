@@ -195,10 +195,12 @@ func TestGasHelper_FeeHistory(t *testing.T) {
 
 					for i := 0; i < 3; i++ {
 						tx := types.NewTx(&types.DynamicFeeTx{
-							Value:     ethgo.Ether(1),
-							To:        &types.ZeroAddress,
 							GasTipCap: ethgo.Gwei(uint64(200)),
 							GasFeeCap: ethgo.Gwei(uint64(200 + 200)),
+							BaseTx: &types.BaseTx{
+								Value: ethgo.Ether(1),
+								To:    &types.ZeroAddress,
+							},
 						})
 
 						tx, err := signer.SignTx(tx, senderKey)

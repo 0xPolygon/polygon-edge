@@ -62,19 +62,25 @@ func Test_maxPriceQueue(t *testing.T) {
 				types.NewTx(&types.DynamicFeeTx{
 					GasFeeCap: big.NewInt(2000),
 					GasTipCap: big.NewInt(500),
-					Nonce:     3,
+					BaseTx: &types.BaseTx{
+						Nonce: 3,
+					},
 				}),
 				// Lowest tx fee
 				types.NewTx(&types.DynamicFeeTx{
 					GasFeeCap: big.NewInt(2000),
 					GasTipCap: big.NewInt(500),
-					Nonce:     1,
+					BaseTx: &types.BaseTx{
+						Nonce: 1,
+					},
 				}),
 				// Middle tx fee
 				types.NewTx(&types.DynamicFeeTx{
 					GasFeeCap: big.NewInt(2000),
 					GasTipCap: big.NewInt(500),
-					Nonce:     2,
+					BaseTx: &types.BaseTx{
+						Nonce: 2,
+					},
 				}),
 			},
 			sorted: []*types.Transaction{
@@ -82,19 +88,25 @@ func Test_maxPriceQueue(t *testing.T) {
 				types.NewTx(&types.DynamicFeeTx{
 					GasFeeCap: big.NewInt(2000),
 					GasTipCap: big.NewInt(500),
-					Nonce:     1,
+					BaseTx: &types.BaseTx{
+						Nonce: 1,
+					},
 				}),
 				// Middle tx fee
 				types.NewTx(&types.DynamicFeeTx{
 					GasFeeCap: big.NewInt(2000),
 					GasTipCap: big.NewInt(500),
-					Nonce:     2,
+					BaseTx: &types.BaseTx{
+						Nonce: 2,
+					},
 				}),
 				// Lowest tx fee
 				types.NewTx(&types.DynamicFeeTx{
 					GasFeeCap: big.NewInt(2000),
 					GasTipCap: big.NewInt(500),
-					Nonce:     3,
+					BaseTx: &types.BaseTx{
+						Nonce: 3,
+					},
 				}),
 			},
 		},

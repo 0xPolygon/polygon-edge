@@ -104,17 +104,19 @@ func TestToTransaction_Returns_V_R_S_ValuesWithoutLeading0(t *testing.T) {
 	r, _ := hex.DecodeHex(hexWithLeading0)
 	s, _ := hex.DecodeHex(hexWithLeading0)
 	txn := types.NewTx(&types.LegacyTx{
-		Nonce:    0,
 		GasPrice: big.NewInt(0),
-		Gas:      0,
-		To:       nil,
-		Value:    big.NewInt(0),
-		Input:    nil,
-		V:        new(big.Int).SetBytes(v),
-		R:        new(big.Int).SetBytes(r),
-		S:        new(big.Int).SetBytes(s),
-		Hash:     types.Hash{},
-		From:     types.Address{},
+		BaseTx: &types.BaseTx{
+			Nonce: 0,
+			Gas:   0,
+			To:    nil,
+			Value: big.NewInt(0),
+			Input: nil,
+			V:     new(big.Int).SetBytes(v),
+			R:     new(big.Int).SetBytes(r),
+			S:     new(big.Int).SetBytes(s),
+			Hash:  types.Hash{},
+			From:  types.Address{},
+		},
 	})
 
 	jsonTx := toTransaction(txn, nil, nil, nil)
@@ -135,18 +137,20 @@ func TestToTransaction_EIP1559(t *testing.T) {
 	r, _ := hex.DecodeHex(hexWithLeading0)
 	s, _ := hex.DecodeHex(hexWithLeading0)
 	txn := types.NewTx(&types.DynamicFeeTx{
-		Nonce:     0,
 		GasTipCap: big.NewInt(10),
 		GasFeeCap: big.NewInt(10),
-		Gas:       0,
-		To:        nil,
-		Value:     big.NewInt(0),
-		Input:     nil,
-		V:         new(big.Int).SetBytes(v),
-		R:         new(big.Int).SetBytes(r),
-		S:         new(big.Int).SetBytes(s),
-		Hash:      types.Hash{},
-		From:      types.Address{},
+		BaseTx: &types.BaseTx{
+			Nonce: 0,
+			Gas:   0,
+			To:    nil,
+			Value: big.NewInt(0),
+			Input: nil,
+			V:     new(big.Int).SetBytes(v),
+			R:     new(big.Int).SetBytes(r),
+			S:     new(big.Int).SetBytes(s),
+			Hash:  types.Hash{},
+			From:  types.Address{},
+		},
 	})
 
 	jsonTx := toTransaction(txn, nil, nil, nil)

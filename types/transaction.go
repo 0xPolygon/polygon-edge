@@ -74,46 +74,47 @@ func NewTx(inner TxData) *Transaction {
 func (t *Transaction) InitInnerData(txType TxType) {
 	switch txType {
 	case AccessListTxType:
-		t.Inner = &AccessListTxn{}
+		t.Inner = &AccessListTxn{BaseTx: &BaseTx{}}
 	case StateTxType:
-		t.Inner = &StateTx{}
+		t.Inner = &StateTx{BaseTx: &BaseTx{}}
 	case LegacyTxType:
-		t.Inner = &LegacyTx{}
+		t.Inner = &LegacyTx{BaseTx: &BaseTx{}}
 	default:
-		t.Inner = &DynamicFeeTx{}
+		t.Inner = &DynamicFeeTx{BaseTx: &BaseTx{}}
 	}
 }
 
 type TxData interface {
 	transactionType() TxType
 	chainID() *big.Int
-	nonce() uint64
 	gasPrice() *big.Int
 	gasTipCap() *big.Int
 	gasFeeCap() *big.Int
-	gas() uint64
-	to() *Address
 	value() *big.Int
-	input() []byte
-	accessList() TxAccessList
+	nonce() uint64
+	gas() uint64
 	from() Address
+	to() *Address
+	input() []byte
 	hash() Hash
+	accessList() TxAccessList
 	rawSignatureValues() (v, r, s *big.Int)
 
 	//methods to set transactions fields
-	setSignatureValues(v, r, s *big.Int)
-	setFrom(Address)
-	setGas(uint64)
+
 	setChainID(*big.Int)
 	setGasPrice(*big.Int)
 	setGasFeeCap(*big.Int)
 	setGasTipCap(*big.Int)
-	setValue(*big.Int)
-	setInput([]byte)
-	setTo(address *Address)
-	setNonce(uint64)
+	setValue(value *big.Int)
+	setGas(gas uint64)
+	setNonce(nonce uint64)
+	setFrom(addr Address)
+	setTo(addr *Address)
+	setInput(input []byte)
+	setHash(h Hash)
 	setAccessList(TxAccessList)
-	setHash(Hash)
+	setSignatureValues(v, r, s *big.Int)
 	unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error
 	marshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value
 	copy() TxData

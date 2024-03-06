@@ -71,9 +71,11 @@ func TestEIP155Signer_Sender(t *testing.T) {
 			}
 
 			txn := types.NewTx(&types.LegacyTx{
-				To:       &toAddress,
-				Value:    big.NewInt(1),
 				GasPrice: big.NewInt(0),
+				BaseTx: &types.BaseTx{
+					To:    &toAddress,
+					Value: big.NewInt(1),
+				},
 			})
 
 			signer := NewEIP155Signer(
@@ -106,9 +108,11 @@ func TestEIP155Signer_ChainIDMismatch(t *testing.T) {
 		}
 
 		txn := types.NewTx(&types.LegacyTx{
-			To:       &toAddress,
-			Value:    big.NewInt(1),
 			GasPrice: big.NewInt(0),
+			BaseTx: &types.BaseTx{
+				To:    &toAddress,
+				Value: big.NewInt(1),
+			},
 		})
 
 		signer := NewEIP155Signer(chainIDTop)

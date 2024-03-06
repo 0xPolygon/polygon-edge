@@ -330,39 +330,45 @@ func (t *stTransaction) At(i indexes, baseFee *big.Int) (*types.Transaction, err
 	// if tx is not dynamic and accessList is not nil, create an access list transaction
 	if !isDynamiFeeTx && accessList != nil {
 		txData = &types.AccessListTxn{
-			From:       t.From,
-			To:         t.To,
-			Nonce:      t.Nonce,
-			Value:      value,
-			Gas:        t.GasLimit[i.Gas],
 			GasPrice:   gasPrice,
-			Input:      hex.MustDecodeHex(t.Data[i.Data]),
 			AccessList: accessList,
+			BaseTx: &types.BaseTx{
+				From:  t.From,
+				To:    t.To,
+				Nonce: t.Nonce,
+				Value: value,
+				Gas:   t.GasLimit[i.Gas],
+				Input: hex.MustDecodeHex(t.Data[i.Data]),
+			},
 		}
 	}
 
 	if txData == nil {
 		if isDynamiFeeTx {
 			txData = &types.DynamicFeeTx{
-				From:       t.From,
-				To:         t.To,
-				Nonce:      t.Nonce,
-				Value:      value,
-				Gas:        t.GasLimit[i.Gas],
 				GasFeeCap:  t.MaxFeePerGas,
 				GasTipCap:  t.MaxPriorityFeePerGas,
-				Input:      hex.MustDecodeHex(t.Data[i.Data]),
 				AccessList: accessList,
+				BaseTx: &types.BaseTx{
+					From:  t.From,
+					To:    t.To,
+					Nonce: t.Nonce,
+					Value: value,
+					Gas:   t.GasLimit[i.Gas],
+					Input: hex.MustDecodeHex(t.Data[i.Data]),
+				},
 			}
 		} else {
 			txData = &types.LegacyTx{
-				From:     t.From,
-				To:       t.To,
-				Nonce:    t.Nonce,
-				Value:    value,
-				Gas:      t.GasLimit[i.Gas],
 				GasPrice: gasPrice,
-				Input:    hex.MustDecodeHex(t.Data[i.Data]),
+				BaseTx: &types.BaseTx{
+					From:  t.From,
+					To:    t.To,
+					Nonce: t.Nonce,
+					Value: value,
+					Gas:   t.GasLimit[i.Gas],
+					Input: hex.MustDecodeHex(t.Data[i.Data]),
+				},
 			}
 		}
 	}

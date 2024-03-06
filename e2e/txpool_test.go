@@ -47,19 +47,23 @@ func generateTx(params generateTxReqParams) *types.Transaction {
 
 	if params.gasPrice != nil {
 		unsignedTx = types.NewTx(&types.LegacyTx{
-			Nonce: params.nonce,
-			To:    &params.toAddress,
-			Gas:   1000000,
-			Value: params.value,
+			BaseTx: &types.BaseTx{
+				Nonce: params.nonce,
+				To:    &params.toAddress,
+				Gas:   1000000,
+				Value: params.value,
+			},
 		})
 		unsignedTx.SetGasPrice(params.gasPrice)
 	} else {
 		unsignedTx = types.NewTx(&types.DynamicFeeTx{
-			Nonce:   params.nonce,
-			To:      &params.toAddress,
-			Gas:     1000000,
-			Value:   params.value,
 			ChainID: new(big.Int).SetUint64(defaultChainID),
+			BaseTx: &types.BaseTx{
+				Nonce: params.nonce,
+				To:    &params.toAddress,
+				Gas:   1000000,
+				Value: params.value,
+			},
 		})
 		unsignedTx.SetGasFeeCap(params.gasFeeCap)
 		unsignedTx.SetGasTipCap(params.gasTipCap)
@@ -242,31 +246,37 @@ func TestTxPool_RecoverableError(t *testing.T) {
 
 	transactions := []*types.Transaction{
 		types.NewTx(&types.LegacyTx{
-			Nonce:    0,
 			GasPrice: big.NewInt(framework.DefaultGasPrice),
-			Gas:      22000,
-			To:       &receiverAddress,
-			Value:    oneEth,
-			V:        big.NewInt(27),
-			From:     senderAddress,
+			BaseTx: &types.BaseTx{
+				Nonce: 0,
+				Gas:   22000,
+				To:    &receiverAddress,
+				Value: oneEth,
+				V:     big.NewInt(27),
+				From:  senderAddress,
+			},
 		}),
 		types.NewTx(&types.LegacyTx{
-			Nonce:    1,
 			GasPrice: big.NewInt(framework.DefaultGasPrice),
-			Gas:      22000,
-			To:       &receiverAddress,
-			Value:    oneEth,
-			V:        big.NewInt(27),
+			BaseTx: &types.BaseTx{
+				Nonce: 1,
+				Gas:   22000,
+				To:    &receiverAddress,
+				Value: oneEth,
+				V:     big.NewInt(27),
+			},
 		}),
 		types.NewTx(&types.DynamicFeeTx{
-			Nonce:     2,
+			ChainID:   new(big.Int).SetUint64(defaultChainID),
 			GasFeeCap: big.NewInt(framework.DefaultGasPrice),
 			GasTipCap: big.NewInt(1000000000),
-			Gas:       22000,
-			To:        &receiverAddress,
-			Value:     oneEth,
-			ChainID:   new(big.Int).SetUint64(defaultChainID),
-			V:         big.NewInt(27),
+			BaseTx: &types.BaseTx{
+				Nonce: 2,
+				Gas:   22000,
+				To:    &receiverAddress,
+				Value: oneEth,
+				V:     big.NewInt(27),
+			},
 		}),
 	}
 
@@ -350,13 +360,15 @@ func TestTxPool_GetPendingTx(t *testing.T) {
 	client := server.JSONRPC()
 
 	signedTx, err := signer.SignTx(types.NewTx(&types.LegacyTx{
-		Nonce:    0,
 		GasPrice: big.NewInt(1000000000),
-		Gas:      framework.DefaultGasLimit - 1,
-		To:       &receiverAddress,
-		Value:    oneEth,
-		V:        big.NewInt(1),
-		From:     types.ZeroAddress,
+		BaseTx: &types.BaseTx{
+			Nonce: 0,
+			Gas:   framework.DefaultGasLimit - 1,
+			To:    &receiverAddress,
+			Value: oneEth,
+			V:     big.NewInt(1),
+			From:  types.ZeroAddress,
+		},
 	}), senderKey)
 	assert.NoError(t, err, "failed to sign transaction")
 

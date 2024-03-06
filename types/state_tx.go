@@ -8,52 +8,21 @@ import (
 )
 
 type StateTx struct {
-	Nonce    uint64
+	*BaseTx
 	GasPrice *big.Int
-	Gas      uint64
-	To       *Address
-	Value    *big.Int
-	Input    []byte
-	V, R, S  *big.Int
-	From     Address
-	Hash     Hash
 }
 
 func (tx *StateTx) transactionType() TxType { return StateTxType }
-func (tx *StateTx) chainID() *big.Int       { return deriveChainID(tx.V) }
-func (tx *StateTx) input() []byte           { return tx.Input }
-func (tx *StateTx) gas() uint64             { return tx.Gas }
+func (tx *StateTx) chainID() *big.Int       { return deriveChainID(tx.v()) }
 func (tx *StateTx) gasPrice() *big.Int      { return tx.GasPrice }
 func (tx *StateTx) gasTipCap() *big.Int     { return tx.GasPrice }
 func (tx *StateTx) gasFeeCap() *big.Int     { return tx.GasPrice }
-func (tx *StateTx) value() *big.Int         { return tx.Value }
-func (tx *StateTx) nonce() uint64           { return tx.Nonce }
-func (tx *StateTx) to() *Address            { return tx.To }
-func (tx *StateTx) from() Address           { return tx.From }
-
-func (tx *StateTx) hash() Hash { return tx.Hash }
-
-func (tx *StateTx) rawSignatureValues() (v, r, s *big.Int) {
-	return tx.V, tx.R, tx.S
-}
 
 func (tx *StateTx) accessList() TxAccessList {
 	return nil
 }
 
 // set methods for transaction fields
-func (tx *StateTx) setSignatureValues(v, r, s *big.Int) {
-	tx.V, tx.R, tx.S = v, r, s
-}
-
-func (tx *StateTx) setFrom(addr Address) {
-	tx.From = addr
-}
-
-func (tx *StateTx) setGas(gas uint64) {
-	tx.Gas = gas
-}
-
 func (tx *StateTx) setChainID(id *big.Int) {}
 
 func (tx *StateTx) setGasPrice(gas *big.Int) {
@@ -68,25 +37,7 @@ func (tx *StateTx) setGasTipCap(gas *big.Int) {
 	tx.GasPrice = gas
 }
 
-func (tx *StateTx) setValue(value *big.Int) {
-	tx.Value = value
-}
-
-func (tx *StateTx) setInput(input []byte) {
-	tx.Input = input
-}
-
-func (tx *StateTx) setTo(addeess *Address) {
-	tx.To = addeess
-}
-
-func (tx *StateTx) setNonce(nonce uint64) {
-	tx.Nonce = nonce
-}
-
 func (tx *StateTx) setAccessList(accessList TxAccessList) {}
-
-func (tx *StateTx) setHash(h Hash) { tx.Hash = h }
 
 // unmarshalRLPFrom unmarshals a Transaction in RLP format
 // Be careful! This function does not de-serialize tx type, it assumes that t.Type is already set
@@ -226,8 +177,6 @@ func (tx *StateTx) marshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 func (tx *StateTx) copy() TxData { //nolint:dupl
 	cpy := &StateTx{}
 
-	cpy.setNonce(tx.nonce())
-
 	if tx.gasPrice() != nil {
 		gasPrice := new(big.Int)
 		gasPrice.Set(tx.gasPrice())
@@ -235,46 +184,7 @@ func (tx *StateTx) copy() TxData { //nolint:dupl
 		cpy.setGasPrice(gasPrice)
 	}
 
-	cpy.setGas(tx.gas())
-
-	cpy.setTo(tx.to())
-
-	if tx.value() != nil {
-		value := new(big.Int)
-		value.Set(tx.value())
-
-		cpy.setValue(value)
-	}
-
-	inputCopy := make([]byte, len(tx.input()))
-	copy(inputCopy, tx.input()[:])
-
-	cpy.setInput(inputCopy)
-
-	v, r, s := tx.rawSignatureValues()
-
-	var vCopy, rCopy, sCopy *big.Int
-
-	if v != nil {
-		vCopy = new(big.Int)
-		vCopy.Set(v)
-	}
-
-	if r != nil {
-		rCopy = new(big.Int)
-		rCopy.Set(r)
-	}
-
-	if s != nil {
-		sCopy = new(big.Int)
-		sCopy.Set(s)
-	}
-
-	cpy.setSignatureValues(vCopy, rCopy, sCopy)
-
-	cpy.setFrom(tx.from())
-
-	cpy.setHash(tx.hash())
+	cpy.BaseTx = tx.BaseTx.copy()
 
 	return cpy
 }
