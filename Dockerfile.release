@@ -9,7 +9,9 @@ COPY blade /usr/local/bin/
 EXPOSE 8545 9632 1478
 
 RUN addgroup -S blade-group \
-    && adduser -S blade -G blade-group
+    && adduser -S blade -G blade-group \
+    && apk add --no-cache shadow \
+    && usermod -u 1001 blade
 
 USER blade
 
