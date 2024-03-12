@@ -466,7 +466,7 @@ func WithPredeploy(predeployString string) ClusterOption {
 	}
 }
 
-func WithHttps(certFile string, keyFile string) ClusterOption {
+func WithHTTPS(certFile string, keyFile string) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.TLSCertFile = certFile
 		h.TLSKeyFile = keyFile

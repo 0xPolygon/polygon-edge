@@ -69,6 +69,7 @@ func (t *TestServer) GrpcAddr() string {
 func (t *TestServer) JSONRPCAddr() string {
 	if t.config.TLSCertFile != "" && t.config.TLSKeyFile != "" {
 		host, _ := os.Hostname()
+
 		return fmt.Sprintf("https://%s:%d", host, t.config.JSONRPCPort)
 	} else {
 		return fmt.Sprintf("http://%s:%d", hostIP, t.config.JSONRPCPort)
