@@ -27,8 +27,8 @@ func TestGovernanceManager_PostEpoch(t *testing.T) {
 	baseFeeChangeDenomEvent := &contractsapi.NewBaseFeeChangeDenomEvent{BaseFeeChangeDenom: big.NewInt(100)}
 	epochRewardEvent := &contractsapi.NewEpochRewardEvent{Reward: big.NewInt(10000)}
 
-	require.NoError(t, state.GovernanceStore.insertGovernanceEvent(1, 7, baseFeeChangeDenomEvent, nil))
-	require.NoError(t, state.GovernanceStore.insertGovernanceEvent(1, 7, epochRewardEvent, nil))
+	require.NoError(t, state.GovernanceStore.insertGovernanceEvent(1, baseFeeChangeDenomEvent, nil))
+	require.NoError(t, state.GovernanceStore.insertGovernanceEvent(1, epochRewardEvent, nil))
 
 	// no initial config was saved, so we expect an error
 	require.ErrorIs(t, governanceManager.PostEpoch(&PostEpochRequest{
@@ -88,7 +88,7 @@ func TestGovernanceManager_PostBlock(t *testing.T) {
 		})
 
 		chainParams := &chain.Params{Engine: map[string]interface{}{ConsensusName: genesisPolybftConfig}}
-		governanceManager, err := newGovernanceManager(chainParams, genesisPolybftConfig,
+		governanceManager, err := newGovernanceManager(chainParams,
 			hclog.NewNullLogger(), state, blockchainMock, nil)
 		require.NoError(t, err)
 
@@ -122,14 +122,14 @@ func TestGovernanceManager_PostBlock(t *testing.T) {
 		})
 
 		chainParams := &chain.Params{Engine: map[string]interface{}{ConsensusName: genesisPolybftConfig}}
-		governanceManager, err := newGovernanceManager(chainParams, genesisPolybftConfig,
+		governanceManager, err := newGovernanceManager(chainParams,
 			hclog.NewNullLogger(), state, blockchainMock, nil)
 		require.NoError(t, err)
 
 		// this cheats that we have this fork in code
 		governanceManager.allForksHashes[newForkHash] = newForkName
 
-		require.NoError(t, state.GovernanceStore.insertGovernanceEvent(1, newForkBlock.Uint64(),
+		require.NoError(t, state.GovernanceStore.insertGovernanceEvent(1,
 			&contractsapi.NewFeatureEvent{
 				Feature: newForkHash, Block: newForkBlock,
 			}, nil))
