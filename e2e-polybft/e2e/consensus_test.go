@@ -536,7 +536,7 @@ func TestE2E_Consensus_EIP1559Check(t *testing.T) {
 
 	client := cluster.Servers[0].JSONRPC().Eth()
 
-	waitUntilBalancesChanged := func(acct ethgo.Address, initialBalance *big.Int) error {
+	waitUntilBalancesChanged := func(_ ethgo.Address, initialBalance *big.Int) error {
 		err := cluster.WaitUntil(30*time.Second, 1*time.Second, func() bool {
 			balance, err := client.GetBalance(recipient, ethgo.Latest)
 			if err != nil {

@@ -57,8 +57,7 @@ func (g *GovernanceStore) initialize(tx *bolt.Tx) error {
 
 // insertGovernanceEvent inserts governance event to bolt db
 // each epoch has a list of events that happened in it
-func (g *GovernanceStore) insertGovernanceEvent(epoch, block uint64,
-	event contractsapi.EventAbi, dbTx *bolt.Tx) error {
+func (g *GovernanceStore) insertGovernanceEvent(epoch uint64, event contractsapi.EventAbi, dbTx *bolt.Tx) error {
 	insertFn := func(tx *bolt.Tx) error {
 		if forkHash, forkBlock, isForkEvent := isForkParamsEvent(event); isForkEvent {
 			forkParamsBucket := tx.Bucket(forkParamsEventsBucket)

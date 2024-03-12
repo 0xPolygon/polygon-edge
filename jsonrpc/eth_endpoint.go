@@ -590,7 +590,13 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 		highEnd = header.GasLimit
 	}
 
-	gasPriceInt := new(big.Int).Set(transaction.GasPrice())
+	gasPriceInt := big.NewInt(0)
+	gasprice := transaction.GasPrice()
+
+	if gasprice != nil { // if dynamic transaction this will be nil
+		gasPriceInt.Set(gasprice)
+	}
+
 	valueInt := new(big.Int).Set(transaction.Value())
 
 	var availableBalance *big.Int

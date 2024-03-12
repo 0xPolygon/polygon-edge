@@ -15,7 +15,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
 )
 
@@ -155,7 +154,7 @@ func newTestState(tb testing.TB) *State {
 		tb.Fatal(err)
 	}
 
-	state, err := newState(path.Join(dir, "my.db"), hclog.NewNullLogger(), make(chan struct{}))
+	state, err := newState(path.Join(dir, "my.db"), make(chan struct{}))
 	if err != nil {
 		tb.Fatal(err)
 	}
