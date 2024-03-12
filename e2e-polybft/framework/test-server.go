@@ -39,6 +39,8 @@ type TestServerConfig struct {
 	Relayer               bool
 	NumBlockConfirmations uint64
 	BridgeJSONRPC         string
+	TLSCertFile           string
+	TLSKeyFile            string
 }
 
 type TestServerConfigCallback func(*TestServerConfig)
@@ -65,7 +67,13 @@ func (t *TestServer) GrpcAddr() string {
 }
 
 func (t *TestServer) JSONRPCAddr() string {
-	return fmt.Sprintf("http://%s:%d", hostIP, t.config.JSONRPCPort)
+	if t.config.TLSCertFile != "" && t.config.TLSKeyFile != "" {
+		host, _ := os.Hostname()
+
+		return fmt.Sprintf("https://%s:%d", host, t.config.JSONRPCPort)
+	} else {
+		return fmt.Sprintf("http://%s:%d", hostIP, t.config.JSONRPCPort)
+	}
 }
 
 func (t *TestServer) BridgeJSONRPCAddr() string {
@@ -165,6 +173,10 @@ func (t *TestServer) Start() {
 		"--jsonrpc", fmt.Sprintf(":%d", config.JSONRPCPort),
 		// minimal number of child blocks required for the parent block to be considered final
 		"--num-block-confirmations", strconv.FormatUint(config.NumBlockConfirmations, 10),
+		// TLS certificate file
+		"--tls-cert-file", config.TLSCertFile,
+		// TLS key file
+		"--tls-key-file", config.TLSKeyFile,
 	}
 
 	if len(config.LogLevel) > 0 {

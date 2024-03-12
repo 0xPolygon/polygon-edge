@@ -146,6 +146,9 @@ type TestClusterConfig struct {
 	VotingDelay  uint64
 
 	logsDirOnce sync.Once
+
+	TLSCertFile string
+	TLSKeyFile  string
 }
 
 func (c *TestClusterConfig) Dir(name string) string {
@@ -460,6 +463,13 @@ func WithRewardWallet(rewardWallet string) ClusterOption {
 func WithPredeploy(predeployString string) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.PredeployContract = predeployString
+	}
+}
+
+func WithHTTPS(certFile string, keyFile string) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.TLSCertFile = certFile
+		h.TLSKeyFile = keyFile
 	}
 }
 
@@ -805,6 +815,8 @@ func (c *TestCluster) InitTestServer(t *testing.T,
 		config.Relayer = nodeType.IsSet(Relayer)
 		config.NumBlockConfirmations = c.Config.NumBlockConfirmations
 		config.BridgeJSONRPC = bridgeJSONRPC
+		config.TLSCertFile = c.Config.TLSCertFile
+		config.TLSKeyFile = c.Config.TLSKeyFile
 	})
 
 	// watch the server for stop signals. It is important to fix the specific

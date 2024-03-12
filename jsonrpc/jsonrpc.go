@@ -71,6 +71,8 @@ type Config struct {
 
 	ConcurrentRequestsDebug uint64
 	WebSocketReadLimit      uint64
+	TLSCertFile             string
+	TLSKeyFile              string
 }
 
 // NewJSONRPC returns the JSONRPC http server
@@ -107,7 +109,7 @@ func NewJSONRPC(logger hclog.Logger, config *Config) (*JSONRPC, error) {
 }
 
 func (j *JSONRPC) setupHTTP() error {
-	j.logger.Info("http server started", "addr", j.config.Addr.String())
+	j.logger.Info("http server starting...", "addr", j.config.Addr.String())
 
 	lis, err := net.Listen("tcp", j.config.Addr.String())
 	if err != nil {
@@ -130,12 +132,24 @@ func (j *JSONRPC) setupHTTP() error {
 		ReadHeaderTimeout: 60 * time.Second,
 	}
 
-	go func() {
-		if err := srv.Serve(lis); err != nil {
-			j.logger.Error("closed http connection", "err", err)
-		}
-	}()
+	if j.config.TLSCertFile != "" && j.config.TLSKeyFile != "" {
+		j.logger.Info("https cert file", j.config.TLSCertFile)
+		j.logger.Info("https key file", j.config.TLSKeyFile)
 
+		go func() {
+			if err := srv.ServeTLS(lis, j.config.TLSCertFile, j.config.TLSKeyFile); err != nil {
+				j.logger.Error("closed https connection", "err", err)
+			}
+		}()
+	} else {
+		go func() {
+			if err := srv.Serve(lis); err != nil {
+				j.logger.Error("closed http connection", "err", err)
+			}
+		}()
+	}
+
+	j.logger.Info("http server started", "addr", j.config.Addr.String())
 	return nil
 }
 
