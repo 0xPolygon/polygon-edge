@@ -25,6 +25,12 @@ jobs:
         with:
           go-version: 1.20.x
           check-latest: true
+      - name: Setup TSL
+        run: openssl req -x509 -out localhost.crt -keyout localhost.key   -newkey rsa:2048 -nodes -sha256   -subj '/CN=localhost' -extensions EXT -config <(printf "[dn]\nCN=localhost\n[req]\ndistinguished_name = dn\n[EXT]\nsubjectAltName=DNS:localhost\nkeyUsage=digitalSignature\nextendedKeyUsage=serverAuth")
+        run: sudo cp localhost.key /etc/ssl/private/localhost.key
+        run: sudo cp localhost.crt /usr/local/share/ca-certificates/localhost.crt
+        run: sudo update-ca-certificates
+        run: sudo chmod 644 /etc/ssl/private/localhost.key
       - name: Run tests
         run: make test-e2e-polybft
       - name: Run tests failed
