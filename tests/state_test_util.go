@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io/fs"
 	"math/big"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -615,57 +614,28 @@ func contains(l []string, name string) bool {
 	return false
 }
 
-func listFolders(paths []string) ([]string, error) {
-	var folders []string
-
-	for _, rootPath := range paths {
-		err := filepath.WalkDir(rootPath, func(path string, d fs.DirEntry, err error) error {
-			if err != nil {
-				return err
-			}
-
-			if d.IsDir() {
-				files, err := os.ReadDir(path)
-				if err != nil {
-					return err
-				}
-
-				if len(files) > 0 {
-					folders = append(folders, path)
-				}
-			}
-
-			return nil
-		})
-
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return folders, nil
-}
-
 func listFiles(folder string, extensions ...string) ([]string, error) {
 	var files []string
 
-	err := filepath.WalkDir(folder, func(path string, d fs.DirEntry, err error) error {
+	err := filepath.Walk(folder, func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 
-		if !d.IsDir() {
-			if len(extensions) > 0 {
-				// filter files by extensions
-				for _, ext := range extensions {
-					if strings.HasSuffix(path, ext) {
-						files = append(files, path)
-					}
+		if info.IsDir() {
+			return nil
+		}
+
+		if len(extensions) > 0 {
+			// filter files by extensions
+			for _, ext := range extensions {
+				if fileExt := filepath.Ext(path); fileExt == ext {
+					files = append(files, path)
 				}
-			} else {
-				// if no extensions filter is provided, add all files
-				files = append(files, path)
 			}
+		} else {
+			// if no extensions filter is provided, add all files
+			files = append(files, path)
 		}
 
 		return nil
