@@ -33,8 +33,10 @@ jobs:
         run: sudo cp localhost.crt /usr/local/share/ca-certificates/localhost.crt
       - name: Add certificate to trusted list
         run: sudo update-ca-certificates
-      - name: Update certificate folder key permissions
+      - name: Update certificate key folder permissions
         run: sudo chmod -R 644 /etc/ssl/private
+      - name: Update certificate key file permissions
+        run: sudo chmod 644 /etc/ssl/private/localhost.key
       - name: Check certificate key permissions
         run: ls -l /etc/ssl/private/localhost.key
       - name: Run tests
