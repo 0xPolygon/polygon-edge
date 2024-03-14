@@ -126,4 +126,3 @@ docker_manifests:
       - DOCKERHUB_ORGANIZATION/{{ .ProjectName }}:{{ .Version }}-amd64
       - DOCKERHUB_ORGANIZATION/{{ .ProjectName }}:{{ .Version }}-arm64
     skip_push: auto
-    
