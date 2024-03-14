@@ -46,18 +46,16 @@ func TestEth_DecodeTxn(t *testing.T) {
 				Nonce:     toArgUint64Ptr(0),
 				Type:      toArgUint64Ptr(uint64(types.DynamicFeeTxType)),
 			},
-			res: types.NewTx(&types.DynamicFeeTx{
-				GasTipCap: big.NewInt(10000),
-				GasFeeCap: big.NewInt(10000),
-				BaseTx: &types.BaseTx{
-					From:  addr1,
-					To:    &addr2,
-					Gas:   21000,
-					Value: oneEther,
-					Input: []byte{},
-					Nonce: 0,
-				},
-			}),
+			res: types.NewTx(types.NewDynamicFeeTx(
+				types.WithGasTipCap(big.NewInt(10000)),
+				types.WithGasFeeCap(big.NewInt(10000)),
+				types.WithFrom(addr1),
+				types.WithTo(&addr2),
+				types.WithGas(21000),
+				types.WithValue(oneEther),
+				types.WithInput([]byte{}),
+				types.WithNonce(0),
+			)),
 			err: nil,
 		},
 		{
@@ -69,17 +67,15 @@ func TestEth_DecodeTxn(t *testing.T) {
 				Value:    toArgBytesPtr(oneEther.Bytes()),
 				Data:     nil,
 			},
-			res: types.NewTx(&types.LegacyTx{
-				GasPrice: big.NewInt(10000),
-				BaseTx: &types.BaseTx{
-					From:  types.ZeroAddress,
-					To:    &addr2,
-					Gas:   21000,
-					Value: oneEther,
-					Input: []byte{},
-					Nonce: 0,
-				},
-			}),
+			res: types.NewTx(types.NewLegacyTx(
+				types.WithGasPrice(big.NewInt(10000)),
+				types.WithFrom(types.ZeroAddress),
+				types.WithTo(&addr2),
+				types.WithGas(21000),
+				types.WithValue(oneEther),
+				types.WithInput([]byte{}),
+				types.WithNonce(0),
+			)),
 			err: nil,
 		},
 		{
@@ -97,17 +93,15 @@ func TestEth_DecodeTxn(t *testing.T) {
 				Value:    toArgBytesPtr(oneEther.Bytes()),
 				Data:     nil,
 			},
-			res: types.NewTx(&types.LegacyTx{
-				GasPrice: big.NewInt(10000),
-				BaseTx: &types.BaseTx{
-					From:  addr1,
-					To:    &addr2,
-					Gas:   21000,
-					Value: oneEther,
-					Input: []byte{},
-					Nonce: 10,
-				},
-			}),
+			res: types.NewTx(types.NewLegacyTx(
+				types.WithGasPrice(big.NewInt(10000)),
+				types.WithFrom(addr1),
+				types.WithTo(&addr2),
+				types.WithGas(21000),
+				types.WithValue(oneEther),
+				types.WithInput([]byte{}),
+				types.WithNonce(10),
+			)),
 			err: nil,
 		},
 		{
@@ -120,17 +114,15 @@ func TestEth_DecodeTxn(t *testing.T) {
 				Data:     nil,
 				Nonce:    toArgUint64Ptr(1),
 			},
-			res: types.NewTx(&types.LegacyTx{
-				GasPrice: big.NewInt(10000),
-				BaseTx: &types.BaseTx{
-					From:  addr1,
-					To:    &addr2,
-					Gas:   21000,
-					Value: new(big.Int).SetBytes([]byte{}),
-					Input: []byte{},
-					Nonce: 1,
-				},
-			}),
+			res: types.NewTx(types.NewLegacyTx(
+				types.WithGasPrice(big.NewInt(10000)),
+				types.WithFrom(addr1),
+				types.WithTo(&addr2),
+				types.WithGas(21000),
+				types.WithValue(new(big.Int).SetBytes([]byte{})),
+				types.WithInput([]byte{}),
+				types.WithNonce(1),
+			)),
 			err: nil,
 		},
 		{
@@ -142,17 +134,15 @@ func TestEth_DecodeTxn(t *testing.T) {
 				Data:     nil,
 				Nonce:    toArgUint64Ptr(1),
 			},
-			res: types.NewTx(&types.LegacyTx{
-				GasPrice: big.NewInt(10000),
-				BaseTx: &types.BaseTx{
-					Value: new(big.Int).SetBytes([]byte{}),
-					Input: []byte{},
-					Nonce: 1,
-					From:  addr1,
-					To:    &addr2,
-					Gas:   0,
-				},
-			}),
+			res: types.NewTx(types.NewLegacyTx(
+				types.WithGasPrice(big.NewInt(10000)),
+				types.WithValue(new(big.Int).SetBytes([]byte{})),
+				types.WithInput([]byte{}),
+				types.WithNonce(1),
+				types.WithFrom(addr1),
+				types.WithTo(&addr2),
+				types.WithGas(0),
+			)),
 			err: nil,
 		},
 	}
@@ -279,18 +269,16 @@ func TestEth_TxnType(t *testing.T) {
 		Type:      toArgUint64Ptr(uint64(types.DynamicFeeTxType)),
 	}
 
-	expectedRes := types.NewTx(&types.DynamicFeeTx{
-		GasTipCap: big.NewInt(10000),
-		GasFeeCap: big.NewInt(10000),
-		BaseTx: &types.BaseTx{
-			From:  addr1,
-			To:    &addr2,
-			Gas:   21000,
-			Value: oneEther,
-			Input: []byte{},
-			Nonce: 0,
-		},
-	})
+	expectedRes := types.NewTx(types.NewDynamicFeeTx(
+		types.WithGasTipCap(big.NewInt(10000)),
+		types.WithGasFeeCap(big.NewInt(10000)),
+		types.WithFrom(addr1),
+		types.WithTo(&addr2),
+		types.WithGas(21000),
+		types.WithValue(oneEther),
+		types.WithInput([]byte{}),
+		types.WithNonce(0),
+	))
 	res, err := DecodeTxn(args, 1, store, false)
 
 	expectedRes.ComputeHash()

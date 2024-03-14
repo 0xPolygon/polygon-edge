@@ -52,60 +52,55 @@ func TestState(t *testing.T) {
 		"CALLBlake2f_MaxRounds",
 	}
 
-	folders, err := listFolders([]string{stateTestsDir})
+	files, err := listFiles(stateTestsDir, ".json")
 	require.NoError(t, err)
 
-	for _, folder := range folders {
-		files, err := listFiles(folder, ".json")
-		require.NoError(t, err)
+	for _, file := range files {
+		if contains(long, file) && testing.Short() {
+			t.Logf("Long test '%s' is skipped in short mode\n", file)
 
-		for _, file := range files {
-			if contains(long, file) && testing.Short() {
-				t.Logf("Long test '%s' is skipped in short mode\n", file)
+			continue
+		}
 
-				continue
+		if contains(skip, file) {
+			t.Logf("Test '%s' is skipped\n", file)
+
+			continue
+		}
+
+		file := file
+		t.Run(file, func(t *testing.T) {
+			t.Parallel()
+
+			data, err := os.ReadFile(file)
+			require.NoError(t, err)
+
+			var testCases map[string]testCase
+			if err = json.Unmarshal(data, &testCases); err != nil {
+				t.Fatalf("failed to unmarshal %s: %v", file, err)
 			}
 
-			if contains(skip, file) {
-				t.Logf("Test '%s' is skipped\n", file)
+			for _, tc := range testCases {
+				for fork, postState := range tc.Post {
+					forks, exists := Forks[fork]
+					if !exists {
+						t.Logf("%s fork is not supported, skipping test case.", fork)
+						continue
+					}
 
-				continue
-			}
+					fc := &forkConfig{name: fork, forks: forks}
 
-			file := file
-			t.Run(file, func(t *testing.T) {
-				t.Parallel()
+					for idx, postStateEntry := range postState {
+						start := time.Now()
+						err := runSpecificTestCase(t, file, tc, fc, idx, postStateEntry)
 
-				data, err := os.ReadFile(file)
-				require.NoError(t, err)
+						t.Logf("'%s' executed. Fork: %s. Case: %d, Duration=%v\n", file, fork, idx, time.Since(start))
 
-				var testCases map[string]testCase
-				if err = json.Unmarshal(data, &testCases); err != nil {
-					t.Fatalf("failed to unmarshal %s: %v", file, err)
-				}
-
-				for _, tc := range testCases {
-					for fork, postState := range tc.Post {
-						forks, exists := Forks[fork]
-						if !exists {
-							t.Logf("%s fork is not supported, skipping test case.", fork)
-							continue
-						}
-
-						fc := &forkConfig{name: fork, forks: forks}
-
-						for idx, postStateEntry := range postState {
-							start := time.Now()
-							err := runSpecificTestCase(t, file, tc, fc, idx, postStateEntry)
-
-							t.Logf("'%s' executed. Fork: %s. Case: %d, Duration=%v\n", file, fork, idx, time.Since(start))
-
-							require.NoError(t, tc.checkError(fork, idx, err))
-						}
+						require.NoError(t, tc.checkError(fork, idx, err))
 					}
 				}
-			})
-		}
+			}
+		})
 	}
 }
 

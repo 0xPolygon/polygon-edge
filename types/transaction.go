@@ -74,13 +74,13 @@ func NewTx(inner TxData) *Transaction {
 func (t *Transaction) InitInnerData(txType TxType) {
 	switch txType {
 	case AccessListTxType:
-		t.Inner = &AccessListTxn{BaseTx: &BaseTx{}}
+		t.Inner = NewAccessListTx()
 	case StateTxType:
-		t.Inner = &StateTx{BaseTx: &BaseTx{}}
+		t.Inner = NewStateTx()
 	case LegacyTxType:
-		t.Inner = &LegacyTx{BaseTx: &BaseTx{}}
+		t.Inner = NewLegacyTx()
 	default:
-		t.Inner = &DynamicFeeTx{BaseTx: &BaseTx{}}
+		t.Inner = NewDynamicFeeTx()
 	}
 }
 
@@ -390,4 +390,84 @@ func NewTxWithType(txType TxType) *Transaction {
 	tx.InitInnerData(txType)
 
 	return tx
+}
+
+type TxOption func(TxData)
+
+func WithGasPrice(gasPrice *big.Int) TxOption {
+	return func(td TxData) {
+		td.setGasPrice(gasPrice)
+	}
+}
+
+func WithNonce(nonce uint64) TxOption {
+	return func(td TxData) {
+		td.setNonce(nonce)
+	}
+}
+
+func WithGas(gas uint64) TxOption {
+	return func(td TxData) {
+		td.setGas(gas)
+	}
+}
+
+func WithTo(to *Address) TxOption {
+	return func(td TxData) {
+		td.setTo(to)
+	}
+}
+
+func WithValue(value *big.Int) TxOption {
+	return func(td TxData) {
+		td.setValue(value)
+	}
+}
+
+func WithInput(input []byte) TxOption {
+	return func(td TxData) {
+		td.setInput(input)
+	}
+}
+
+func WithSignatureValues(v, r, s *big.Int) TxOption {
+	return func(td TxData) {
+		td.setSignatureValues(v, r, s)
+	}
+}
+
+func WithHash(hash Hash) TxOption {
+	return func(td TxData) {
+		td.setHash(hash)
+	}
+}
+
+func WithFrom(from Address) TxOption {
+	return func(td TxData) {
+		td.setFrom(from)
+	}
+}
+
+func WithGasTipCap(gasTipCap *big.Int) TxOption {
+	return func(td TxData) {
+		td.setGasTipCap(gasTipCap)
+	}
+}
+
+func WithGasFeeCap(gasFeeCap *big.Int) TxOption {
+	return func(td TxData) {
+		td.setGasFeeCap(gasFeeCap)
+	}
+}
+
+func WithChainID(chainID *big.Int) TxOption {
+	return func(td TxData) {
+		td.setChainID(chainID)
+	}
+}
+
+func WithAccessList(accessList TxAccessList) TxOption {
+	return func(td TxData) {
+		td.setAccessList(accessList)
+	}
 }

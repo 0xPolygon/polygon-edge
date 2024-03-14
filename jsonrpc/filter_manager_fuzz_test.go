@@ -33,27 +33,15 @@ func FuzzGetLogsForQuery(f *testing.F) {
 				Hash:   types.StringToHash(strconv.Itoa(i)),
 			},
 			Transactions: []*types.Transaction{
-				{
-					Inner: &types.LegacyTx{
-						BaseTx: &types.BaseTx{
-							Value: big.NewInt(10),
-						},
-					},
-				},
-				{
-					Inner: &types.LegacyTx{
-						BaseTx: &types.BaseTx{
-							Value: big.NewInt(11),
-						},
-					},
-				},
-				{
-					Inner: &types.LegacyTx{
-						BaseTx: &types.BaseTx{
-							Value: big.NewInt(12),
-						},
-					},
-				},
+				types.NewTx(types.NewLegacyTx(
+					types.WithValue(big.NewInt(10)),
+				)),
+				types.NewTx(types.NewLegacyTx(
+					types.WithValue(big.NewInt(11)),
+				)),
+				types.NewTx(types.NewLegacyTx(
+					types.WithValue(big.NewInt(12)),
+				)),
 			},
 		}
 	}

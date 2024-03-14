@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"math/big"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -18,48 +20,47 @@ import (
 )
 
 const (
-	benchmarksDir = "evm-benchmarks/benchmarks"
-	chainID       = 10
+	benchmarksDir  = "evm-benchmarks"
+	testsExtension = ".json"
+	chainID        = 10
 )
 
 func BenchmarkEVM(b *testing.B) {
-	folders, err := listFolders([]string{benchmarksDir})
+	files, err := listFiles(benchmarksDir, testsExtension)
 	require.NoError(b, err)
 
-	for _, folder := range folders {
-		files, err := listFiles(folder, ".json")
-		require.NoError(b, err)
+	for _, file := range files {
+		name := filepath.ToSlash(strings.TrimPrefix(strings.TrimSuffix(file, testsExtension), benchmarksDir+string(filepath.Separator)))
 
-		for _, file := range files {
-			name := getTestName(file)
+		b.Run(name, func(b *testing.B) {
+			data, err := os.ReadFile(file)
+			require.NoError(b, err)
 
-			b.Run(name, func(b *testing.B) {
-				data, err := os.ReadFile(file)
-				require.NoError(b, err)
+			var testCases map[string]testCase
+			if err = json.Unmarshal(data, &testCases); err != nil {
+				b.Fatalf("failed to unmarshal %s: %v", file, err)
+			}
 
-				var testCases map[string]testCase
-				if err = json.Unmarshal(data, &testCases); err != nil {
-					b.Fatalf("failed to unmarshal %s: %v", file, err)
-				}
+			for _, tc := range testCases {
+				for fork, postState := range tc.Post {
+					forks, exists := Forks[fork]
+					if !exists {
+						b.Logf("%s fork is not supported, skipping test case.", fork)
+						continue
+					}
 
-				for _, tc := range testCases {
-					for fork, postState := range tc.Post {
-						forks, exists := Forks[fork]
-						if !exists {
-							b.Logf("%s fork is not supported, skipping test case.", fork)
-							continue
-						}
+					fc := &forkConfig{name: fork, forks: forks}
 
-						fc := &forkConfig{name: fork, forks: forks}
-
-						for idx, postStateEntry := range postState {
+					for idx, postStateEntry := range postState {
+						key := fmt.Sprintf("%s/%d", fork, idx)
+						b.Run(key, func(b *testing.B) {
 							err := runBenchmarkTest(b, tc, fc, postStateEntry)
 							require.NoError(b, err, fmt.Sprintf("test %s (case#%d) execution failed", name, idx))
-						}
+						})
 					}
 				}
-			})
-		}
+			}
+		})
 	}
 }
 
