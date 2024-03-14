@@ -34,7 +34,7 @@ jobs:
       - name: Add certificate to trusted list
         run: sudo update-ca-certificates
       - name: Update certificate key folder permissions
-        run: sudo chmod -R 644 /etc/ssl/private
+        run: sudo chmod -R 755 /etc/ssl/private
       - name: Update certificate key file permissions
         run: sudo chmod 644 /etc/ssl/private/localhost.key
       - name: Check certificate key permissions
