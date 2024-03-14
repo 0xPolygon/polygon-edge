@@ -89,7 +89,7 @@ func TestEth_Block_GetBlockTransactionCountByHash(t *testing.T) {
 
 	for i := 0; i < 10; i++ {
 		block.Transactions = append(block.Transactions, []*types.Transaction{
-			types.NewTx(&types.LegacyTx{BaseTx: &types.BaseTx{Nonce: 0, From: addr0}})}...)
+			types.NewTx(types.NewLegacyTx(types.WithNonce(0), types.WithFrom(addr0)))}...)
 	}
 	store.add(block)
 
@@ -108,7 +108,7 @@ func TestEth_Block_GetBlockTransactionCountByNumber(t *testing.T) {
 
 	for i := 0; i < 10; i++ {
 		block.Transactions = append(block.Transactions, []*types.Transaction{
-			types.NewTx(&types.LegacyTx{BaseTx: &types.BaseTx{Nonce: 0, From: addr0}})}...)
+			types.NewTx(types.NewLegacyTx(types.WithNonce(0), types.WithFrom(addr0)))}...)
 	}
 	store.add(block)
 

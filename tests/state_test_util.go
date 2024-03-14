@@ -328,47 +328,42 @@ func (t *stTransaction) At(i indexes, baseFee *big.Int) (*types.Transaction, err
 
 	// if tx is not dynamic and accessList is not nil, create an access list transaction
 	if !isDynamiFeeTx && accessList != nil {
-		txData = &types.AccessListTxn{
-			GasPrice:   gasPrice,
-			AccessList: accessList,
-			BaseTx: &types.BaseTx{
-				From:  t.From,
-				To:    t.To,
-				Nonce: t.Nonce,
-				Value: value,
-				Gas:   t.GasLimit[i.Gas],
-				Input: hex.MustDecodeHex(t.Data[i.Data]),
-			},
-		}
+		txData = types.NewAccessListTx(
+			types.WithGasPrice(gasPrice),
+			types.WithAccessList(accessList),
+			types.WithFrom(t.From),
+			types.WithTo(t.To),
+			types.WithNonce(t.Nonce),
+			types.WithValue(value),
+			types.WithGas(t.GasLimit[i.Gas]),
+			types.WithInput(hex.MustDecodeHex(t.Data[i.Data])),
+		)
 	}
 
 	if txData == nil {
 		if isDynamiFeeTx {
-			txData = &types.DynamicFeeTx{
-				GasFeeCap:  t.MaxFeePerGas,
-				GasTipCap:  t.MaxPriorityFeePerGas,
-				AccessList: accessList,
-				BaseTx: &types.BaseTx{
-					From:  t.From,
-					To:    t.To,
-					Nonce: t.Nonce,
-					Value: value,
-					Gas:   t.GasLimit[i.Gas],
-					Input: hex.MustDecodeHex(t.Data[i.Data]),
-				},
-			}
+			txData =
+				types.NewDynamicFeeTx(
+					types.WithGasFeeCap(t.MaxFeePerGas),
+					types.WithGasTipCap(t.MaxPriorityFeePerGas),
+					types.WithAccessList(accessList),
+					types.WithFrom(t.From),
+					types.WithTo(t.To),
+					types.WithNonce(t.Nonce),
+					types.WithValue(value),
+					types.WithGas(t.GasLimit[i.Gas]),
+					types.WithInput(hex.MustDecodeHex(t.Data[i.Data])),
+				)
 		} else {
-			txData = &types.LegacyTx{
-				GasPrice: gasPrice,
-				BaseTx: &types.BaseTx{
-					From:  t.From,
-					To:    t.To,
-					Nonce: t.Nonce,
-					Value: value,
-					Gas:   t.GasLimit[i.Gas],
-					Input: hex.MustDecodeHex(t.Data[i.Data]),
-				},
-			}
+			txData = types.NewLegacyTx(
+				types.WithGasPrice(gasPrice),
+				types.WithFrom(t.From),
+				types.WithTo(t.To),
+				types.WithNonce(t.Nonce),
+				types.WithValue(value),
+				types.WithGas(t.GasLimit[i.Gas]),
+				types.WithInput(hex.MustDecodeHex(t.Data[i.Data])),
+			)
 		}
 	}
 

@@ -80,11 +80,11 @@ func Test_Transition_checkDynamicFees(t *testing.T) {
 		{
 			name:    "happy path",
 			baseFee: big.NewInt(100),
-			tx: types.NewTx(&types.DynamicFeeTx{
-				GasFeeCap: big.NewInt(100),
-				GasTipCap: big.NewInt(100),
-				BaseTx:    &types.BaseTx{From: types.ZeroAddress},
-			}),
+			tx: types.NewTx(types.NewDynamicFeeTx(
+				types.WithGasFeeCap(big.NewInt(100)),
+				types.WithGasTipCap(big.NewInt(100)),
+				types.WithFrom(types.ZeroAddress),
+			)),
 			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
 				assert.NoError(t, err, i)
 
@@ -94,11 +94,11 @@ func Test_Transition_checkDynamicFees(t *testing.T) {
 		{
 			name:    "happy path with empty values",
 			baseFee: big.NewInt(0),
-			tx: types.NewTx(&types.DynamicFeeTx{
-				GasFeeCap: big.NewInt(0),
-				GasTipCap: big.NewInt(0),
-				BaseTx:    &types.BaseTx{From: types.ZeroAddress},
-			}),
+			tx: types.NewTx(types.NewDynamicFeeTx(
+				types.WithGasFeeCap(big.NewInt(0)),
+				types.WithGasTipCap(big.NewInt(0)),
+				types.WithFrom(types.ZeroAddress),
+			)),
 			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
 				assert.NoError(t, err, i)
 
@@ -108,11 +108,11 @@ func Test_Transition_checkDynamicFees(t *testing.T) {
 		{
 			name:    "gas fee cap less than base fee",
 			baseFee: big.NewInt(20),
-			tx: types.NewTx(&types.DynamicFeeTx{
-				GasFeeCap: big.NewInt(10),
-				GasTipCap: big.NewInt(0),
-				BaseTx:    &types.BaseTx{From: types.ZeroAddress},
-			}),
+			tx: types.NewTx(types.NewDynamicFeeTx(
+				types.WithGasFeeCap(big.NewInt(10)),
+				types.WithGasTipCap(big.NewInt(0)),
+				types.WithFrom(types.ZeroAddress),
+			)),
 			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
 				expectedError := fmt.Sprintf("max fee per gas less than block base fee: "+
 					"address %s, GasFeeCap/GasPrice: 10, BaseFee: 20", types.ZeroAddress)
@@ -124,11 +124,11 @@ func Test_Transition_checkDynamicFees(t *testing.T) {
 		{
 			name:    "gas fee cap less than tip cap",
 			baseFee: big.NewInt(5),
-			tx: types.NewTx(&types.DynamicFeeTx{
-				GasFeeCap: big.NewInt(10),
-				GasTipCap: big.NewInt(15),
-				BaseTx:    &types.BaseTx{From: types.ZeroAddress},
-			}),
+			tx: types.NewTx(types.NewDynamicFeeTx(
+				types.WithGasFeeCap(big.NewInt(10)),
+				types.WithGasTipCap(big.NewInt(15)),
+				types.WithFrom(types.ZeroAddress),
+			)),
 			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
 				expectedError := fmt.Sprintf("max priority fee per gas higher than max fee per gas: "+
 					"address %s, GasTipCap: 15, GasFeeCap: 10", types.ZeroAddress)

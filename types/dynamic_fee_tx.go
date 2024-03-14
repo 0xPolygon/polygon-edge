@@ -16,6 +16,16 @@ type DynamicFeeTx struct {
 	AccessList TxAccessList
 }
 
+func NewDynamicFeeTx(options ...TxOption) *DynamicFeeTx {
+	dynamicTx := &DynamicFeeTx{BaseTx: &BaseTx{}}
+
+	for _, opt := range options {
+		opt(dynamicTx)
+	}
+
+	return dynamicTx
+}
+
 func (tx *DynamicFeeTx) transactionType() TxType { return DynamicFeeTxType }
 func (tx *DynamicFeeTx) chainID() *big.Int       { return tx.ChainID }
 func (tx *DynamicFeeTx) gasPrice() *big.Int      { return nil }
@@ -208,7 +218,7 @@ func (tx *DynamicFeeTx) marshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 }
 
 func (tx *DynamicFeeTx) copy() TxData {
-	cpy := &DynamicFeeTx{}
+	cpy := NewDynamicFeeTx()
 
 	if tx.chainID() != nil {
 		chainID := new(big.Int)

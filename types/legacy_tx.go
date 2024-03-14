@@ -12,6 +12,16 @@ type LegacyTx struct {
 	GasPrice *big.Int
 }
 
+func NewLegacyTx(options ...TxOption) *LegacyTx {
+	legacyTx := &LegacyTx{BaseTx: &BaseTx{}}
+
+	for _, opt := range options {
+		opt(legacyTx)
+	}
+
+	return legacyTx
+}
+
 func (tx *LegacyTx) transactionType() TxType { return LegacyTxType }
 func (tx *LegacyTx) chainID() *big.Int       { return deriveChainID(tx.v()) }
 func (tx *LegacyTx) gasPrice() *big.Int      { return tx.GasPrice }
@@ -159,7 +169,7 @@ func (tx *LegacyTx) marshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 }
 
 func (tx *LegacyTx) copy() TxData { //nolint:dupl
-	cpy := &LegacyTx{BaseTx: &BaseTx{}}
+	cpy := NewLegacyTx()
 
 	if tx.gasPrice() != nil {
 		gasPrice := new(big.Int)

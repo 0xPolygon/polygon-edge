@@ -46,25 +46,21 @@ func generateTx(params generateTxReqParams) *types.Transaction {
 	var unsignedTx *types.Transaction
 
 	if params.gasPrice != nil {
-		unsignedTx = types.NewTx(&types.LegacyTx{
-			BaseTx: &types.BaseTx{
-				Nonce: params.nonce,
-				To:    &params.toAddress,
-				Gas:   1000000,
-				Value: params.value,
-			},
-		})
+		unsignedTx = types.NewTx(types.NewLegacyTx(
+			types.WithNonce(params.nonce),
+			types.WithTo(&params.toAddress),
+			types.WithGas(1000000),
+			types.WithValue(params.value),
+		))
 		unsignedTx.SetGasPrice(params.gasPrice)
 	} else {
-		unsignedTx = types.NewTx(&types.DynamicFeeTx{
-			ChainID: new(big.Int).SetUint64(defaultChainID),
-			BaseTx: &types.BaseTx{
-				Nonce: params.nonce,
-				To:    &params.toAddress,
-				Gas:   1000000,
-				Value: params.value,
-			},
-		})
+		unsignedTx = types.NewTx(types.NewDynamicFeeTx(
+			types.WithChainID(new(big.Int).SetUint64(defaultChainID)),
+			types.WithNonce(params.nonce),
+			types.WithTo(&params.toAddress),
+			types.WithGas(1000000),
+			types.WithValue(params.value),
+		))
 		unsignedTx.SetGasFeeCap(params.gasFeeCap)
 		unsignedTx.SetGasTipCap(params.gasTipCap)
 	}
@@ -245,39 +241,33 @@ func TestTxPool_RecoverableError(t *testing.T) {
 	_, receiverAddress := tests.GenerateKeyAndAddr(t)
 
 	transactions := []*types.Transaction{
-		types.NewTx(&types.LegacyTx{
-			GasPrice: big.NewInt(framework.DefaultGasPrice),
-			BaseTx: &types.BaseTx{
-				Nonce: 0,
-				Gas:   22000,
-				To:    &receiverAddress,
-				Value: oneEth,
-				V:     big.NewInt(27),
-				From:  senderAddress,
-			},
-		}),
-		types.NewTx(&types.LegacyTx{
-			GasPrice: big.NewInt(framework.DefaultGasPrice),
-			BaseTx: &types.BaseTx{
-				Nonce: 1,
-				Gas:   22000,
-				To:    &receiverAddress,
-				Value: oneEth,
-				V:     big.NewInt(27),
-			},
-		}),
-		types.NewTx(&types.DynamicFeeTx{
-			ChainID:   new(big.Int).SetUint64(defaultChainID),
-			GasFeeCap: big.NewInt(framework.DefaultGasPrice),
-			GasTipCap: big.NewInt(1000000000),
-			BaseTx: &types.BaseTx{
-				Nonce: 2,
-				Gas:   22000,
-				To:    &receiverAddress,
-				Value: oneEth,
-				V:     big.NewInt(27),
-			},
-		}),
+		types.NewTx(types.NewLegacyTx(
+			types.WithGasPrice(big.NewInt(framework.DefaultGasPrice)),
+			types.WithNonce(0),
+			types.WithGas(22000),
+			types.WithTo(&receiverAddress),
+			types.WithValue(oneEth),
+			types.WithSignatureValues(big.NewInt(27), nil, nil),
+			types.WithFrom(senderAddress),
+		)),
+		types.NewTx(types.NewLegacyTx(
+			types.WithGasPrice(big.NewInt(framework.DefaultGasPrice)),
+			types.WithNonce(1),
+			types.WithGas(22000),
+			types.WithTo(&receiverAddress),
+			types.WithValue(oneEth),
+			types.WithSignatureValues(big.NewInt(27), nil, nil),
+		)),
+		types.NewTx(types.NewDynamicFeeTx(
+			types.WithChainID(new(big.Int).SetUint64(defaultChainID)),
+			types.WithGasFeeCap(big.NewInt(framework.DefaultGasPrice)),
+			types.WithGasTipCap(big.NewInt(1000000000)),
+			types.WithNonce(2),
+			types.WithGas(22000),
+			types.WithTo(&receiverAddress),
+			types.WithValue(oneEth),
+			types.WithSignatureValues(big.NewInt(27), nil, nil),
+		)),
 	}
 
 	server := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
@@ -359,17 +349,16 @@ func TestTxPool_GetPendingTx(t *testing.T) {
 	operator := server.TxnPoolOperator()
 	client := server.JSONRPC()
 
-	signedTx, err := signer.SignTx(types.NewTx(&types.LegacyTx{
-		GasPrice: big.NewInt(1000000000),
-		BaseTx: &types.BaseTx{
-			Nonce: 0,
-			Gas:   framework.DefaultGasLimit - 1,
-			To:    &receiverAddress,
-			Value: oneEth,
-			V:     big.NewInt(1),
-			From:  types.ZeroAddress,
-		},
-	}), senderKey)
+	signedTx, err := signer.SignTx(types.NewTx(types.NewLegacyTx(
+		types.WithGasPrice(big.NewInt(1000000000)),
+		types.WithNonce(0),
+		types.WithGas(framework.DefaultGasLimit-1),
+		types.WithTo(&receiverAddress),
+		types.WithValue(oneEth),
+		types.WithSignatureValues(big.NewInt(1), nil, nil),
+		types.WithFrom(types.ZeroAddress),
+	),
+	), senderKey)
 	assert.NoError(t, err, "failed to sign transaction")
 
 	// Add the transaction

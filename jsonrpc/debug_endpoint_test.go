@@ -605,18 +605,16 @@ func TestTraceCall(t *testing.T) {
 			Nonce:     &nonce,
 			Type:      toArgUint64Ptr(uint64(types.DynamicFeeTxType)),
 		}
-		decodedTx = types.NewTx(&types.DynamicFeeTx{
-			GasTipCap: new(big.Int).SetBytes([]byte(gasTipCap)),
-			GasFeeCap: new(big.Int).SetBytes([]byte(gasFeeCap)),
-			BaseTx: &types.BaseTx{
-				Nonce: uint64(nonce),
-				Gas:   uint64(gas),
-				To:    &to,
-				Value: new(big.Int).SetBytes([]byte(value)),
-				Input: data,
-				From:  from,
-			},
-		})
+		decodedTx = types.NewTx(types.NewDynamicFeeTx(
+			types.WithGasTipCap(new(big.Int).SetBytes([]byte(gasTipCap))),
+			types.WithGasFeeCap(new(big.Int).SetBytes([]byte(gasFeeCap))),
+			types.WithNonce(uint64(nonce)),
+			types.WithGas(uint64(gas)),
+			types.WithTo(&to),
+			types.WithValue(new(big.Int).SetBytes([]byte(value))),
+			types.WithInput(data),
+			types.WithFrom(from),
+		))
 	)
 
 	decodedTx.ComputeHash()

@@ -15,13 +15,12 @@ func TestFrontierSigner(t *testing.T) {
 	key, err := GenerateECDSAKey()
 	assert.NoError(t, err)
 
-	txn := types.NewTx(&types.LegacyTx{
-		GasPrice: big.NewInt(0),
-		BaseTx: &types.BaseTx{
-			To:    &toAddress,
-			Value: big.NewInt(10),
-		},
-	})
+	txn := types.NewTx(types.NewLegacyTx(
+		types.WithGasPrice(big.NewInt(0)),
+		types.WithTo(&toAddress),
+		types.WithValue(big.NewInt(10)),
+	))
+
 	signedTx, err := signer.SignTx(txn, key)
 	assert.NoError(t, err)
 

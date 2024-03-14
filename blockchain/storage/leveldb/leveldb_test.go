@@ -54,16 +54,14 @@ func generateTxs(t *testing.T, startNonce, count int, from types.Address, to *ty
 	txs := make([]*types.Transaction, count)
 
 	for i := range txs {
-		tx := types.NewTx(&types.DynamicFeeTx{
-			GasFeeCap: big.NewInt(100),
-			GasTipCap: big.NewInt(10),
-			BaseTx: &types.BaseTx{
-				Gas:   types.StateTransactionGasLimit,
-				Nonce: uint64(startNonce + i),
-				To:    to,
-				Value: big.NewInt(2000),
-			},
-		})
+		tx := types.NewTx(types.NewDynamicFeeTx(
+			types.WithGasFeeCap(big.NewInt(100)),
+			types.WithGasTipCap(big.NewInt(10)),
+			types.WithGas(types.StateTransactionGasLimit),
+			types.WithNonce(uint64(startNonce+1)),
+			types.WithTo(to),
+			types.WithValue(big.NewInt(2000)),
+		))
 
 		input := make([]byte, 1000)
 		_, err := rand.Read(input)
