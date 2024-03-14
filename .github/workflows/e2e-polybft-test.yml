@@ -36,7 +36,7 @@ jobs:
       - name: Update certificate key permissions
         run: sudo chmod 644 /etc/ssl/private/localhost.key
       - name: Check certificate key permissions
-        run: ls -l /etc/ssl/private/localhost.key
+        run: sudo ls -l /etc/ssl/private/localhost.key
       - name: Run tests
         run: make test-e2e-polybft
       - name: Run tests failed
