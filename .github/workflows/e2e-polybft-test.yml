@@ -33,10 +33,10 @@ jobs:
         run: sudo cp localhost.crt /usr/local/share/ca-certificates/localhost.crt
       - name: Add certificate to trusted list
         run: sudo update-ca-certificates
-      - name: Update certificate key permissions
-        run: sudo chmod 644 /etc/ssl/private/localhost.key
+      - name: Update certificate folder key permissions
+        run: sudo chmod -R 644 /etc/ssl/private
       - name: Check certificate key permissions
-        run: sudo ls -l /etc/ssl/private/localhost.key
+        run: ls -l /etc/ssl/private/localhost.key
       - name: Run tests
         run: make test-e2e-polybft
       - name: Run tests failed
