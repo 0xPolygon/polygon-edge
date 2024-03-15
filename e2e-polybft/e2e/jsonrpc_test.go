@@ -26,7 +26,7 @@ func TestE2E_JsonRPC(t *testing.T) {
 
 	cluster := framework.NewTestCluster(t, 4,
 		framework.WithPremine(types.Address(acct.Address())),
-		// framework.WithHTTPS("/etc/ssl/certs/ssl-cert-snakeoil.pem", "/etc/ssl/private/ssl-cert-snakeoil.key"),
+		framework.WithHTTPS("/etc/ssl/certs/localhost.pem", "/etc/ssl/private/localhost.key"),
 	)
 	defer cluster.Stop()
 

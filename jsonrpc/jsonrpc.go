@@ -133,8 +133,8 @@ func (j *JSONRPC) setupHTTP() error {
 	}
 
 	if j.config.TLSCertFile != "" && j.config.TLSKeyFile != "" {
-		j.logger.Info("https cert file", j.config.TLSCertFile)
-		j.logger.Info("https key file", j.config.TLSKeyFile)
+		j.logger.Info("TLS", "cert file", j.config.TLSCertFile)
+		j.logger.Info("TLS", "key file", j.config.TLSKeyFile)
 
 		go func() {
 			if err := srv.ServeTLS(lis, j.config.TLSCertFile, j.config.TLSKeyFile); err != nil {
