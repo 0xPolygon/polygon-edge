@@ -31,7 +31,7 @@ values={[
 | `--output`            | The flag indicating whether to output existing secrets             | FALSE        | NO        |
 | `--private`           | The flag indicating whether the private key is printed            | FALSE         | NO        |
 
-:::info Mutually Exclusive Paramaters
+:::info Mutually Exclusive Parameters
 
 - `--config` and `--data-dir`: These flags are mutually exclusive. Use either `--config` to specify the path to the SecretsManager config file or `--data-dir` to set the directory for the Polygon Edge data if the local FS is used.
 
@@ -90,7 +90,7 @@ values={[
 | `--validators-path` | Root path containing polybft validators' secrets | "./" | NO | `genesis --validators-path "/data/validators"` | NO |
 | `--validators-secret` | Validators secrets | []string{} | NO | `genesis --validators-secret "0x0101010101010101010101010101010101010101010101010101010101010101"` | NO |
 
-:::info Mutually Exclusive Paramaters
+:::info Mutually Exclusive Parameters
 
 - `--validators`: Validators defined by the user (format: `<P2P multi address>:<public ECDSA address>:<public BLS key>`). If this flag is set, the entire multi address must be specified. If not set, validators configuration will be read from `--validators-path`.
 - `--validators-path`: Root path containing polybft validators' secrets. If `--validators` flag is not specified, validators' configuration will be read from this path.
@@ -142,7 +142,7 @@ values={[
 | `--relayer-poll-interval` duration | Interval (number of seconds) at which relayer's tracker polls for latest block at childchain. | 1s | NO | `server --relayer-poll-interval "2s"` | NO |
 | `--metrics-interval` duration | The interval (in seconds) at which special metrics are generated. A value of zero means the metrics are disabled. | 8s | NO | `server --metrics-interval "10s"` | NO |
 
-:::info Mutually Exclusive Paramaters
+:::info Mutually Exclusive Parameters
 
 - `--max-inbound-peers`: The client's maximum number of inbound peers allowed. Default value is 32.
 - `--max-outbound-peers`: The client's maximum number of outbound peers allowed. Default value is 8.
