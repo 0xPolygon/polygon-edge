@@ -15,7 +15,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/golang-lru v1.0.2
 	github.com/hashicorp/hcl v1.0.1-vault-5
-	github.com/hashicorp/vault/api v1.10.0
+	github.com/hashicorp/vault/api v1.12.1
 	github.com/libp2p/go-libp2p v0.32.0
 	github.com/libp2p/go-libp2p-kbucket v0.6.3
 	github.com/libp2p/go-libp2p-pubsub v0.10.0
@@ -42,7 +42,7 @@ require (
 	github.com/aws/aws-sdk-go v1.49.19
 	github.com/benbjohnson/clock v1.3.5 // indirect
 	github.com/coinbase/kryptology v1.8.0
-	github.com/fatih/color v1.15.0 // indirect
+	github.com/fatih/color v1.16.0 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/ipfs/go-cid v0.4.1 // indirect
 	github.com/klauspost/compress v1.17.2 // indirect
