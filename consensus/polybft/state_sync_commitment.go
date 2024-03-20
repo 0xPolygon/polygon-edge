@@ -12,11 +12,6 @@ import (
 	merkle "github.com/Ethernal-Tech/merkle-tree"
 )
 
-const (
-	stTypeBridgeCommitment = "commitment"
-	stTypeEndEpoch         = "end-epoch"
-)
-
 // PendingCommitment holds merkle trie of bridge transactions accompanied by epoch number
 type PendingCommitment struct {
 	*contractsapi.StateSyncCommitment

@@ -1,6 +1,7 @@
 package jsonrpc
 
 import (
+	"fmt"
 	"math/big"
 	"strconv"
 	"strings"
@@ -8,7 +9,10 @@ import (
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/valyala/fastjson"
 )
+
+var defaultArena fastjson.ArenaPool
 
 const jsonRPCMetric = "json_rpc"
 
@@ -382,18 +386,19 @@ func encodeToHex(b []byte) []byte {
 
 // txnArgs is the transaction argument for the rpc endpoints
 type txnArgs struct {
-	From       *types.Address
-	To         *types.Address
-	Gas        *argUint64
-	GasPrice   *argBytes
-	GasTipCap  *argBytes
-	GasFeeCap  *argBytes
-	Value      *argBytes
-	Data       *argBytes
-	Input      *argBytes
-	Nonce      *argUint64
-	Type       *argUint64
-	AccessList *types.TxAccessList
+	From       *types.Address      `json:"from"`
+	To         *types.Address      `json:"to"`
+	Gas        *argUint64          `json:"gas"`
+	GasPrice   *argBytes           `json:"gasPrice,omitempty"`
+	GasTipCap  *argBytes           `json:"maxFeePerGas,omitempty"`
+	GasFeeCap  *argBytes           `json:"maxPriorityFeePerGas,omitempty"`
+	Value      *argBytes           `json:"value"`
+	Data       *argBytes           `json:"data"`
+	Input      *argBytes           `json:"input"`
+	Nonce      *argUint64          `json:"nonce"`
+	Type       *argUint64          `json:"type"`
+	AccessList *types.TxAccessList `json:"accessList,omitempty"`
+	ChainID    *argUint64          `json:"chainId,omitempty"`
 }
 
 type progression struct {
@@ -426,4 +431,148 @@ func convertToArgUint64SliceSlice(slice [][]uint64) [][]argUint64 {
 	}
 
 	return argSlice
+}
+
+type OverrideAccount struct {
+	Nonce     *argUint64                 `json:"nonce"`
+	Code      *argBytes                  `json:"code"`
+	Balance   *argUint64                 `json:"balance"`
+	State     *map[types.Hash]types.Hash `json:"state"`
+	StateDiff *map[types.Hash]types.Hash `json:"stateDiff"`
+}
+
+func (o *OverrideAccount) ToType() types.OverrideAccount {
+	res := types.OverrideAccount{}
+
+	if o.Nonce != nil {
+		res.Nonce = (*uint64)(o.Nonce)
+	}
+
+	if o.Code != nil {
+		res.Code = *o.Code
+	}
+
+	if o.Balance != nil {
+		res.Balance = new(big.Int).SetUint64(*(*uint64)(o.Balance))
+	}
+
+	if o.State != nil {
+		res.State = *o.State
+	}
+
+	if o.StateDiff != nil {
+		res.StateDiff = *o.StateDiff
+	}
+
+	return res
+}
+
+// StateOverride is the collection of overridden accounts
+type StateOverride map[types.Address]OverrideAccount
+
+// MarshalJSON marshals the StateOverride to JSON
+func (s StateOverride) MarshalJSON() ([]byte, error) {
+	a := defaultArena.Get()
+	defer a.Reset()
+
+	o := a.NewObject()
+
+	for addr, obj := range s {
+		oo := a.NewObject()
+		if obj.Nonce != nil {
+			oo.Set("nonce", a.NewString(fmt.Sprintf("0x%x", *obj.Nonce)))
+		}
+
+		if obj.Balance != nil {
+			oo.Set("balance", a.NewString(fmt.Sprintf("0x%x", obj.Balance)))
+		}
+
+		if obj.Code != nil {
+			oo.Set("code", a.NewString("0x"+hex.EncodeToString(*obj.Code)))
+		}
+
+		if obj.State != nil {
+			ooo := a.NewObject()
+			for k, v := range *obj.State {
+				ooo.Set(k.String(), a.NewString(v.String()))
+			}
+
+			oo.Set("state", ooo)
+		}
+
+		if obj.StateDiff != nil {
+			ooo := a.NewObject()
+			for k, v := range *obj.StateDiff {
+				ooo.Set(k.String(), a.NewString(v.String()))
+			}
+
+			oo.Set("stateDiff", ooo)
+		}
+
+		o.Set(addr.String(), oo)
+	}
+
+	res := o.MarshalTo(nil)
+
+	defaultArena.Put(a)
+
+	return res, nil
+}
+
+// CallMsg contains parameters for contract calls
+type CallMsg struct {
+	From      types.Address  // the sender of the 'transaction'
+	To        *types.Address // the destination contract (nil for contract creation)
+	Gas       uint64         // if 0, the call executes with near-infinite gas
+	GasPrice  *big.Int       // wei <-> gas exchange ratio
+	GasFeeCap *big.Int       // EIP-1559 fee cap per gas
+	GasTipCap *big.Int       // EIP-1559 tip per gas
+	Value     *big.Int       // amount of wei sent along with the call
+	Data      []byte         // input data, usually an ABI-encoded contract method invocation
+
+	AccessList types.TxAccessList // EIP-2930 access list
+}
+
+// MarshalJSON implements the Marshal interface.
+func (c *CallMsg) MarshalJSON() ([]byte, error) {
+	a := defaultArena.Get()
+	defer a.Reset()
+
+	o := a.NewObject()
+	o.Set("from", a.NewString(c.From.String()))
+	o.Set("gas", a.NewString(fmt.Sprintf("0x%x", c.Gas)))
+
+	if c.To != nil {
+		o.Set("to", a.NewString(c.To.String()))
+	}
+
+	if len(c.Data) != 0 {
+		o.Set("data", a.NewString("0x"+hex.EncodeToString(c.Data)))
+	}
+
+	if c.GasPrice != nil {
+		o.Set("gasPrice", a.NewString(fmt.Sprintf("0x%x", c.GasPrice)))
+	}
+
+	if c.Value != nil {
+		o.Set("value", a.NewString(fmt.Sprintf("0x%x", c.Value)))
+	}
+
+	if c.GasFeeCap != nil {
+		o.Set("maxFeePerGas", a.NewString(fmt.Sprintf("0x%x", c.GasFeeCap)))
+	}
+
+	if c.GasTipCap != nil {
+		o.Set("maxPriorityFeePerGas", a.NewString(fmt.Sprintf("0x%x", c.GasTipCap)))
+	}
+
+	if c.AccessList != nil {
+		o.Set("accessList", c.AccessList.MarshalJSONWith(a))
+	}
+
+	res := o.MarshalTo(nil)
+
+	defaultArena.Put(a)
+
+	return res, nil
 }

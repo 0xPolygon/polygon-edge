@@ -3,7 +3,6 @@ package polybft
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"sort"
 
@@ -19,8 +18,6 @@ var (
 	exitEventsBucket             = []byte("exitEvent")
 	exitEventToEpochLookupBucket = []byte("exitIdToEpochLookup")
 	exitRelayerEventsBucket      = []byte("exitRelayerEvents")
-
-	errNoLastSavedEntry = errors.New("there is no last saved block in last saved bucket")
 )
 
 type exitEventNotFoundError struct {
@@ -136,7 +133,7 @@ func getExitEventSingle(exitEventID uint64, tx *bolt.Tx) (*ExitEvent, error) {
 	key := bytes.Join([][]byte{epochBytes, exitIDBytes}, nil)
 	k, v := exitEventBucket.Cursor().Seek(key)
 
-	if bytes.HasPrefix(k, key) == false || v == nil {
+	if !bytes.HasPrefix(k, key) || v == nil {
 		return nil, &exitEventNotFoundError{
 			exitID: exitEventID,
 			epoch:  common.EncodeBytesToUint64(epochBytes),

@@ -364,7 +364,7 @@ func TestOverrideAccount_ToType(t *testing.T) {
 	state := map[types.Hash]types.Hash{types.StringToHash("1"): types.StringToHash("2")}
 	stateDiff := map[types.Hash]types.Hash{types.StringToHash("3"): types.StringToHash("4")}
 
-	overrideAcc := &overrideAccount{
+	overrideAcc := &OverrideAccount{
 		Nonce:     toArgUint64Ptr(nonce),
 		Code:      toArgBytesPtr(code),
 		Balance:   toArgUint64Ptr(balance),

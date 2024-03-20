@@ -5,6 +5,7 @@ import (
 	"math/big"
 
 	"github.com/umbracle/fastrlp"
+	"github.com/valyala/fastjson"
 )
 
 type DynamicFeeTx struct {
@@ -245,4 +246,39 @@ func (tx *DynamicFeeTx) copy() TxData {
 	cpy.setAccessList(tx.accessList().Copy())
 
 	return cpy
+}
+
+func (tx *DynamicFeeTx) unmarshalJSON(v *fastjson.Value) error {
+	if err := tx.BaseTx.unmarshalJSON(v); err != nil {
+		return err
+	}
+
+	gasTipCap, err := unmarshalJSONBigInt(v, "maxPriorityFeePerGas")
+	if err != nil {
+		return err
+	}
+
+	tx.setGasTipCap(gasTipCap)
+
+	gasFeeCap, err := unmarshalJSONBigInt(v, "maxFeePerGas")
+	if err != nil {
+		return err
+	}
+
+	tx.setGasFeeCap(gasFeeCap)
+
+	chainID, err := unmarshalJSONBigInt(v, "chainId")
+	if err != nil {
+		return err
+	}
+
+	tx.setChainID(chainID)
+
+	if hasKey(v, "accessList") {
+		if err := tx.AccessList.unmarshalJSON(v.Get("accessList")); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

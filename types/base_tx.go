@@ -2,6 +2,8 @@ package types
 
 import (
 	"math/big"
+
+	"github.com/valyala/fastjson"
 )
 
 // BaseTx represents a base abstract transaction in the blockchain,
@@ -104,4 +106,80 @@ func (tx *BaseTx) copy() *BaseTx {
 	cpy.setFrom(tx.from())
 
 	return cpy
+}
+
+func (tx *BaseTx) unmarshalJSON(v *fastjson.Value) error {
+	hash, err := unmarshalJSONHash(v, "hash")
+	if err != nil {
+		return err
+	}
+
+	tx.setHash(hash)
+
+	from, err := unmarshalJSONAddr(v, "from")
+	if err != nil {
+		return err
+	}
+
+	tx.setFrom(from)
+
+	// Do not decode 'to' if it doesn't exist.
+	if hasKey(v, "to") {
+		if v.Get("to").String() != "null" {
+			var to Address
+
+			if to, err = unmarshalJSONAddr(v, "to"); err != nil {
+				return err
+			}
+
+			tx.setTo(&to)
+		}
+	}
+
+	input, err := unmarshalJSONBytes(v, "input")
+	if err != nil {
+		return err
+	}
+
+	tx.setInput(input)
+
+	value, err := unmarshalJSONBigInt(v, "value")
+	if err != nil {
+		return err
+	}
+
+	tx.setValue(value)
+
+	nonce, err := unmarshalJSONUint64(v, "nonce")
+	if err != nil {
+		return err
+	}
+
+	tx.setNonce(nonce)
+
+	vParity, err := unmarshalJSONBigInt(v, "v")
+	if err != nil {
+		return err
+	}
+
+	r, err := unmarshalJSONBigInt(v, "r")
+	if err != nil {
+		return err
+	}
+
+	s, err := unmarshalJSONBigInt(v, "s")
+	if err != nil {
+		return err
+	}
+
+	tx.setSignatureValues(vParity, r, s)
+
+	gas, err := unmarshalJSONUint64(v, "gas")
+	if err != nil {
+		return err
+	}
+
+	tx.setGas(gas)
+
+	return nil
 }

@@ -5,6 +5,7 @@ import (
 	"math/big"
 
 	"github.com/umbracle/fastrlp"
+	"github.com/valyala/fastjson"
 )
 
 type TxAccessList []AccessTuple
@@ -102,6 +103,66 @@ func (al TxAccessList) MarshallRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 	}
 
 	return accessListVV
+}
+
+func (t *TxAccessList) MarshalJSONWith(a *fastjson.Arena) *fastjson.Value {
+	arr := a.NewArray()
+
+	for i, tuple := range *t {
+		arrElem := a.NewObject()
+		arrElem.Set("address", a.NewString(tuple.Address.String()))
+
+		strg := a.NewArray()
+
+		for j, key := range tuple.StorageKeys {
+			strg.SetArrayItem(j, a.NewString(key.String()))
+		}
+
+		arrElem.Set("storageKeys", strg)
+		arr.SetArrayItem(i, arrElem)
+	}
+
+	return arr
+}
+
+func (t *TxAccessList) unmarshalJSON(v *fastjson.Value) error {
+	elems, err := v.Array()
+	if err != nil {
+		return err
+	}
+
+	for _, elem := range elems {
+		accessTuple := AccessTuple{}
+
+		addr, err := unmarshalJSONAddr(elem, "address")
+		if err != nil {
+			return err
+		}
+
+		accessTuple.Address = addr
+
+		storage, err := elem.Get("storageKeys").Array()
+		if err != nil {
+			return err
+		}
+
+		accessTuple.StorageKeys = make([]Hash, len(storage))
+
+		for indx, stg := range storage {
+			b, err := stg.StringBytes()
+			if err != nil {
+				return err
+			}
+
+			if err := accessTuple.StorageKeys[indx].UnmarshalText(b); err != nil {
+				return err
+			}
+		}
+
+		*t = append(*t, accessTuple)
+	}
+
+	return nil
 }
 
 type AccessListTxn struct {
@@ -327,4 +388,32 @@ func (tx *AccessListTxn) copy() TxData {
 	cpy.setAccessList(tx.accessList().Copy())
 
 	return cpy
+}
+
+func (tx *AccessListTxn) unmarshalJSON(v *fastjson.Value) error {
+	if err := tx.BaseTx.unmarshalJSON(v); err != nil {
+		return err
+	}
+
+	gasPrice, err := unmarshalJSONBigInt(v, "gasPrice")
+	if err != nil {
+		return err
+	}
+
+	tx.setGasPrice(gasPrice)
+
+	chainID, err := unmarshalJSONBigInt(v, "chainId")
+	if err != nil {
+		return err
+	}
+
+	tx.setChainID(chainID)
+
+	if hasKey(v, "accessList") {
+		if err := tx.AccessList.unmarshalJSON(v.Get("accessList")); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

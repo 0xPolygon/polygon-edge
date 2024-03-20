@@ -6,12 +6,10 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/forkmanager"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
-	"github.com/umbracle/ethgo/abi"
 )
 
 func TestGovernanceManager_PostEpoch(t *testing.T) {
@@ -142,23 +140,4 @@ func TestGovernanceManager_PostBlock(t *testing.T) {
 		// new fork should be registered and enabled before PostBlock
 		require.True(t, forkmanager.GetInstance().IsForkEnabled(newForkName, newForkBlock.Uint64()))
 	})
-}
-
-func createTestLogForNewEpochSizeEvent(t *testing.T, epochSize uint64) *types.Log {
-	t.Helper()
-
-	var epochSizeEvent contractsapi.NewEpochSizeEvent
-
-	topics := make([]types.Hash, 2)
-	topics[0] = types.Hash(epochSizeEvent.Sig())
-	encodedData, err := abi.MustNewType("uint256").Encode(new(big.Int).SetUint64(epochSize))
-	require.NoError(t, err)
-
-	topics[1] = types.BytesToHash(encodedData)
-
-	return &types.Log{
-		Address: contracts.NetworkParamsContract,
-		Topics:  topics,
-		Data:    nil,
-	}
 }

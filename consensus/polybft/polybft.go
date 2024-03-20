@@ -4,7 +4,6 @@ package polybft
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math/big"
 	"path/filepath"
@@ -33,10 +32,6 @@ const (
 	minSyncPeers = 2
 	pbftProto    = "/pbft/0.2"
 	bridgeProto  = "/bridge/0.2"
-)
-
-var (
-	errMissingBridgeConfig = errors.New("invalid genesis configuration, missing bridge configuration")
 )
 
 // polybftBackend is an interface defining polybft methods needed by fsm and sync tracker

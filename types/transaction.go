@@ -8,6 +8,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/keccak"
 	"github.com/umbracle/fastrlp"
+	"github.com/valyala/fastjson"
 )
 
 const (
@@ -117,6 +118,7 @@ type TxData interface {
 	setSignatureValues(v, r, s *big.Int)
 	unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error
 	marshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value
+	unmarshalJSON(v *fastjson.Value) error
 	copy() TxData
 }
 

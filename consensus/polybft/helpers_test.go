@@ -27,7 +27,7 @@ func createTestKey(t *testing.T) *wallet.Key {
 func createRandomTestKeys(t *testing.T, numberOfKeys int) []*wallet.Key {
 	t.Helper()
 
-	result := make([]*wallet.Key, numberOfKeys, numberOfKeys)
+	result := make([]*wallet.Key, numberOfKeys)
 
 	for i := 0; i < numberOfKeys; i++ {
 		result[i] = wallet.NewKey(generateTestAccount(t))

@@ -7,13 +7,10 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/umbracle/ethgo/abi"
 	"github.com/umbracle/ethgo/jsonrpc"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
-	"github.com/0xPolygon/polygon-edge/contracts"
-	"github.com/0xPolygon/polygon-edge/helper/common"
 	merkle "github.com/Ethernal-Tech/merkle-tree"
 	hclog "github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/mock"
@@ -508,25 +505,4 @@ func getBlockNumberCheckpointSubmitInput(t *testing.T, input []byte) uint64 {
 	require.NoError(t, submit.DecodeAbi(input))
 
 	return submit.Checkpoint.BlockNumber.Uint64()
-}
-
-func createTestLogForExitEvent(t *testing.T, exitEventID uint64) *types.Log {
-	t.Helper()
-
-	var exitEvent contractsapi.L2StateSyncedEvent
-
-	topics := make([]types.Hash, 4)
-	topics[0] = types.Hash(exitEvent.Sig())
-	topics[1] = types.BytesToHash(common.EncodeUint64ToBytes(exitEventID))
-	topics[2] = types.BytesToHash(types.StringToAddress("0x1111").Bytes())
-	topics[3] = types.BytesToHash(types.StringToAddress("0x2222").Bytes())
-	someType := abi.MustNewType("tuple(string firstName, string lastName)")
-	encodedData, err := someType.Encode(map[string]string{"firstName": "John", "lastName": "Doe"})
-	require.NoError(t, err)
-
-	return &types.Log{
-		Address: contracts.L2StateSenderContract,
-		Topics:  topics,
-		Data:    encodedData,
-	}
 }

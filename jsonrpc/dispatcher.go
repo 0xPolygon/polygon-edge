@@ -475,7 +475,7 @@ func (d *Dispatcher) registerService(serviceName string, service interface{}) er
 
 	st := reflect.TypeOf(service)
 	if st.Kind() == reflect.Struct {
-		return errors.New(fmt.Sprintf("jsonrpc: service '%s' must be a pointer to struct", serviceName))
+		return fmt.Errorf("jsonrpc: service '%s' must be a pointer to struct", serviceName)
 	}
 
 	funcMap := make(map[string]*funcData)

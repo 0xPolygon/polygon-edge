@@ -5,6 +5,7 @@ import (
 	"math/big"
 
 	"github.com/umbracle/fastrlp"
+	"github.com/valyala/fastjson"
 )
 
 type StateTx struct {
@@ -197,4 +198,19 @@ func (tx *StateTx) copy() TxData { //nolint:dupl
 	cpy.BaseTx = tx.BaseTx.copy()
 
 	return cpy
+}
+
+func (tx *StateTx) unmarshalJSON(v *fastjson.Value) error {
+	if err := tx.BaseTx.unmarshalJSON(v); err != nil {
+		return err
+	}
+
+	gasPrice, err := unmarshalJSONBigInt(v, "gasPrice")
+	if err != nil {
+		return err
+	}
+
+	tx.setGasPrice(gasPrice)
+
+	return nil
 }

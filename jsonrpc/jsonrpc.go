@@ -14,27 +14,6 @@ import (
 	"github.com/hashicorp/go-hclog"
 )
 
-type serverType int
-
-const (
-	serverIPC serverType = iota
-	serverHTTP
-	serverWS
-)
-
-func (s serverType) String() string {
-	switch s {
-	case serverIPC:
-		return "ipc"
-	case serverHTTP:
-		return "http"
-	case serverWS:
-		return "ws"
-	default:
-		panic("BUG: Not expected") //nolint:gocritic
-	}
-}
-
 // JSONRPC is an API consensus
 type JSONRPC struct {
 	logger     hclog.Logger
