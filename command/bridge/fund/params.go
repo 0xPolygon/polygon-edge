@@ -12,6 +12,8 @@ import (
 const (
 	jsonRPCFlag        = "json-rpc"
 	mintStakeTokenFlag = "mint"
+	txTimeoutFlag      = "tx-timeout"
+	txPollFreqFlag     = "tx-poll-freq"
 )
 
 var (
@@ -24,6 +26,8 @@ type fundParams struct {
 	amounts            []string
 	deployerPrivateKey string
 	jsonRPCAddress     string
+	txTimeout          uint64
+	txPollFreq         uint64
 
 	amountValues []*big.Int
 	addresses    []types.Address

@@ -39,6 +39,8 @@ const (
 	Erc20TokenFlag          = "erc20-token" //nolint:gosec
 	BladeManagerFlag        = "blade-manager"
 	BladeManagerFlagDesc    = "address of blade manager contract on a rootchain"
+	TxTimeoutFlag           = "tx-timeout"
+	TxPollFreqFlag          = "tx-poll-freq"
 )
 
 var (

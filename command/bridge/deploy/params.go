@@ -13,6 +13,8 @@ const (
 	deployerKeyFlag = "deployer-key"
 	jsonRPCFlag     = "json-rpc"
 	erc20AddrFlag   = "erc20-token"
+	txTimeoutFlag   = "tx-timeout"
+	txPollFreqFlag  = "tx-poll-freq"
 )
 
 type deployParams struct {
@@ -21,6 +23,8 @@ type deployParams struct {
 	jsonRPCAddress      string
 	rootERC20TokenAddr  string
 	proxyContractsAdmin string
+	txTimeout           uint64
+	txPollFreq          uint64
 	isTestMode          bool
 }
 

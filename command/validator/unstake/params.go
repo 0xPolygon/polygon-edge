@@ -18,6 +18,8 @@ type unstakeParams struct {
 	accountConfig string
 	jsonRPC       string
 	amount        string
+	txTimeout     uint64
+	txPollFreq    uint64
 
 	amountValue *big.Int
 }

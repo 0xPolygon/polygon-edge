@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo/jsonrpc"
@@ -24,6 +25,8 @@ const (
 	exitEventIDFlag  = "exit-id"
 	rootJSONRPCFlag  = "root-json-rpc"
 	childJSONRPCFlag = "child-json-rpc"
+	txTimeoutFlag    = "tx-timeout"
+	txPollFreqFlag   = "tx-poll-freq"
 
 	// generateExitProofFn is JSON RPC endpoint which creates exit proof
 	generateExitProofFn = "bridge_generateExitProof"
@@ -35,6 +38,8 @@ type exitParams struct {
 	exitID            uint64
 	rootJSONRPCAddr   string
 	childJSONRPCAddr  string
+	txTimeout         uint64
+	txPollFreq        uint64
 }
 
 var (
@@ -85,6 +90,19 @@ func GetCommand() *cobra.Command {
 		"the JSON RPC child chain endpoint",
 	)
 
+	exitCmd.Flags().Uint64Var(
+		&ep.txTimeout,
+		txTimeoutFlag,
+		5000,
+		"timeout for receipts in milliseconds",
+	)
+	exitCmd.Flags().Uint64Var(
+		&ep.txPollFreq,
+		txPollFreqFlag,
+		50,
+		"frequency in milliseconds for poll transactions",
+	)
+
 	_ = exitCmd.MarkFlagRequired(exitHelperFlag)
 
 	return exitCmd
@@ -101,7 +119,9 @@ func run(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	rootTxRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(ep.rootJSONRPCAddr))
+	rootTxRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(ep.rootJSONRPCAddr),
+		txrelayer.WithReceiptsTimeout(time.Duration(ep.txTimeout*uint64(time.Millisecond))),
+		txrelayer.WithReceiptsPollFreq(time.Duration(ep.txPollFreq*uint64(time.Millisecond))))
 	if err != nil {
 		outputter.SetError(fmt.Errorf("could not create root chain tx relayer: %w", err))
 

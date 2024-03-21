@@ -3,6 +3,7 @@ package erc20
 import (
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"
@@ -89,7 +90,9 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 	depositorAddr := depositorKey.Address()
 
-	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(dp.JSONRPCAddr))
+	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(dp.JSONRPCAddr),
+		txrelayer.WithReceiptsTimeout(time.Duration(dp.TxTimeout*uint64(time.Millisecond))),
+		txrelayer.WithReceiptsPollFreq(time.Duration(dp.TxPollFreq*uint64(time.Millisecond))))
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to initialize tx relayer: %w", err))
 

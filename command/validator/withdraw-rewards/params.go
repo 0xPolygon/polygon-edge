@@ -12,6 +12,8 @@ type withdrawRewardsParams struct {
 	accountDir    string
 	accountConfig string
 	jsonRPC       string
+	txTimeout     uint64
+	txPollFreq    uint64
 }
 
 type withdrawRewardResult struct {

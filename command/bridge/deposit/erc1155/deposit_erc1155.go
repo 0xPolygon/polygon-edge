@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -96,7 +97,9 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 	depositorAddr := depositorKey.Address()
 
-	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(dp.JSONRPCAddr))
+	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(dp.JSONRPCAddr),
+		txrelayer.WithReceiptsTimeout(time.Duration(dp.TxTimeout*uint64(time.Millisecond))),
+		txrelayer.WithReceiptsPollFreq(time.Duration(dp.TxPollFreq*uint64(time.Millisecond))))
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to initialize tx relayer: %w", err))
 

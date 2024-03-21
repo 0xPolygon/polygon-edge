@@ -25,6 +25,8 @@ type premineParams struct {
 	jsonRPC         string
 	stakedAmount    string
 	premineAmount   string
+	txTimeout       uint64
+	txPollFreq      uint64
 
 	premineAmountValue  *big.Int
 	stakedValue         *big.Int

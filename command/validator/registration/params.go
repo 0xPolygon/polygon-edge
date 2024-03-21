@@ -18,6 +18,8 @@ type registerParams struct {
 	jsonRPC       string
 	amount        string
 	stakeToken    string
+	txTimeout     uint64
+	txPollFreq    uint64
 
 	amountValue    *big.Int
 	stakeTokenAddr types.Address

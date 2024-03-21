@@ -16,6 +16,8 @@ type finalizeParams struct {
 	jsonRPC       string
 	bladeManager  string
 	genesisPath   string
+	txTimeout     uint64
+	txPollFreq    uint64
 
 	bladeManagerAddr types.Address
 }

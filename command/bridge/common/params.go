@@ -35,6 +35,8 @@ const (
 	ChildTokenFlag         = "child-token"
 	JSONRPCFlag            = "json-rpc"
 	ChildChainMintableFlag = "child-chain-mintable"
+	txTimeoutFlag          = "tx-timeout"
+	txPollFreqFlag         = "tx-poll-freq"
 
 	MinterKeyFlag     = "minter-key"
 	MinterKeyFlagDesc = "minter key is the account which is able to mint tokens to sender account " +
@@ -53,6 +55,8 @@ type BridgeParams struct {
 	PredicateAddr      string
 	JSONRPCAddr        string
 	ChildChainMintable bool
+	TxTimeout          uint64
+	TxPollFreq         uint64
 }
 
 // RegisterCommonFlags registers common bridge flags to a given command
@@ -83,6 +87,20 @@ func (p *BridgeParams) RegisterCommonFlags(cmd *cobra.Command) {
 		ChildChainMintableFlag,
 		false,
 		"flag indicating whether tokens originate from child chain",
+	)
+
+	cmd.Flags().Uint64Var(
+		&p.TxTimeout,
+		txTimeoutFlag,
+		5000,
+		"timeout for receipts in milliseconds",
+	)
+
+	cmd.Flags().Uint64Var(
+		&p.TxPollFreq,
+		txPollFreqFlag,
+		50,
+		"frequency in milliseconds for poll transactions",
 	)
 }
 

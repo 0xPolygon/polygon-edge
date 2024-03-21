@@ -2,6 +2,7 @@ package fund
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"
@@ -60,6 +61,20 @@ func setFlags(cmd *cobra.Command) {
 		"",
 		polybftsecrets.PrivateKeyFlagDesc,
 	)
+
+	cmd.Flags().Uint64Var(
+		&params.txTimeout,
+		txTimeoutFlag,
+		5000,
+		"timeout for receipts in milliseconds",
+	)
+
+	cmd.Flags().Uint64Var(
+		&params.txPollFreq,
+		txPollFreqFlag,
+		50,
+		"frequency in milliseconds for poll transactions",
+	)
 }
 
 func preRunCommand(_ *cobra.Command, _ []string) error {
@@ -70,7 +85,9 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
-	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(params.jsonRPCAddress))
+	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(params.jsonRPCAddress),
+		txrelayer.WithReceiptsTimeout(time.Duration(params.txTimeout*uint64(time.Millisecond))),
+		txrelayer.WithReceiptsPollFreq(time.Duration(params.txPollFreq*uint64(time.Millisecond))))
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to initialize tx relayer: %w", err))
 

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/bls"
 	"github.com/0xPolygon/polygon-edge/command"
@@ -66,6 +67,20 @@ func setFlags(cmd *cobra.Command) {
 		polybftsecrets.StakeTokenFlagDesc,
 	)
 
+	cmd.Flags().Uint64Var(
+		&params.txTimeout,
+		bridgeHelper.TxTimeoutFlag,
+		5000,
+		"timeout for receipts in milliseconds",
+	)
+
+	cmd.Flags().Uint64Var(
+		&params.txPollFreq,
+		bridgeHelper.TxPollFreqFlag,
+		50,
+		"frequency in milliseconds for poll transactions",
+	)
+
 	helper.RegisterJSONRPCFlag(cmd)
 	cmd.MarkFlagsMutuallyExclusive(polybftsecrets.AccountConfigFlag, polybftsecrets.AccountDirFlag)
 }
@@ -85,7 +100,9 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(params.jsonRPC))
+	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(params.jsonRPC),
+		txrelayer.WithReceiptsTimeout(time.Duration(params.txTimeout*uint64(time.Millisecond))),
+		txrelayer.WithReceiptsPollFreq(time.Duration(params.txPollFreq*uint64(time.Millisecond))))
 	if err != nil {
 		return err
 	}

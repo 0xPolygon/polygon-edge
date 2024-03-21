@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -82,7 +83,9 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(wp.JSONRPCAddr))
+	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(wp.JSONRPCAddr),
+		txrelayer.WithReceiptsTimeout(time.Duration(wp.TxTimeout*uint64(time.Millisecond))),
+		txrelayer.WithReceiptsPollFreq(time.Duration(wp.TxPollFreq*uint64(time.Millisecond))))
 	if err != nil {
 		outputter.SetError(fmt.Errorf("could not create destination chain tx relayer: %w", err))
 

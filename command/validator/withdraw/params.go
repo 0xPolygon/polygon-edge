@@ -16,6 +16,8 @@ type withdrawParams struct {
 	accountDir    string
 	accountConfig string
 	jsonRPC       string
+	txTimeout     uint64
+	txPollFreq    uint64
 }
 
 func (v *withdrawParams) validateFlags() (err error) {

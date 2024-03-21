@@ -23,6 +23,8 @@ type whitelistParams struct {
 	privateKey            string
 	jsonRPC               string
 	newValidatorAddresses []string
+	txTimeout             uint64
+	txPollFreq            uint64
 }
 
 func (ep *whitelistParams) validateFlags() error {

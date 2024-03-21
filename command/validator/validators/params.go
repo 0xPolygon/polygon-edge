@@ -15,6 +15,8 @@ type validatorInfoParams struct {
 	supernetManagerAddress string
 	stakeManagerAddress    string
 	chainID                int64
+	txTimeout              uint64
+	txPollFreq             uint64
 }
 
 func (v *validatorInfoParams) validateFlags() error {

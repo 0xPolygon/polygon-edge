@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"sync"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"
@@ -337,6 +338,20 @@ func GetCommand() *cobra.Command {
 		helper.ProxyContractsAdminDesc,
 	)
 
+	cmd.Flags().Uint64Var(
+		&params.txTimeout,
+		txTimeoutFlag,
+		5000,
+		"timeout for receipts in milliseconds",
+	)
+
+	cmd.Flags().Uint64Var(
+		&params.txPollFreq,
+		txPollFreqFlag,
+		50,
+		"frequency in milliseconds for poll transactions",
+	)
+
 	cmd.MarkFlagsMutuallyExclusive(helper.TestModeFlag, deployerKeyFlag)
 
 	return cmd
@@ -429,7 +444,10 @@ func runCommand(cmd *cobra.Command, _ []string) {
 // deployContracts deploys and initializes rootchain smart contracts
 func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, chainID int64,
 	initialValidators []*validator.GenesisValidator, cmdCtx context.Context) (deploymentResultInfo, error) {
-	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(client), txrelayer.WithWriter(outputter))
+	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(client), txrelayer.WithWriter(outputter),
+		txrelayer.WithReceiptsTimeout(time.Duration(params.txTimeout*uint64(time.Millisecond))),
+		txrelayer.WithReceiptsPollFreq(time.Duration(params.txPollFreq*uint64(time.Millisecond))))
+
 	if err != nil {
 		return deploymentResultInfo{RootchainCfg: nil, CommandResults: nil},
 			fmt.Errorf("failed to initialize tx relayer: %w", err)
