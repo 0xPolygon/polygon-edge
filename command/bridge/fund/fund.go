@@ -62,17 +62,17 @@ func setFlags(cmd *cobra.Command) {
 		polybftsecrets.PrivateKeyFlagDesc,
 	)
 
-	cmd.Flags().Uint64Var(
+	cmd.Flags().DurationVar(
 		&params.txTimeout,
 		txTimeoutFlag,
-		5000,
+		5*time.Second,
 		"timeout for receipts in milliseconds",
 	)
 
-	cmd.Flags().Uint64Var(
+	cmd.Flags().DurationVar(
 		&params.txPollFreq,
 		txPollFreqFlag,
-		50,
+		50*time.Millisecond,
 		"frequency in milliseconds for poll transactions",
 	)
 }
@@ -86,8 +86,8 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	defer outputter.WriteOutput()
 
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(params.jsonRPCAddress),
-		txrelayer.WithReceiptsTimeout(time.Duration(params.txTimeout*uint64(time.Millisecond))),
-		txrelayer.WithReceiptsPollFreq(time.Duration(params.txPollFreq*uint64(time.Millisecond))))
+		txrelayer.WithReceiptsTimeout(time.Duration(params.txTimeout)),
+		txrelayer.WithReceiptsPollFreq(time.Duration(params.txPollFreq)))
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to initialize tx relayer: %w", err))
 

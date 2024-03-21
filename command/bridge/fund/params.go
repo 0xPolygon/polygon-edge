@@ -3,6 +3,7 @@ package fund
 import (
 	"errors"
 	"math/big"
+	"time"
 
 	bridgeHelper "github.com/0xPolygon/polygon-edge/command/bridge/helper"
 	cmdhelper "github.com/0xPolygon/polygon-edge/command/helper"
@@ -26,8 +27,8 @@ type fundParams struct {
 	amounts            []string
 	deployerPrivateKey string
 	jsonRPCAddress     string
-	txTimeout          uint64
-	txPollFreq         uint64
+	txTimeout          time.Duration
+	txPollFreq         time.Duration
 
 	amountValues []*big.Int
 	addresses    []types.Address

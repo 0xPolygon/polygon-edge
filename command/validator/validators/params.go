@@ -3,6 +3,7 @@ package validators
 import (
 	"bytes"
 	"fmt"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	validatorHelper "github.com/0xPolygon/polygon-edge/command/validator/helper"
@@ -15,8 +16,8 @@ type validatorInfoParams struct {
 	supernetManagerAddress string
 	stakeManagerAddress    string
 	chainID                int64
-	txTimeout              uint64
-	txPollFreq             uint64
+	txTimeout              time.Duration
+	txPollFreq             time.Duration
 }
 
 func (v *validatorInfoParams) validateFlags() error {

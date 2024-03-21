@@ -69,17 +69,17 @@ func setFlags(cmd *cobra.Command) {
 		"erc20 token address",
 	)
 
-	cmd.Flags().Uint64Var(
+	cmd.Flags().DurationVar(
 		&params.txTimeout,
 		bridgeHelper.TxTimeoutFlag,
-		5000,
+		5*time.Second,
 		"timeout for receipts in milliseconds",
 	)
 
-	cmd.Flags().Uint64Var(
+	cmd.Flags().DurationVar(
 		&params.txPollFreq,
 		bridgeHelper.TxPollFreqFlag,
-		50,
+		50*time.Millisecond,
 		"frequency in milliseconds for poll transactions",
 	)
 
@@ -91,8 +91,8 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	defer outputter.WriteOutput()
 
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(params.jsonRPCAddress),
-		txrelayer.WithReceiptsTimeout(time.Duration(params.txTimeout*uint64(time.Millisecond))),
-		txrelayer.WithReceiptsPollFreq(time.Duration(params.txPollFreq*uint64(time.Millisecond))))
+		txrelayer.WithReceiptsTimeout(time.Duration(params.txTimeout)),
+		txrelayer.WithReceiptsPollFreq(time.Duration(params.txPollFreq)))
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to initialize tx relayer: %w", err))
 

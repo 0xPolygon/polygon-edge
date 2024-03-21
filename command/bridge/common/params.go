@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"
@@ -55,8 +56,8 @@ type BridgeParams struct {
 	PredicateAddr      string
 	JSONRPCAddr        string
 	ChildChainMintable bool
-	TxTimeout          uint64
-	TxPollFreq         uint64
+	TxTimeout          time.Duration
+	TxPollFreq         time.Duration
 }
 
 // RegisterCommonFlags registers common bridge flags to a given command
@@ -89,17 +90,17 @@ func (p *BridgeParams) RegisterCommonFlags(cmd *cobra.Command) {
 		"flag indicating whether tokens originate from child chain",
 	)
 
-	cmd.Flags().Uint64Var(
+	cmd.Flags().DurationVar(
 		&p.TxTimeout,
 		txTimeoutFlag,
-		5000,
+		5*time.Second,
 		"timeout for receipts in milliseconds",
 	)
 
-	cmd.Flags().Uint64Var(
+	cmd.Flags().DurationVar(
 		&p.TxPollFreq,
 		txPollFreqFlag,
-		50,
+		50*time.Millisecond,
 		"frequency in milliseconds for poll transactions",
 	)
 }

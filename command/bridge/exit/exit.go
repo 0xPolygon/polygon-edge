@@ -38,8 +38,8 @@ type exitParams struct {
 	exitID            uint64
 	rootJSONRPCAddr   string
 	childJSONRPCAddr  string
-	txTimeout         uint64
-	txPollFreq        uint64
+	txTimeout         time.Duration
+	txPollFreq        time.Duration
 }
 
 var (
@@ -90,16 +90,16 @@ func GetCommand() *cobra.Command {
 		"the JSON RPC child chain endpoint",
 	)
 
-	exitCmd.Flags().Uint64Var(
+	exitCmd.Flags().DurationVar(
 		&ep.txTimeout,
 		txTimeoutFlag,
-		5000,
+		5*time.Second,
 		"timeout for receipts in milliseconds",
 	)
-	exitCmd.Flags().Uint64Var(
+	exitCmd.Flags().DurationVar(
 		&ep.txPollFreq,
 		txPollFreqFlag,
-		50,
+		50*time.Millisecond,
 		"frequency in milliseconds for poll transactions",
 	)
 
@@ -120,8 +120,8 @@ func run(cmd *cobra.Command, _ []string) {
 	}
 
 	rootTxRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(ep.rootJSONRPCAddr),
-		txrelayer.WithReceiptsTimeout(time.Duration(ep.txTimeout*uint64(time.Millisecond))),
-		txrelayer.WithReceiptsPollFreq(time.Duration(ep.txPollFreq*uint64(time.Millisecond))))
+		txrelayer.WithReceiptsTimeout(time.Duration(ep.txTimeout)),
+		txrelayer.WithReceiptsPollFreq(time.Duration(ep.txPollFreq)))
 	if err != nil {
 		outputter.SetError(fmt.Errorf("could not create root chain tx relayer: %w", err))
 

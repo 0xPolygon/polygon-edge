@@ -84,8 +84,8 @@ func run(cmd *cobra.Command, _ []string) {
 	}
 
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(wp.JSONRPCAddr),
-		txrelayer.WithReceiptsTimeout(time.Duration(wp.TxTimeout*uint64(time.Millisecond))),
-		txrelayer.WithReceiptsPollFreq(time.Duration(wp.TxPollFreq*uint64(time.Millisecond))))
+		txrelayer.WithReceiptsTimeout(time.Duration(wp.TxTimeout)),
+		txrelayer.WithReceiptsPollFreq(time.Duration(wp.TxPollFreq)))
 	if err != nil {
 		outputter.SetError(fmt.Errorf("could not create child chain tx relayer: %w", err))
 

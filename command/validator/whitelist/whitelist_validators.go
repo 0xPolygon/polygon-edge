@@ -59,14 +59,14 @@ func setFlags(cmd *cobra.Command) {
 		"account addresses of a possible validators",
 	)
 
-	cmd.Flags().Uint64Var(
+	cmd.Flags().DurationVar(
 		&params.txTimeout,
 		bridgeHelper.TxTimeoutFlag,
 		5000,
 		"timeout for receipts in milliseconds",
 	)
 
-	cmd.Flags().Uint64Var(
+	cmd.Flags().DurationVar(
 		&params.txPollFreq,
 		bridgeHelper.TxPollFreqFlag,
 		150,
@@ -96,8 +96,8 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	}
 
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(params.jsonRPC),
-		txrelayer.WithReceiptsTimeout(time.Duration(params.txTimeout*uint64(time.Millisecond))),
-		txrelayer.WithReceiptsPollFreq(time.Duration(params.txPollFreq*uint64(time.Millisecond))))
+		txrelayer.WithReceiptsTimeout(time.Duration(params.txTimeout)),
+		txrelayer.WithReceiptsPollFreq(time.Duration(params.txPollFreq)))
 	if err != nil {
 		return fmt.Errorf("whitelist validator failed. Could not create tx relayer: %w", err)
 	}

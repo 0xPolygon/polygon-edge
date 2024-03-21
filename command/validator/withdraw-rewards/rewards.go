@@ -49,17 +49,17 @@ func setFlags(cmd *cobra.Command) {
 		polybftsecrets.AccountConfigFlagDesc,
 	)
 
-	cmd.Flags().Uint64Var(
+	cmd.Flags().DurationVar(
 		&params.txTimeout,
 		bridgeHelper.TxTimeoutFlag,
-		5000,
+		5*time.Second,
 		"timeout for receipts in milliseconds",
 	)
 
-	cmd.Flags().Uint64Var(
+	cmd.Flags().DurationVar(
 		&params.txPollFreq,
 		bridgeHelper.TxPollFreqFlag,
-		150,
+		150*time.Millisecond,
 		"frequency in milliseconds for poll transactions",
 	)
 
@@ -84,8 +84,8 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	validatorAddr := validatorAccount.Ecdsa.Address()
 
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(params.jsonRPC),
-		txrelayer.WithReceiptsTimeout(time.Duration(params.txTimeout*uint64(time.Millisecond))),
-		txrelayer.WithReceiptsPollFreq(time.Duration(params.txPollFreq*uint64(time.Millisecond))))
+		txrelayer.WithReceiptsTimeout(time.Duration(params.txTimeout)),
+		txrelayer.WithReceiptsPollFreq(time.Duration(params.txPollFreq)))
 	if err != nil {
 		return err
 	}

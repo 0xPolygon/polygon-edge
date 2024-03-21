@@ -3,6 +3,7 @@ package rewards
 import (
 	"bytes"
 	"fmt"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	validatorHelper "github.com/0xPolygon/polygon-edge/command/validator/helper"
@@ -12,8 +13,8 @@ type withdrawRewardsParams struct {
 	accountDir    string
 	accountConfig string
 	jsonRPC       string
-	txTimeout     uint64
-	txPollFreq    uint64
+	txTimeout     time.Duration
+	txPollFreq    time.Duration
 }
 
 type withdrawRewardResult struct {
