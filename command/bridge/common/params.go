@@ -93,7 +93,7 @@ func (p *BridgeParams) RegisterCommonFlags(cmd *cobra.Command) {
 	cmd.Flags().DurationVar(
 		&p.TxTimeout,
 		txTimeoutFlag,
-		5*time.Second,
+		50*time.Second,
 		"timeout for receipts in milliseconds",
 	)
 

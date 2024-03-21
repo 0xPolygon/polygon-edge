@@ -93,7 +93,7 @@ func GetCommand() *cobra.Command {
 	exitCmd.Flags().DurationVar(
 		&ep.txTimeout,
 		txTimeoutFlag,
-		5*time.Second,
+		50*time.Second,
 		"timeout for receipts in milliseconds",
 	)
 	exitCmd.Flags().DurationVar(

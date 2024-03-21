@@ -64,7 +64,7 @@ func NewTxRelayer(opts ...TxRelayerOption) (TxRelayer, error) {
 	t := &TxRelayerImpl{
 		ipAddress:        DefaultRPCAddress,
 		receiptsPollFreq: 50 * time.Millisecond,
-		receiptsTimeout:  5 * time.Second,
+		receiptsTimeout:  50 * time.Second,
 	}
 	for _, opt := range opts {
 		opt(t)
