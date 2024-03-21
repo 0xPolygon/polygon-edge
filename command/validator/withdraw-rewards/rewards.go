@@ -84,8 +84,8 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	validatorAddr := validatorAccount.Ecdsa.Address()
 
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(params.jsonRPC),
-		txrelayer.WithReceiptsTimeout(time.Duration(params.txTimeout)),
-		txrelayer.WithReceiptsPollFreq(time.Duration(params.txPollFreq)))
+		txrelayer.WithReceiptsTimeout(params.txTimeout),
+		txrelayer.WithReceiptsPollFreq(params.txPollFreq))
 	if err != nil {
 		return err
 	}

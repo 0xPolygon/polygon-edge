@@ -2,7 +2,6 @@ package withdraw
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/0xPolygon/polygon-edge/command"
 	bridgeHelper "github.com/0xPolygon/polygon-edge/command/bridge/helper"
@@ -80,8 +79,8 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	}
 
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(params.jsonRPC),
-		txrelayer.WithReceiptsTimeout(time.Duration(params.txTimeout)),
-		txrelayer.WithReceiptsPollFreq(time.Duration(params.txPollFreq)))
+		txrelayer.WithReceiptsTimeout(params.txTimeout),
+		txrelayer.WithReceiptsPollFreq(params.txPollFreq))
 	if err != nil {
 		return err
 	}

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
-	"time"
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/bridge/common"
@@ -84,8 +83,8 @@ func run(cmd *cobra.Command, _ []string) {
 	}
 
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(wp.JSONRPCAddr),
-		txrelayer.WithReceiptsTimeout(time.Duration(wp.TxTimeout)),
-		txrelayer.WithReceiptsPollFreq(time.Duration(wp.TxPollFreq)))
+		txrelayer.WithReceiptsTimeout(wp.TxTimeout),
+		txrelayer.WithReceiptsPollFreq(wp.TxPollFreq))
 	if err != nil {
 		outputter.SetError(fmt.Errorf("could not create child chain tx relayer: %w", err))
 

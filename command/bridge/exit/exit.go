@@ -120,8 +120,8 @@ func run(cmd *cobra.Command, _ []string) {
 	}
 
 	rootTxRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(ep.rootJSONRPCAddr),
-		txrelayer.WithReceiptsTimeout(time.Duration(ep.txTimeout)),
-		txrelayer.WithReceiptsPollFreq(time.Duration(ep.txPollFreq)))
+		txrelayer.WithReceiptsTimeout(ep.txTimeout),
+		txrelayer.WithReceiptsPollFreq(ep.txPollFreq))
 	if err != nil {
 		outputter.SetError(fmt.Errorf("could not create root chain tx relayer: %w", err))
 

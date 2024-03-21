@@ -86,8 +86,8 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	defer outputter.WriteOutput()
 
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(params.jsonRPCAddress),
-		txrelayer.WithReceiptsTimeout(time.Duration(params.txTimeout)),
-		txrelayer.WithReceiptsPollFreq(time.Duration(params.txPollFreq)))
+		txrelayer.WithReceiptsTimeout(params.txTimeout),
+		txrelayer.WithReceiptsPollFreq(params.txPollFreq))
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to initialize tx relayer: %w", err))
 

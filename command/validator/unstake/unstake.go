@@ -87,8 +87,8 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	}
 
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(params.jsonRPC),
-		txrelayer.WithReceiptsPollFreq(time.Duration(params.txPollFreq)),
-		txrelayer.WithReceiptsPollFreq(time.Duration(params.txTimeout)))
+		txrelayer.WithReceiptsPollFreq(params.txPollFreq),
+		txrelayer.WithReceiptsPollFreq(params.txTimeout))
 	if err != nil {
 		return err
 	}

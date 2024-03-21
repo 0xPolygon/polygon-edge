@@ -445,8 +445,8 @@ func runCommand(cmd *cobra.Command, _ []string) {
 func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, chainID int64,
 	initialValidators []*validator.GenesisValidator, cmdCtx context.Context) (deploymentResultInfo, error) {
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(client), txrelayer.WithWriter(outputter),
-		txrelayer.WithReceiptsTimeout(time.Duration(params.txTimeout)),
-		txrelayer.WithReceiptsPollFreq(time.Duration(params.txPollFreq)))
+		txrelayer.WithReceiptsTimeout(params.txTimeout),
+		txrelayer.WithReceiptsPollFreq(params.txPollFreq))
 
 	if err != nil {
 		return deploymentResultInfo{RootchainCfg: nil, CommandResults: nil},
