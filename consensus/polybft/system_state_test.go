@@ -17,6 +17,7 @@ import (
 	"github.com/umbracle/ethgo/abi"
 	"github.com/umbracle/ethgo/contract"
 	"github.com/umbracle/ethgo/testutil"
+	"github.com/umbracle/ethgo/wallet"
 )
 
 func TestSystemState_GetNextCommittedIndex(t *testing.T) {
@@ -116,13 +117,14 @@ func TestSystemState_GetEpoch(t *testing.T) {
 func TestStateProvider_Txn_NotSupported(t *testing.T) {
 	t.Parallel()
 
-	transition := newTestTransition(t, nil)
-
 	provider := &stateProvider{
-		transition: transition,
+		transition: newTestTransition(t, nil),
 	}
 
-	_, err := provider.Txn(ethgo.ZeroAddress, createTestKey(t), []byte{0x1})
+	key, err := wallet.GenerateKey()
+	require.NoError(t, err)
+
+	_, err = provider.Txn(ethgo.ZeroAddress, key, []byte{0x1})
 	require.ErrorIs(t, err, errSendTxnUnsupported)
 }
 

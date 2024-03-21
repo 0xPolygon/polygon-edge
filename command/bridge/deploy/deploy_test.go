@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/jsonrpc"
 	"github.com/umbracle/ethgo/testutil"
 
@@ -32,7 +33,7 @@ func TestDeployContracts_NoPanics(t *testing.T) {
 	testKey, err := helper.DecodePrivateKey("")
 	require.NoError(t, err)
 
-	receipt, err := server.Fund(testKey.Address())
+	receipt, err := server.Fund(ethgo.Address(testKey.Address()))
 	require.NoError(t, err)
 	require.Equal(t, uint64(types.ReceiptSuccess), receipt.Status)
 

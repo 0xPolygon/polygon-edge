@@ -10,6 +10,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/contracts"
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -58,7 +59,7 @@ var _ CheckpointManager = (*checkpointManager)(nil)
 // checkpointManager encapsulates logic for checkpoint data submission
 type checkpointManager struct {
 	// key is the identity of the node submitting a checkpoint
-	key ethgo.Key
+	key crypto.Key
 	// blockchain is abstraction for blockchain
 	blockchain blockchainBackend
 	// consensusBackend is abstraction for polybft consensus specific functions
@@ -76,7 +77,7 @@ type checkpointManager struct {
 }
 
 // newCheckpointManager creates a new instance of checkpointManager
-func newCheckpointManager(key ethgo.Key,
+func newCheckpointManager(key crypto.Key,
 	checkpointManagerSC types.Address, txRelayer txrelayer.TxRelayer,
 	blockchain blockchainBackend, backend polybftBackend, logger hclog.Logger,
 	state *State) *checkpointManager {
@@ -98,7 +99,7 @@ func getCurrentCheckpointBlock(relayer txrelayer.TxRelayer, checkpointManagerAdd
 		return 0, fmt.Errorf("failed to encode currentCheckpointBlockNumber function parameters: %w", err)
 	}
 
-	currentCheckpointBlockRaw, err := relayer.Call(ethgo.ZeroAddress, ethgo.Address(checkpointManagerAddr),
+	currentCheckpointBlockRaw, err := relayer.Call(types.ZeroAddress, checkpointManagerAddr,
 		checkpointBlockNumInput)
 	if err != nil {
 		return 0, fmt.Errorf("failed to invoke currentCheckpointBlockNumber function on the rootchain: %w", err)
@@ -198,8 +199,6 @@ func (c *checkpointManager) submitCheckpoint(latestHeader *types.Header, isEndOf
 func (c *checkpointManager) encodeAndSendCheckpoint(header *types.Header, extra *Extra, isEndOfEpoch bool) error {
 	c.logger.Debug("send checkpoint txn...", "block number", header.Number)
 
-	checkpointManager := ethgo.Address(c.checkpointManagerAddr)
-
 	nextEpochValidators := validator.AccountSet{}
 
 	if isEndOfEpoch {
@@ -216,11 +215,10 @@ func (c *checkpointManager) encodeAndSendCheckpoint(header *types.Header, extra 
 		return fmt.Errorf("failed to encode checkpoint data to ABI for block %d: %w", header.Number, err)
 	}
 
-	txn := &ethgo.Transaction{
-		To:    &checkpointManager,
-		Input: input,
-		Type:  ethgo.TransactionDynamicFee,
-	}
+	txn := types.NewTx(types.NewDynamicFeeTx(
+		types.WithTo(&c.checkpointManagerAddr),
+		types.WithInput(input),
+	))
 
 	receipt, err := c.rootChainRelayer.SendTransaction(txn, c.key)
 	if err != nil {
@@ -331,9 +329,7 @@ func (c *checkpointManager) GenerateExitProof(exitID uint64) (types.Proof, error
 		return types.Proof{}, fmt.Errorf("failed to encode get checkpoint block input: %w", err)
 	}
 
-	getCheckpointBlockResp, err := c.rootChainRelayer.Call(
-		ethgo.ZeroAddress,
-		ethgo.Address(c.checkpointManagerAddr),
+	getCheckpointBlockResp, err := c.rootChainRelayer.Call(types.ZeroAddress, c.checkpointManagerAddr,
 		input)
 	if err != nil {
 		return types.Proof{}, fmt.Errorf("failed to retrieve checkpoint block for exit ID %d: %w", exitID, err)

@@ -11,7 +11,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/wallet"
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/bridge/common"
@@ -20,6 +19,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
 	helperCommon "github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/state/runtime/addresslist"
@@ -53,7 +53,7 @@ func TestE2E_Bridge_RootchainTokensTransfers(t *testing.T) {
 	receiverKeys := make([]string, transfersCount)
 
 	for i := 0; i < transfersCount; i++ {
-		key, err := wallet.GenerateKey()
+		key, err := crypto.GenerateECDSAKey()
 		require.NoError(t, err)
 
 		rawKey, err := key.MarshallPrivateKey()
@@ -100,12 +100,12 @@ func TestE2E_Bridge_RootchainTokensTransfers(t *testing.T) {
 	deployerKey, err := bridgeHelper.DecodePrivateKey("")
 	require.NoError(t, err)
 
-	receipt, err := rootchainTxRelayer.SendTransaction(
-		&ethgo.Transaction{
-			To:    nil,
-			Input: contractsapi.RootERC20.Bytecode,
-		},
-		deployerKey)
+	deployTx := types.NewTx(types.NewLegacyTx(
+		types.WithTo(nil),
+		types.WithInput(contractsapi.RootERC20.Bytecode),
+	))
+
+	receipt, err := rootchainTxRelayer.SendTransaction(deployTx, deployerKey)
 	require.NoError(t, err)
 	require.NotNil(t, receipt)
 	require.Equal(t, uint64(types.ReceiptSuccess), receipt.Status)
@@ -206,7 +206,7 @@ func TestE2E_Bridge_RootchainTokensTransfers(t *testing.T) {
 		require.NoError(t, err)
 
 		// check that we submitted the minimal commitment to smart contract
-		commitmentIDRaw, err := txRelayer.Call(ethgo.ZeroAddress, ethgo.Address(contracts.StateReceiverContract), lastCommittedIDInput)
+		commitmentIDRaw, err := txRelayer.Call(types.ZeroAddress, contracts.StateReceiverContract, lastCommittedIDInput)
 		require.NoError(t, err)
 
 		initialCommittedID, err := helperCommon.ParseUint64orHex(&commitmentIDRaw)
@@ -239,8 +239,8 @@ func TestE2E_Bridge_RootchainTokensTransfers(t *testing.T) {
 		require.NoError(t, cluster.WaitForBlock(midBlockNumber, 2*time.Minute))
 
 		// check that we submitted the minimal commitment to smart contract
-		commitmentIDRaw, err = txRelayer.Call(ethgo.ZeroAddress,
-			ethgo.Address(contracts.StateReceiverContract), lastCommittedIDInput)
+		commitmentIDRaw, err = txRelayer.Call(types.ZeroAddress,
+			contracts.StateReceiverContract, lastCommittedIDInput)
 		require.NoError(t, err)
 
 		lastCommittedID, err := helperCommon.ParseUint64orHex(&commitmentIDRaw)
@@ -266,7 +266,7 @@ func TestE2E_Bridge_RootchainTokensTransfers(t *testing.T) {
 		require.NoError(t, cluster.WaitForBlock(midBlockNumber+5*sprintSize, 3*time.Minute))
 
 		// check that we submitted the minimal commitment to smart contract
-		commitmentIDRaw, err = txRelayer.Call(ethgo.ZeroAddress, ethgo.Address(contracts.StateReceiverContract), lastCommittedIDInput)
+		commitmentIDRaw, err = txRelayer.Call(types.ZeroAddress, contracts.StateReceiverContract, lastCommittedIDInput)
 		require.NoError(t, err)
 
 		// check that the second (larger commitment) was also submitted in epoch
@@ -298,7 +298,7 @@ func TestE2E_Bridge_ERC721Transfer(t *testing.T) {
 	tokenIDs := make([]string, transfersCount)
 
 	for i := 0; i < transfersCount; i++ {
-		key, err := wallet.GenerateKey()
+		key, err := crypto.GenerateECDSAKey()
 		require.NoError(t, err)
 
 		rawKey, err := key.MarshallPrivateKey()
@@ -335,12 +335,15 @@ func TestE2E_Bridge_ERC721Transfer(t *testing.T) {
 	rootchainDeployer, err := bridgeHelper.DecodePrivateKey("")
 	require.NoError(t, err)
 
-	// deploy root ERC 721 token
-	receipt, err := rootchainTxRelayer.SendTransaction(
-		&ethgo.Transaction{
+	deployTx := types.NewTx(&types.LegacyTx{
+		BaseTx: &types.BaseTx{
 			To:    nil,
 			Input: contractsapi.RootERC721.Bytecode,
-		}, rootchainDeployer)
+		},
+	})
+
+	// deploy root ERC 721 token
+	receipt, err := rootchainTxRelayer.SendTransaction(deployTx, rootchainDeployer)
 	require.NoError(t, err)
 
 	rootERC721Addr := receipt.ContractAddress
@@ -467,7 +470,7 @@ func TestE2E_Bridge_ERC1155Transfer(t *testing.T) {
 	tokenIDs := make([]string, transfersCount)
 
 	for i := 0; i < transfersCount; i++ {
-		key, err := wallet.GenerateKey()
+		key, err := crypto.GenerateECDSAKey()
 		require.NoError(t, err)
 
 		rawKey, err := key.MarshallPrivateKey()
@@ -506,15 +509,18 @@ func TestE2E_Bridge_ERC1155Transfer(t *testing.T) {
 	rootchainDeployer, err := bridgeHelper.DecodePrivateKey("")
 	require.NoError(t, err)
 
-	// deploy root ERC 1155 token
-	receipt, err := rootchainTxRelayer.SendTransaction(
-		&ethgo.Transaction{
+	deployTx := types.NewTx(&types.LegacyTx{
+		BaseTx: &types.BaseTx{
 			To:    nil,
 			Input: contractsapi.RootERC1155.Bytecode,
-		}, rootchainDeployer)
+		},
+	})
+
+	// deploy root ERC 1155 token
+	receipt, err := rootchainTxRelayer.SendTransaction(deployTx, rootchainDeployer)
 	require.NoError(t, err)
 
-	rootERC1155Addr := receipt.ContractAddress
+	rootERC1155Addr := types.Address(receipt.ContractAddress)
 
 	// DEPOSIT ERC1155 TOKENS
 	// send a few transactions to the bridge
@@ -581,7 +587,7 @@ func TestE2E_Bridge_ERC1155Transfer(t *testing.T) {
 		balanceInput, err := balanceOfFn.EncodeAbi()
 		require.NoError(t, err)
 
-		balanceRaw, err := txRelayer.Call(ethgo.ZeroAddress, ethgo.Address(l2ChildTokenAddr), balanceInput)
+		balanceRaw, err := txRelayer.Call(types.ZeroAddress, l2ChildTokenAddr, balanceInput)
 		require.NoError(t, err)
 
 		balance, err := helperCommon.ParseUint256orHex(&balanceRaw)
@@ -644,7 +650,7 @@ func TestE2E_Bridge_ERC1155Transfer(t *testing.T) {
 		balanceInput, err := balanceOfFn.EncodeAbi()
 		require.NoError(t, err)
 
-		balanceRaw, err := rootchainTxRelayer.Call(ethgo.ZeroAddress, rootERC1155Addr, balanceInput)
+		balanceRaw, err := rootchainTxRelayer.Call(types.ZeroAddress, rootERC1155Addr, balanceInput)
 		require.NoError(t, err)
 
 		balance, err := helperCommon.ParseUint256orHex(&balanceRaw)
@@ -670,13 +676,13 @@ func TestE2E_Bridge_ChildchainTokensTransfer(t *testing.T) {
 	funds := make([]*big.Int, transfersCount)
 	singleToken := ethgo.Ether(1)
 
-	admin, err := wallet.GenerateKey()
+	admin, err := crypto.GenerateECDSAKey()
 	require.NoError(t, err)
 
 	adminAddr := types.Address(admin.Address())
 
 	for i := uint64(0); i < transfersCount; i++ {
-		key, err := wallet.GenerateKey()
+		key, err := crypto.GenerateECDSAKey()
 		require.NoError(t, err)
 
 		rawKey, err := key.MarshallPrivateKey()
@@ -997,7 +1003,7 @@ func TestE2E_CheckpointSubmission(t *testing.T) {
 	polybftCfg, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
 	require.NoError(t, err)
 
-	checkpointManagerAddr := ethgo.Address(polybftCfg.Bridge.CheckpointManagerAddr)
+	checkpointManagerAddr := polybftCfg.Bridge.CheckpointManagerAddr
 
 	testCheckpointBlockNumber := func(expectedCheckpointBlock uint64) (bool, error) {
 		actualCheckpointBlock, err := getCheckpointBlockNumber(rootChainRelayer, checkpointManagerAddr)
@@ -1049,7 +1055,7 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 	depositAmounts := make([]string, transfersCount)
 	withdrawAmounts := make([]string, transfersCount)
 
-	admin, _ := wallet.GenerateKey()
+	admin, _ := crypto.GenerateECDSAKey()
 	adminAddr := types.Address(admin.Address())
 
 	cluster := framework.NewTestCluster(t, 5,
@@ -1098,11 +1104,13 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 	deployerKey, err := bridgeHelper.DecodePrivateKey("")
 	require.NoError(t, err)
 
+	deployTx := types.NewTx(types.NewLegacyTx(
+		types.WithTo(nil),
+		types.WithInput(contractsapi.RootERC20.Bytecode),
+	))
+
 	// deploy root erc20 token
-	receipt, err := rootchainTxRelayer.SendTransaction(
-		&ethgo.Transaction{
-			To: nil, Input: contractsapi.RootERC20.Bytecode,
-		}, deployerKey)
+	receipt, err := rootchainTxRelayer.SendTransaction(deployTx, deployerKey)
 	require.NoError(t, err)
 	require.NotNil(t, receipt)
 	require.Equal(t, uint64(types.ReceiptSuccess), receipt.Status)
@@ -1252,13 +1260,13 @@ func TestE2E_Bridge_NonMintableERC20Token_WithPremine(t *testing.T) {
 		bigZero               = big.NewInt(0)
 	)
 
-	nonValidatorKey, err := wallet.GenerateKey()
+	nonValidatorKey, err := crypto.GenerateECDSAKey()
 	require.NoError(t, err)
 
 	nonValidatorKeyRaw, err := nonValidatorKey.MarshallPrivateKey()
 	require.NoError(t, err)
 
-	rewardWalletKey, err := wallet.GenerateKey()
+	rewardWalletKey, err := crypto.GenerateECDSAKey()
 	require.NoError(t, err)
 
 	rewardWalletKeyRaw, err := rewardWalletKey.MarshallPrivateKey()
@@ -1383,7 +1391,7 @@ func TestE2E_Bridge_NonMintableERC20Token_WithPremine(t *testing.T) {
 		require.NoError(t, err)
 
 		nonValidatorBalanceAfterWithdraw, err := childEthEndpoint.GetBalance(
-			nonValidatorKey.Address(), ethgo.Latest)
+			ethgo.Address(nonValidatorKey.Address()), ethgo.Latest)
 		require.NoError(t, err)
 
 		currentBlock, err := childEthEndpoint.GetBlockByNumber(ethgo.Latest, false)
@@ -1469,7 +1477,7 @@ func TestE2E_Bridge_L1OriginatedNativeToken_ERC20StakingToken(t *testing.T) {
 		stakeTokenAddr = types.StringToAddress("0x2040")
 	)
 
-	minter, err := wallet.GenerateKey()
+	minter, err := crypto.GenerateECDSAKey()
 	require.NoError(t, err)
 
 	cluster := framework.NewTestCluster(t, 5,
@@ -1512,14 +1520,14 @@ func TestE2E_Bridge_L1OriginatedNativeToken_ERC20StakingToken(t *testing.T) {
 	mintInput, err := mintFn.EncodeAbi()
 	require.NoError(t, err)
 
-	nonNativeErc20 := ethgo.Address(polybftCfg.StakeTokenAddr)
+	nonNativeErc20 := polybftCfg.StakeTokenAddr
 
-	receipt, err := relayer.SendTransaction(
-		&ethgo.Transaction{
-			To:    &nonNativeErc20,
-			Input: mintInput,
-			Type:  ethgo.TransactionDynamicFee,
-		}, minter)
+	mintTx := types.NewTx(types.NewDynamicFeeTx(
+		types.WithTo(&nonNativeErc20),
+		types.WithInput(mintInput),
+	))
+
+	receipt, err := relayer.SendTransaction(mintTx, minter)
 	require.NoError(t, err)
 	require.Equal(t, uint64(types.ReceiptSuccess), receipt.Status)
 

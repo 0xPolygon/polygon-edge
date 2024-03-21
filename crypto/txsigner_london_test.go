@@ -67,7 +67,7 @@ func TestLondonSignerSender(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			key, err := GenerateECDSAKey()
+			key, err := GenerateECDSAPrivateKey()
 			require.NoError(t, err, "unable to generate private key")
 
 			var txn *types.Transaction

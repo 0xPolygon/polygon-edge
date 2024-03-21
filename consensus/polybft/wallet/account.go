@@ -5,22 +5,21 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/umbracle/ethgo/wallet"
-
 	"github.com/0xPolygon/polygon-edge/bls"
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
 // Account is an account for key signatures
 type Account struct {
-	Ecdsa *wallet.Key
+	Ecdsa *crypto.ECDSAKey
 	Bls   *bls.PrivateKey
 }
 
 // GenerateAccount generates a new random account
 func GenerateAccount() (*Account, error) {
-	key, err := wallet.GenerateKey()
+	key, err := crypto.GenerateECDSAKey()
 	if err != nil {
 		return nil, fmt.Errorf("cannot generate key. error: %w", err)
 	}
@@ -52,7 +51,7 @@ func NewAccountFromSecret(secretsManager secrets.SecretsManager) (*Account, erro
 }
 
 // GetEcdsaFromSecret retrieves validator(ECDSA) key by using provided secretsManager
-func GetEcdsaFromSecret(secretsManager secrets.SecretsManager) (*wallet.Key, error) {
+func GetEcdsaFromSecret(secretsManager secrets.SecretsManager) (*crypto.ECDSAKey, error) {
 	encodedKey, err := secretsManager.GetSecret(secrets.ValidatorKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve ecdsa key: %w", err)
@@ -63,7 +62,7 @@ func GetEcdsaFromSecret(secretsManager secrets.SecretsManager) (*wallet.Key, err
 		return nil, fmt.Errorf("failed to retrieve ecdsa key: %w", err)
 	}
 
-	key, err := wallet.NewWalletFromPrivKey(ecdsaRaw)
+	key, err := crypto.NewECDSAKeyFromRawPrivECDSA(ecdsaRaw)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve ecdsa key: %w", err)
 	}
@@ -116,7 +115,7 @@ func (a *Account) GetEcdsaPrivateKey() (*ecdsa.PrivateKey, error) {
 		return nil, err
 	}
 
-	return wallet.ParsePrivateKey(ecdsaRaw)
+	return crypto.ParseECDSAPrivateKey(ecdsaRaw)
 }
 
 func (a Account) Address() types.Address {

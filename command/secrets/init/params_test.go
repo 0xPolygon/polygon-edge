@@ -8,9 +8,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/umbracle/ethgo/wallet"
 
 	"github.com/0xPolygon/polygon-edge/bls"
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/secrets/helper"
 )
 
@@ -94,7 +94,8 @@ func Test_getResult(t *testing.T) {
 	// Test public key serialization
 	privKey, err := hex.DecodeString(sir.PrivateKey)
 	require.NoError(t, err)
-	k, err := wallet.NewWalletFromPrivKey(privKey)
+
+	k, err := crypto.NewECDSAKeyFromRawPrivECDSA(privKey)
 	require.NoError(t, err)
 
 	pubKey := k.Address().String()

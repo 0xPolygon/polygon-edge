@@ -183,6 +183,15 @@ func (t *Transaction) SetSignatureValues(v, r, s *big.Int) {
 	t.Inner.setSignatureValues(v, r, s)
 }
 
+// SplitToRawSignatureValues splits signature to v, r and s components and sets it to the transaction
+func (t *Transaction) SplitToRawSignatureValues(signature, vRaw []byte) {
+	r := new(big.Int).SetBytes(signature[:HashLength])
+	s := new(big.Int).SetBytes(signature[HashLength : 2*HashLength])
+	v := new(big.Int).SetBytes(vRaw)
+
+	t.SetSignatureValues(v, r, s)
+}
+
 func (t *Transaction) SetFrom(addr Address) {
 	t.Inner.setFrom(addr)
 }

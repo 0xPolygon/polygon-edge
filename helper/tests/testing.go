@@ -31,7 +31,7 @@ var (
 func GenerateKeyAndAddr(t *testing.T) (*ecdsa.PrivateKey, types.Address) {
 	t.Helper()
 
-	key, err := crypto.GenerateECDSAKey()
+	key, err := crypto.GenerateECDSAPrivateKey()
 
 	assert.NoError(t, err)
 

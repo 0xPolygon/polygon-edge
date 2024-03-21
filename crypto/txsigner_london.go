@@ -115,14 +115,13 @@ func (signer *LondonSigner) Sender(tx *types.Transaction) (types.Address, error)
 	return recoverAddress(signer.Hash(tx), r, s, v, true)
 }
 
-// SingTx takes the original transaction as input and returns its signed version
+// SignTx takes the original transaction as input and returns its signed version
 func (signer *LondonSigner) SignTx(tx *types.Transaction, privateKey *ecdsa.PrivateKey) (*types.Transaction, error) {
 	if tx.Type() != types.DynamicFeeTxType {
 		return signer.BerlinSigner.SignTx(tx, privateKey)
 	}
 
 	tx = tx.Copy()
-
 	h := signer.Hash(tx)
 
 	sig, err := Sign(privateKey, h[:])
@@ -140,6 +139,25 @@ func (signer *LondonSigner) SignTx(tx *types.Transaction, privateKey *ecdsa.Priv
 	v := new(big.Int).SetBytes(signer.calculateV(sig[64]))
 
 	tx.SetSignatureValues(v, r, s)
+
+	return tx, nil
+}
+
+func (signer *LondonSigner) SignTxWithCallback(tx *types.Transaction,
+	signFn func(hash types.Hash) (sig []byte, err error)) (*types.Transaction, error) {
+	if tx.Type() != types.DynamicFeeTxType {
+		return signer.BerlinSigner.SignTxWithCallback(tx, signFn)
+	}
+
+	tx = tx.Copy()
+	h := signer.Hash(tx)
+
+	signature, err := signFn(h)
+	if err != nil {
+		return nil, err
+	}
+
+	tx.SplitToRawSignatureValues(signature, signer.calculateV(signature[64]))
 
 	return tx, nil
 }

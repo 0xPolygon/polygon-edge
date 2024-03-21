@@ -3537,7 +3537,7 @@ func TestAddTxsInOrder(t *testing.T) {
 	addrsTxs := [accountCount]container{}
 
 	for i := 0; i < accountCount; i++ {
-		key, err := crypto.GenerateECDSAKey()
+		key, err := crypto.GenerateECDSAPrivateKey()
 		require.NoError(t, err)
 
 		addrsTxs[i] = container{
@@ -3774,7 +3774,7 @@ func BenchmarkAddTxTime(b *testing.B) {
 	b.Run("benchmark add one tx", func(b *testing.B) {
 		signer := crypto.NewEIP155Signer(100)
 
-		key, err := crypto.GenerateECDSAKey()
+		key, err := crypto.GenerateECDSAPrivateKey()
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -3802,7 +3802,7 @@ func BenchmarkAddTxTime(b *testing.B) {
 	b.Run("benchmark fill account", func(b *testing.B) {
 		signer := crypto.NewEIP155Signer(100)
 
-		key, err := crypto.GenerateECDSAKey()
+		key, err := crypto.GenerateECDSAPrivateKey()
 		if err != nil {
 			b.Fatal(err)
 		}

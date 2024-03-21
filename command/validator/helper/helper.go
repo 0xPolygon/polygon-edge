@@ -14,7 +14,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/umbracle/ethgo"
 )
 
 const (
@@ -59,7 +58,7 @@ func GetAccountFromDir(accountDir string) (*wallet.Account, error) {
 
 // GetValidatorInfo queries CustomSupernetManager, StakeManager and RewardPool smart contracts
 // to retrieve validator info for given address
-func GetValidatorInfo(validatorAddr ethgo.Address, childRelayer txrelayer.TxRelayer) (*polybft.ValidatorInfo, error) {
+func GetValidatorInfo(validatorAddr types.Address, childRelayer txrelayer.TxRelayer) (*polybft.ValidatorInfo, error) {
 	getValidatorMethod := contractsapi.StakeManager.Abi.GetMethod("getValidator")
 
 	encode, err := getValidatorMethod.Encode([]interface{}{validatorAddr})
@@ -67,8 +66,7 @@ func GetValidatorInfo(validatorAddr ethgo.Address, childRelayer txrelayer.TxRela
 		return nil, err
 	}
 
-	response, err := childRelayer.Call(ethgo.Address(contracts.SystemCaller),
-		ethgo.Address(contracts.StakeManagerContract), encode)
+	response, err := childRelayer.Call(contracts.SystemCaller, contracts.StakeManagerContract, encode)
 	if err != nil {
 		return nil, err
 	}
@@ -109,8 +107,7 @@ func GetValidatorInfo(validatorAddr ethgo.Address, childRelayer txrelayer.TxRela
 		return nil, err
 	}
 
-	response, err = childRelayer.Call(ethgo.Address(contracts.SystemCaller),
-		ethgo.Address(contracts.StakeManagerContract), encode)
+	response, err = childRelayer.Call(contracts.SystemCaller, contracts.StakeManagerContract, encode)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +126,7 @@ func GetValidatorInfo(validatorAddr ethgo.Address, childRelayer txrelayer.TxRela
 		return nil, err
 	}
 
-	response, err = childRelayer.Call(ethgo.ZeroAddress, ethgo.Address(contracts.EpochManagerContract), encode)
+	response, err = childRelayer.Call(types.ZeroAddress, contracts.EpochManagerContract, encode)
 	if err != nil {
 		return nil, err
 	}

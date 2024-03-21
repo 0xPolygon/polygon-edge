@@ -3,7 +3,6 @@ package crypto
 import (
 	"crypto/ecdsa"
 	"errors"
-	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -40,16 +39,20 @@ func (signer *HomesteadSigner) Sender(tx *types.Transaction) (types.Address, err
 	return signer.sender(tx, true)
 }
 
-// SingTx takes the original transaction as input and returns its signed version
+// SignTx takes the original transaction as input and returns its signed version
 func (signer *HomesteadSigner) SignTx(tx *types.Transaction, privateKey *ecdsa.PrivateKey) (*types.Transaction, error) {
-	return signer.signTx(tx, privateKey, func(v, r, s *big.Int) error {
-		// Homestead hard-fork introduced the rule that the S value
-		// must be inclusively lower than the half of the secp256k1 curve order
-		// Specification: https://eips.ethereum.org/EIPS/eip-2#specification (2)
-		if s.Cmp(secp256k1NHalf) > 0 {
-			return errors.New("SignTx method: S must be inclusively lower than secp256k1n/2")
-		}
+	tx, err := signer.signTxInternal(tx, privateKey)
+	if err != nil {
+		return nil, err
+	}
 
-		return nil
-	})
+	_, _, s := tx.RawSignatureValues()
+	// Homestead hard-fork introduced the rule that the S value
+	// must be inclusively lower than the half of the secp256k1 curve order
+	// Specification: https://eips.ethereum.org/EIPS/eip-2#specification (2)
+	if s.Cmp(secp256k1NHalf) > 0 {
+		return nil, errors.New("SignTx method: S must be inclusively lower than secp256k1n/2")
+	}
+
+	return tx, nil
 }

@@ -183,8 +183,7 @@ func registerValidator(sender txrelayer.TxRelayer, account *wallet.Account,
 		return nil, fmt.Errorf("register validator failed: %w", err)
 	}
 
-	stakeManagerAddr := ethgo.Address(contracts.StakeManagerContract)
-	txn := bridgeHelper.CreateTransaction(ethgo.ZeroAddress, &stakeManagerAddr, input, nil, true)
+	txn := bridgeHelper.CreateTransaction(types.ZeroAddress, &contracts.StakeManagerContract, input, nil, true)
 
 	return sender.SendTransaction(txn, account.Ecdsa)
 }

@@ -6,6 +6,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -500,7 +501,7 @@ func newDummyStakeTxRelayer(t *testing.T, callback func() *validator.ValidatorMe
 	}
 }
 
-func (d *dummyStakeTxRelayer) Call(from ethgo.Address, to ethgo.Address, input []byte) (string, error) {
+func (d *dummyStakeTxRelayer) Call(from types.Address, to types.Address, input []byte) (string, error) {
 	args := d.Called(from, to, input)
 
 	if d.callback != nil {
@@ -520,14 +521,14 @@ func (d *dummyStakeTxRelayer) Call(from ethgo.Address, to ethgo.Address, input [
 	return args.String(0), args.Error(1)
 }
 
-func (d *dummyStakeTxRelayer) SendTransaction(transaction *ethgo.Transaction, key ethgo.Key) (*ethgo.Receipt, error) {
+func (d *dummyStakeTxRelayer) SendTransaction(transaction *types.Transaction, key crypto.Key) (*ethgo.Receipt, error) {
 	args := d.Called(transaction, key)
 
 	return args.Get(0).(*ethgo.Receipt), args.Error(1)
 }
 
 // SendTransactionLocal sends non-signed transaction (this is only for testing purposes)
-func (d *dummyStakeTxRelayer) SendTransactionLocal(txn *ethgo.Transaction) (*ethgo.Receipt, error) {
+func (d *dummyStakeTxRelayer) SendTransactionLocal(txn *types.Transaction) (*ethgo.Receipt, error) {
 	args := d.Called(txn)
 
 	return args.Get(0).(*ethgo.Receipt), args.Error(1)

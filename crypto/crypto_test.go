@@ -17,7 +17,7 @@ import (
 
 func TestKeyEncoding(t *testing.T) {
 	for i := 0; i < 10; i++ {
-		priv, _ := GenerateECDSAKey()
+		priv, _ := GenerateECDSAPrivateKey()
 
 		// marshall private key
 		buf, err := MarshalECDSAPrivateKey(priv)
@@ -461,7 +461,7 @@ func TestRecoverPublicKey(t *testing.T) {
 
 		hash := types.BytesToHash([]byte{0, 1, 2})
 
-		privateKey, err := GenerateECDSAKey()
+		privateKey, err := GenerateECDSAPrivateKey()
 		require.NoError(t, err)
 
 		signature, err := Sign(privateKey, hash.Bytes())

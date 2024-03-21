@@ -571,7 +571,6 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 	}
 
 	// Check if the transaction is signed properly
-
 	// Extract the sender
 	from, signerErr := p.signer.Sender(tx)
 	if signerErr != nil {

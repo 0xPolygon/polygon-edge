@@ -15,6 +15,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -105,7 +106,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("enlist validator failed: %w", err)
 	}
 
-	bladeManagerAddr := ethgo.Address(params.bladeManagerAddr)
+	bladeManagerAddr := params.bladeManagerAddr
 
 	// finalize genesis accounts on BladeManager so that no one can stake and premine no more
 	encoded, err := finalizeGenesisABIFn.Encode([]interface{}{})
@@ -145,7 +146,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("failed to encode genesis set input: %w", err)
 	}
 
-	genesisSetHexOut, err := txRelayer.Call(ethgo.ZeroAddress, bladeManagerAddr, genesisSetInput)
+	genesisSetHexOut, err := txRelayer.Call(types.ZeroAddress, bladeManagerAddr, genesisSetInput)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve genesis set: %w", err)
 	}
@@ -315,7 +316,7 @@ func validatorSetToABISlice(o command.OutputFormatter,
 func initializeCheckpointManager(outputter command.OutputFormatter,
 	txRelayer txrelayer.TxRelayer,
 	consensusConfig polybft.PolyBFTConfig, chainID int64,
-	deployerKey ethgo.Key) error {
+	deployerKey crypto.Key) error {
 	validatorSet, err := validatorSetToABISlice(outputter, consensusConfig.InitialValidatorSet)
 	if err != nil {
 		return fmt.Errorf("failed to convert validators to map: %w", err)
@@ -333,7 +334,7 @@ func initializeCheckpointManager(outputter command.OutputFormatter,
 		return fmt.Errorf("failed to encode initialization params for CheckpointManager.initialize. error: %w", err)
 	}
 
-	if _, err := bridgeHelper.SendTransaction(txRelayer, ethgo.Address(consensusConfig.Bridge.CheckpointManagerAddr),
+	if _, err := bridgeHelper.SendTransaction(txRelayer, consensusConfig.Bridge.CheckpointManagerAddr,
 		input, "CheckpointManager", deployerKey); err != nil {
 		return err
 	}

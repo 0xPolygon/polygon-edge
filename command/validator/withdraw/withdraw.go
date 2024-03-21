@@ -14,7 +14,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/spf13/cobra"
-	"github.com/umbracle/ethgo"
 )
 
 var params withdrawParams
@@ -77,8 +76,8 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	receiver := (*ethgo.Address)(&contracts.StakeManagerContract)
-	txn := bridgeHelper.CreateTransaction(validatorAccount.Ecdsa.Address(), receiver, encoded, nil, false)
+	txn := bridgeHelper.CreateTransaction(validatorAccount.Ecdsa.Address(),
+		&contracts.StakeManagerContract, encoded, nil, false)
 
 	receipt, err := txRelayer.SendTransaction(txn, validatorAccount.Ecdsa)
 	if err != nil {

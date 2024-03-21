@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/go-ibft/messages/proto"
-	"github.com/umbracle/ethgo"
 	protobuf "google.golang.org/protobuf/proto"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
@@ -28,7 +27,7 @@ func (k *Key) String() string {
 }
 
 // Address returns ECDSA address
-func (k *Key) Address() ethgo.Address {
+func (k *Key) Address() types.Address {
 	return k.raw.Ecdsa.Address()
 }
 
@@ -73,13 +72,13 @@ func RecoverAddressFromSignature(sig, rawContent []byte) (types.Address, error) 
 	return crypto.PubKeyToAddress(pub), nil
 }
 
-// ECDSASigner implements ethgo.Key interface and it is used for signing using provided ECDSA key
+// ECDSASigner implements crypto.Key interface and it is used for signing using provided ECDSA key
 type ECDSASigner struct {
 	*Key
 }
 
-func NewEcdsaSigner(ecdsaKey *Key) *ECDSASigner {
-	return &ECDSASigner{Key: ecdsaKey}
+func NewEcdsaSigner(key *Key) *ECDSASigner {
+	return &ECDSASigner{Key: key}
 }
 
 func (k *ECDSASigner) Sign(b []byte) ([]byte, error) {

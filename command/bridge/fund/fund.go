@@ -96,8 +96,8 @@ func runCommand(cmd *cobra.Command, _ []string) {
 				return ctx.Err()
 
 			default:
-				fundAddr := ethgo.Address(params.addresses[i])
-				txn := helper.CreateTransaction(ethgo.ZeroAddress, &fundAddr, nil, params.amountValues[i], true)
+				fundAddr := params.addresses[i]
+				txn := helper.CreateTransaction(types.ZeroAddress, &fundAddr, nil, params.amountValues[i], true)
 
 				var (
 					receipt *ethgo.Receipt

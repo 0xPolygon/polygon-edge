@@ -118,14 +118,13 @@ func (signer *EIP155Signer) Sender(tx *types.Transaction) (types.Address, error)
 	return recoverAddress(signer.Hash(tx), r, s, bigV, true)
 }
 
-// SingTx takes the original transaction as input and returns its signed version
+// SignTx takes the original transaction as input and returns its signed version
 func (signer *EIP155Signer) SignTx(tx *types.Transaction, privateKey *ecdsa.PrivateKey) (*types.Transaction, error) {
 	if tx.Type() != types.LegacyTxType && tx.Type() != types.StateTxType {
 		return nil, types.ErrTxTypeNotSupported
 	}
 
 	tx = tx.Copy()
-
 	hash := signer.Hash(tx)
 
 	signature, err := Sign(privateKey, hash[:])
@@ -133,16 +132,31 @@ func (signer *EIP155Signer) SignTx(tx *types.Transaction, privateKey *ecdsa.Priv
 		return nil, err
 	}
 
-	r := new(big.Int).SetBytes(signature[:32])
-	s := new(big.Int).SetBytes(signature[32:64])
+	tx.SplitToRawSignatureValues(signature, signer.calculateV(signature[64]))
 
+	_, _, s := tx.RawSignatureValues()
 	if s.Cmp(secp256k1NHalf) > 0 {
 		return nil, errors.New("SignTx method: S must be inclusively lower than secp256k1n/2")
 	}
 
-	v := new(big.Int).SetBytes(signer.calculateV(signature[64]))
+	return tx, nil
+}
 
-	tx.SetSignatureValues(v, r, s)
+func (e *EIP155Signer) SignTxWithCallback(tx *types.Transaction,
+	signFn func(hash types.Hash) (sig []byte, err error)) (*types.Transaction, error) {
+	if tx.Type() != types.LegacyTxType && tx.Type() != types.StateTxType {
+		return nil, types.ErrTxTypeNotSupported
+	}
+
+	tx = tx.Copy()
+	h := e.Hash(tx)
+
+	signature, err := signFn(h)
+	if err != nil {
+		return nil, err
+	}
+
+	tx.SplitToRawSignatureValues(signature, e.calculateV(signature[64]))
 
 	return tx, nil
 }

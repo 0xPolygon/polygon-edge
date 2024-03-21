@@ -12,7 +12,7 @@ func TestFrontierSigner(t *testing.T) {
 	signer := &FrontierSigner{}
 
 	toAddress := types.StringToAddress("1")
-	key, err := GenerateECDSAKey()
+	key, err := GenerateECDSAPrivateKey()
 	assert.NoError(t, err)
 
 	txn := types.NewTx(types.NewLegacyTx(
