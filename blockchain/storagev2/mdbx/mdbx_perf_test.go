@@ -51,7 +51,7 @@ func TestWriteBlockPerf(t *testing.T) {
 		require.NoError(t, batchWriter.WriteBatch())
 
 		d := time.Since(tn)
-		watchTime = watchTime + d.Milliseconds()
+		watchTime += d.Milliseconds()
 	}
 
 	time.Sleep(time.Second)
@@ -81,7 +81,7 @@ func TestReadBlockPerf(t *testing.T) {
 		b, err5 := s.ReadBlockLookup(h)
 		d := time.Since(tn)
 
-		watchTime = watchTime + d.Milliseconds()
+		watchTime += d.Milliseconds()
 
 		if !ok || err1 != nil || err3 != nil || err4 != nil || err5 != nil {
 			t.Logf("\terror")

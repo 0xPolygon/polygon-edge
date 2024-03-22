@@ -166,7 +166,7 @@ func prepareBatch(t *testing.T, s storage.Storage, b *types.FullBlock) *storage.
 
 	batchWriter := storage.NewBatchWriter(s)
 
-	// GidLid 'sorted'
+	// Lookup 'sorted'
 	batchWriter.PutHeadHash(b.Block.Header.Hash)
 	batchWriter.PutHeadNumber(b.Block.Number())
 
@@ -205,7 +205,7 @@ func TestWriteBlockPerf(t *testing.T) {
 		}
 
 		d := time.Since(tn)
-		watchTime = watchTime + d.Milliseconds()
+		watchTime += d.Milliseconds()
 	}
 
 	time.Sleep(time.Second)
@@ -234,7 +234,7 @@ func TestReadBlockPerf(t *testing.T) {
 		_, err4 := s.ReadReceipts(h)
 		d := time.Since(tn)
 
-		watchTime = watchTime + d.Milliseconds()
+		watchTime += d.Milliseconds()
 
 		if !ok || err2 != nil || err3 != nil || err4 != nil {
 			t.Logf("\terror")

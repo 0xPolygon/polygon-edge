@@ -118,7 +118,7 @@ func PrepareBatch(t *testing.T, s *Storage, b *types.FullBlock) *Writer {
 
 	batchWriter := s.NewWriter()
 
-	// GidLid 'sorted'
+	// Lookup 'sorted'
 	batchWriter.PutHeadHash(b.Block.Header.Hash)
 	batchWriter.PutHeadNumber(b.Block.Number())
 	batchWriter.PutBlockLookup(b.Block.Hash(), b.Block.Number())

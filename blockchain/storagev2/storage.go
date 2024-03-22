@@ -38,7 +38,7 @@ const (
 	RECEIPTS   = uint8(8)
 )
 
-// GidLid tables
+// Lookup tables
 const (
 	FORK         = uint8(0) | LOOKUP_INDEX
 	HEAD_HASH    = uint8(2) | LOOKUP_INDEX

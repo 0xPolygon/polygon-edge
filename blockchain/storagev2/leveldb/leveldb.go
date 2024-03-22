@@ -20,7 +20,7 @@ var tableMapper = map[uint8][]byte{
 	storagev2.RECEIPTS:   []byte("r"), // DB key = block number + block hash + mapper, value = block receipts
 	storagev2.CANONICAL:  {},          // DB key = block number + mapper, value = block hash
 
-	// GidLid DB
+	// Lookup DB
 	storagev2.FORK:         {}, // DB key = FORK_KEY + mapper, value = fork hashes
 	storagev2.HEAD_HASH:    {}, // DB key = HEAD_HASH_KEY + mapper, value = head hash
 	storagev2.HEAD_NUMBER:  {}, // DB key = HEAD_NUMBER_KEY + mapper, value = head number
@@ -39,26 +39,26 @@ func NewLevelDBStorage(path string, logger hclog.Logger) (*storagev2.Storage, er
 		WriteBuffer:        128 * opt.MiB, // Two of these are used internally
 	}
 
-	db, err := openLevelDBStorage(path, options)
+	maindb, err := openLevelDBStorage(path, options)
 	if err != nil {
 		return nil, err
 	}
 
-	// Open GidLid
+	// Open Lookup
 	// Set default options
 	options = &opt.Options{
 		BlockCacheCapacity: 64 * opt.MiB,
 		WriteBuffer:        opt.DefaultWriteBuffer,
 	}
-	path = path + "/gidlid"
+	path += "/lookup"
 
-	gidlid, err := openLevelDBStorage(path, options)
+	lookup, err := openLevelDBStorage(path, options)
 	if err != nil {
 		return nil, err
 	}
 
-	ldbs[0] = &levelDB{db}
-	ldbs[1] = &levelDB{gidlid}
+	ldbs[0] = &levelDB{maindb}
+	ldbs[1] = &levelDB{lookup}
 
 	return storagev2.Open(logger.Named("leveldb"), ldbs)
 }
