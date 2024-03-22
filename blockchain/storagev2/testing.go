@@ -1,9 +1,12 @@
 package storagev2
 
 import (
+	"context"
+	"crypto/rand"
 	"math/big"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -433,166 +436,100 @@ func testWriteCanonicalHeader(t *testing.T, m PlaceholderStorage) {
 	}
 }
 
-// Storage delegators
+func generateTxs(t *testing.T, startNonce, count int, from types.Address, to *types.Address) []*types.Transaction {
+	t.Helper()
 
-type readCanonicalHashDelegate func(uint64) (types.Hash, error)
-type readHeadHashDelegate func() (types.Hash, error)
-type readHeadNumberDelegate func() (uint64, error)
-type readForksDelegate func() ([]types.Hash, error)
-type readTotalDifficultyDelegate func(uint64) (*big.Int, error)
-type readHeaderDelegate func(uint64) (*types.Header, error)
-type readBodyDelegate func(uint64) (*types.Body, error)
-type readReceiptsDelegate func(uint64) ([]*types.Receipt, error)
-type readTxLookupDelegate func(types.Hash) (uint64, error)
-type closeDelegate func() error
-type newBatchDelegate func() Batch
+	txs := make([]*types.Transaction, count)
 
-type MockStorage struct {
-	readCanonicalHashFn   readCanonicalHashDelegate
-	readHeadHashFn        readHeadHashDelegate
-	readHeadNumberFn      readHeadNumberDelegate
-	readForksFn           readForksDelegate
-	readTotalDifficultyFn readTotalDifficultyDelegate
-	readHeaderFn          readHeaderDelegate
-	readBodyFn            readBodyDelegate
-	readReceiptsFn        readReceiptsDelegate
-	readTxLookupFn        readTxLookupDelegate
-	closeFn               closeDelegate
-	newBatchFn            newBatchDelegate
-}
+	for i := range txs {
+		tx := types.NewTx(&types.DynamicFeeTx{
+			Gas:       types.StateTransactionGasLimit,
+			Nonce:     uint64(startNonce + i),
+			From:      from,
+			To:        to,
+			Value:     big.NewInt(2000),
+			GasFeeCap: big.NewInt(100),
+			GasTipCap: big.NewInt(10),
+		})
 
-func NewMockStorage() *MockStorage {
-	return &MockStorage{}
-}
+		input := make([]byte, 1000)
+		_, err := rand.Read(input)
 
-func (m *MockStorage) ReadCanonicalHash(n uint64) (types.Hash, error) {
-	if m.readCanonicalHashFn != nil {
-		return m.readCanonicalHashFn(n)
+		require.NoError(t, err)
+
+		tx.ComputeHash()
+
+		txs[i] = tx
 	}
 
-	return types.Hash{}, nil
+	return txs
 }
 
-func (m *MockStorage) HookReadCanonicalHash(fn readCanonicalHashDelegate) {
-	m.readCanonicalHashFn = fn
-}
+func generateBlock(t *testing.T, num uint64) *types.FullBlock {
+	t.Helper()
 
-func (m *MockStorage) ReadHeadHash() (types.Hash, error) {
-	if m.readHeadHashFn != nil {
-		return m.readHeadHashFn()
+	transactionsCount := 2500
+	status := types.ReceiptSuccess
+	addr1 := types.StringToAddress("17878aa")
+	addr2 := types.StringToAddress("2bf5653")
+	b := &types.FullBlock{
+		Block: &types.Block{
+			Header: &types.Header{
+				Number:    num,
+				ExtraData: make([]byte, 32),
+				Hash:      types.ZeroHash,
+			},
+			Transactions: generateTxs(t, 0, transactionsCount, addr1, &addr2),
+			// Uncles:       blockchain.NewTestHeaders(10),
+		},
+		Receipts: make([]*types.Receipt, transactionsCount),
 	}
 
-	return types.Hash{}, nil
-}
+	logs := make([]*types.Log, 10)
 
-func (m *MockStorage) HookReadHeadHash(fn readHeadHashDelegate) {
-	m.readHeadHashFn = fn
-}
-
-func (m *MockStorage) ReadHeadNumber() (uint64, error) {
-	if m.readHeadNumberFn != nil {
-		return m.readHeadNumberFn()
+	for i := 0; i < 10; i++ {
+		logs[i] = &types.Log{
+			Address: addr1,
+			Topics:  []types.Hash{types.StringToHash("t1"), types.StringToHash("t2"), types.StringToHash("t3")},
+			Data:    []byte{0xaa, 0xbb, 0xcc, 0xdd, 0xbb, 0xaa, 0x01, 0x012},
+		}
 	}
 
-	return 0, nil
-}
-
-func (m *MockStorage) HookReadHeadNumber(fn readHeadNumberDelegate) {
-	m.readHeadNumberFn = fn
-}
-
-func (m *MockStorage) ReadForks() ([]types.Hash, error) {
-	if m.readForksFn != nil {
-		return m.readForksFn()
+	for i := 0; i < len(b.Block.Transactions); i++ {
+		b.Receipts[i] = &types.Receipt{
+			TxHash:            b.Block.Transactions[i].Hash(),
+			Root:              types.StringToHash("mockhashstring"),
+			TransactionType:   types.LegacyTxType,
+			GasUsed:           uint64(100000),
+			Status:            &status,
+			Logs:              logs,
+			CumulativeGasUsed: uint64(100000),
+			ContractAddress:   &types.Address{0xaa, 0xbb, 0xcc, 0xdd, 0xab, 0xac},
+		}
 	}
 
-	return []types.Hash{}, nil
-}
-
-func (m *MockStorage) HookReadForks(fn readForksDelegate) {
-	m.readForksFn = fn
-}
-
-func (m *MockStorage) ReadTotalDifficulty(bn uint64) (*big.Int, error) {
-	if m.readTotalDifficultyFn != nil {
-		return m.readTotalDifficultyFn(bn)
+	for i := 0; i < 5; i++ {
+		b.Receipts[i].LogsBloom = types.CreateBloom(b.Receipts)
 	}
 
-	return big.NewInt(0), nil
+	return b
 }
 
-func (m *MockStorage) HookReadTotalDifficulty(fn readTotalDifficultyDelegate) {
-	m.readTotalDifficultyFn = fn
-}
+func GenerateBlocks(t *testing.T, count int, ch chan *types.FullBlock, ctx context.Context) {
+	t.Helper()
 
-func (m *MockStorage) ReadHeader(bn uint64) (*types.Header, error) {
-	if m.readHeaderFn != nil {
-		return m.readHeaderFn(bn)
+	ticker := time.NewTicker(100 * time.Millisecond)
+
+	for i := 1; i <= count; i++ {
+		b := generateBlock(t, uint64(i))
+		select {
+		case <-ctx.Done():
+			close(ch)
+			ticker.Stop()
+
+			return
+		case <-ticker.C:
+			ch <- b
+		}
 	}
-
-	return &types.Header{}, nil
-}
-
-func (m *MockStorage) HookReadHeader(fn readHeaderDelegate) {
-	m.readHeaderFn = fn
-}
-
-func (m *MockStorage) ReadBody(bn uint64) (*types.Body, error) {
-	if m.readBodyFn != nil {
-		return m.readBodyFn(bn)
-	}
-
-	return &types.Body{}, nil
-}
-
-func (m *MockStorage) HookReadBody(fn readBodyDelegate) {
-	m.readBodyFn = fn
-}
-
-func (m *MockStorage) ReadReceipts(bn uint64) ([]*types.Receipt, error) {
-	if m.readReceiptsFn != nil {
-		return m.readReceiptsFn(bn)
-	}
-
-	return []*types.Receipt{}, nil
-}
-
-func (m *MockStorage) HookReadReceipts(fn readReceiptsDelegate) {
-	m.readReceiptsFn = fn
-}
-
-func (m *MockStorage) ReadTxLookup(hash types.Hash) (uint64, error) {
-	if m.readTxLookupFn != nil {
-		return m.readTxLookupFn(hash)
-	}
-
-	return 0, nil
-}
-
-func (m *MockStorage) HookReadTxLookup(fn readTxLookupDelegate) {
-	m.readTxLookupFn = fn
-}
-
-func (m *MockStorage) Close() error {
-	if m.closeFn != nil {
-		return m.closeFn()
-	}
-
-	return nil
-}
-
-func (m *MockStorage) HookClose(fn closeDelegate) {
-	m.closeFn = fn
-}
-
-func (m *MockStorage) HookNewBatch(fn newBatchDelegate) {
-	m.newBatchFn = fn
-}
-
-func (m *MockStorage) NewBatch() Batch {
-	if m.newBatchFn != nil {
-		return m.newBatchFn()
-	}
-
-	return nil
 }

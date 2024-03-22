@@ -19,6 +19,19 @@ type MdbxDB struct {
 	dbi [storagev2.MAX_TABLES]mdbx.DBI
 }
 
+const (
+	B  uint64 = 1
+	KB        = B << 10
+	MB        = KB << 10
+	GB        = MB << 10
+	TB        = GB << 10
+)
+
+var (
+	mapSize    uint64 = 2 * TB
+	growthSize uint64 = 2 * GB
+)
+
 var tableMapper = map[uint8]string{
 	storagev2.BODY:         "Body",
 	storagev2.CANONICAL:    "Canonical",
@@ -50,7 +63,7 @@ func NewMdbxStorage(path string, logger hclog.Logger) (*storagev2.Storage, error
 		return nil, err
 	}
 
-	if err = env.SetGeometry(-1, -1, 2*1024*1024*1024*1024, 2*1024*1024*1024, -1, int(defaultPageSize())); err != nil {
+	if err = env.SetGeometry(-1, -1, int(mapSize), int(growthSize), -1, int(defaultPageSize())); err != nil {
 		return nil, err
 	}
 

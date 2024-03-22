@@ -2,8 +2,6 @@ package mdbx
 
 import (
 	"context"
-	"crypto/rand"
-	"math/big"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -12,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/blockchain/storagev2"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
@@ -45,89 +42,6 @@ func newStorage(t *testing.T) (*storagev2.Storage, func()) {
 	return s, closeFn
 }
 
-func TestStorage(t *testing.T) {
-	storagev2.TestStorage(t, newStorage)
-}
-
-func generateTxs(t *testing.T, startNonce, count int, from types.Address, to *types.Address) []*types.Transaction {
-	t.Helper()
-
-	txs := make([]*types.Transaction, count)
-
-	for i := range txs {
-		tx := types.NewTx(&types.DynamicFeeTx{
-			Gas:       types.StateTransactionGasLimit,
-			Nonce:     uint64(startNonce + i),
-			From:      from,
-			To:        to,
-			Value:     big.NewInt(2000),
-			GasFeeCap: big.NewInt(100),
-			GasTipCap: big.NewInt(10),
-		})
-
-		input := make([]byte, 1000)
-		_, err := rand.Read(input)
-
-		require.NoError(t, err)
-
-		tx.ComputeHash()
-
-		txs[i] = tx
-	}
-
-	return txs
-}
-
-func generateBlock(t *testing.T, num uint64) *types.FullBlock {
-	t.Helper()
-
-	transactionsCount := 2500
-	status := types.ReceiptSuccess
-	addr1 := types.StringToAddress("17878aa")
-	addr2 := types.StringToAddress("2bf5653")
-	b := &types.FullBlock{
-		Block: &types.Block{
-			Header: &types.Header{
-				Number:    num,
-				ExtraData: make([]byte, 32),
-				Hash:      types.ZeroHash,
-			},
-			Transactions: generateTxs(t, 0, transactionsCount, addr1, &addr2),
-			Uncles:       blockchain.NewTestHeaders(10),
-		},
-		Receipts: make([]*types.Receipt, transactionsCount),
-	}
-
-	logs := make([]*types.Log, 10)
-
-	for i := 0; i < 10; i++ {
-		logs[i] = &types.Log{
-			Address: addr1,
-			Topics:  []types.Hash{types.StringToHash("t1"), types.StringToHash("t2"), types.StringToHash("t3")},
-			Data:    []byte{0xaa, 0xbb, 0xcc, 0xdd, 0xbb, 0xaa, 0x01, 0x012},
-		}
-	}
-
-	for i := 0; i < len(b.Block.Transactions); i++ {
-		b.Receipts[i] = &types.Receipt{
-			TxHash:            b.Block.Transactions[i].Hash(),
-			Root:              types.StringToHash("mockhashstring"),
-			TransactionType:   types.LegacyTxType,
-			GasUsed:           uint64(100000),
-			Status:            &status,
-			Logs:              logs,
-			CumulativeGasUsed: uint64(100000),
-			ContractAddress:   &types.Address{0xaa, 0xbb, 0xcc, 0xdd, 0xab, 0xac},
-		}
-	}
-
-	for i := 0; i < 5; i++ {
-		b.Receipts[i].LogsBloom = types.CreateBloom(b.Receipts)
-	}
-
-	return b
-}
-
 func newStorageP(t *testing.T) (*storagev2.Storage, func(), string) {
 	t.Helper()
 
@@ -152,25 +66,6 @@ func newStorageP(t *testing.T) (*storagev2.Storage, func(), string) {
 	return s, closeFn, p
 }
 
-func generateBlocks(t *testing.T, count int, ch chan *types.FullBlock, ctx context.Context) {
-	t.Helper()
-
-	ticker := time.NewTicker(100 * time.Millisecond)
-
-	for i := 1; i <= count; i++ {
-		b := generateBlock(t, uint64(i))
-		select {
-		case <-ctx.Done():
-			close(ch)
-			ticker.Stop()
-
-			return
-		case <-ticker.C:
-			ch <- b
-		}
-	}
-}
-
 func dbSize(t *testing.T, path string) int64 {
 	t.Helper()
 
@@ -192,6 +87,10 @@ func dbSize(t *testing.T, path string) int64 {
 	return size
 }
 
+func TestStorage(t *testing.T) {
+	storagev2.TestStorage(t, newStorage)
+}
+
 func TestWriteFullBlock(t *testing.T) {
 	s, _, path := newStorageP(t)
 	defer s.Close()
@@ -208,7 +107,7 @@ func TestWriteFullBlock(t *testing.T) {
 	}()
 
 	blockchain := make(chan *types.FullBlock, 1)
-	go generateBlocks(t, count, blockchain, ctx)
+	go storagev2.GenerateBlocks(t, count, blockchain, ctx)
 
 insertloop:
 	for i := 1; i <= count; i++ {
