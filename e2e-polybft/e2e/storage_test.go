@@ -50,7 +50,7 @@ func TestE2E_Storage(t *testing.T) {
 			txn := &ethgo.Transaction{
 				From:  sender.Address(),
 				To:    &to,
-				Gas:   30000, // enough to send a transfer
+				Gas:   21000, // enough to send a transfer
 				Value: big.NewInt(int64(i)),
 				Nonce: uint64(i),
 			}
