@@ -267,27 +267,27 @@ func testBody(t *testing.T, m PlaceholderStorage) {
 	require.NoError(t, batch.WriteBatch())
 
 	addr1 := types.StringToAddress("11")
-	t0 := types.NewTx(&types.LegacyTx{
-		Nonce:    0,
-		To:       &addr1,
-		Value:    big.NewInt(1),
-		Gas:      11,
-		GasPrice: big.NewInt(11),
-		Input:    []byte{1, 2},
-		V:        big.NewInt(1),
-	})
+	t0 := types.NewTx(types.NewLegacyTx(
+		types.WithNonce(0),
+		types.WithTo(&addr1),
+		types.WithValue(big.NewInt(1)),
+		types.WithGas(11),
+		types.WithGasPrice(big.NewInt(11)),
+		types.WithInput([]byte{1, 2}),
+		types.WithSignatureValues(big.NewInt(1), nil, nil),
+	))
 	t0.ComputeHash()
 
 	addr2 := types.StringToAddress("22")
-	t1 := types.NewTx(&types.LegacyTx{
-		Nonce:    0,
-		To:       &addr2,
-		Value:    big.NewInt(1),
-		Gas:      22,
-		GasPrice: big.NewInt(11),
-		Input:    []byte{4, 5},
-		V:        big.NewInt(2),
-	})
+	t1 := types.NewTx(types.NewLegacyTx(
+		types.WithNonce(0),
+		types.WithTo(&addr2),
+		types.WithValue(big.NewInt(1)),
+		types.WithGas(22),
+		types.WithGasPrice(big.NewInt(11)),
+		types.WithInput([]byte{4, 5}),
+		types.WithSignatureValues(big.NewInt(2), nil, nil),
+	))
 	t1.ComputeHash()
 
 	block := types.Block{
@@ -335,12 +335,12 @@ func testReceipts(t *testing.T, m PlaceholderStorage) {
 
 	body := &types.Body{
 		Transactions: []*types.Transaction{
-			types.NewTx(&types.StateTx{
-				Nonce:    1000,
-				Gas:      50,
-				GasPrice: new(big.Int).SetUint64(100),
-				V:        big.NewInt(11),
-			}),
+			types.NewTx(types.NewStateTx(
+				types.WithNonce(1000),
+				types.WithGas(50),
+				types.WithGasPrice(new(big.Int).SetUint64(100)),
+				types.WithSignatureValues(big.NewInt(11), nil, nil),
+			)),
 		},
 	}
 	receipts := []*types.Receipt{
@@ -442,15 +442,15 @@ func generateTxs(t *testing.T, startNonce, count int, from types.Address, to *ty
 	txs := make([]*types.Transaction, count)
 
 	for i := range txs {
-		tx := types.NewTx(&types.DynamicFeeTx{
-			Gas:       types.StateTransactionGasLimit,
-			Nonce:     uint64(startNonce + i),
-			From:      from,
-			To:        to,
-			Value:     big.NewInt(2000),
-			GasFeeCap: big.NewInt(100),
-			GasTipCap: big.NewInt(10),
-		})
+		tx := types.NewTx(types.NewDynamicFeeTx(
+			types.WithGas(types.StateTransactionGasLimit),
+			types.WithNonce(uint64(startNonce+i)),
+			types.WithFrom(from),
+			types.WithTo(to),
+			types.WithValue(big.NewInt(2000)),
+			types.WithGasFeeCap(big.NewInt(100)),
+			types.WithGasTipCap(big.NewInt(10)),
+		))
 
 		input := make([]byte, 1000)
 		_, err := rand.Read(input)

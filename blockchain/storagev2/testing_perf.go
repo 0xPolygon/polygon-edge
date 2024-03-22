@@ -27,15 +27,15 @@ func createTxs(t *testing.T, startNonce, count int, from types.Address, to *type
 	txs := make([]*types.Transaction, count)
 
 	for i := range txs {
-		tx := types.NewTx(&types.DynamicFeeTx{
-			Gas:       types.StateTransactionGasLimit,
-			Nonce:     uint64(startNonce + i),
-			From:      from,
-			To:        to,
-			Value:     big.NewInt(2000),
-			GasFeeCap: big.NewInt(100),
-			GasTipCap: big.NewInt(10),
-		})
+		tx := types.NewTx(types.NewDynamicFeeTx(
+			types.WithGas(types.StateTransactionGasLimit),
+			types.WithNonce(uint64(startNonce+i)),
+			types.WithFrom(from),
+			types.WithTo(to),
+			types.WithValue(big.NewInt(2000)),
+			types.WithGasFeeCap(big.NewInt(100)),
+			types.WithGasTipCap(big.NewInt(10)),
+		))
 
 		txs[i] = tx
 	}
