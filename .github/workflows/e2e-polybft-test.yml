@@ -25,6 +25,20 @@ jobs:
         with:
           go-version: 1.20.x
           check-latest: true
+      - name: Generate OpenSSL certificate
+        run: openssl req -x509 -out localhost.crt -keyout localhost.key   -newkey rsa:2048 -nodes -sha256   -subj '/CN=localhost' -extensions EXT -config <(printf "[dn]\nCN=localhost\n[req]\ndistinguished_name = dn\n[EXT]\nsubjectAltName=DNS:localhost\nkeyUsage=digitalSignature\nextendedKeyUsage=serverAuth")
+      - name: Copy certificate key
+        run: sudo cp localhost.key /etc/ssl/private/localhost.key
+      - name: Copy certificate itself
+        run: sudo cp localhost.crt /usr/local/share/ca-certificates/localhost.crt
+      - name: Add certificate to trusted list
+        run: sudo update-ca-certificates
+      - name: Update certificate key folder permissions
+        run: sudo chmod -R 755 /etc/ssl/private
+      - name: Update certificate key file permissions
+        run: sudo chmod 644 /etc/ssl/private/localhost.key
+      - name: Check certificate key permissions
+        run: ls -l /etc/ssl/private/localhost.key
       - name: Run tests
         run: make test-e2e-polybft
       - name: Run tests failed

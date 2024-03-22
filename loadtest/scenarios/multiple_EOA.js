@@ -5,7 +5,7 @@ import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.2/index.js';
 
 let setupTimeout = __ENV.SETUP_TIMEOUT;
 if (setupTimeout == undefined) {
-  setupTimeout = "220s"
+  setupTimeout = "1800s"
 }
 
 let rate = __ENV.RATE;
@@ -55,39 +55,43 @@ if (rpc_url == undefined) {
   rpc_url = "http://localhost:10002"
 }
 
-export function setup() {
+export async function setup() {
   const client = new eth.Client({
     url: rpc_url,
     mnemonic: mnemonic,
   });
 
-  return { accounts: fundTestAccounts(client, root_address) };
+  var accounts = await fundTestAccounts(client, root_address);
+
+  return { accounts: accounts };
 }
 
-var nonce = 0;
-var client;
+var clients = [];
 
 // VU client
 export default function (data) {
+  var client = clients[exec.vu.idInInstance - 1];
   if (client == null) {
     client = new eth.Client({
       url: rpc_url,
       privateKey: data.accounts[exec.vu.idInInstance - 1].private_key
     });
+
+    clients[exec.vu.idInInstance - 1] = client;
   }
 
-  console.log(`nonce => ${nonce}`);
+  const userData = data.accounts[exec.vu.idInInstance - 1]
 
   const tx = {
     to: "0xDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEF",
     value: Number(0.00000001 * 1e18),
-    gas_price: client.gasPrice(),
-    nonce: nonce,
+    gas_price: client.gasPrice()*1.2,
+    nonce: userData.nonce,
   };
 
   const txh = client.sendRawTransaction(tx);
-  console.log("tx hash => " + txh);
-  nonce++;
+  console.log("sender => " + userData.address + " tx hash => " + txh + " nonce => " + userData.nonce);
+  userData.nonce++;
 
   // client.waitForTransactionReceipt(txh).then((receipt) => {
   //   console.log("tx block hash => " + receipt.block_hash);

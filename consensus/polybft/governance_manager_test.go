@@ -6,12 +6,10 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/forkmanager"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
-	"github.com/umbracle/ethgo/abi"
 )
 
 func TestGovernanceManager_PostEpoch(t *testing.T) {
@@ -27,8 +25,8 @@ func TestGovernanceManager_PostEpoch(t *testing.T) {
 	baseFeeChangeDenomEvent := &contractsapi.NewBaseFeeChangeDenomEvent{BaseFeeChangeDenom: big.NewInt(100)}
 	epochRewardEvent := &contractsapi.NewEpochRewardEvent{Reward: big.NewInt(10000)}
 
-	require.NoError(t, state.GovernanceStore.insertGovernanceEvent(1, 7, baseFeeChangeDenomEvent, nil))
-	require.NoError(t, state.GovernanceStore.insertGovernanceEvent(1, 7, epochRewardEvent, nil))
+	require.NoError(t, state.GovernanceStore.insertGovernanceEvent(1, baseFeeChangeDenomEvent, nil))
+	require.NoError(t, state.GovernanceStore.insertGovernanceEvent(1, epochRewardEvent, nil))
 
 	// no initial config was saved, so we expect an error
 	require.ErrorIs(t, governanceManager.PostEpoch(&PostEpochRequest{
@@ -88,7 +86,7 @@ func TestGovernanceManager_PostBlock(t *testing.T) {
 		})
 
 		chainParams := &chain.Params{Engine: map[string]interface{}{ConsensusName: genesisPolybftConfig}}
-		governanceManager, err := newGovernanceManager(chainParams, genesisPolybftConfig,
+		governanceManager, err := newGovernanceManager(chainParams,
 			hclog.NewNullLogger(), state, blockchainMock, nil)
 		require.NoError(t, err)
 
@@ -122,14 +120,14 @@ func TestGovernanceManager_PostBlock(t *testing.T) {
 		})
 
 		chainParams := &chain.Params{Engine: map[string]interface{}{ConsensusName: genesisPolybftConfig}}
-		governanceManager, err := newGovernanceManager(chainParams, genesisPolybftConfig,
+		governanceManager, err := newGovernanceManager(chainParams,
 			hclog.NewNullLogger(), state, blockchainMock, nil)
 		require.NoError(t, err)
 
 		// this cheats that we have this fork in code
 		governanceManager.allForksHashes[newForkHash] = newForkName
 
-		require.NoError(t, state.GovernanceStore.insertGovernanceEvent(1, newForkBlock.Uint64(),
+		require.NoError(t, state.GovernanceStore.insertGovernanceEvent(1,
 			&contractsapi.NewFeatureEvent{
 				Feature: newForkHash, Block: newForkBlock,
 			}, nil))
@@ -142,23 +140,4 @@ func TestGovernanceManager_PostBlock(t *testing.T) {
 		// new fork should be registered and enabled before PostBlock
 		require.True(t, forkmanager.GetInstance().IsForkEnabled(newForkName, newForkBlock.Uint64()))
 	})
-}
-
-func createTestLogForNewEpochSizeEvent(t *testing.T, epochSize uint64) *types.Log {
-	t.Helper()
-
-	var epochSizeEvent contractsapi.NewEpochSizeEvent
-
-	topics := make([]types.Hash, 2)
-	topics[0] = types.Hash(epochSizeEvent.Sig())
-	encodedData, err := abi.MustNewType("uint256").Encode(new(big.Int).SetUint64(epochSize))
-	require.NoError(t, err)
-
-	topics[1] = types.BytesToHash(encodedData)
-
-	return &types.Log{
-		Address: contracts.NetworkParamsContract,
-		Topics:  topics,
-		Data:    nil,
-	}
 }

@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/helper/common"
-	"github.com/hashicorp/go-hclog"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -47,7 +46,7 @@ type State struct {
 }
 
 // newState creates new instance of State
-func newState(path string, logger hclog.Logger, closeCh chan struct{}) (*State, error) {
+func newState(path string, closeCh chan struct{}) (*State, error) {
 	db, err := bolt.Open(path, 0666, nil)
 	if err != nil {
 		return nil, err

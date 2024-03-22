@@ -212,7 +212,6 @@ func (c *consensusRuntime) initStakeManager(logger hcf.Logger, dbTx *bolt.Tx) er
 func (c *consensusRuntime) initGovernanceManager(logger hcf.Logger, dbTx *bolt.Tx) error {
 	governanceManager, err := newGovernanceManager(
 		c.config.genesisParams,
-		c.config.GenesisConfig,
 		logger.Named("governance-manager"),
 		c.state,
 		c.config.blockchain,
@@ -1069,19 +1068,4 @@ func (c *consensusRuntime) getCurrentBlockTimeDrift() uint64 {
 	defer c.lock.RUnlock()
 
 	return c.epoch.CurrentClientConfig.BlockTimeDrift
-}
-
-// getSealersForBlock checks who sealed a given block and updates the counter
-func getSealersForBlock(sealersCounter map[types.Address]uint64,
-	blockExtra *Extra, validators validator.AccountSet) error {
-	signers, err := validators.GetFilteredValidators(blockExtra.Parent.Bitmap)
-	if err != nil {
-		return err
-	}
-
-	for _, a := range signers.GetAddresses() {
-		sealersCounter[a]++
-	}
-
-	return nil
 }

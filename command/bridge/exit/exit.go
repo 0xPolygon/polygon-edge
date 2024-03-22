@@ -6,7 +6,6 @@ import (
 	"strconv"
 
 	"github.com/spf13/cobra"
-	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/jsonrpc"
 
 	"github.com/0xPolygon/polygon-edge/command"
@@ -156,7 +155,7 @@ func run(cmd *cobra.Command, _ []string) {
 }
 
 // createExitTxn encodes parameters for exit function on root chain ExitHelper contract
-func createExitTxn(sender ethgo.Address, proof types.Proof) (*ethgo.Transaction,
+func createExitTxn(sender types.Address, proof types.Proof) (*types.Transaction,
 	*contractsapi.L2StateSyncedEvent, error) {
 	exitInput, err := polybft.GetExitInputFromProof(proof)
 	if err != nil {
@@ -180,9 +179,9 @@ func createExitTxn(sender ethgo.Address, proof types.Proof) (*ethgo.Transaction,
 		return nil, nil, fmt.Errorf("failed to encode provided parameters: %w", err)
 	}
 
-	exitHelperAddr := ethgo.Address(types.StringToAddress(ep.exitHelperAddrRaw))
+	exitHelperAddr := types.StringToAddress(ep.exitHelperAddrRaw)
 	txn := helper.CreateTransaction(sender, &exitHelperAddr, input, nil, true)
-	txn.Gas = txrelayer.DefaultGasLimit
+	txn.SetGas(txrelayer.DefaultGasLimit)
 
 	return txn, exitEvent, err
 }

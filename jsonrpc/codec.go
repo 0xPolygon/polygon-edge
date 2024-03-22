@@ -9,6 +9,17 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
+func init() {
+	pendingBN := PendingBlockNumber
+	PendingBlockNumberOrHash = BlockNumberOrHash{BlockNumber: &pendingBN}
+
+	latestBN := LatestBlockNumber
+	LatestBlockNumberOrHash = BlockNumberOrHash{BlockNumber: &latestBN}
+
+	earliestBN := EarliestBlockNumber
+	EarliestBlockNumberOrHash = BlockNumberOrHash{BlockNumber: &earliestBN}
+}
+
 // Request is a jsonrpc request
 type Request struct {
 	ID     interface{}     `json:"id"`
@@ -127,11 +138,40 @@ const (
 	EarliestBlockNumber = BlockNumber(-1)
 )
 
+var (
+	PendingBlockNumberOrHash  BlockNumberOrHash
+	LatestBlockNumberOrHash   BlockNumberOrHash
+	EarliestBlockNumberOrHash BlockNumberOrHash
+)
+
 type BlockNumber int64
+
+// String returns the string representation of the block number
+func (b BlockNumber) String() string {
+	switch b {
+	case PendingBlockNumber:
+		return pending
+	case LatestBlockNumber:
+		return latest
+	case EarliestBlockNumber:
+		return earliest
+	}
+
+	return fmt.Sprintf("0x%x", uint64(b))
+}
 
 type BlockNumberOrHash struct {
 	BlockNumber *BlockNumber `json:"blockNumber,omitempty"`
 	BlockHash   *types.Hash  `json:"blockHash,omitempty"`
+}
+
+// String returns the string representation of the block number or hash
+func (bnh BlockNumberOrHash) String() string {
+	if bnh.BlockNumber != nil {
+		return bnh.BlockNumber.String()
+	}
+
+	return bnh.BlockHash.String()
 }
 
 // UnmarshalJSON will try to extract the filter's data.

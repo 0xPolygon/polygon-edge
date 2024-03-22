@@ -38,14 +38,14 @@ protoc: check-protoc
 .PHONY: build
 build: check-go check-git
 	$(eval COMMIT_HASH = $(shell git rev-parse HEAD))
-	$(eval VERSION = $(shell git tag --points-at ${COMMIT_HASH}))
+	$(eval VERSION = $(shell git describe --tags --abbrev=0 ${COMMIT_HASH}))
 	$(eval BRANCH = $(shell git rev-parse --abbrev-ref HEAD | tr -d '\040\011\012\015\n'))
 	$(eval TIME = $(shell date))
 	go build -o blade -ldflags="\
-    	-X 'github.com/Ethernal-Tech/blade/versioning.Version=$(VERSION)' \
-		-X 'github.com/Ethernal-Tech/blade/versioning.Commit=$(COMMIT_HASH)'\
-		-X 'github.com/Ethernal-Tech/blade/versioning.Branch=$(BRANCH)'\
-		-X 'github.com/Ethernal-Tech/blade/versioning.BuildTime=$(TIME)'" \
+		-X 'github.com/0xPolygon/polygon-edge/versioning.Version=$(VERSION)' \
+		-X 'github.com/0xPolygon/polygon-edge/versioning.Commit=$(COMMIT_HASH)'\
+		-X 'github.com/0xPolygon/polygon-edge/versioning.Branch=$(BRANCH)'\
+		-X 'github.com/0xPolygon/polygon-edge/versioning.BuildTime=$(TIME)'" \
 	main.go
 
 .PHONY: lint
@@ -59,6 +59,10 @@ generate-bsd-licenses: check-git
 .PHONY: unit-test
 unit-test: check-go
 	go test -race -shuffle=on -coverprofile coverage.out -timeout 20m `go list ./... | grep -v e2e`
+
+.PHONY: benchmark-test
+benchmark-test: check-go
+	go test -bench=. -run=^$ `go list ./... | grep -v /e2e`
 
 .PHONY: fuzz-test
 fuzz-test: check-go

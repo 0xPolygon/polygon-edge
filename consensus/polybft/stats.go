@@ -1,14 +1,10 @@
 package polybft
 
 import (
-	"math/big"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/armon/go-metrics"
-	"github.com/hashicorp/go-hclog"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/umbracle/ethgo"
 )
 
 // startStatsReleasing starts the process that releases BoltDB stats into prometheus periodically.
@@ -156,55 +152,5 @@ func (s *State) startStatsReleasing() {
 
 		// Save stats for the next loop.
 		prev = stats
-	}
-}
-
-// publishRootchainMetrics publishes rootchain related metrics
-func (p *Polybft) publishRootchainMetrics(logger hclog.Logger) {
-	interval := p.config.MetricsInterval
-	validatorAddr := p.key.Address()
-	bridgeCfg := p.genesisClientConfig.Bridge
-
-	// zero means metrics are disabled
-	if interval <= 0 {
-		return
-	}
-
-	relayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(bridgeCfg.JSONRPCEndpoint))
-	if err != nil {
-		logger.Error("failed to connect to the rootchain node", "err", err, "JSON RPC", bridgeCfg.JSONRPCEndpoint)
-
-		return
-	}
-
-	gweiPerWei := new(big.Float).SetInt(new(big.Int).Exp(big.NewInt(10), big.NewInt(9), nil)) // 10^9
-
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-p.closeCh:
-			return
-		case <-ticker.C:
-			// rootchain validator balance
-			balance, err := relayer.Client().Eth().GetBalance(p.key.Address(), ethgo.Latest)
-			if err != nil {
-				logger.Error("failed to query eth_getBalance", "err", err)
-			} else {
-				balanceInGwei := new(big.Float).Quo(new(big.Float).SetInt(balance), gweiPerWei)
-				balanceInGweiFloat, _ := balanceInGwei.Float32()
-
-				metrics.SetGauge([]string{"bridge", "validator_root_balance_gwei", validatorAddr.String()}, balanceInGweiFloat)
-			}
-
-			// rootchain current checkpoint block
-			checkpointBlock, err := getCurrentCheckpointBlock(relayer, bridgeCfg.CheckpointManagerAddr)
-			if err != nil {
-				logger.Error("failed to query latest checkpoint block", "err", err)
-			} else {
-				metrics.SetGauge([]string{"bridge", "checkpoint_block_number"}, float32(checkpointBlock))
-			}
-		}
 	}
 }

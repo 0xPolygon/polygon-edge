@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/spf13/cobra"
+
 	"github.com/0xPolygon/polygon-edge/command"
 	bridgeHelper "github.com/0xPolygon/polygon-edge/command/bridge/helper"
 	"github.com/0xPolygon/polygon-edge/command/helper"
@@ -13,8 +15,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/spf13/cobra"
-	"github.com/umbracle/ethgo"
 )
 
 var (
@@ -112,9 +112,8 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	stakeManagerAddr := ethgo.Address(contracts.StakeManagerContract)
-
-	txn := bridgeHelper.CreateTransaction(validatorAccount.Ecdsa.Address(), &stakeManagerAddr, encoded, nil, true)
+	txn := bridgeHelper.CreateTransaction(validatorAccount.Ecdsa.Address(),
+		&contracts.StakeManagerContract, encoded, nil, true)
 
 	receipt, err = txRelayer.SendTransaction(txn, validatorAccount.Ecdsa)
 	if err != nil {

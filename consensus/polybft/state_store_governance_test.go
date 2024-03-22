@@ -18,7 +18,6 @@ func TestGovernanceStore_InsertAndGetEvents(t *testing.T) {
 	t.Parallel()
 
 	epoch := uint64(11)
-	block := uint64(111)
 	state := newTestState(t)
 
 	// NetworkParams events
@@ -61,7 +60,7 @@ func TestGovernanceStore_InsertAndGetEvents(t *testing.T) {
 	allEvents = append(allEvents, forkParamsEvents...)
 
 	for _, e := range allEvents {
-		require.NoError(t, state.GovernanceStore.insertGovernanceEvent(epoch, block, e, nil))
+		require.NoError(t, state.GovernanceStore.insertGovernanceEvent(epoch, e, nil))
 	}
 
 	// test for an epoch that didn't have any events
@@ -87,8 +86,8 @@ func TestGovernanceStore_InsertAndGetEvents(t *testing.T) {
 	newFeatureEventTwo := &contractsapi.UpdatedFeatureEvent{Feature: types.BytesToHash([]byte("OxSomeFeature3")),
 		Block: big.NewInt(130_000)}
 
-	require.NoError(t, state.GovernanceStore.insertGovernanceEvent(epoch, block+1, sprintSizeEvent, nil))
-	require.NoError(t, state.GovernanceStore.insertGovernanceEvent(epoch, block+1, newFeatureEventTwo, nil))
+	require.NoError(t, state.GovernanceStore.insertGovernanceEvent(epoch, sprintSizeEvent, nil))
+	require.NoError(t, state.GovernanceStore.insertGovernanceEvent(epoch, newFeatureEventTwo, nil))
 
 	eventsRaw, err = state.GovernanceStore.getNetworkParamsEvents(epoch, nil)
 	require.NoError(t, err)

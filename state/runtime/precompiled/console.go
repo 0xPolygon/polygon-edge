@@ -7,17 +7,20 @@ import (
 	"log"
 	"regexp"
 
+	"github.com/umbracle/ethgo/abi"
+
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/abi"
 )
 
-//go:embed console.sol
-var consoleContract string
+var (
+	//go:embed console.sol
+	consoleContract string
 
-var logOverloads = map[string]*abi.Type{}
+	logOverloads = map[string]*abi.Type{}
+)
 
 func init() {
 	rxp := regexp.MustCompile("abi.encodeWithSignature\\(\"log(.*)\"")
@@ -34,7 +37,7 @@ func init() {
 		}
 
 		// signature of the call. Use the version without the bytes in 'uint'.
-		sig := ethgo.Keccak256([]byte("log" + match[1]))[:4]
+		sig := crypto.Keccak256([]byte("log" + match[1]))[:4]
 		logOverloads[hex.EncodeToString(sig)] = typ
 	}
 }

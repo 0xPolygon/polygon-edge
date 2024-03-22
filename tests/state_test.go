@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"math/big"
 	"os"
-	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -24,19 +22,92 @@ import (
 // It does not include Merge hardfork test cases.
 
 const (
-	stateTests         = "tests/GeneralStateTests"
-	testGenesisBaseFee = 0x0a
+	stateTestsDir = "tests/GeneralStateTests"
 )
 
 var (
 	ripemd = types.StringToAddress("0000000000000000000000000000000000000003")
 )
 
-func RunSpecificTest(t *testing.T, file string, c testCase, fc *forkConfig, index int, p postEntry) error {
+func TestState(t *testing.T) {
+	t.Parallel()
+
+	long := []string{
+		"static_Call50000",
+		"static_Return50000",
+		"static_Call1MB",
+		"stQuadraticComplexityTest",
+		"stTimeConsuming",
+		"modexp",
+		"CallRecursiveBomb",
+		"ContractCreationSpam",
+		"badOpcodes",
+		"Opcodes_TransactionInit",
+	}
+
+	skip := []string{
+		"RevertPrecompiledTouch",
+		"RevertPrecompiledTouch_storage",
+		"loopMul",
+		"CALLBlake2f_MaxRounds",
+	}
+
+	files, err := listFiles(stateTestsDir, ".json")
+	require.NoError(t, err)
+
+	for _, file := range files {
+		if contains(long, file) && testing.Short() {
+			t.Logf("Long test '%s' is skipped in short mode\n", file)
+
+			continue
+		}
+
+		if contains(skip, file) {
+			t.Logf("Test '%s' is skipped\n", file)
+
+			continue
+		}
+
+		file := file
+		t.Run(file, func(t *testing.T) {
+			t.Parallel()
+
+			data, err := os.ReadFile(file)
+			require.NoError(t, err)
+
+			var testCases map[string]testCase
+			if err = json.Unmarshal(data, &testCases); err != nil {
+				t.Fatalf("failed to unmarshal %s: %v", file, err)
+			}
+
+			for _, tc := range testCases {
+				for fork, postState := range tc.Post {
+					forks, exists := Forks[fork]
+					if !exists {
+						t.Logf("%s fork is not supported, skipping test case.", fork)
+						continue
+					}
+
+					fc := &forkConfig{name: fork, forks: forks}
+
+					for idx, postStateEntry := range postState {
+						start := time.Now()
+						err := runSpecificTestCase(t, file, tc, fc, idx, postStateEntry)
+
+						t.Logf("'%s' executed. Fork: %s. Case: %d, Duration=%v\n", file, fork, idx, time.Since(start))
+
+						require.NoError(t, tc.checkError(fork, idx, err))
+					}
+				}
+			}
+		})
+	}
+}
+
+func runSpecificTestCase(t *testing.T, file string, c testCase, fc *forkConfig, index int, p postEntry) error {
 	t.Helper()
 
-	testName := filepath.Base(file)
-	testName = strings.TrimSuffix(testName, ".json")
+	testName := getTestName(file)
 
 	env := c.Env.ToEnv(t)
 	forks := fc.forks
@@ -149,90 +220,4 @@ func RunSpecificTest(t *testing.T, file string, c testCase, fc *forkConfig, inde
 	}
 
 	return nil
-}
-
-func TestState(t *testing.T) {
-	t.Parallel()
-
-	long := []string{
-		"static_Call50000",
-		"static_Return50000",
-		"static_Call1MB",
-		"stQuadraticComplexityTest",
-		"stTimeConsuming",
-	}
-
-	skip := []string{
-		"RevertPrecompiledTouch",
-		"RevertPrecompiledTouch_storage",
-		"loopMul",
-		"CALLBlake2f_MaxRounds",
-	}
-
-	folders, err := listFolders([]string{stateTests})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	for _, folder := range folders {
-		files, err := listFiles(folder, ".json")
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		for _, file := range files {
-			if contains(long, file) && testing.Short() {
-				t.Logf("Long test '%s' is skipped in short mode\n", file)
-
-				continue
-			}
-
-			if contains(skip, file) {
-				t.Logf("Test '%s' is skipped\n", file)
-
-				continue
-			}
-
-			file := file
-			t.Run(file, func(t *testing.T) {
-				t.Parallel()
-
-				data, err := os.ReadFile(file)
-				if err != nil {
-					t.Fatal(err)
-				}
-
-				var testCases map[string]testCase
-				if err = json.Unmarshal(data, &testCases); err != nil {
-					t.Fatalf("failed to unmarshal %s: %v", file, err)
-				}
-
-				for _, tc := range testCases {
-					for fork, postState := range tc.Post {
-						forks, exists := Forks[fork]
-						if !exists {
-							t.Logf("%s fork is not supported, skipping test case.", fork)
-							continue
-						}
-
-						fc := &forkConfig{name: fork, forks: forks}
-
-						for idx, postStateEntry := range postState {
-							start := time.Now()
-							err := RunSpecificTest(t, file, tc, fc, idx, postStateEntry)
-
-							t.Logf("'%s' executed. Fork: %s. Case: %d, Duration=%v\n", file, fork, idx, time.Since(start))
-
-							require.NoError(t, tc.checkError(fork, idx, err))
-						}
-					}
-				}
-			})
-		}
-	}
-}
-
-type forkConfig struct {
-	name  string
-	forks *chain.Forks
 }

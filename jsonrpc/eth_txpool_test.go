@@ -11,10 +11,10 @@ import (
 func TestEth_TxnPool_SendRawTransaction(t *testing.T) {
 	store := &mockStoreTxn{}
 	eth := newTestEthEndpoint(store)
-	txn := types.NewTx(&types.LegacyTx{
-		From: addr0,
-		V:    big.NewInt(1),
-	})
+	txn := types.NewTx(types.NewLegacyTx(
+		types.WithFrom(addr0),
+		types.WithSignatureValues(big.NewInt(1), nil, nil),
+	))
 	txn.ComputeHash()
 
 	data := txn.MarshalRLP()
@@ -32,12 +32,12 @@ func TestEth_TxnPool_SendTransaction(t *testing.T) {
 	store := &mockStoreTxn{}
 	store.AddAccount(addr0)
 	eth := newTestEthEndpoint(store)
-	txToSend := types.NewTx(&types.LegacyTx{
-		From:     addr0,
-		To:       argAddrPtr(addr0),
-		Nonce:    uint64(0),
-		GasPrice: big.NewInt(int64(1)),
-	})
+	txToSend := types.NewTx(types.NewLegacyTx(
+		types.WithGasPrice(big.NewInt(1)),
+		types.WithFrom(addr0),
+		types.WithTo(argAddrPtr(addr0)),
+		types.WithNonce(0),
+	))
 
 	_, err := eth.SendRawTransaction(txToSend.MarshalRLP())
 	assert.NoError(t, err)

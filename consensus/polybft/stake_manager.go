@@ -67,11 +67,8 @@ var _ StakeManager = (*stakeManager)(nil)
 type stakeManager struct {
 	logger                   hclog.Logger
 	state                    *State
-	key                      ethgo.Key
 	stakeManagerContractAddr types.Address
-	validatorSetContract     types.Address
 	polybftBackend           polybftBackend
-	stakeManagerContract     *contract.Contract
 	blockchain               blockchainBackend
 }
 
@@ -468,13 +465,4 @@ func (sc validatorStakeMap) String() string {
 	}
 
 	return sb.String()
-}
-
-func getEpochID(blockchain blockchainBackend, header *types.Header) (uint64, error) {
-	provider, err := blockchain.GetStateProviderForBlock(header)
-	if err != nil {
-		return 0, err
-	}
-
-	return blockchain.GetSystemState(provider).GetEpoch()
 }

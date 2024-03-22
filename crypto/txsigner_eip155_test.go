@@ -65,16 +65,16 @@ func TestEIP155Signer_Sender(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			key, keyGenError := GenerateECDSAKey()
+			key, keyGenError := GenerateECDSAPrivateKey()
 			if keyGenError != nil {
 				t.Fatalf("Unable to generate key")
 			}
 
-			txn := types.NewTx(&types.LegacyTx{
-				To:       &toAddress,
-				Value:    big.NewInt(1),
-				GasPrice: big.NewInt(0),
-			})
+			txn := types.NewTx(types.NewLegacyTx(
+				types.WithGasPrice(big.NewInt(0)),
+				types.WithTo(&toAddress),
+				types.WithValue(big.NewInt(1)),
+			))
 
 			signer := NewEIP155Signer(
 				testCase.chainID.Uint64(),
@@ -100,16 +100,16 @@ func TestEIP155Signer_ChainIDMismatch(t *testing.T) {
 	toAddress := types.StringToAddress("1")
 
 	for _, chainIDTop := range chainIDS {
-		key, keyGenError := GenerateECDSAKey()
+		key, keyGenError := GenerateECDSAPrivateKey()
 		if keyGenError != nil {
 			t.Fatalf("Unable to generate key")
 		}
 
-		txn := types.NewTx(&types.LegacyTx{
-			To:       &toAddress,
-			Value:    big.NewInt(1),
-			GasPrice: big.NewInt(0),
-		})
+		txn := types.NewTx(types.NewLegacyTx(
+			types.WithGasPrice(big.NewInt(0)),
+			types.WithTo(&toAddress),
+			types.WithValue(big.NewInt(1)),
+		))
 
 		signer := NewEIP155Signer(chainIDTop)
 

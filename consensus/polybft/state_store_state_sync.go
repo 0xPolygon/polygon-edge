@@ -24,8 +24,6 @@ var (
 
 	// errNotEnoughStateSyncs error message
 	errNotEnoughStateSyncs = errors.New("there is either a gap or not enough sync events")
-	// errCommitmentNotBuilt error message
-	errCommitmentNotBuilt = errors.New("there is no built commitment to register")
 	// errNoCommitmentForStateSync error message
 	errNoCommitmentForStateSync = errors.New("no commitment found for given state sync event")
 )

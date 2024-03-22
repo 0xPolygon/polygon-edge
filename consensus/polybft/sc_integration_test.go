@@ -276,12 +276,12 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 	reward := uint64(math.Pow(10, 18))             // 1 token
 	walletAddress := types.StringToAddress("1234889893")
 
-	validatorSets := make([]*validator.TestValidators, len(validatorSetSize), len(validatorSetSize))
+	validatorSets := make([]*validator.TestValidators, len(validatorSetSize))
 
 	// create all validator sets which will be used in test
 	for i, size := range validatorSetSize {
-		aliases := make([]string, size, size)
-		vps := make([]uint64, size, size)
+		aliases := make([]string, size)
+		vps := make([]uint64, size)
 
 		for j := 0; j < size; j++ {
 			aliases[j] = "v" + strconv.Itoa(j)

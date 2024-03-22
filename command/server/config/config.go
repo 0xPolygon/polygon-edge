@@ -32,6 +32,8 @@ type Config struct {
 	JSONRPCBlockRangeLimit   uint64     `json:"json_rpc_block_range_limit" yaml:"json_rpc_block_range_limit"`
 	JSONLogFormat            bool       `json:"json_log_format" yaml:"json_log_format"`
 	CorsAllowedOrigins       []string   `json:"cors_allowed_origins" yaml:"cors_allowed_origins"`
+	TLSCertFile              string     `json:"tls_cert_file" yaml:"tls_cert_file"`
+	TLSKeyFile               string     `json:"tls_key_file" yaml:"tls_key_file"`
 
 	Relayer bool `json:"relayer" yaml:"relayer"`
 
@@ -144,6 +146,8 @@ func DefaultConfig() *Config {
 			AccessControlAllowOrigins: []string{"*"},
 		},
 		LogFilePath:              "",
+		TLSCertFile:              "",
+		TLSKeyFile:               "",
 		JSONRPCBatchRequestLimit: DefaultJSONRPCBatchRequestLimit,
 		JSONRPCBlockRangeLimit:   DefaultJSONRPCBlockRangeLimit,
 		Relayer:                  false,

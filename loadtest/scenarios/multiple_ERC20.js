@@ -5,7 +5,7 @@ import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.2/index.js';
 
 let setupTimeout = __ENV.SETUP_TIMEOUT;
 if (setupTimeout == undefined) {
-  setupTimeout = "220s"
+  setupTimeout = "1800s"
 }
 
 let rate = __ENV.RATE;
@@ -57,7 +57,7 @@ if (rpc_url == undefined) {
 
 const ZexCoin = JSON.parse(open("../contracts/ZexCoinERC20.json"));
 
-export function setup() {
+export async function setup() {
     let data = {};
 
     const client = new eth.Client({
@@ -67,32 +67,36 @@ export function setup() {
 
     const receipt = client.deployContract(JSON.stringify(ZexCoin.abi), ZexCoin.bytecode.substring(2), 500000000000, "ZexCoin", "ZEX")
 
+    var accounts = await fundTestAccounts(client, root_address);
+
     return {
-        accounts: fundTestAccounts(client, root_address),
+        accounts: accounts,
         contract_address: data.contract_address
     };
 }
 
-let nonce = 0;
-let client;
+var clients = [];
 
 // VU client
 export default function (data) {
-    let acc = data.accounts[exec.vu.idInInstance - 1];
-
+    var client = clients[exec.vu.idInInstance - 1];
     if (client == null) {
-        client = new eth.Client({
-            url: rpc_url,
-            privateKey: acc.private_key
-        });
+      client = new eth.Client({
+        url: rpc_url,
+        privateKey: data.accounts[exec.vu.idInInstance - 1].private_key
+      });
+  
+      clients[exec.vu.idInInstance - 1] = client;
     }
+
+    let acc = data.accounts[exec.vu.idInInstance - 1];
 
     console.log(acc.address);
     const con = client.newContract(data.contract_address, JSON.stringify(ZexCoin.abi));
-    const res = con.txn("transfer", { gas_limit: 100000, nonce: nonce }, acc.address, 1);
-    console.log(`txn hash => ${res}`);
+    const res = con.txn("transfer", { gas_limit: 100000, nonce: acc.nonce, gas_price: client.gasPrice()*1.3 }, acc.address, 1);
+    console.log("sender => " + acc.address + " tx hash => " + res + " nonce => " + acc.nonce);
 
-    nonce++;
+    acc.nonce++;
     // console.log(JSON.stringify(con.call("balanceOf", acc.address)));
 }
 

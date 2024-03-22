@@ -343,6 +343,7 @@ func NewServer(config *Config) (*Server, error) {
 				PriceLimit:         m.config.PriceLimit,
 				MaxAccountEnqueued: m.config.MaxAccountEnqueued,
 				ChainID:            big.NewInt(m.config.Chain.Params.ChainID),
+				PeerID:             m.network.AddrInfo().ID,
 			},
 		)
 		if err != nil {
@@ -868,6 +869,8 @@ func (s *Server) setupJSONRPC() error {
 		BlockRangeLimit:          s.config.JSONRPC.BlockRangeLimit,
 		ConcurrentRequestsDebug:  s.config.JSONRPC.ConcurrentRequestsDebug,
 		WebSocketReadLimit:       s.config.JSONRPC.WebSocketReadLimit,
+		TLSCertFile:              s.config.TLSCertFile,
+		TLSKeyFile:               s.config.TLSKeyFile,
 	}
 
 	srv, err := jsonrpc.NewJSONRPC(s.logger, conf)

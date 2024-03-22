@@ -7,26 +7,26 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
+	"github.com/umbracle/ethgo"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	"github.com/0xPolygon/polygon-edge/crypto"
 	frameworkpolybft "github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/stretchr/testify/require"
-	"github.com/syndtr/goleveldb/leveldb"
-	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/wallet"
 )
 
 func TestE2E_Migration(t *testing.T) {
-	userKey, _ := wallet.GenerateKey()
-	userAddr := userKey.Address()
-	userKey2, _ := wallet.GenerateKey()
-	userAddr2 := userKey2.Address()
+	userKey, _ := crypto.GenerateECDSAKey()
+	userAddr := ethgo.Address(userKey.Address())
+	userKey2, _ := crypto.GenerateECDSAKey()
+	userAddr2 := ethgo.Address(userKey2.Address())
 
 	initialBalance := ethgo.Ether(10)
 	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
@@ -61,32 +61,39 @@ func TestE2E_Migration(t *testing.T) {
 	relayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(rpcClient))
 	require.NoError(t, err)
 
-	//send transaction to user2
+	// send transaction to user2
 	sendAmount := ethgo.Gwei(10000)
-	receipt, err := relayer.SendTransaction(
-		&ethgo.Transaction{
-			From:     userAddr,
-			To:       &userAddr2,
-			Gas:      1000000,
-			Value:    sendAmount,
-			GasPrice: ethgo.Gwei(2).Uint64(),
-		}, userKey)
+	tx := types.NewTx(&types.LegacyTx{
+		BaseTx: &types.BaseTx{
+			From:  userKey.Address(),
+			To:    userKey2.Address().Ptr(),
+			Gas:   1000000,
+			Value: sendAmount,
+		},
+		GasPrice: ethgo.Gwei(2),
+	})
+
+	receipt, err := relayer.SendTransaction(tx, userKey)
 	require.NoError(t, err)
 	require.NotNil(t, receipt)
 
-	receipt, err = relayer.SendTransaction(&ethgo.Transaction{
-		From:     userAddr,
-		Gas:      1000000,
-		GasPrice: ethgo.Gwei(2).Uint64(),
-		Input:    contractsapi.TestWriteBlockMetadata.Bytecode,
-	}, userKey)
+	tx = types.NewTx(&types.LegacyTx{
+		BaseTx: &types.BaseTx{
+			From:  userKey.Address(),
+			Gas:   1000000,
+			Input: contractsapi.TestWriteBlockMetadata.Bytecode,
+		},
+		GasPrice: ethgo.Gwei(2),
+	})
+
+	receipt, err = relayer.SendTransaction(tx, userKey)
 	require.NoError(t, err)
 	require.NotNil(t, receipt)
 	require.Equal(t, uint64(types.ReceiptSuccess), receipt.Status)
 
 	deployedContractBalance := receipt.ContractAddress
 
-	initReceipt, err := ABITransaction(relayer, userKey, contractsapi.TestWriteBlockMetadata, receipt.ContractAddress, "init")
+	initReceipt, err := ABITransaction(relayer, userKey, contractsapi.TestWriteBlockMetadata, types.Address(receipt.ContractAddress), "init")
 	if err != nil {
 		t.Fatal(err)
 	}

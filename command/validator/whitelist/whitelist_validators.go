@@ -13,7 +13,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/spf13/cobra"
-	"github.com/umbracle/ethgo"
 )
 
 var params whitelistParams
@@ -97,8 +96,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("whitelist validator failed. Could not abi encode whitelist function: %w", err)
 	}
 
-	stakeManagerAddr := ethgo.Address(contracts.StakeManagerContract)
-	txn := bridgeHelper.CreateTransaction(ecdsaKey.Address(), &stakeManagerAddr, encoded, nil, true)
+	txn := bridgeHelper.CreateTransaction(ecdsaKey.Address(), &contracts.StakeManagerContract, encoded, nil, true)
 
 	receipt, err := txRelayer.SendTransaction(txn, ecdsaKey)
 	if err != nil {

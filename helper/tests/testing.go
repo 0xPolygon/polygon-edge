@@ -31,7 +31,7 @@ var (
 func GenerateKeyAndAddr(t *testing.T) (*ecdsa.PrivateKey, types.Address) {
 	t.Helper()
 
-	key, err := crypto.GenerateECDSAKey()
+	key, err := crypto.GenerateECDSAPrivateKey()
 
 	assert.NoError(t, err)
 
@@ -238,17 +238,16 @@ type GenerateTxReqParams struct {
 func generateTx(params GenerateTxReqParams) (*types.Transaction, error) {
 	signer := crypto.NewEIP155Signer(100)
 
-	signedTx, signErr := signer.SignTx(types.NewTx(&types.LegacyTx{
-		Nonce:    params.Nonce,
-		From:     params.ReferenceAddr,
-		To:       &params.ToAddress,
-		GasPrice: params.GasPrice,
-		Gas:      1000000,
-		Value:    params.Value,
-		Input:    params.Input,
-		V:        big.NewInt(27), // it is necessary to encode in rlp
-	}), params.ReferenceKey)
-
+	signedTx, signErr := signer.SignTx(types.NewTx(types.NewLegacyTx(
+		types.WithGasPrice(params.GasPrice),
+		types.WithNonce(params.Nonce),
+		types.WithFrom(params.ReferenceAddr),
+		types.WithTo(&params.ToAddress),
+		types.WithGas(1000000),
+		types.WithValue(params.Value),
+		types.WithInput(params.Input),
+		types.WithSignatureValues(big.NewInt(27), nil, nil),
+	)), params.ReferenceKey)
 	if signErr != nil {
 		return nil, fmt.Errorf("unable to sign transaction, %w", signErr)
 	}

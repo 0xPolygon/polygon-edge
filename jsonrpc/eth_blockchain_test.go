@@ -83,13 +83,32 @@ func TestEth_Block_BlockNumber(t *testing.T) {
 	assert.Equal(t, argUintPtr(10), num)
 }
 
+func TestEth_Block_GetBlockTransactionCountByHash(t *testing.T) {
+	store := &mockBlockStore{}
+	block := newTestBlock(1, hash1)
+
+	for i := 0; i < 10; i++ {
+		block.Transactions = append(block.Transactions, []*types.Transaction{
+			types.NewTx(types.NewLegacyTx(types.WithNonce(0), types.WithFrom(addr0)))}...)
+	}
+	store.add(block)
+
+	eth := newTestEthEndpoint(store)
+
+	res, err := eth.GetBlockTransactionCountByHash(block.Header.Hash)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, res, "expected to return block, but got nil")
+	assert.Equal(t, "0xa", res)
+}
+
 func TestEth_Block_GetBlockTransactionCountByNumber(t *testing.T) {
 	store := &mockBlockStore{}
 	block := newTestBlock(1, hash1)
 
 	for i := 0; i < 10; i++ {
 		block.Transactions = append(block.Transactions, []*types.Transaction{
-			types.NewTx(&types.LegacyTx{Nonce: 0, From: addr0})}...)
+			types.NewTx(types.NewLegacyTx(types.WithNonce(0), types.WithFrom(addr0)))}...)
 	}
 	store.add(block)
 
@@ -100,6 +119,58 @@ func TestEth_Block_GetBlockTransactionCountByNumber(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, res, "expected to return block, but got nil")
 	assert.Equal(t, "0xa", res)
+}
+
+func TestEth_Block_GetTransactionByBlockNumberAndIndex(t *testing.T) {
+	store := &mockBlockStore{}
+	eth := newTestEthEndpoint(store)
+	block := newTestBlock(1, hash1)
+
+	for i := 0; i < 10; i++ {
+		txn := newTestTransaction(uint64(i), addr0)
+		block.Transactions = append(block.Transactions, txn)
+	}
+	store.add(block)
+
+	testIndex := 5
+	res, err := eth.GetTransactionByBlockNumberAndIndex(BlockNumber(block.Header.Number), argUint64(testIndex))
+
+	transaction := toTransaction(
+		block.Transactions[testIndex],
+		argUintPtr(block.Number()),
+		argHashPtr(block.Hash()),
+		&testIndex,
+	)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, res, "expected to return transaction, but got nil")
+	assert.Equal(t, transaction, res)
+}
+
+func TestEth_Block_GetTransactionByBlockHashAndIndex(t *testing.T) {
+	store := &mockBlockStore{}
+	block := newTestBlock(1, hash1)
+
+	for i := 0; i < 10; i++ {
+		txn := newTestTransaction(uint64(i), addr0)
+		block.Transactions = append(block.Transactions, txn)
+	}
+	store.add(block)
+
+	eth := newTestEthEndpoint(store)
+	testIndex := 5
+	res, err := eth.GetTransactionByBlockHashAndIndex(block.Header.Hash, argUint64(testIndex))
+
+	transaction := toTransaction(
+		block.Transactions[testIndex],
+		argUintPtr(block.Number()),
+		argHashPtr(block.Hash()),
+		&testIndex,
+	)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, res, "expected to return transaction, but got nil")
+	assert.Equal(t, transaction, res)
 }
 
 func TestEth_GetTransactionByHash(t *testing.T) {

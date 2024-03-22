@@ -136,7 +136,7 @@ func TestE2E_Governance_ProposeAndExecuteSimpleProposal(t *testing.T) {
 
 		// check if epoch size changed on NetworkParams
 		networkParamsResponse, err := ABICall(relayer, contractsapi.NetworkParams,
-			ethgo.Address(polybftCfg.GovernanceConfig.NetworkParamsAddr), ethgo.ZeroAddress, "epochSize")
+			polybftCfg.GovernanceConfig.NetworkParamsAddr, types.ZeroAddress, "epochSize")
 		require.NoError(t, err)
 
 		epochSizeOnNetworkParams, err := common.ParseUint256orHex(&networkParamsResponse)
@@ -291,7 +291,7 @@ func TestE2E_Governance_ProposeAndExecuteSimpleProposal(t *testing.T) {
 
 		// check if base fee change denom changed on NetworkParams
 		networkParamsResponse, err := ABICall(relayer, contractsapi.NetworkParams,
-			ethgo.Address(polybftCfg.GovernanceConfig.NetworkParamsAddr), ethgo.ZeroAddress, "baseFeeChangeDenom")
+			polybftCfg.GovernanceConfig.NetworkParamsAddr, types.ZeroAddress, "baseFeeChangeDenom")
 		require.NoError(t, err)
 
 		baseFeeDenomOnNetworkParams, err := common.ParseUint256orHex(&networkParamsResponse)
@@ -311,7 +311,7 @@ func getProposalState(t *testing.T, proposalID *big.Int, childGovernorAddr types
 	input, err := stateFn.EncodeAbi()
 	require.NoError(t, err)
 
-	response, err := txRelayer.Call(ethgo.ZeroAddress, ethgo.Address(childGovernorAddr), input)
+	response, err := txRelayer.Call(types.ZeroAddress, childGovernorAddr, input)
 	require.NoError(t, err)
 	require.NotEqual(t, "0x", response)
 
@@ -322,7 +322,7 @@ func getProposalState(t *testing.T, proposalID *big.Int, childGovernorAddr types
 }
 
 func sendQueueProposalTransaction(t *testing.T,
-	txRelayer txrelayer.TxRelayer, senderKey ethgo.Key,
+	txRelayer txrelayer.TxRelayer, senderKey crypto.Key,
 	childGovernorAddr, paramsContractAddr types.Address,
 	input []byte, description string) {
 	t.Helper()
@@ -337,11 +337,10 @@ func sendQueueProposalTransaction(t *testing.T,
 	input, err := queueFn.EncodeAbi()
 	require.NoError(t, err)
 
-	childGovernor := ethgo.Address(childGovernorAddr)
-	txn := &ethgo.Transaction{
-		To:    &childGovernor,
-		Input: input,
-	}
+	txn := types.NewTx(types.NewLegacyTx(
+		types.WithTo(&childGovernorAddr),
+		types.WithInput(input),
+	))
 
 	receipt, err := txRelayer.SendTransaction(txn, senderKey)
 	require.NoError(t, err)
@@ -349,7 +348,7 @@ func sendQueueProposalTransaction(t *testing.T,
 }
 
 func sendExecuteProposalTransaction(t *testing.T,
-	txRelayer txrelayer.TxRelayer, senderKey ethgo.Key,
+	txRelayer txrelayer.TxRelayer, senderKey crypto.Key,
 	childGovernorAddr, paramsContractAddr types.Address,
 	input []byte, description string) {
 	t.Helper()
@@ -364,11 +363,10 @@ func sendExecuteProposalTransaction(t *testing.T,
 	input, err := executeFn.EncodeAbi()
 	require.NoError(t, err)
 
-	childGovernor := ethgo.Address(childGovernorAddr)
-	txn := &ethgo.Transaction{
-		To:    &childGovernor,
-		Input: input,
-	}
+	txn := types.NewTx(types.NewLegacyTx(
+		types.WithTo(&childGovernorAddr),
+		types.WithInput(input),
+	))
 
 	receipt, err := txRelayer.SendTransaction(txn, senderKey)
 	require.NoError(t, err)
@@ -377,7 +375,7 @@ func sendExecuteProposalTransaction(t *testing.T,
 
 func sendVoteTransaction(t *testing.T, proposalID *big.Int, vote VoteType,
 	childGovernorAddr types.Address,
-	txRelayer txrelayer.TxRelayer, senderKey ethgo.Key) {
+	txRelayer txrelayer.TxRelayer, senderKey crypto.Key) {
 	t.Helper()
 
 	castVoteFn := &contractsapi.CastVoteChildGovernorFn{
@@ -388,11 +386,10 @@ func sendVoteTransaction(t *testing.T, proposalID *big.Int, vote VoteType,
 	input, err := castVoteFn.EncodeAbi()
 	require.NoError(t, err)
 
-	childGovernor := ethgo.Address(childGovernorAddr)
-	txn := &ethgo.Transaction{
-		To:    &childGovernor,
-		Input: input,
-	}
+	txn := types.NewTx(types.NewLegacyTx(
+		types.WithTo(&childGovernorAddr),
+		types.WithInput(input),
+	))
 
 	receipt, err := txRelayer.SendTransaction(txn, senderKey)
 	require.NoError(t, err)
@@ -400,7 +397,7 @@ func sendVoteTransaction(t *testing.T, proposalID *big.Int, vote VoteType,
 }
 
 func sendProposalTransaction(t *testing.T, txRelayer txrelayer.TxRelayer,
-	senderKey ethgo.Key,
+	senderKey crypto.Key,
 	childGovernorAddr, paramsContractAddr types.Address,
 	input []byte, description string) *big.Int {
 	t.Helper()
@@ -415,11 +412,10 @@ func sendProposalTransaction(t *testing.T, txRelayer txrelayer.TxRelayer,
 	input, err := proposeFn.EncodeAbi()
 	require.NoError(t, err)
 
-	childGovernor := ethgo.Address(childGovernorAddr)
-	txn := &ethgo.Transaction{
-		To:    &childGovernor,
-		Input: input,
-	}
+	txn := types.NewTx(types.NewLegacyTx(
+		types.WithTo(&childGovernorAddr),
+		types.WithInput(input),
+	))
 
 	receipt, err := txRelayer.SendTransaction(txn, senderKey)
 	require.NoError(t, err)

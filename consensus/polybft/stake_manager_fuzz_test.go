@@ -15,11 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type epochIDValidatorsF struct {
-	EpochID    uint64
-	Validators []*validator.ValidatorMetadata
-}
-
 type postBlockStructF struct {
 	EpochID     uint64
 	ValidatorID uint64

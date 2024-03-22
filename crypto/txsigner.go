@@ -29,8 +29,12 @@ type TxSigner interface {
 	// Sender returns the sender of the transaction
 	Sender(*types.Transaction) (types.Address, error)
 
-	// SingTx takes the original transaction as input and returns its signed version
+	// SignTx takes the original transaction as input and returns its signed version
 	SignTx(*types.Transaction, *ecdsa.PrivateKey) (*types.Transaction, error)
+
+	// SignTxWithCallback signs a transaction by using a custom callback
+	SignTxWithCallback(tx *types.Transaction,
+		signFn func(hash types.Hash) (sig []byte, err error)) (*types.Transaction, error)
 }
 
 // NewSigner creates a new signer based on currently supported forks

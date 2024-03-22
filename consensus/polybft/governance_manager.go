@@ -102,7 +102,7 @@ type governanceManager struct {
 }
 
 // newGovernanceManager is a constructor function for governance manager
-func newGovernanceManager(genesisParams *chain.Params, genesisConfig *PolyBFTConfig,
+func newGovernanceManager(genesisParams *chain.Params,
 	logger hclog.Logger,
 	state *State,
 	blockhain blockchainBackend,
@@ -459,7 +459,7 @@ func isForkParamsEvent(event contractsapi.EventAbi) (types.Hash, *big.Int, bool)
 }
 
 // parseGovernanceEvent parses provided log to correct governance event
-func parseGovernanceEvent(h *types.Header, log *ethgo.Log) (contractsapi.EventAbi, bool, error) {
+func parseGovernanceEvent(log *ethgo.Log) (contractsapi.EventAbi, bool, error) {
 	var (
 		checkpointIntervalEvent  contractsapi.NewCheckpointBlockIntervalEvent
 		epochSizeEvent           contractsapi.NewEpochSizeEvent
@@ -546,7 +546,7 @@ func (g *governanceManager) GetLogFilters() map[types.Address][]types.Hash {
 }
 
 func (g *governanceManager) ProcessLog(header *types.Header, log *ethgo.Log, dbTx *bolt.Tx) error {
-	event, isGovernanceEvent, err := parseGovernanceEvent(header, log)
+	event, isGovernanceEvent, err := parseGovernanceEvent(log)
 	if err != nil {
 		return err
 	}
@@ -567,7 +567,7 @@ func (g *governanceManager) ProcessLog(header *types.Header, log *ethgo.Log, dbT
 	)
 
 	return g.state.GovernanceStore.insertGovernanceEvent(
-		extra.Checkpoint.EpochNumber, header.Number, event, dbTx)
+		extra.Checkpoint.EpochNumber, event, dbTx)
 }
 
 // unmarshalGovernanceEvent unmarshals given raw event to desired type

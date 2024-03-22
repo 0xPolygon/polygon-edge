@@ -4,16 +4,16 @@ import (
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/wallet"
 )
 
 func TestE2E_BurnContract_Deployed(t *testing.T) {
-	contractKey, _ := wallet.GenerateKey()
-	destinationKey, _ := wallet.GenerateKey()
+	contractKey, _ := crypto.GenerateECDSAKey()
+	destinationKey, _ := crypto.GenerateECDSAKey()
 
 	contractAddr := types.Address(contractKey.Address())
 	destinationAddr := types.Address(destinationKey.Address())

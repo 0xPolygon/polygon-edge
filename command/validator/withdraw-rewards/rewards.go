@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/umbracle/ethgo"
 
 	"github.com/0xPolygon/polygon-edge/command"
 	bridgeHelper "github.com/0xPolygon/polygon-edge/command/bridge/helper"
@@ -69,7 +68,6 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	}
 
 	validatorAddr := validatorAccount.Ecdsa.Address()
-	epochManagerContract := ethgo.Address(contracts.EpochManagerContract)
 
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(params.jsonRPC),
 		txrelayer.WithReceiptTimeout(150*time.Millisecond))
@@ -82,7 +80,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	response, err := txRelayer.Call(validatorAddr, epochManagerContract, encoded)
+	response, err := txRelayer.Call(validatorAddr, contracts.EpochManagerContract, encoded)
 	if err != nil {
 		return err
 	}
@@ -97,7 +95,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	txn := bridgeHelper.CreateTransaction(validatorAddr, &epochManagerContract, encoded, nil, false)
+	txn := bridgeHelper.CreateTransaction(validatorAddr, &contracts.EpochManagerContract, encoded, nil, false)
 
 	receipt, err := txRelayer.SendTransaction(txn, validatorAccount.Ecdsa)
 	if err != nil {

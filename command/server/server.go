@@ -214,6 +214,20 @@ func setFlags(cmd *cobra.Command) {
 		"write all logs to the file at specified location instead of writing them to console",
 	)
 
+	cmd.Flags().StringVar(
+		&params.rawConfig.TLSCertFile,
+		tlsCertFileLocationFlag,
+		defaultConfig.TLSCertFile,
+		"path to TLS cert file, if no file is provided then TLS is not used",
+	)
+
+	cmd.Flags().StringVar(
+		&params.rawConfig.TLSKeyFile,
+		tlsKeyFileLocationFlag,
+		defaultConfig.TLSKeyFile,
+		"path to TLS key file, if no file is provided then TLS is not used",
+	)
+
 	cmd.Flags().BoolVar(
 		&params.rawConfig.Relayer,
 		relayerFlag,

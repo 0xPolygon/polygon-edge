@@ -4,7 +4,6 @@ package polybft
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math/big"
 	"path/filepath"
@@ -33,10 +32,6 @@ const (
 	minSyncPeers = 2
 	pbftProto    = "/pbft/0.2"
 	bridgeProto  = "/bridge/0.2"
-)
-
-var (
-	errMissingBridgeConfig = errors.New("invalid genesis configuration, missing bridge configuration")
 )
 
 // polybftBackend is an interface defining polybft methods needed by fsm and sync tracker
@@ -486,7 +481,7 @@ func (p *Polybft) Initialize() error {
 		return fmt.Errorf("failed to create data directory. Error: %w", err)
 	}
 
-	stt, err := newState(filepath.Join(p.dataDir, stateFileName), p.logger, p.closeCh)
+	stt, err := newState(filepath.Join(p.dataDir, stateFileName), p.closeCh)
 	if err != nil {
 		return fmt.Errorf("failed to create state instance. Error: %w", err)
 	}

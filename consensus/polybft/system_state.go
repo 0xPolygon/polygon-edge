@@ -13,7 +13,7 @@ import (
 // ValidatorInfo is data transfer object which holds validator information,
 // provided by smart contract
 type ValidatorInfo struct {
-	Address             ethgo.Address `json:"address"`
+	Address             types.Address `json:"address"`
 	Stake               *big.Int      `json:"stake"`
 	WithdrawableRewards *big.Int      `json:"withdrawableRewards"`
 	IsActive            bool          `json:"isActive"`

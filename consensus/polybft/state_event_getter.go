@@ -30,8 +30,6 @@ type EventProvider struct {
 
 	subscriberIDCounter uint64
 
-	blockchain blockchainBackend
-
 	subscribers map[uint64]EventSubscriber
 	allFilters  map[types.Address]map[types.Hash][]uint64
 }

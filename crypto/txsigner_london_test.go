@@ -67,37 +67,37 @@ func TestLondonSignerSender(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			key, err := GenerateECDSAKey()
+			key, err := GenerateECDSAPrivateKey()
 			require.NoError(t, err, "unable to generate private key")
 
 			var txn *types.Transaction
 
 			switch tc.txType {
 			case types.AccessListTxType:
-				txn = types.NewTx(&types.AccessListTxn{
-					To:       &recipient,
-					Value:    big.NewInt(1),
-					GasPrice: big.NewInt(5),
-					ChainID:  tc.chainID,
-				})
+				txn = types.NewTx(types.NewAccessListTx(
+					types.WithGasPrice(big.NewInt(5)),
+					types.WithChainID(tc.chainID),
+					types.WithTo(&recipient),
+					types.WithValue(big.NewInt(1)),
+				))
 			case types.LegacyTxType:
-				txn = types.NewTx(&types.LegacyTx{
-					To:       &recipient,
-					Value:    big.NewInt(1),
-					GasPrice: big.NewInt(5),
-				})
+				txn = types.NewTx(types.NewLegacyTx(
+					types.WithGasPrice(big.NewInt(5)),
+					types.WithTo(&recipient),
+					types.WithValue(big.NewInt(1)),
+				))
 			case types.StateTxType:
-				txn = types.NewTx(&types.StateTx{
-					To:       &recipient,
-					Value:    big.NewInt(1),
-					GasPrice: big.NewInt(5),
-				})
+				txn = types.NewTx(types.NewStateTx(
+					types.WithGasPrice(big.NewInt(5)),
+					types.WithTo(&recipient),
+					types.WithValue(big.NewInt(1)),
+				))
 			case types.DynamicFeeTxType:
-				txn = types.NewTx(&types.DynamicFeeTx{
-					To:      &recipient,
-					Value:   big.NewInt(1),
-					ChainID: tc.chainID,
-				})
+				txn = types.NewTx(types.NewDynamicFeeTx(
+					types.WithChainID(tc.chainID),
+					types.WithTo(&recipient),
+					types.WithValue(big.NewInt(1)),
+				))
 			}
 
 			chainID := tc.chainID.Uint64()
@@ -134,17 +134,15 @@ func Test_LondonSigner_Sender(t *testing.T) {
 	}{
 		{
 			name: "sender is 0x85dA99c8a7C2C95964c8EfD687E95E632Fc533D6",
-			tx: types.NewTx(&types.DynamicFeeTx{
-				GasTipCap: ethgo.Gwei(1),
-				GasFeeCap: ethgo.Gwei(10),
-				Gas:       21000,
-				To:        &to,
-				Value:     big.NewInt(100000000000000),
-				V:         big.NewInt(0),
-				R:         r,
-				S:         s,
-				ChainID:   big.NewInt(100),
-			}),
+			tx: types.NewTx(types.NewDynamicFeeTx(
+				types.WithChainID(big.NewInt(100)),
+				types.WithGasTipCap(ethgo.Gwei(1)),
+				types.WithGasFeeCap(ethgo.Gwei(10)),
+				types.WithGas(21000),
+				types.WithTo(&to),
+				types.WithValue(big.NewInt(100000000000000)),
+				types.WithSignatureValues(big.NewInt(0), r, s),
+			)),
 			sender: types.StringToAddress("0x85dA99c8a7C2C95964c8EfD687E95E632Fc533D6"),
 		},
 	}

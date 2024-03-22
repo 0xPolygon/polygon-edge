@@ -100,10 +100,6 @@ type Eth struct {
 	priceLimit    uint64
 }
 
-var (
-	ErrInsufficientFunds = errors.New("insufficient funds for execution")
-)
-
 // ChainId returns the chain id of the client
 //
 //nolint:stylecheck
@@ -176,6 +172,16 @@ func (e *Eth) filterExtra(block *types.Block) error {
 	return nil
 }
 
+// GetBlockTransactionCountByHash returns the number of transactions in the block with the given hash.
+func (e *Eth) GetBlockTransactionCountByHash(blockHash types.Hash) (interface{}, error) {
+	block, ok := e.store.GetBlockByHash(blockHash, true)
+	if !ok {
+		return nil, nil
+	}
+
+	return *common.EncodeUint64(uint64(len(block.Transactions))), nil
+}
+
 func (e *Eth) GetBlockTransactionCountByNumber(number BlockNumber) (interface{}, error) {
 	num, err := GetNumericBlockNumber(number, e.store)
 	if err != nil {
@@ -189,6 +195,31 @@ func (e *Eth) GetBlockTransactionCountByNumber(number BlockNumber) (interface{},
 	}
 
 	return *common.EncodeUint64(uint64(len(block.Transactions))), nil
+}
+
+// GetTransactionByBlockNumberAndIndex returns the transaction for the given block number and index.
+func (e *Eth) GetTransactionByBlockNumberAndIndex(number BlockNumber, index argUint64) (interface{}, error) {
+	num, err := GetNumericBlockNumber(number, e.store)
+	if err != nil {
+		return nil, err
+	}
+
+	block, ok := e.store.GetBlockByNumber(num, true)
+	if !ok {
+		return nil, nil
+	}
+
+	return GetTransactionByBlockAndIndex(block, index)
+}
+
+// GetTransactionByBlockHashAndIndex returns the transaction for the given block hash and index.
+func (e *Eth) GetTransactionByBlockHashAndIndex(blockHash types.Hash, index argUint64) (interface{}, error) {
+	block, ok := e.store.GetBlockByHash(blockHash, true)
+	if !ok {
+		return nil, nil
+	}
+
+	return GetTransactionByBlockAndIndex(block, index)
 }
 
 // BlockNumber returns current block number
@@ -417,45 +448,8 @@ func (e *Eth) fillTransactionGasPrice(tx *types.Transaction) error {
 	return nil
 }
 
-type overrideAccount struct {
-	Nonce     *argUint64                 `json:"nonce"`
-	Code      *argBytes                  `json:"code"`
-	Balance   *argUint64                 `json:"balance"`
-	State     *map[types.Hash]types.Hash `json:"state"`
-	StateDiff *map[types.Hash]types.Hash `json:"stateDiff"`
-}
-
-func (o *overrideAccount) ToType() types.OverrideAccount {
-	res := types.OverrideAccount{}
-
-	if o.Nonce != nil {
-		res.Nonce = (*uint64)(o.Nonce)
-	}
-
-	if o.Code != nil {
-		res.Code = *o.Code
-	}
-
-	if o.Balance != nil {
-		res.Balance = new(big.Int).SetUint64(*(*uint64)(o.Balance))
-	}
-
-	if o.State != nil {
-		res.State = *o.State
-	}
-
-	if o.StateDiff != nil {
-		res.StateDiff = *o.StateDiff
-	}
-
-	return res
-}
-
-// StateOverride is the collection of overridden accounts.
-type stateOverride map[types.Address]overrideAccount
-
 // Call executes a smart contract call using the transaction object data
-func (e *Eth) Call(arg *txnArgs, filter BlockNumberOrHash, apiOverride *stateOverride) (interface{}, error) {
+func (e *Eth) Call(arg *txnArgs, filter BlockNumberOrHash, apiOverride *StateOverride) (interface{}, error) {
 	header, err := GetHeaderFromBlockNumberOrHash(filter, e.store)
 	if err != nil {
 		return nil, err
@@ -559,7 +553,13 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 		highEnd = header.GasLimit
 	}
 
-	gasPriceInt := new(big.Int).Set(transaction.GasPrice())
+	gasPriceInt := big.NewInt(0)
+	gasprice := transaction.GasPrice()
+
+	if gasprice != nil { // if dynamic transaction this will be nil
+		gasPriceInt.Set(gasprice)
+	}
+
 	valueInt := new(big.Int).Set(transaction.Value())
 
 	var availableBalance *big.Int

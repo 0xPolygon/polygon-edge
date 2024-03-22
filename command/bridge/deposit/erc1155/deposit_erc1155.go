@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/umbracle/ethgo"
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/bridge/common"
@@ -245,8 +244,8 @@ func runCommand(cmd *cobra.Command, _ []string) {
 }
 
 // createDepositTxn encodes parameters for deposit function on rootchain predicate contract
-func createDepositTxn(sender ethgo.Address, receivers []types.Address,
-	amounts, tokenIDs []*big.Int) (*ethgo.Transaction, error) {
+func createDepositTxn(sender types.Address, receivers []types.Address,
+	amounts, tokenIDs []*big.Int) (*types.Transaction, error) {
 	depositBatchFn := &contractsapi.DepositBatchRootERC1155PredicateFn{
 		RootToken: types.StringToAddress(dp.TokenAddr),
 		Receivers: receivers,
@@ -259,14 +258,14 @@ func createDepositTxn(sender ethgo.Address, receivers []types.Address,
 		return nil, fmt.Errorf("failed to encode provided parameters: %w", err)
 	}
 
-	addr := ethgo.Address(types.StringToAddress(dp.PredicateAddr))
+	addr := types.StringToAddress(dp.PredicateAddr)
 
 	return helper.CreateTransaction(sender, &addr, input,
 		nil, !dp.ChildChainMintable), nil
 }
 
 // createMintTxn encodes parameters for mint function on rootchain token contract
-func createMintTxn(sender, receiver types.Address, amounts, tokenIDs []*big.Int) (*ethgo.Transaction, error) {
+func createMintTxn(sender, receiver types.Address, amounts, tokenIDs []*big.Int) (*types.Transaction, error) {
 	mintFn := &contractsapi.MintBatchRootERC1155Fn{
 		To:      receiver,
 		Amounts: amounts,
@@ -278,16 +277,16 @@ func createMintTxn(sender, receiver types.Address, amounts, tokenIDs []*big.Int)
 		return nil, fmt.Errorf("failed to encode provided parameters: %w", err)
 	}
 
-	addr := ethgo.Address(types.StringToAddress(dp.TokenAddr))
+	addr := types.StringToAddress(dp.TokenAddr)
 
-	return helper.CreateTransaction(ethgo.Address(sender), &addr,
+	return helper.CreateTransaction(sender, &addr,
 		input, nil, !dp.ChildChainMintable), nil
 }
 
 // createApproveERC1155PredicateTxn sends approve transaction
 // to ERC1155 token for ERC1155 predicate so that it is able to spend given tokens
 func createApproveERC1155PredicateTxn(rootERC1155Predicate,
-	rootERC1155Token types.Address) (*ethgo.Transaction, error) {
+	rootERC1155Token types.Address) (*types.Transaction, error) {
 	approveFnParams := &contractsapi.SetApprovalForAllRootERC1155Fn{
 		Operator: rootERC1155Predicate,
 		Approved: true,
@@ -298,8 +297,6 @@ func createApproveERC1155PredicateTxn(rootERC1155Predicate,
 		return nil, fmt.Errorf("failed to encode parameters for RootERC1155.setApprovalForAll. error: %w", err)
 	}
 
-	addr := ethgo.Address(rootERC1155Token)
-
-	return helper.CreateTransaction(ethgo.ZeroAddress, &addr,
+	return helper.CreateTransaction(types.ZeroAddress, &rootERC1155Token,
 		input, nil, !dp.ChildChainMintable), nil
 }

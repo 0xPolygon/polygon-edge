@@ -15,7 +15,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
 )
 
@@ -28,7 +27,7 @@ func createTestKey(t *testing.T) *wallet.Key {
 func createRandomTestKeys(t *testing.T, numberOfKeys int) []*wallet.Key {
 	t.Helper()
 
-	result := make([]*wallet.Key, numberOfKeys, numberOfKeys)
+	result := make([]*wallet.Key, numberOfKeys)
 
 	for i := 0; i < numberOfKeys; i++ {
 		result[i] = wallet.NewKey(generateTestAccount(t))
@@ -155,7 +154,7 @@ func newTestState(tb testing.TB) *State {
 		tb.Fatal(err)
 	}
 
-	state, err := newState(path.Join(dir, "my.db"), hclog.NewNullLogger(), make(chan struct{}))
+	state, err := newState(path.Join(dir, "my.db"), make(chan struct{}))
 	if err != nil {
 		tb.Fatal(err)
 	}

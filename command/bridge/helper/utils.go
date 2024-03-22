@@ -10,13 +10,13 @@ import (
 	dockertypes "github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/wallet"
 
 	polybftsecrets "github.com/0xPolygon/polygon-edge/command/secrets/init"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	polybftWallet "github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
@@ -49,7 +49,7 @@ var (
 	ErrNoAddressesProvided = errors.New("no addresses provided")
 	ErrInconsistentLength  = errors.New("addresses and amounts must be equal length")
 
-	rootchainAccountKey *wallet.Key
+	rootchainAccountKey *crypto.ECDSAKey
 )
 
 type MessageResult struct {
@@ -66,7 +66,7 @@ func (r MessageResult) GetOutput() string {
 }
 
 // DecodePrivateKey decodes a private key from provided raw private key
-func DecodePrivateKey(rawKey string) (ethgo.Key, error) {
+func DecodePrivateKey(rawKey string) (crypto.Key, error) {
 	privateKeyRaw := TestAccountPrivKey
 	if rawKey != "" {
 		privateKeyRaw = rawKey
@@ -77,7 +77,7 @@ func DecodePrivateKey(rawKey string) (ethgo.Key, error) {
 		return nil, fmt.Errorf("failed to decode private key string '%s': %w", privateKeyRaw, err)
 	}
 
-	rootchainAccountKey, err = wallet.NewWalletFromPrivKey(dec)
+	rootchainAccountKey, err = crypto.NewECDSAKeyFromRawPrivECDSA(dec)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize key from provided private key '%s': %w", privateKeyRaw, err)
 	}
@@ -132,7 +132,7 @@ func ReadRootchainIP() (string, error) {
 // GetECDSAKey returns the key based on provided parameters
 // If private key is provided, it will return that key
 // if not, it will return the key from the secrets manager
-func GetECDSAKey(privateKey, accountDir, accountConfig string) (ethgo.Key, error) {
+func GetECDSAKey(privateKey, accountDir, accountConfig string) (crypto.Key, error) {
 	if privateKey != "" {
 		key, err := DecodePrivateKey(privateKey)
 		if err != nil {
@@ -152,9 +152,9 @@ func GetECDSAKey(privateKey, accountDir, accountConfig string) (ethgo.Key, error
 
 // GetValidatorInfo queries SupernetManager smart contract on root
 // and retrieves validator info for given address
-func GetValidatorInfo(validatorAddr ethgo.Address, supernetManagerAddr, stakeManagerAddr types.Address,
+func GetValidatorInfo(validatorAddr types.Address, supernetManagerAddr, stakeManagerAddr types.Address,
 	txRelayer txrelayer.TxRelayer) (*polybft.ValidatorInfo, error) {
-	caller := ethgo.Address(contracts.SystemCaller)
+	caller := contracts.SystemCaller
 	getValidatorMethod := contractsapi.StakeManager.Abi.GetMethod("stakeOf")
 
 	encode, err := getValidatorMethod.Encode([]interface{}{validatorAddr})
@@ -162,7 +162,7 @@ func GetValidatorInfo(validatorAddr ethgo.Address, supernetManagerAddr, stakeMan
 		return nil, err
 	}
 
-	response, err := txRelayer.Call(caller, ethgo.Address(supernetManagerAddr), encode)
+	response, err := txRelayer.Call(caller, supernetManagerAddr, encode)
 	if err != nil {
 		return nil, err
 	}
@@ -203,7 +203,7 @@ func GetValidatorInfo(validatorAddr ethgo.Address, supernetManagerAddr, stakeMan
 		return nil, err
 	}
 
-	response, err = txRelayer.Call(caller, ethgo.Address(stakeManagerAddr), encode)
+	response, err = txRelayer.Call(caller, stakeManagerAddr, encode)
 	if err != nil {
 		return nil, err
 	}
@@ -220,7 +220,7 @@ func GetValidatorInfo(validatorAddr ethgo.Address, supernetManagerAddr, stakeMan
 
 // CreateMintTxn encodes parameters for mint function on rootchain token contract
 func CreateMintTxn(receiver, erc20TokenAddr types.Address,
-	amount *big.Int, rootchainTx bool) (*ethgo.Transaction, error) {
+	amount *big.Int, rootchainTx bool) (*types.Transaction, error) {
 	mintFn := &contractsapi.MintRootERC20Fn{
 		To:     receiver,
 		Amount: amount,
@@ -231,8 +231,7 @@ func CreateMintTxn(receiver, erc20TokenAddr types.Address,
 		return nil, fmt.Errorf("failed to encode provided parameters: %w", err)
 	}
 
-	addr := ethgo.Address(erc20TokenAddr)
-	txn := CreateTransaction(ethgo.ZeroAddress, &addr, input, nil, rootchainTx)
+	txn := CreateTransaction(types.ZeroAddress, &erc20TokenAddr, input, nil, rootchainTx)
 
 	return txn, nil
 }
@@ -240,7 +239,7 @@ func CreateMintTxn(receiver, erc20TokenAddr types.Address,
 // CreateApproveERC20Txn sends approve transaction
 // to ERC20 token for spender so that it is able to spend given tokens
 func CreateApproveERC20Txn(amount *big.Int,
-	spender, erc20TokenAddr types.Address, rootchainTx bool) (*ethgo.Transaction, error) {
+	spender, erc20TokenAddr types.Address, rootchainTx bool) (*types.Transaction, error) {
 	approveFnParams := &contractsapi.ApproveRootERC20Fn{
 		Spender: spender,
 		Amount:  amount,
@@ -251,20 +250,18 @@ func CreateApproveERC20Txn(amount *big.Int,
 		return nil, fmt.Errorf("failed to encode parameters for RootERC20.approve. error: %w", err)
 	}
 
-	addr := ethgo.Address(erc20TokenAddr)
-
-	return CreateTransaction(ethgo.ZeroAddress, &addr, input, nil, rootchainTx), nil
+	return CreateTransaction(types.ZeroAddress, &erc20TokenAddr, input, nil, rootchainTx), nil
 }
 
 // SendTransaction sends provided transaction
-func SendTransaction(txRelayer txrelayer.TxRelayer, addr ethgo.Address, input []byte, contractName string,
-	deployerKey ethgo.Key) (*ethgo.Receipt, error) {
-	txn := CreateTransaction(ethgo.ZeroAddress, &addr, input, nil, true)
+func SendTransaction(txRelayer txrelayer.TxRelayer, addr types.Address, input []byte, contractName string,
+	deployerKey crypto.Key) (*ethgo.Receipt, error) {
+	txn := CreateTransaction(types.ZeroAddress, &addr, input, nil, true)
 
 	receipt, err := txRelayer.SendTransaction(txn, deployerKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send transaction to %s contract (%s). error: %w",
-			contractName, txn.To.Address(), err)
+			contractName, txn.To(), err)
 	}
 
 	if receipt == nil || receipt.Status != uint64(types.ReceiptSuccess) {
@@ -275,25 +272,21 @@ func SendTransaction(txRelayer txrelayer.TxRelayer, addr ethgo.Address, input []
 }
 
 // CreateTransaction is a helper function that creates either dynamic fee or legacy transaction based on provided flag
-func CreateTransaction(sender ethgo.Address, receiver *ethgo.Address,
-	input []byte, value *big.Int, isDynamicFeeTx bool) *ethgo.Transaction {
-	txn := &ethgo.Transaction{
-		From:  sender,
-		To:    receiver,
-		Input: input,
-		Value: value,
-	}
-
+func CreateTransaction(sender types.Address, receiver *types.Address,
+	input []byte, value *big.Int, isDynamicFeeTx bool) *types.Transaction {
+	var txData types.TxData
 	if isDynamicFeeTx {
-		txn.Type = ethgo.TransactionDynamicFee
+		txData = types.NewDynamicFeeTx(types.WithFrom(sender),
+			types.WithTo(receiver), types.WithValue(value), types.WithInput(input))
 	} else {
-		txn.Type = ethgo.TransactionLegacy
+		txData = types.NewLegacyTx(types.WithFrom(sender),
+			types.WithTo(receiver), types.WithValue(value), types.WithInput(input))
 	}
 
-	return txn
+	return types.NewTx(txData)
 }
 
-func DeployProxyContract(txRelayer txrelayer.TxRelayer, deployerKey ethgo.Key, proxyContractName string,
+func DeployProxyContract(txRelayer txrelayer.TxRelayer, deployerKey crypto.Key, proxyContractName string,
 	proxyAdmin, logicAddress types.Address) (*ethgo.Receipt, error) {
 	proxyConstructorFn := contractsapi.TransparentUpgradeableProxyConstructorFn{
 		Logic:  logicAddress,
@@ -312,7 +305,7 @@ func DeployProxyContract(txRelayer txrelayer.TxRelayer, deployerKey ethgo.Key, p
 	proxyDeployInput = append(proxyDeployInput, contractsapi.TransparentUpgradeableProxy.Bytecode...)
 	proxyDeployInput = append(proxyDeployInput, constructorInput...)
 
-	txn := CreateTransaction(ethgo.ZeroAddress, nil, proxyDeployInput, nil, true)
+	txn := CreateTransaction(types.ZeroAddress, nil, proxyDeployInput, nil, true)
 
 	receipt, err := txRelayer.SendTransaction(txn, deployerKey)
 	if err != nil {

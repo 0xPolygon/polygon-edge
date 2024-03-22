@@ -129,28 +129,33 @@ func TestCalculateTransactionsRoot(t *testing.T) {
 		transactions := []*types.Transaction{
 			{
 				Inner: &types.DynamicFeeTx{
-					Hash:      types.StringToHash("0x1"),
-					From:      types.StringToAddress("0x2"),
-					To:        &contractAddr1,
-					Value:     big.NewInt(100),
+
 					GasTipCap: big.NewInt(10),
 					GasFeeCap: big.NewInt(100),
-					Input:     []byte{0x1, 0x2, 0x3},
-					Nonce:     1,
-					Gas:       100000,
-					ChainID:   big.NewInt(1),
+					BaseTx: &types.BaseTx{
+						Hash:  types.StringToHash("0x1"),
+						From:  types.StringToAddress("0x2"),
+						To:    &contractAddr1,
+						Value: big.NewInt(100),
+						Input: []byte{0x1, 0x2, 0x3},
+						Nonce: 1,
+						Gas:   100000,
+					},
+					ChainID: big.NewInt(1),
 				},
 			},
 			{
 				Inner: &types.LegacyTx{
-					Hash:     types.StringToHash("0x4"),
-					From:     types.StringToAddress("0x5"),
-					To:       &contractAddr2,
-					Value:    big.NewInt(200),
 					GasPrice: big.NewInt(20),
-					Gas:      200000,
-					Input:    []byte{0x4, 0x5, 0x6},
-					Nonce:    2,
+					BaseTx: &types.BaseTx{
+						Hash:  types.StringToHash("0x4"),
+						From:  types.StringToAddress("0x5"),
+						To:    &contractAddr2,
+						Value: big.NewInt(200),
+						Gas:   200000,
+						Input: []byte{0x4, 0x5, 0x6},
+						Nonce: 2,
+					},
 				},
 			},
 		}

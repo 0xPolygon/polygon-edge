@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"io/fs"
 	"math/big"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"github.com/umbracle/fastrlp"
 
 	"github.com/0xPolygon/polygon-edge/chain"
@@ -22,6 +22,10 @@ import (
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
+)
+
+const (
+	testGenesisBaseFee = 0xa
 )
 
 type testCase struct {
@@ -57,7 +61,7 @@ type env struct {
 	Timestamp  string `json:"currentTimestamp"`
 }
 
-func (e *env) ToHeader(t *testing.T) *types.Header {
+func (e *env) ToHeader(t testing.TB) *types.Header {
 	t.Helper()
 
 	baseFee := uint64(0)
@@ -75,7 +79,7 @@ func (e *env) ToHeader(t *testing.T) *types.Header {
 	}
 }
 
-func (e *env) ToEnv(t *testing.T) runtime.TxContext {
+func (e *env) ToEnv(t testing.TB) runtime.TxContext {
 	t.Helper()
 
 	baseFee := new(big.Int)
@@ -129,35 +133,29 @@ func stringToBigInt(str string) (*big.Int, error) {
 	return n, nil
 }
 
-func stringToBigIntT(t *testing.T, str string) *big.Int {
+func stringToBigIntT(t testing.TB, str string) *big.Int {
 	t.Helper()
 
 	number, err := stringToBigInt(str)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	return number
 }
 
-func stringToAddressT(t *testing.T, str string) types.Address {
+func stringToAddressT(t testing.TB, str string) types.Address {
 	t.Helper()
 
 	address, err := stringToAddress(str)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	return address
 }
 
-func stringToHashT(t *testing.T, str string) types.Hash {
+func stringToHashT(t testing.TB, str string) types.Hash {
 	t.Helper()
 
 	address, err := stringToHash(str)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	return address
 }
@@ -171,24 +169,20 @@ func stringToUint64(str string) (uint64, error) {
 	return n.Uint64(), nil
 }
 
-func stringToUint64T(t *testing.T, str string) uint64 {
+func stringToUint64T(t testing.TB, str string) uint64 {
 	t.Helper()
 
 	n, err := stringToUint64(str)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	return n
 }
 
-func stringToInt64T(t *testing.T, str string) int64 {
+func stringToInt64T(t testing.TB, str string) int64 {
 	t.Helper()
 
 	n, err := stringToUint64(str)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	return int64(n)
 }
@@ -259,10 +253,6 @@ func (p *postEntry) UnmarshalJSON(input []byte) error {
 
 type postState []postEntry
 
-// TODO: Check do we need access lists in the stTransaction
-// (we do not have them in the types.Transaction either)
-//
-//nolint:godox
 type stTransaction struct {
 	Data                 []string              `json:"data"`
 	Value                []string              `json:"value"`
@@ -338,41 +328,42 @@ func (t *stTransaction) At(i indexes, baseFee *big.Int) (*types.Transaction, err
 
 	// if tx is not dynamic and accessList is not nil, create an access list transaction
 	if !isDynamiFeeTx && accessList != nil {
-		txData = &types.AccessListTxn{
-			From:       t.From,
-			To:         t.To,
-			Nonce:      t.Nonce,
-			Value:      value,
-			Gas:        t.GasLimit[i.Gas],
-			GasPrice:   gasPrice,
-			Input:      hex.MustDecodeHex(t.Data[i.Data]),
-			AccessList: accessList,
-		}
+		txData = types.NewAccessListTx(
+			types.WithGasPrice(gasPrice),
+			types.WithAccessList(accessList),
+			types.WithFrom(t.From),
+			types.WithTo(t.To),
+			types.WithNonce(t.Nonce),
+			types.WithValue(value),
+			types.WithGas(t.GasLimit[i.Gas]),
+			types.WithInput(hex.MustDecodeHex(t.Data[i.Data])),
+		)
 	}
 
 	if txData == nil {
 		if isDynamiFeeTx {
-			txData = &types.DynamicFeeTx{
-				From:       t.From,
-				To:         t.To,
-				Nonce:      t.Nonce,
-				Value:      value,
-				Gas:        t.GasLimit[i.Gas],
-				GasFeeCap:  t.MaxFeePerGas,
-				GasTipCap:  t.MaxPriorityFeePerGas,
-				Input:      hex.MustDecodeHex(t.Data[i.Data]),
-				AccessList: accessList,
-			}
+			txData =
+				types.NewDynamicFeeTx(
+					types.WithGasFeeCap(t.MaxFeePerGas),
+					types.WithGasTipCap(t.MaxPriorityFeePerGas),
+					types.WithAccessList(accessList),
+					types.WithFrom(t.From),
+					types.WithTo(t.To),
+					types.WithNonce(t.Nonce),
+					types.WithValue(value),
+					types.WithGas(t.GasLimit[i.Gas]),
+					types.WithInput(hex.MustDecodeHex(t.Data[i.Data])),
+				)
 		} else {
-			txData = &types.LegacyTx{
-				From:     t.From,
-				To:       t.To,
-				Nonce:    t.Nonce,
-				Value:    value,
-				Gas:      t.GasLimit[i.Gas],
-				GasPrice: gasPrice,
-				Input:    hex.MustDecodeHex(t.Data[i.Data]),
-			}
+			txData = types.NewLegacyTx(
+				types.WithGasPrice(gasPrice),
+				types.WithFrom(t.From),
+				types.WithTo(t.To),
+				types.WithNonce(t.Nonce),
+				types.WithValue(value),
+				types.WithGas(t.GasLimit[i.Gas]),
+				types.WithInput(hex.MustDecodeHex(t.Data[i.Data])),
+			)
 		}
 	}
 
@@ -618,57 +609,28 @@ func contains(l []string, name string) bool {
 	return false
 }
 
-func listFolders(paths []string) ([]string, error) {
-	var folders []string
-
-	for _, rootPath := range paths {
-		err := filepath.WalkDir(rootPath, func(path string, d fs.DirEntry, err error) error {
-			if err != nil {
-				return err
-			}
-
-			if d.IsDir() {
-				files, err := os.ReadDir(path)
-				if err != nil {
-					return err
-				}
-
-				if len(files) > 0 {
-					folders = append(folders, path)
-				}
-			}
-
-			return nil
-		})
-
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return folders, nil
-}
-
 func listFiles(folder string, extensions ...string) ([]string, error) {
 	var files []string
 
-	err := filepath.WalkDir(folder, func(path string, d fs.DirEntry, err error) error {
+	err := filepath.Walk(folder, func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 
-		if !d.IsDir() {
-			if len(extensions) > 0 {
-				// filter files by extensions
-				for _, ext := range extensions {
-					if strings.HasSuffix(path, ext) {
-						files = append(files, path)
-					}
+		if info.IsDir() {
+			return nil
+		}
+
+		if len(extensions) > 0 {
+			// filter files by extensions
+			for _, ext := range extensions {
+				if fileExt := filepath.Ext(path); fileExt == ext {
+					files = append(files, path)
 				}
-			} else {
-				// if no extensions filter is provided, add all files
-				files = append(files, path)
 			}
+		} else {
+			// if no extensions filter is provided, add all files
+			files = append(files, path)
 		}
 
 		return nil
@@ -692,4 +654,16 @@ func rlpHashLogs(logs []*types.Log) (res types.Hash) {
 
 func vmTestBlockHash(n uint64) types.Hash {
 	return types.BytesToHash(crypto.Keccak256([]byte(big.NewInt(int64(n)).String())))
+}
+
+// getTestName extracts test name from the test file path
+func getTestName(testFile string) string {
+	testName := filepath.Base(testFile)
+
+	return strings.TrimSuffix(testName, ".json")
+}
+
+type forkConfig struct {
+	name  string
+	forks *chain.Forks
 }

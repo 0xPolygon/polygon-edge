@@ -84,14 +84,14 @@ func TestGasHelper_MaxPriorityFeePerGas(t *testing.T) {
 					b.Header.Miner = sender.Bytes()
 
 					for i := 0; i < 3; i++ {
-						tx := types.NewTx(&types.DynamicFeeTx{
-							From:      sender,
-							Value:     ethgo.Ether(1),
-							To:        &types.ZeroAddress,
-							GasTipCap: ethgo.Gwei(uint64(rand.Intn(200))),
-							GasFeeCap: ethgo.Gwei(uint64(rand.Intn(200) + 200)),
-							ChainID:   big.NewInt(backend.Config().ChainID),
-						})
+						tx := types.NewTx(types.NewDynamicFeeTx(
+							types.WithGasTipCap(ethgo.Gwei(uint64(rand.Intn(200)))),
+							types.WithGasFeeCap(ethgo.Gwei(uint64(rand.Intn(200)+200))),
+							types.WithChainID(big.NewInt(backend.Config().ChainID)),
+							types.WithFrom(sender),
+							types.WithValue(ethgo.Ether(1)),
+							types.WithTo(&types.ZeroAddress),
+						))
 
 						tx, err := signer.SignTx(tx, senderKey)
 						require.NoError(t, err)
@@ -219,14 +219,14 @@ func createTestTxs(t *testing.T, backend *backendMock, numOfTxsPerBlock, txCap i
 		for i := 0; i < numOfTxsPerBlock; i++ {
 			senderKey, sender := tests.GenerateKeyAndAddr(t)
 
-			tx := types.NewTx(&types.DynamicFeeTx{
-				From:      sender,
-				Value:     ethgo.Ether(1),
-				To:        &types.ZeroAddress,
-				GasTipCap: ethgo.Gwei(uint64(rand.Intn(txCap))),
-				GasFeeCap: ethgo.Gwei(uint64(rand.Intn(txCap) + txCap)),
-				ChainID:   big.NewInt(backend.Config().ChainID),
-			})
+			tx := types.NewTx(types.NewDynamicFeeTx(
+				types.WithGasTipCap(ethgo.Gwei(uint64(rand.Intn(txCap)))),
+				types.WithGasFeeCap(ethgo.Gwei(uint64(rand.Intn(txCap)+txCap))),
+				types.WithChainID(big.NewInt(backend.Config().ChainID)),
+				types.WithFrom(sender),
+				types.WithValue(ethgo.Ether(1)),
+				types.WithTo(&types.ZeroAddress),
+			))
 
 			tx, err := signer.SignTx(tx, senderKey)
 			require.NoError(t, err)

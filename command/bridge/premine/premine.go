@@ -13,7 +13,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/spf13/cobra"
-	"github.com/umbracle/ethgo"
 )
 
 var (
@@ -140,7 +139,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	bladeManagerAddr := ethgo.Address(types.StringToAddress(params.bladeManager))
+	bladeManagerAddr := types.StringToAddress(params.bladeManager)
 	txn := bridgeHelper.CreateTransaction(ownerKey.Address(), &bladeManagerAddr, premineInput, nil, false)
 
 	receipt, err = txRelayer.SendTransaction(txn, ownerKey)

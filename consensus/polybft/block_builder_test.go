@@ -1,12 +1,12 @@
 package polybft
 
 import (
-	"crypto/ecdsa"
 	"math/big"
 	"testing"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/state"
@@ -29,21 +29,13 @@ func TestBlockBuilder_BuildBlockTxOneFailedTxAndOneTakesTooMuchGas(t *testing.T)
 		chainID       = 100
 	)
 
-	type account struct {
-		privKey *ecdsa.PrivateKey
-		address types.Address
-	}
+	accounts := make([]*wallet.Account, 0, 6)
 
-	accounts := [6]*account{}
-
-	for i := range accounts {
-		ecdsaKey, err := crypto.GenerateECDSAKey()
+	for i := 0; i < cap(accounts); i++ {
+		acc, err := wallet.GenerateAccount()
 		require.NoError(t, err)
 
-		accounts[i] = &account{
-			privKey: ecdsaKey,
-			address: crypto.PubKeyToAddress(&ecdsaKey.PublicKey),
-		}
+		accounts = append(accounts, acc)
 	}
 
 	forks := &chain.Forks{}
@@ -71,7 +63,7 @@ func TestBlockBuilder_BuildBlockTxOneFailedTxAndOneTakesTooMuchGas(t *testing.T)
 	for i, acc := range accounts {
 		// the third tx will fail because of insufficient balance
 		if i != 2 {
-			balanceMap[acc.address] = &chain.GenesisAccount{Balance: ethgo.Ether(1)}
+			balanceMap[acc.Address()] = &chain.GenesisAccount{Balance: ethgo.Ether(1)}
 		}
 	}
 
@@ -93,15 +85,19 @@ func TestBlockBuilder_BuildBlockTxOneFailedTxAndOneTakesTooMuchGas(t *testing.T)
 			gas = blockGasLimit - 1
 		}
 
-		tx := types.NewTx(&types.LegacyTx{
-			Value:    big.NewInt(amount),
-			GasPrice: big.NewInt(gasPrice),
-			Gas:      gas,
-			Nonce:    0,
-			To:       &acc.address,
-		})
+		recipient := acc.Address()
 
-		tx, err = signer.SignTx(tx, acc.privKey)
+		tx := types.NewTx(types.NewLegacyTx(
+			types.WithGasPrice(big.NewInt(gasPrice)),
+			types.WithValue(big.NewInt(amount)),
+			types.WithGas(gas),
+			types.WithNonce(0),
+			types.WithTo(&recipient),
+		))
+
+		tx, err = signer.SignTxWithCallback(tx, func(hash types.Hash) (sig []byte, err error) {
+			return acc.Ecdsa.Sign(hash.Bytes())
+		})
 		require.NoError(t, err)
 
 		// all tx until the fifth will be retrieved from the pool
