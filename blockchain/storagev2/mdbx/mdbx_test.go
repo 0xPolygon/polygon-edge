@@ -178,18 +178,16 @@ func dbSize(t *testing.T, path string) int64 {
 
 	err := filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
 		if err != nil {
-			t.Fail()
+			return err
 		}
 
 		if info != nil && !info.IsDir() && strings.Contains(info.Name(), ".dat") {
 			size += info.Size()
 		}
 
-		return err
+		return nil
 	})
-	if err != nil {
-		t.Log(err)
-	}
+	require.NoError(t, err)
 
 	return size
 }
@@ -231,14 +229,10 @@ insertloop:
 			batchWriter.PutHeadHash(b.Block.Header.Hash)
 			batchWriter.PutReceipts(b.Block.Number(), b.Block.Hash(), b.Receipts)
 			batchWriter.PutCanonicalHash(uint64(i), b.Block.Hash())
-
-			if err := batchWriter.WriteBatch(); err != nil {
-				require.NoError(t, err)
-			}
-
-			t.Logf("writing block %d", i)
+			require.NoError(t, batchWriter.WriteBatch())
 
 			size := dbSize(t, path)
+			t.Logf("writing block %d", i)
 			t.Logf("\tdir size %d MBs", size/1_000_000)
 		}
 	}

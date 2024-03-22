@@ -40,11 +40,11 @@ const (
 
 // GidLid tables
 const (
-	FORK         = uint8(0) | GIDLID_INDEX
-	HEAD_HASH    = uint8(2) | GIDLID_INDEX
-	HEAD_NUMBER  = uint8(4) | GIDLID_INDEX
-	BLOCK_LOOKUP = uint8(6) | GIDLID_INDEX
-	TX_LOOKUP    = uint8(8) | GIDLID_INDEX
+	FORK         = uint8(0) | LOOKUP_INDEX
+	HEAD_HASH    = uint8(2) | LOOKUP_INDEX
+	HEAD_NUMBER  = uint8(4) | LOOKUP_INDEX
+	BLOCK_LOOKUP = uint8(6) | LOOKUP_INDEX
+	TX_LOOKUP    = uint8(8) | LOOKUP_INDEX
 )
 
 const MAX_TABLES = uint8(20)
@@ -52,12 +52,14 @@ const MAX_TABLES = uint8(20)
 // Database indexes
 const (
 	MAINDB_INDEX = uint8(0)
-	GIDLID_INDEX = uint8(1)
+	LOOKUP_INDEX = uint8(1)
 )
 
-var FORK_KEY = []byte("0000000f")
-var HEAD_HASH_KEY = []byte("0000000h")
-var HEAD_NUMBER_KEY = []byte("0000000n")
+var (
+	FORK_KEY        = []byte("0000000f")
+	HEAD_HASH_KEY   = []byte("0000000h")
+	HEAD_NUMBER_KEY = []byte("0000000n")
+)
 
 var ErrNotFound = fmt.Errorf("not found")
 var ErrInvalidData = fmt.Errorf("invalid data")
@@ -93,8 +95,8 @@ func (s *Storage) NewWriter() *Writer {
 }
 
 func getIndex(t uint8) uint8 {
-	if t&GIDLID_INDEX != 0 {
-		return GIDLID_INDEX
+	if t&LOOKUP_INDEX != 0 {
+		return LOOKUP_INDEX
 	}
 
 	return MAINDB_INDEX

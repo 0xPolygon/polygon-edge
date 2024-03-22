@@ -177,9 +177,7 @@ func TestWriteBlockPerf(t *testing.T) {
 
 		tn := time.Now().UTC()
 
-		if err := batchWriter.WriteBatch(); err != nil {
-			require.NoError(t, err)
-		}
+		require.NoError(t, batchWriter.WriteBatch())
 
 		d := time.Since(tn)
 		watchTime = watchTime + d.Milliseconds()

@@ -108,11 +108,8 @@ func (db *MdbxDB) update(f func(tx *mdbx.Txn) error) (err error) {
 	}
 
 	_, err = tx.Commit()
-	if err != nil {
-		return err
-	}
 
-	return nil
+	return err
 }
 
 func (db *MdbxDB) openDBI(flags uint) error {
@@ -134,11 +131,11 @@ func (db *MdbxDB) openDBI(flags uint) error {
 	err := db.update(func(tx *mdbx.Txn) error {
 		for i, name := range tableMapper {
 			dbi, err := tx.OpenDBISimple(name, mdbx.Create)
-			if err == nil {
-				db.dbi[i] = dbi
-			} else {
+			if err != nil {
 				return err
 			}
+
+			db.dbi[i] = dbi
 		}
 
 		return nil

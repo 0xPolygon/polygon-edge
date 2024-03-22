@@ -28,7 +28,7 @@ func newBatchMdbx(db *MdbxDB) *batchMdbx {
 }
 
 func (b *batchMdbx) Put(t uint8, k []byte, v []byte) {
-	if t&storagev2.GIDLID_INDEX != 0 {
+	if t&storagev2.LOOKUP_INDEX != 0 {
 		// Random write
 		b.tx.Put(b.dbi[t], k, v, mdbx.NoDupData)
 	} else {
