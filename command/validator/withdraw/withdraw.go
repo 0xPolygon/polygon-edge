@@ -49,7 +49,7 @@ func setFlags(cmd *cobra.Command) {
 	cmd.Flags().DurationVar(
 		&params.txTimeout,
 		bridgeHelper.TxTimeoutFlag,
-		50*time.Second,
+		150*time.Second,
 		"timeout for receipts in milliseconds",
 	)
 
