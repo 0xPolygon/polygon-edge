@@ -65,8 +65,8 @@ type TxRelayerImpl struct {
 func NewTxRelayer(opts ...TxRelayerOption) (TxRelayer, error) {
 	t := &TxRelayerImpl{
 		ipAddress:        DefaultRPCAddress,
-		receiptsPollFreq: DefaultTimeoutTransactions,
-		receiptsTimeout:  DefaultPollFreq,
+		receiptsPollFreq: DefaultPollFreq,
+		receiptsTimeout:  DefaultTimeoutTransactions,
 	}
 	for _, opt := range opts {
 		opt(t)
