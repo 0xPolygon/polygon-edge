@@ -23,6 +23,8 @@ const (
 	defaultNumRetries          = 1000
 	gasLimitIncreasePercentage = 100
 	feeIncreasePercentage      = 100
+	DefaultTimeoutTransactions = time.Duration(50 * time.Second)
+	DefaultPollFreq            = time.Duration(50 * time.Millisecond)
 )
 
 var (
@@ -63,8 +65,8 @@ type TxRelayerImpl struct {
 func NewTxRelayer(opts ...TxRelayerOption) (TxRelayer, error) {
 	t := &TxRelayerImpl{
 		ipAddress:        DefaultRPCAddress,
-		receiptsPollFreq: 50 * time.Millisecond,
-		receiptsTimeout:  50 * time.Second,
+		receiptsPollFreq: DefaultTimeoutTransactions,
+		receiptsTimeout:  DefaultPollFreq,
 	}
 	for _, opt := range opts {
 		opt(t)

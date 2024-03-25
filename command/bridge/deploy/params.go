@@ -15,7 +15,6 @@ const (
 	jsonRPCFlag     = "json-rpc"
 	erc20AddrFlag   = "erc20-token"
 	txTimeoutFlag   = "tx-timeout"
-	txPollFreqFlag  = "tx-poll-freq"
 )
 
 type deployParams struct {
@@ -25,7 +24,6 @@ type deployParams struct {
 	rootERC20TokenAddr  string
 	proxyContractsAdmin string
 	txTimeout           time.Duration
-	txPollFreq          time.Duration
 	isTestMode          bool
 }
 

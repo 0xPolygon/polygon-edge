@@ -18,7 +18,6 @@ type finalizeParams struct {
 	bladeManager  string
 	genesisPath   string
 	txTimeout     time.Duration
-	txPollFreq    time.Duration
 
 	bladeManagerAddr types.Address
 }

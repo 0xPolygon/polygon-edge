@@ -21,7 +21,6 @@ type stakeParams struct {
 	amount        string
 	stakeToken    string
 	txTimeout     time.Duration
-	txPollFreq    time.Duration
 
 	amountValue    *big.Int
 	stakeTokenAddr types.Address

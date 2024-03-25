@@ -18,7 +18,6 @@ type withdrawParams struct {
 	accountConfig string
 	jsonRPC       string
 	txTimeout     time.Duration
-	txPollFreq    time.Duration
 }
 
 func (v *withdrawParams) validateFlags() (err error) {

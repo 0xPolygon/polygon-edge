@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math/big"
 	"sync"
-	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"
@@ -341,15 +340,8 @@ func GetCommand() *cobra.Command {
 	cmd.Flags().DurationVar(
 		&params.txTimeout,
 		txTimeoutFlag,
-		50*time.Second,
-		"timeout for receipts in milliseconds",
-	)
-
-	cmd.Flags().DurationVar(
-		&params.txPollFreq,
-		txPollFreqFlag,
-		50*time.Millisecond,
-		"frequency in milliseconds for poll transactions",
+		txrelayer.DefaultTimeoutTransactions,
+		cmdHelper.TxTimeoutDesc,
 	)
 
 	cmd.MarkFlagsMutuallyExclusive(helper.TestModeFlag, deployerKeyFlag)
@@ -445,8 +437,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, chainID int64,
 	initialValidators []*validator.GenesisValidator, cmdCtx context.Context) (deploymentResultInfo, error) {
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(client), txrelayer.WithWriter(outputter),
-		txrelayer.WithReceiptsTimeout(params.txTimeout),
-		txrelayer.WithReceiptsPollFreq(params.txPollFreq))
+		txrelayer.WithReceiptsTimeout(params.txTimeout))
 
 	if err != nil {
 		return deploymentResultInfo{RootchainCfg: nil, CommandResults: nil},

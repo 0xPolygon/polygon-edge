@@ -40,7 +40,6 @@ const (
 	BladeManagerFlag        = "blade-manager"
 	BladeManagerFlagDesc    = "address of blade manager contract on a rootchain"
 	TxTimeoutFlag           = "tx-timeout"
-	TxPollFreqFlag          = "tx-poll-freq"
 )
 
 var (

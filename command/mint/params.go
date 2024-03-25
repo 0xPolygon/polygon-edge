@@ -18,7 +18,6 @@ type mintParams struct {
 	minterPrivateKey string
 	jsonRPCAddress   string
 	txTimeout        time.Duration
-	txPollFreq       time.Duration
 
 	amountValues []*big.Int
 }

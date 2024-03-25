@@ -2,7 +2,6 @@ package fund
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"
@@ -10,6 +9,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/bridge/helper"
+	cmdHelper "github.com/0xPolygon/polygon-edge/command/helper"
 	polybftsecrets "github.com/0xPolygon/polygon-edge/command/secrets/init"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -65,15 +65,8 @@ func setFlags(cmd *cobra.Command) {
 	cmd.Flags().DurationVar(
 		&params.txTimeout,
 		txTimeoutFlag,
-		50*time.Second,
-		"timeout for receipts in milliseconds",
-	)
-
-	cmd.Flags().DurationVar(
-		&params.txPollFreq,
-		txPollFreqFlag,
-		50*time.Millisecond,
-		"frequency in milliseconds for poll transactions",
+		txrelayer.DefaultTimeoutTransactions,
+		cmdHelper.TxTimeoutDesc,
 	)
 }
 
@@ -86,8 +79,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	defer outputter.WriteOutput()
 
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(params.jsonRPCAddress),
-		txrelayer.WithReceiptsTimeout(params.txTimeout),
-		txrelayer.WithReceiptsPollFreq(params.txPollFreq))
+		txrelayer.WithReceiptsTimeout(params.txTimeout))
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to initialize tx relayer: %w", err))
 

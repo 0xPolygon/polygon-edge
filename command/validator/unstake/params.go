@@ -20,7 +20,6 @@ type unstakeParams struct {
 	jsonRPC       string
 	amount        string
 	txTimeout     time.Duration
-	txPollFreq    time.Duration
 
 	amountValue *big.Int
 }

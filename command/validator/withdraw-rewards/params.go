@@ -14,7 +14,6 @@ type withdrawRewardsParams struct {
 	accountConfig string
 	jsonRPC       string
 	txTimeout     time.Duration
-	txPollFreq    time.Duration
 }
 
 type withdrawRewardResult struct {

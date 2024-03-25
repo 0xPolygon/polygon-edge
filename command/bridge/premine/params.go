@@ -27,7 +27,6 @@ type premineParams struct {
 	stakedAmount    string
 	premineAmount   string
 	txTimeout       time.Duration
-	txPollFreq      time.Duration
 
 	premineAmountValue  *big.Int
 	stakedValue         *big.Int

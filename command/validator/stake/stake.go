@@ -68,14 +68,7 @@ func setFlags(cmd *cobra.Command) {
 		&params.txTimeout,
 		bridgeHelper.TxTimeoutFlag,
 		150*time.Second,
-		"timeout for receipts in milliseconds",
-	)
-
-	cmd.Flags().DurationVar(
-		&params.txPollFreq,
-		bridgeHelper.TxPollFreqFlag,
-		150*time.Millisecond,
-		"frequency in milliseconds for poll transactions",
+		helper.TxTimeoutDesc,
 	)
 
 	cmd.MarkFlagsMutuallyExclusive(polybftsecrets.AccountDirFlag, polybftsecrets.AccountConfigFlag)
@@ -98,7 +91,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(params.jsonRPC),
 		txrelayer.WithReceiptsTimeout(params.txTimeout),
-		txrelayer.WithReceiptsPollFreq(params.txPollFreq))
+		txrelayer.WithReceiptsPollFreq(150*time.Millisecond))
 	if err != nil {
 		return err
 	}

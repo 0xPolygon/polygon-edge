@@ -26,7 +26,6 @@ const (
 	rootJSONRPCFlag  = "root-json-rpc"
 	childJSONRPCFlag = "child-json-rpc"
 	txTimeoutFlag    = "tx-timeout"
-	txPollFreqFlag   = "tx-poll-freq"
 
 	// generateExitProofFn is JSON RPC endpoint which creates exit proof
 	generateExitProofFn = "bridge_generateExitProof"
@@ -39,7 +38,6 @@ type exitParams struct {
 	rootJSONRPCAddr   string
 	childJSONRPCAddr  string
 	txTimeout         time.Duration
-	txPollFreq        time.Duration
 }
 
 var (
@@ -93,14 +91,8 @@ func GetCommand() *cobra.Command {
 	exitCmd.Flags().DurationVar(
 		&ep.txTimeout,
 		txTimeoutFlag,
-		50*time.Second,
-		"timeout for receipts in milliseconds",
-	)
-	exitCmd.Flags().DurationVar(
-		&ep.txPollFreq,
-		txPollFreqFlag,
-		50*time.Millisecond,
-		"frequency in milliseconds for poll transactions",
+		txrelayer.DefaultTimeoutTransactions,
+		cmdHelper.TxTimeoutDesc,
 	)
 
 	_ = exitCmd.MarkFlagRequired(exitHelperFlag)
@@ -120,8 +112,7 @@ func run(cmd *cobra.Command, _ []string) {
 	}
 
 	rootTxRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(ep.rootJSONRPCAddr),
-		txrelayer.WithReceiptsTimeout(ep.txTimeout),
-		txrelayer.WithReceiptsPollFreq(ep.txPollFreq))
+		txrelayer.WithReceiptsTimeout(ep.txTimeout))
 	if err != nil {
 		outputter.SetError(fmt.Errorf("could not create root chain tx relayer: %w", err))
 

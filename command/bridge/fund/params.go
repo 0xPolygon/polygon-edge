@@ -14,7 +14,6 @@ const (
 	jsonRPCFlag        = "json-rpc"
 	mintStakeTokenFlag = "mint"
 	txTimeoutFlag      = "tx-timeout"
-	txPollFreqFlag     = "tx-poll-freq"
 )
 
 var (
@@ -28,10 +27,8 @@ type fundParams struct {
 	deployerPrivateKey string
 	jsonRPCAddress     string
 	txTimeout          time.Duration
-	txPollFreq         time.Duration
-
-	amountValues []*big.Int
-	addresses    []types.Address
+	amountValues       []*big.Int
+	addresses          []types.Address
 }
 
 func (fp *fundParams) validateFlags() error {

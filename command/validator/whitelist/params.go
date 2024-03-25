@@ -25,7 +25,6 @@ type whitelistParams struct {
 	jsonRPC               string
 	newValidatorAddresses []string
 	txTimeout             time.Duration
-	txPollFreq            time.Duration
 }
 
 func (ep *whitelistParams) validateFlags() error {

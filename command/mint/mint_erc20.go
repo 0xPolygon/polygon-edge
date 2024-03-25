@@ -2,7 +2,6 @@ package mint
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/0xPolygon/polygon-edge/command"
 	bridgeHelper "github.com/0xPolygon/polygon-edge/command/bridge/helper"
@@ -72,15 +71,8 @@ func setFlags(cmd *cobra.Command) {
 	cmd.Flags().DurationVar(
 		&params.txTimeout,
 		bridgeHelper.TxTimeoutFlag,
-		50*time.Second,
-		"timeout for receipts in milliseconds",
-	)
-
-	cmd.Flags().DurationVar(
-		&params.txPollFreq,
-		bridgeHelper.TxPollFreqFlag,
-		50*time.Millisecond,
-		"frequency in milliseconds for poll transactions",
+		txrelayer.DefaultTimeoutTransactions,
+		helper.TxTimeoutDesc,
 	)
 
 	_ = cmd.MarkFlagRequired(bridgeHelper.Erc20TokenFlag)
@@ -91,8 +83,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	defer outputter.WriteOutput()
 
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(params.jsonRPCAddress),
-		txrelayer.WithReceiptsTimeout(params.txTimeout),
-		txrelayer.WithReceiptsPollFreq(params.txPollFreq))
+		txrelayer.WithReceiptsTimeout(params.txTimeout))
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to initialize tx relayer: %w", err))
 

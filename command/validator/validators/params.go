@@ -17,7 +17,6 @@ type validatorInfoParams struct {
 	stakeManagerAddress    string
 	chainID                int64
 	txTimeout              time.Duration
-	txPollFreq             time.Duration
 }
 
 func (v *validatorInfoParams) validateFlags() error {
