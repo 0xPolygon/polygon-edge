@@ -73,7 +73,6 @@ func NewTxRelayer(opts ...TxRelayerOption) (TxRelayer, error) {
 	}
 
 	// Calculate receiptsPollFreq based on receiptsTimeout
-
 	if t.receiptsTimeout >= time.Minute {
 		t.receiptsPollFreq = 2 * time.Second
 	}
