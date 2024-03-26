@@ -93,25 +93,28 @@ func (s *EpochStore) getValidatorSnapshot(epoch uint64) (*validatorSnapshot, err
 	return validatorSnapshot, err
 }
 
-// getLastSnapshot returns the last snapshot saved in db
-// since they are stored by epoch number (uint64), they are sequentially stored,
-// so the latest epoch will be the last snapshot in db
-func (s *EpochStore) getLastSnapshot(dbTx *bolt.Tx) (*validatorSnapshot, error) {
+// getNearestOrEpochSnapshot returns the nearest or the exact epoch snapshot from db
+func (s *EpochStore) getNearestOrEpochSnapshot(epoch uint64, dbTx *bolt.Tx) (*validatorSnapshot, error) {
 	var (
 		snapshot *validatorSnapshot
 		err      error
 	)
 
 	getFn := func(tx *bolt.Tx) error {
-		c := tx.Bucket(validatorSnapshotsBucket).Cursor()
-		k, v := c.Last()
+		for {
+			v := tx.Bucket(validatorSnapshotsBucket).Get(common.EncodeUint64ToBytes(epoch))
+			if v != nil {
+				return json.Unmarshal(v, &snapshot)
+			}
 
-		if k == nil {
-			// we have no snapshots in db
-			return nil
+			if epoch == 0 { // prevent uint64 underflow
+				break
+			}
+
+			epoch--
 		}
 
-		return json.Unmarshal(v, &snapshot)
+		return nil
 	}
 
 	if dbTx == nil {
