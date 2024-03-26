@@ -12,9 +12,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/blockchain/storage"
-	"github.com/0xPolygon/polygon-edge/blockchain/storage/leveldb"
-	"github.com/0xPolygon/polygon-edge/blockchain/storage/memory"
+	"github.com/0xPolygon/polygon-edge/blockchain/storagev2"
+	"github.com/0xPolygon/polygon-edge/blockchain/storagev2/leveldb"
+	"github.com/0xPolygon/polygon-edge/blockchain/storagev2/memory"
 	consensusPolyBFT "github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/forkmanager"
 	"github.com/0xPolygon/polygon-edge/gasprice"
@@ -168,7 +168,7 @@ func NewServer(config *Config) (*Server, error) {
 	}
 
 	// Set up datadog profiler
-	if ddErr := m.enableDataDogProfiler(); err != nil {
+	if ddErr := m.enableDataDogProfiler(); ddErr != nil {
 		m.logger.Error("DataDog profiler setup failed", "err", ddErr.Error())
 	}
 
@@ -286,10 +286,10 @@ func NewServer(config *Config) (*Server, error) {
 	signer := crypto.NewSigner(config.Chain.Params.Forks.At(0), uint64(m.config.Chain.Params.ChainID))
 
 	// create storage instance for blockchain
-	var db storage.Storage
+	var db *storagev2.Storage
 	{
 		if m.config.DataDir == "" {
-			db, err = memory.NewMemoryStorage(nil)
+			db, err = memory.NewMemoryStorage()
 			if err != nil {
 				return nil, err
 			}

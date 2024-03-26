@@ -333,13 +333,13 @@ func TestGetTxAndBlockByTxHash(t *testing.T) {
 			name:   "should return tx and block",
 			txHash: testTx1.Hash(),
 			store: &debugEndpointMockStore{
-				readTxLookupFn: func(hash types.Hash) (types.Hash, bool) {
+				readTxLookupFn: func(hash types.Hash) (uint64, bool) {
 					assert.Equal(t, testTx1.Hash(), hash)
 
-					return blockWithTx.Hash(), true
+					return blockWithTx.Number(), true
 				},
-				getBlockByHashFn: func(hash types.Hash, full bool) (*types.Block, bool) {
-					assert.Equal(t, blockWithTx.Hash(), hash)
+				getBlockByNumberFn: func(number uint64, full bool) (*types.Block, bool) {
+					assert.Equal(t, blockWithTx.Number(), number)
 					assert.True(t, full)
 
 					return blockWithTx, true
@@ -352,26 +352,26 @@ func TestGetTxAndBlockByTxHash(t *testing.T) {
 			name:   "should return nil if ReadTxLookup returns nothing",
 			txHash: testTx1.Hash(),
 			store: &debugEndpointMockStore{
-				readTxLookupFn: func(hash types.Hash) (types.Hash, bool) {
+				readTxLookupFn: func(hash types.Hash) (uint64, bool) {
 					assert.Equal(t, testTx1.Hash(), hash)
 
-					return types.ZeroHash, false
+					return 0, false
 				},
 			},
 			tx:    nil,
 			block: nil,
 		},
 		{
-			name:   "should return nil if GetBlockByHash returns nothing",
+			name:   "should return nil if GetBlockByNumber returns nothing",
 			txHash: testTx1.Hash(),
 			store: &debugEndpointMockStore{
-				readTxLookupFn: func(hash types.Hash) (types.Hash, bool) {
+				readTxLookupFn: func(hash types.Hash) (uint64, bool) {
 					assert.Equal(t, testTx1.Hash(), hash)
 
-					return blockWithTx.Hash(), true
+					return blockWithTx.Number(), true
 				},
-				getBlockByHashFn: func(hash types.Hash, full bool) (*types.Block, bool) {
-					assert.Equal(t, blockWithTx.Hash(), hash)
+				getBlockByNumberFn: func(number uint64, full bool) (*types.Block, bool) {
+					assert.Equal(t, blockWithTx.Number(), number)
 					assert.True(t, full)
 
 					return nil, false
@@ -384,13 +384,13 @@ func TestGetTxAndBlockByTxHash(t *testing.T) {
 			name:   "should return nil if the block doesn't include the tx",
 			txHash: testTx1.Hash(),
 			store: &debugEndpointMockStore{
-				readTxLookupFn: func(hash types.Hash) (types.Hash, bool) {
+				readTxLookupFn: func(hash types.Hash) (uint64, bool) {
 					assert.Equal(t, testTx1.Hash(), hash)
 
-					return blockWithTx.Hash(), true
+					return blockWithTx.Number(), true
 				},
-				getBlockByHashFn: func(hash types.Hash, full bool) (*types.Block, bool) {
-					assert.Equal(t, blockWithTx.Hash(), hash)
+				getBlockByNumberFn: func(number uint64, full bool) (*types.Block, bool) {
+					assert.Equal(t, blockWithTx.Number(), number)
 					assert.True(t, full)
 
 					return testBlock10, true
