@@ -337,6 +337,13 @@ func GetCommand() *cobra.Command {
 		helper.ProxyContractsAdminDesc,
 	)
 
+	cmd.Flags().DurationVar(
+		&params.txTimeout,
+		cmdHelper.TxTimeoutFlag,
+		txrelayer.DefaultTimeoutTransactions,
+		cmdHelper.TxTimeoutDesc,
+	)
+
 	cmd.MarkFlagsMutuallyExclusive(helper.TestModeFlag, deployerKeyFlag)
 
 	return cmd
@@ -429,7 +436,9 @@ func runCommand(cmd *cobra.Command, _ []string) {
 // deployContracts deploys and initializes rootchain smart contracts
 func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, chainID int64,
 	initialValidators []*validator.GenesisValidator, cmdCtx context.Context) (deploymentResultInfo, error) {
-	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(client), txrelayer.WithWriter(outputter))
+	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(client), txrelayer.WithWriter(outputter),
+		txrelayer.WithReceiptsTimeout(params.txTimeout))
+
 	if err != nil {
 		return deploymentResultInfo{RootchainCfg: nil, CommandResults: nil},
 			fmt.Errorf("failed to initialize tx relayer: %w", err)

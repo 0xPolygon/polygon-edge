@@ -7,7 +7,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/0xPolygon/polygon-edge/blockchain/storage"
+	"github.com/0xPolygon/polygon-edge/blockchain/storagev2"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/state"
@@ -44,7 +44,7 @@ var (
 type Blockchain struct {
 	logger hclog.Logger // The logger object
 
-	db        storage.Storage // The Storage object (database)
+	db        *storagev2.Storage // The Storage object (database)
 	consensus Verifier
 	executor  Executor
 	txSigner  TxSigner
@@ -188,7 +188,7 @@ func (b *Blockchain) GetAvgGasPrice() *big.Int {
 // NewBlockchain creates a new blockchain object
 func NewBlockchain(
 	logger hclog.Logger,
-	db storage.Storage,
+	db *storagev2.Storage,
 	genesisConfig *chain.Chain,
 	consensus Verifier,
 	executor Executor,
@@ -398,7 +398,7 @@ func (b *Blockchain) writeGenesis(genesis *chain.Genesis) error {
 
 // writeGenesisImpl writes the genesis file to the DB + blockchain reference
 func (b *Blockchain) writeGenesisImpl(header *types.Header) error {
-	batchWriter := storage.NewBatchWriter(b.db)
+	batchWriter := b.db.NewWriter()
 
 	newTD := new(big.Int).SetUint64(header.Difficulty)
 
@@ -438,9 +438,14 @@ func (b *Blockchain) GetTD(hash types.Hash) (*big.Int, bool) {
 	return b.readTotalDifficulty(hash)
 }
 
-// GetReceiptsByHash returns the receipts by their hash
+// GetReceiptsByHash returns the receipts by block hash
 func (b *Blockchain) GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, error) {
-	return b.db.ReadReceipts(hash)
+	n, err := b.db.ReadBlockLookup(hash)
+	if err != nil {
+		return nil, err
+	}
+
+	return b.db.ReadReceipts(n, hash)
 }
 
 // GetBodyByHash returns the body by their hash
@@ -468,7 +473,12 @@ func (b *Blockchain) readHeader(hash types.Hash) (*types.Header, bool) {
 	}
 
 	// Cache miss, load it from the DB
-	hh, err := b.db.ReadHeader(hash)
+	n, err := b.db.ReadBlockLookup(hash)
+	if err != nil {
+		return nil, false
+	}
+
+	hh, err := b.db.ReadHeader(n, hash)
 	if err != nil {
 		return nil, false
 	}
@@ -482,7 +492,12 @@ func (b *Blockchain) readHeader(hash types.Hash) (*types.Header, bool) {
 
 // readBody reads the block's body, using the block hash
 func (b *Blockchain) readBody(hash types.Hash) (*types.Body, bool) {
-	bb, err := b.db.ReadBody(hash)
+	n, err := b.db.ReadBlockLookup(hash)
+	if err != nil {
+		return nil, false
+	}
+
+	bb, err := b.db.ReadBody(n, hash)
 	if err != nil {
 		b.logger.Error("failed to read body", "err", err)
 
@@ -491,9 +506,9 @@ func (b *Blockchain) readBody(hash types.Hash) (*types.Body, bool) {
 
 	// To return from field in the transactions of the past blocks
 	if updated := b.recoverFromFieldsInTransactions(bb.Transactions); updated {
-		batchWriter := storage.NewBatchWriter(b.db)
+		batchWriter := b.db.NewWriter()
 
-		batchWriter.PutBody(hash, bb)
+		batchWriter.PutBody(n, hash, bb)
 
 		if err := batchWriter.WriteBatch(); err != nil {
 			b.logger.Warn("failed to write body into storage", "hash", hash, "err", err)
@@ -518,7 +533,12 @@ func (b *Blockchain) readTotalDifficulty(headerHash types.Hash) (*big.Int, bool)
 	}
 
 	// Miss, read the difficulty from the DB
-	dbDifficulty, ok := b.db.ReadTotalDifficulty(headerHash)
+	n, err := b.db.ReadBlockLookup(headerHash)
+	if err != nil {
+		return nil, false
+	}
+
+	dbDifficulty, ok := b.db.ReadTotalDifficulty(n, headerHash)
 	if !ok {
 		return nil, false
 	}
@@ -573,7 +593,7 @@ func (b *Blockchain) WriteHeadersWithBodies(headers []*types.Header) error {
 	for _, header := range headers {
 		event := &Event{}
 
-		batchWriter := storage.NewBatchWriter(b.db)
+		batchWriter := b.db.NewWriter()
 
 		isCanonical, newTD, err := b.writeHeaderImpl(batchWriter, event, header)
 		if err != nil {
@@ -811,7 +831,7 @@ func (b *Blockchain) WriteFullBlock(fblock *types.FullBlock, source string) erro
 
 	header := block.Header
 
-	batchWriter := storage.NewBatchWriter(b.db)
+	batchWriter := b.db.NewWriter()
 
 	if err := b.writeBody(batchWriter, block); err != nil {
 		return err
@@ -828,7 +848,7 @@ func (b *Blockchain) WriteFullBlock(fblock *types.FullBlock, source string) erro
 	// write the receipts, do it only after the header has been written.
 	// Otherwise, a client might ask for a header once the receipt is valid,
 	// but before it is written into the storage
-	batchWriter.PutReceipts(block.Hash(), fblock.Receipts)
+	batchWriter.PutReceipts(block.Number(), block.Hash(), fblock.Receipts)
 
 	// update snapshot
 	if err := b.consensus.ProcessHeaders([]*types.Header{header}); err != nil {
@@ -876,7 +896,7 @@ func (b *Blockchain) WriteBlock(block *types.Block, source string) error {
 
 	header := block.Header
 
-	batchWriter := storage.NewBatchWriter(b.db)
+	batchWriter := b.db.NewWriter()
 
 	if err := b.writeBody(batchWriter, block); err != nil {
 		return err
@@ -899,7 +919,7 @@ func (b *Blockchain) WriteBlock(block *types.Block, source string) error {
 	// write the receipts, do it only after the header has been written.
 	// Otherwise, a client might ask for a header once the receipt is valid,
 	// but before it is written into the storage
-	batchWriter.PutReceipts(block.Hash(), blockReceipts)
+	batchWriter.PutReceipts(block.Number(), block.Hash(), blockReceipts)
 
 	// update snapshot
 	if err := b.consensus.ProcessHeaders([]*types.Header{header}); err != nil {
@@ -990,7 +1010,7 @@ func (b *Blockchain) updateGasPriceAvgWithBlock(block *types.Block) {
 
 // writeBody writes the block body to the DB.
 // Additionally, it also updates the txn lookup, for txnHash -> block lookups
-func (b *Blockchain) writeBody(batchWriter *storage.BatchWriter, block *types.Block) error {
+func (b *Blockchain) writeBody(batchWriter *storagev2.Writer, block *types.Block) error {
 	// Recover 'from' field in tx before saving
 	// Because the block passed from the consensus layer doesn't have from field in tx,
 	// due to missing encoding in RLP
@@ -999,21 +1019,24 @@ func (b *Blockchain) writeBody(batchWriter *storage.BatchWriter, block *types.Bl
 	}
 
 	// Write the full body (txns + receipts)
-	batchWriter.PutBody(block.Header.Hash, block.Body())
+	batchWriter.PutBody(block.Number(), block.Hash(), block.Body())
 
-	// Write txn lookups (txHash -> block)
+	// Write txn lookups (txHash -> block number)
 	for _, txn := range block.Transactions {
-		batchWriter.PutTxLookup(txn.Hash(), block.Hash())
+		batchWriter.PutTxLookup(txn.Hash(), block.Number())
 	}
 
 	return nil
 }
 
 // ReadTxLookup returns the block hash using the transaction hash
-func (b *Blockchain) ReadTxLookup(hash types.Hash) (types.Hash, bool) {
-	v, ok := b.db.ReadTxLookup(hash)
+func (b *Blockchain) ReadTxLookup(hash types.Hash) (uint64, bool) {
+	v, err := b.db.ReadTxLookup(hash)
+	if err != nil {
+		return 0, false
+	}
 
-	return v, ok
+	return v, true
 }
 
 // recoverFromFieldsInBlock recovers 'from' fields in the transactions of the given block
@@ -1140,7 +1163,7 @@ func (b *Blockchain) dispatchEvent(evnt *Event) {
 // writeHeaderImpl writes a block and the data, assumes the genesis is already set
 // Returning parameters (is canonical header, new total difficulty, error)
 func (b *Blockchain) writeHeaderImpl(
-	batchWriter *storage.BatchWriter, evnt *Event, header *types.Header) (bool, *big.Int, error) {
+	batchWriter *storagev2.Writer, evnt *Event, header *types.Header) (bool, *big.Int, error) {
 	// parent total difficulty of incoming header
 	parentTD, ok := b.readTotalDifficulty(header.ParentHash)
 	if !ok {
@@ -1188,8 +1211,9 @@ func (b *Blockchain) writeHeaderImpl(
 	}
 
 	batchWriter.PutHeader(header)
-	batchWriter.PutTotalDifficulty(header.Hash, incomingTD)
+	batchWriter.PutTotalDifficulty(header.Number, header.Hash, incomingTD)
 	batchWriter.PutForks(forks)
+	batchWriter.PutBlockLookup(header.Hash, header.Number)
 
 	// new block has lower difficulty, create a new fork
 	evnt.AddOldHeader(header)
@@ -1202,7 +1226,7 @@ func (b *Blockchain) writeHeaderImpl(
 func (b *Blockchain) getForksToWrite(header *types.Header) ([]types.Hash, error) {
 	forks, err := b.db.ReadForks()
 	if err != nil {
-		if errors.Is(err, storage.ErrNotFound) {
+		if errors.Is(err, storagev2.ErrNotFound) {
 			forks = []types.Hash{}
 		} else {
 			return nil, err
@@ -1222,7 +1246,7 @@ func (b *Blockchain) getForksToWrite(header *types.Header) ([]types.Hash, error)
 
 // handleReorg handles a reorganization event
 func (b *Blockchain) handleReorg(
-	batchWriter *storage.BatchWriter,
+	batchWriter *storagev2.Writer,
 	evnt *Event,
 	oldHeader *types.Header,
 	newHeader *types.Header,
@@ -1414,7 +1438,7 @@ func (b *Blockchain) calcBaseFeeDelta(gasUsedDelta, parentGasTarget, baseFee uin
 }
 
 func (b *Blockchain) writeBatchAndUpdate(
-	batchWriter *storage.BatchWriter,
+	batchWriter *storagev2.Writer,
 	header *types.Header,
 	newTD *big.Int,
 	isCanonnical bool) error {

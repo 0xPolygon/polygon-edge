@@ -3,6 +3,7 @@ package withdraw
 import (
 	"bytes"
 	"fmt"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	validatorHelper "github.com/0xPolygon/polygon-edge/command/validator/helper"
@@ -16,6 +17,7 @@ type withdrawParams struct {
 	accountDir    string
 	accountConfig string
 	jsonRPC       string
+	txTimeout     time.Duration
 }
 
 func (v *withdrawParams) validateFlags() (err error) {

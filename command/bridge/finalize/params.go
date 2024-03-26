@@ -3,6 +3,7 @@ package finalize
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	validatorHelper "github.com/0xPolygon/polygon-edge/command/validator/helper"
@@ -16,6 +17,7 @@ type finalizeParams struct {
 	jsonRPC       string
 	bladeManager  string
 	genesisPath   string
+	txTimeout     time.Duration
 
 	bladeManagerAddr types.Address
 }

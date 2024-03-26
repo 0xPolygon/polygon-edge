@@ -23,6 +23,11 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
+const (
+	TxTimeoutDesc = "timeout for transaction processing wait"
+	TxTimeoutFlag = "tx-timeout"
+)
+
 var ErrBlockTrackerPollInterval = errors.New("block tracker poll interval must be greater than 0")
 
 type ClientCloseResult struct {

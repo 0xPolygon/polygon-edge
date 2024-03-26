@@ -34,7 +34,7 @@ type debugBlockchainStore interface {
 	GetHeaderByNumber(uint64) (*types.Header, bool)
 
 	// ReadTxLookup returns a block hash in which a given txn was mined
-	ReadTxLookup(txnHash types.Hash) (types.Hash, bool)
+	ReadTxLookup(txnHash types.Hash) (uint64, bool)
 
 	// GetBlockByHash gets a block using the provided hash
 	GetBlockByHash(hash types.Hash, full bool) (*types.Block, bool)

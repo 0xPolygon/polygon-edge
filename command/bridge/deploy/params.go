@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
@@ -21,6 +22,7 @@ type deployParams struct {
 	jsonRPCAddress      string
 	rootERC20TokenAddr  string
 	proxyContractsAdmin string
+	txTimeout           time.Duration
 	isTestMode          bool
 }
 

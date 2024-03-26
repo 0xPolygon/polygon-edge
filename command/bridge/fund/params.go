@@ -3,6 +3,7 @@ package fund
 import (
 	"errors"
 	"math/big"
+	"time"
 
 	bridgeHelper "github.com/0xPolygon/polygon-edge/command/bridge/helper"
 	cmdhelper "github.com/0xPolygon/polygon-edge/command/helper"
@@ -24,9 +25,9 @@ type fundParams struct {
 	amounts            []string
 	deployerPrivateKey string
 	jsonRPCAddress     string
-
-	amountValues []*big.Int
-	addresses    []types.Address
+	txTimeout          time.Duration
+	amountValues       []*big.Int
+	addresses          []types.Address
 }
 
 func (fp *fundParams) validateFlags() error {

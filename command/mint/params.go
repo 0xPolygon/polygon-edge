@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"math/big"
+	"time"
 
 	rootHelper "github.com/0xPolygon/polygon-edge/command/bridge/helper"
 	"github.com/0xPolygon/polygon-edge/command/helper"
@@ -16,6 +17,7 @@ type mintParams struct {
 	tokenAddr        string
 	minterPrivateKey string
 	jsonRPCAddress   string
+	txTimeout        time.Duration
 
 	amountValues []*big.Int
 }

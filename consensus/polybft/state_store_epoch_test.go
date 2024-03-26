@@ -5,11 +5,12 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/0xPolygon/polygon-edge/bls"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestState_insertAndGetValidatorSnapshot(t *testing.T) {
@@ -186,35 +187,48 @@ func TestState_Insert_And_Cleanup(t *testing.T) {
 	assert.Equal(t, 1, len(votes))
 }
 
-func TestState_getLastSnapshot(t *testing.T) {
+func TestEpochStore_getNearestOrEpochSnapshot(t *testing.T) {
 	t.Parallel()
 
-	const (
-		lastEpoch          = uint64(10)
-		fixedEpochSize     = uint64(10)
-		numberOfValidators = 3
-	)
-
 	state := newTestState(t)
+	epoch := uint64(1)
+	tv := validator.NewTestValidators(t, 3)
 
-	for i := uint64(1); i <= lastEpoch; i++ {
-		keys, err := bls.CreateRandomBlsKeys(numberOfValidators)
-
-		require.NoError(t, err)
-
-		var snapshot validator.AccountSet
-		for j := 0; j < numberOfValidators; j++ {
-			snapshot = append(snapshot, &validator.ValidatorMetadata{Address: types.BytesToAddress(generateRandomBytes(t)), BlsKey: keys[j].PublicKey()})
-		}
-
-		require.NoError(t, state.EpochStore.insertValidatorSnapshot(
-			&validatorSnapshot{i, i * fixedEpochSize, snapshot}, nil))
+	// Insert a snapshot for epoch 1
+	snapshot := &validatorSnapshot{
+		Epoch:            epoch,
+		EpochEndingBlock: 100,
+		Snapshot:         tv.GetPublicIdentities(),
 	}
 
-	snapshotFromDB, err := state.EpochStore.getLastSnapshot(nil)
+	require.NoError(t, state.EpochStore.insertValidatorSnapshot(snapshot, nil))
 
-	assert.NoError(t, err)
-	assert.Equal(t, numberOfValidators, snapshotFromDB.Snapshot.Len())
-	assert.Equal(t, lastEpoch, snapshotFromDB.Epoch)
-	assert.Equal(t, lastEpoch*fixedEpochSize, snapshotFromDB.EpochEndingBlock)
+	t.Run("with existing dbTx", func(t *testing.T) {
+		t.Parallel()
+
+		dbTx, err := state.EpochStore.db.Begin(false)
+		require.NoError(t, err)
+
+		result, err := state.EpochStore.getNearestOrEpochSnapshot(epoch, dbTx)
+		assert.NoError(t, err)
+		assert.Equal(t, snapshot, result)
+
+		require.NoError(t, dbTx.Rollback())
+	})
+
+	t.Run("without existing dbTx", func(t *testing.T) {
+		t.Parallel()
+
+		result, err := state.EpochStore.getNearestOrEpochSnapshot(epoch, nil)
+		assert.NoError(t, err)
+		assert.Equal(t, snapshot, result)
+	})
+
+	t.Run("with non-existing epoch", func(t *testing.T) {
+		t.Parallel()
+
+		result, err := state.EpochStore.getNearestOrEpochSnapshot(2, nil)
+		assert.NoError(t, err)
+		assert.Equal(t, snapshot, result)
+	})
 }

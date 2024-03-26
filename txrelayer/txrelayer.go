@@ -23,6 +23,8 @@ const (
 	defaultNumRetries          = 1000
 	gasLimitIncreasePercentage = 100
 	feeIncreasePercentage      = 100
+	DefaultTimeoutTransactions = 50 * time.Second
+	DefaultPollFreq            = 1 * time.Second
 )
 
 var (
@@ -49,10 +51,11 @@ type TxRelayer interface {
 var _ TxRelayer = (*TxRelayerImpl)(nil)
 
 type TxRelayerImpl struct {
-	ipAddress      string
-	client         *jsonrpc.Client
-	receiptTimeout time.Duration
-	numRetries     int
+	ipAddress        string
+	client           *jsonrpc.Client
+	receiptsPollFreq time.Duration
+	receiptsTimeout  time.Duration
+	noWaitReceipt    bool
 
 	lock sync.Mutex
 
@@ -61,12 +64,23 @@ type TxRelayerImpl struct {
 
 func NewTxRelayer(opts ...TxRelayerOption) (TxRelayer, error) {
 	t := &TxRelayerImpl{
-		ipAddress:      DefaultRPCAddress,
-		receiptTimeout: 50 * time.Millisecond,
-		numRetries:     defaultNumRetries,
+		ipAddress:        DefaultRPCAddress,
+		receiptsPollFreq: DefaultPollFreq,
+		receiptsTimeout:  DefaultTimeoutTransactions,
 	}
 	for _, opt := range opts {
 		opt(t)
+	}
+
+	// Calculate receiptsPollFreq based on receiptsTimeout
+	if t.receiptsTimeout >= time.Minute {
+		t.receiptsPollFreq = 2 * time.Second
+	}
+
+	if t.receiptsPollFreq >= t.receiptsTimeout || t.receiptsTimeout < time.Second {
+		// if someone decides to configure a small receipts timeout (in ms)
+		// receiptsPollFreq should be less than receiptsTimeout
+		t.receiptsPollFreq = t.receiptsTimeout / 2
 	}
 
 	if t.client == nil {
@@ -264,27 +278,33 @@ func (t *TxRelayerImpl) sendTransactionLocalLocked(txn *types.Transaction) (ethg
 }
 
 func (t *TxRelayerImpl) waitForReceipt(hash ethgo.Hash) (*ethgo.Receipt, error) {
-	// A negative numRetries means we don't want to receive the receipt after SendTransaction/SendTransactionLocal calls
-	if t.numRetries < 0 {
+	if t.noWaitReceipt {
 		return nil, nil
 	}
 
-	for count := 0; count < t.numRetries; count++ {
-		receipt, err := t.client.Eth().GetTransactionReceipt(hash)
-		if err != nil {
-			if err.Error() != "not found" {
-				return nil, err
+	timer := time.NewTimer(t.receiptsTimeout)
+	defer timer.Stop()
+
+	ticker := time.NewTicker(t.receiptsPollFreq)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			receipt, err := t.client.Eth().GetTransactionReceipt(hash)
+			if err != nil {
+				if err.Error() != "not found" {
+					return nil, err
+				}
 			}
-		}
 
-		if receipt != nil {
-			return receipt, nil
+			if receipt != nil {
+				return receipt, nil
+			}
+		case <-timer.C:
+			return nil, fmt.Errorf("timeout while waiting for transaction %s to be processed", hash)
 		}
-
-		time.Sleep(t.receiptTimeout)
 	}
-
-	return nil, fmt.Errorf("timeout while waiting for transaction %s to be processed", hash)
 }
 
 // ConvertTxnToCallMsg converts txn instance to call message
@@ -373,23 +393,23 @@ func WithIPAddress(ipAddress string) TxRelayerOption {
 	}
 }
 
-func WithReceiptTimeout(receiptTimeout time.Duration) TxRelayerOption {
-	return func(t *TxRelayerImpl) {
-		t.receiptTimeout = receiptTimeout
-	}
-}
-
 func WithWriter(writer io.Writer) TxRelayerOption {
 	return func(t *TxRelayerImpl) {
 		t.writer = writer
 	}
 }
 
-// WithNumRetries sets the maximum number of eth_getTransactionReceipt retries
+func WithNoWaiting() TxRelayerOption {
+	return func(t *TxRelayerImpl) {
+		t.noWaitReceipt = true
+	}
+}
+
+// WithReceiptsTimeout sets the maximum number of eth_getTransactionReceipt retries
 // before considering the transaction sending as timed out. Set to -1 to disable
 // waitForReceipt and not wait for the transaction receipt
-func WithNumRetries(numRetries int) TxRelayerOption {
+func WithReceiptsTimeout(receiptsTimeout time.Duration) TxRelayerOption {
 	return func(t *TxRelayerImpl) {
-		t.numRetries = numRetries
+		t.receiptsTimeout = receiptsTimeout
 	}
 }

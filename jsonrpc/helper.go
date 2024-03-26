@@ -93,18 +93,18 @@ func GetBlockHeader(number BlockNumber, store headerGetter) (*types.Header, erro
 }
 
 type txLookupAndBlockGetter interface {
-	ReadTxLookup(types.Hash) (types.Hash, bool)
-	GetBlockByHash(types.Hash, bool) (*types.Block, bool)
+	ReadTxLookup(types.Hash) (uint64, bool)
+	GetBlockByNumber(uint64, bool) (*types.Block, bool)
 }
 
 // GetTxAndBlockByTxHash returns the tx and the block including the tx by given tx hash
 func GetTxAndBlockByTxHash(txHash types.Hash, store txLookupAndBlockGetter) (*types.Transaction, *types.Block) {
-	blockHash, ok := store.ReadTxLookup(txHash)
+	blockNum, ok := store.ReadTxLookup(txHash)
 	if !ok {
 		return nil, nil
 	}
 
-	block, ok := store.GetBlockByHash(blockHash, true)
+	block, ok := store.GetBlockByNumber(blockNum, true)
 	if !ok {
 		return nil, nil
 	}

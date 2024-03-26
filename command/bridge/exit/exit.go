@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo/jsonrpc"
@@ -35,6 +36,7 @@ type exitParams struct {
 	exitID            uint64
 	rootJSONRPCAddr   string
 	childJSONRPCAddr  string
+	txTimeout         time.Duration
 }
 
 var (
@@ -85,6 +87,13 @@ func GetCommand() *cobra.Command {
 		"the JSON RPC child chain endpoint",
 	)
 
+	exitCmd.Flags().DurationVar(
+		&ep.txTimeout,
+		cmdHelper.TxTimeoutFlag,
+		txrelayer.DefaultTimeoutTransactions,
+		cmdHelper.TxTimeoutDesc,
+	)
+
 	_ = exitCmd.MarkFlagRequired(exitHelperFlag)
 
 	return exitCmd
@@ -101,7 +110,8 @@ func run(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	rootTxRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(ep.rootJSONRPCAddr))
+	rootTxRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(ep.rootJSONRPCAddr),
+		txrelayer.WithReceiptsTimeout(ep.txTimeout))
 	if err != nil {
 		outputter.SetError(fmt.Errorf("could not create root chain tx relayer: %w", err))
 

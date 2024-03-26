@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	validatorHelper "github.com/0xPolygon/polygon-edge/command/validator/helper"
@@ -18,6 +19,7 @@ type unstakeParams struct {
 	accountConfig string
 	jsonRPC       string
 	amount        string
+	txTimeout     time.Duration
 
 	amountValue *big.Int
 }

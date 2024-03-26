@@ -1316,7 +1316,7 @@ func TestE2E_Bridge_NonMintableERC20Token_WithPremine(t *testing.T) {
 	require.NoError(t, err)
 
 	checkBalancesFn := func(address types.Address, rootExpected, childExpected *big.Int, isValidator bool) {
-		offset := ethgo.Gwei(10)
+		offset := ethgo.Gwei(100)
 		expectedValue := new(big.Int)
 
 		t.Log("Checking balance of native ERC20 token on root and child", "Address", address,

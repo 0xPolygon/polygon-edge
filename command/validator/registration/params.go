@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	sidechainHelper "github.com/0xPolygon/polygon-edge/command/validator/helper"
@@ -18,6 +19,7 @@ type registerParams struct {
 	jsonRPC       string
 	amount        string
 	stakeToken    string
+	txTimeout     time.Duration
 
 	amountValue    *big.Int
 	stakeTokenAddr types.Address

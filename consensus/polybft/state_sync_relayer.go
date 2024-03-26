@@ -253,6 +253,6 @@ func getBridgeTxRelayer(rpcEndpoint string, logger hclog.Logger) (txrelayer.TxRe
 	}
 
 	return txrelayer.NewTxRelayer(
-		txrelayer.WithIPAddress(rpcEndpoint), txrelayer.WithNumRetries(-1),
+		txrelayer.WithIPAddress(rpcEndpoint), txrelayer.WithNoWaiting(),
 		txrelayer.WithWriter(logger.StandardWriter(&hclog.StandardLoggerOptions{})))
 }
