@@ -68,6 +68,7 @@ func TestDispatcher_HandleWebsocketConnection_EthSubscribe(t *testing.T) {
 			priceLimit:              0,
 			jsonRPCBatchLengthLimit: 20,
 			blockRangeLimit:         1000,
+			secretsManager:          setupSecretsManagerWithKey(t),
 		},
 	)
 
@@ -134,6 +135,7 @@ func TestDispatcher_WebsocketConnection_RequestFormats(t *testing.T) {
 			priceLimit:              0,
 			jsonRPCBatchLengthLimit: 20,
 			blockRangeLimit:         1000,
+			secretsManager:          setupSecretsManagerWithKey(t),
 		},
 	)
 
@@ -247,6 +249,7 @@ func TestDispatcherFuncDecode(t *testing.T) {
 			priceLimit:              0,
 			jsonRPCBatchLengthLimit: 20,
 			blockRangeLimit:         1000,
+			secretsManager:          setupSecretsManagerWithKey(t),
 		},
 	)
 
@@ -349,6 +352,7 @@ func TestDispatcherBatchRequest(t *testing.T) {
 					priceLimit:              0,
 					jsonRPCBatchLengthLimit: 20,
 					blockRangeLimit:         1000,
+					secretsManager:          setupSecretsManagerWithKey(t),
 				},
 			),
 			append([]byte{0x20, 0x20, 0x09, 0x0A, 0x0A, 0x0D}, []byte(`[
@@ -374,6 +378,7 @@ func TestDispatcherBatchRequest(t *testing.T) {
 					priceLimit:              0,
 					jsonRPCBatchLengthLimit: 10,
 					blockRangeLimit:         1000,
+					secretsManager:          setupSecretsManagerWithKey(t),
 				},
 			),
 			[]byte(`[
@@ -403,6 +408,7 @@ func TestDispatcherBatchRequest(t *testing.T) {
 					priceLimit:              0,
 					jsonRPCBatchLengthLimit: 3,
 					blockRangeLimit:         1000,
+					secretsManager:          setupSecretsManagerWithKey(t),
 				},
 			),
 			[]byte(`[
@@ -426,6 +432,7 @@ func TestDispatcherBatchRequest(t *testing.T) {
 					priceLimit:              0,
 					jsonRPCBatchLengthLimit: 0,
 					blockRangeLimit:         0,
+					secretsManager:          setupSecretsManagerWithKey(t),
 				}),
 			[]byte(`[
 				{"id":1,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]},
@@ -517,6 +524,7 @@ func TestDispatcher_WebsocketConnection_Unsubscribe(t *testing.T) {
 			priceLimit:              0,
 			jsonRPCBatchLengthLimit: 20,
 			blockRangeLimit:         1000,
+			secretsManager:          setupSecretsManagerWithKey(t),
 		},
 	)
 	mockConn := &mockWsConn{

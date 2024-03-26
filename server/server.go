@@ -871,6 +871,7 @@ func (s *Server) setupJSONRPC() error {
 		WebSocketReadLimit:       s.config.JSONRPC.WebSocketReadLimit,
 		TLSCertFile:              s.config.TLSCertFile,
 		TLSKeyFile:               s.config.TLSKeyFile,
+		SecretsManager:           s.secretsManager,
 	}
 
 	srv, err := jsonrpc.NewJSONRPC(s.logger, conf)

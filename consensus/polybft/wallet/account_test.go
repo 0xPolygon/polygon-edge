@@ -1,7 +1,6 @@
 package wallet
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/secrets"
@@ -12,7 +11,7 @@ import (
 func TestAccount(t *testing.T) {
 	t.Parallel()
 
-	secretsManager := newSecretsManagerMock()
+	secretsManager := secrets.NewSecretsManagerMock()
 
 	key := generateTestAccount(t)
 	pubKeyMarshalled := key.Bls.PublicKey().Marshal()
@@ -33,10 +32,6 @@ func TestAccount(t *testing.T) {
 	assert.Equal(t, privKeyMarshalled, privKeyMarshalled1)
 }
 
-func newSecretsManagerMock() secrets.SecretsManager {
-	return &secretsManagerMock{cache: make(map[string][]byte)}
-}
-
 func generateTestAccount(t *testing.T) *Account {
 	t.Helper()
 
@@ -44,39 +39,4 @@ func generateTestAccount(t *testing.T) *Account {
 	require.NoError(t, err)
 
 	return acc
-}
-
-type secretsManagerMock struct {
-	cache map[string][]byte
-}
-
-func (sm *secretsManagerMock) Setup() error {
-	return nil
-}
-
-func (sm *secretsManagerMock) GetSecret(name string) ([]byte, error) {
-	value, exists := sm.cache[name]
-	if !exists {
-		return nil, fmt.Errorf("secret does not exists for %s", name)
-	}
-
-	return value, nil
-}
-
-func (sm *secretsManagerMock) SetSecret(name string, value []byte) error {
-	sm.cache[name] = value
-
-	return nil
-}
-
-func (sm *secretsManagerMock) HasSecret(name string) bool {
-	_, exists := sm.cache[name]
-
-	return exists
-}
-
-func (sm *secretsManagerMock) RemoveSecret(name string) error {
-	delete(sm.cache, name)
-
-	return nil
 }

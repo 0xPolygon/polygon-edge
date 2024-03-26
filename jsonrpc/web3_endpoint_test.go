@@ -20,6 +20,7 @@ func TestWeb3EndpointSha3(t *testing.T) {
 			priceLimit:              0,
 			jsonRPCBatchLengthLimit: 20,
 			blockRangeLimit:         1000,
+			secretsManager:          setupSecretsManagerWithKey(t),
 		})
 
 	resp, err := dispatcher.Handle([]byte(`{
@@ -49,6 +50,7 @@ func TestWeb3EndpointClientVersion(t *testing.T) {
 			priceLimit:              0,
 			jsonRPCBatchLengthLimit: 20,
 			blockRangeLimit:         1000,
+			secretsManager:          setupSecretsManagerWithKey(t),
 		},
 	)
 

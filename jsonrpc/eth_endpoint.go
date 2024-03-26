@@ -9,12 +9,19 @@ import (
 	"github.com/hashicorp/go-hclog"
 
 	"github.com/0xPolygon/polygon-edge/chain"
+	polyWallet "github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/gasprice"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
+	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
+)
+
+var (
+	errMissingPrivateKey = errors.New("local private key is undefined")
 )
 
 type ethTxPoolStore interface {
@@ -98,13 +105,49 @@ type Eth struct {
 	chainID       uint64
 	filterManager *FilterManager
 	priceLimit    uint64
+	ecdsaKey      *crypto.ECDSAKey
+}
+
+func NewEth(
+	logger hclog.Logger,
+	store ethStore,
+	filterManager *FilterManager,
+	secretsManager secrets.SecretsManager,
+	chainID uint64,
+	priceLimit uint64) (*Eth, error) {
+	var (
+		ecdsaKey *crypto.ECDSAKey
+		err      error
+	)
+
+	if secretsManager != nil && secretsManager.HasSecret(secrets.ValidatorKey) {
+		ecdsaKey, err = polyWallet.GetEcdsaFromSecret(secretsManager)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read account ECDSA key: %w", err)
+		}
+	}
+
+	return &Eth{
+		store:         store,
+		logger:        logger,
+		chainID:       chainID,
+		ecdsaKey:      ecdsaKey,
+		priceLimit:    priceLimit,
+		filterManager: filterManager,
+	}, nil
 }
 
 // ChainId returns the chain id of the client
-//
-//nolint:stylecheck
 func (e *Eth) ChainId() (interface{}, error) {
 	return argUintPtr(e.chainID), nil
+}
+
+func (e *Eth) Accounts() (interface{}, error) {
+	if e.ecdsaKey == nil {
+		return nil, errMissingPrivateKey
+	}
+
+	return []types.Address{e.ecdsaKey.Address()}, nil
 }
 
 func (e *Eth) Syncing() (interface{}, error) {

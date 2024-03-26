@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/go-hclog"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNetEndpoint_PeerCount(t *testing.T) {
@@ -12,17 +12,18 @@ func TestNetEndpoint_PeerCount(t *testing.T) {
 		hclog.NewNullLogger(),
 		newMockStore(),
 		&dispatcherParams{
-			chainID: 1,
+			chainID:        1,
+			secretsManager: setupSecretsManagerWithKey(t),
 		})
 
 	resp, err := dispatcher.Handle([]byte(`{
 		"method": "net_peerCount",
 		"params": [""]
 	}`))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	var res string
 
-	assert.NoError(t, expectJSONResult(resp, &res))
-	assert.Equal(t, "0x14", res)
+	require.NoError(t, expectJSONResult(resp, &res))
+	require.Equal(t, "0x14", res)
 }

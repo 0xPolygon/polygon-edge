@@ -19,6 +19,7 @@ func TestBridgeEndpoint(t *testing.T) {
 			priceLimit:              0,
 			jsonRPCBatchLengthLimit: 20,
 			blockRangeLimit:         1000,
+			secretsManager:          setupSecretsManagerWithKey(t),
 		},
 	)
 

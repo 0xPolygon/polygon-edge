@@ -21,6 +21,7 @@ func FuzzDispatcherFuncDecode(f *testing.F) {
 			priceLimit:              0,
 			jsonRPCBatchLengthLimit: 20,
 			blockRangeLimit:         1000,
+			secretsManager:          setupSecretsManagerWithKey(f),
 		},
 	)
 
@@ -147,6 +148,7 @@ func FuzzDispatcherBatchRequest(f *testing.F) {
 				priceLimit:              0,
 				jsonRPCBatchLengthLimit: batchLimit,
 				blockRangeLimit:         blockLimit,
+				secretsManager:          setupSecretsManagerWithKey(t),
 			},
 		)
 
@@ -169,6 +171,7 @@ func FuzzDispatcherWebsocketConnectionUnsubscribe(f *testing.F) {
 			priceLimit:              0,
 			jsonRPCBatchLengthLimit: 20,
 			blockRangeLimit:         1000,
+			secretsManager:          setupSecretsManagerWithKey(f),
 		},
 	)
 	mockConn := &mockWsConn{
@@ -207,6 +210,7 @@ func FuzzDispatcherWebSocketConnectionRequestFormats(f *testing.F) {
 			priceLimit:              0,
 			jsonRPCBatchLengthLimit: 20,
 			blockRangeLimit:         1000,
+			secretsManager:          setupSecretsManagerWithKey(f),
 		},
 	)
 	mockConnection, _ := newMockWsConnWithMsgCh()

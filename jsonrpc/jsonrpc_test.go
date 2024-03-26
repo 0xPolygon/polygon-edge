@@ -107,8 +107,9 @@ func newTestJSONRPC(t *testing.T) (*JSONRPC, error) {
 	require.NoError(t, err, "Unable to fetch free port, %v", err)
 
 	config := &Config{
-		Store: store,
-		Addr:  &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: port},
+		Store:          store,
+		Addr:           &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: port},
+		SecretsManager: setupSecretsManagerWithKey(t),
 	}
 
 	return NewJSONRPC(hclog.NewNullLogger(), config)
