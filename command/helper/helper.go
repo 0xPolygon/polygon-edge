@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	TxTimeoutDesc = "timeout for waiting for transactions to be minted"
+	TxTimeoutDesc = "timeout for transaction processing wait"
 	TxTimeoutFlag = "tx-timeout"
 )
 
