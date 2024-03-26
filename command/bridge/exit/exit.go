@@ -25,7 +25,6 @@ const (
 	exitEventIDFlag  = "exit-id"
 	rootJSONRPCFlag  = "root-json-rpc"
 	childJSONRPCFlag = "child-json-rpc"
-	txTimeoutFlag    = "tx-timeout"
 
 	// generateExitProofFn is JSON RPC endpoint which creates exit proof
 	generateExitProofFn = "bridge_generateExitProof"
@@ -90,7 +89,7 @@ func GetCommand() *cobra.Command {
 
 	exitCmd.Flags().DurationVar(
 		&ep.txTimeout,
-		txTimeoutFlag,
+		cmdHelper.TxTimeoutFlag,
 		txrelayer.DefaultTimeoutTransactions,
 		cmdHelper.TxTimeoutDesc,
 	)

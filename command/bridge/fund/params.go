@@ -13,7 +13,6 @@ import (
 const (
 	jsonRPCFlag        = "json-rpc"
 	mintStakeTokenFlag = "mint"
-	txTimeoutFlag      = "tx-timeout"
 )
 
 var (

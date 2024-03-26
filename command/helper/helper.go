@@ -23,7 +23,10 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-const TxTimeoutDesc = "timeout for waiting for transactions to be minted"
+const (
+	TxTimeoutDesc = "timeout for waiting for transactions to be minted"
+	TxTimeoutFlag = "tx-timeout"
+)
 
 var ErrBlockTrackerPollInterval = errors.New("block tracker poll interval must be greater than 0")
 

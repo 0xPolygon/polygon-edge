@@ -36,7 +36,6 @@ const (
 	ChildTokenFlag         = "child-token"
 	JSONRPCFlag            = "json-rpc"
 	ChildChainMintableFlag = "child-chain-mintable"
-	txTimeoutFlag          = "tx-timeout"
 
 	MinterKeyFlag     = "minter-key"
 	MinterKeyFlagDesc = "minter key is the account which is able to mint tokens to sender account " +
@@ -90,7 +89,7 @@ func (p *BridgeParams) RegisterCommonFlags(cmd *cobra.Command) {
 
 	cmd.Flags().DurationVar(
 		&p.TxTimeout,
-		txTimeoutFlag,
+		cmdHelper.TxTimeoutFlag,
 		txrelayer.DefaultTimeoutTransactions,
 		cmdHelper.TxTimeoutDesc,
 	)

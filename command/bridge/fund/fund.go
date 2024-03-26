@@ -64,7 +64,7 @@ func setFlags(cmd *cobra.Command) {
 
 	cmd.Flags().DurationVar(
 		&params.txTimeout,
-		txTimeoutFlag,
+		cmdHelper.TxTimeoutFlag,
 		txrelayer.DefaultTimeoutTransactions,
 		cmdHelper.TxTimeoutDesc,
 	)

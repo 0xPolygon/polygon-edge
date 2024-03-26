@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/command"
-	bridgeHelper "github.com/0xPolygon/polygon-edge/command/bridge/helper"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	polybftsecrets "github.com/0xPolygon/polygon-edge/command/secrets/init"
 	validatorHelper "github.com/0xPolygon/polygon-edge/command/validator/helper"
@@ -56,7 +55,7 @@ func setFlags(cmd *cobra.Command) {
 
 	cmd.Flags().DurationVar(
 		&params.txTimeout,
-		bridgeHelper.TxTimeoutFlag,
+		helper.TxTimeoutFlag,
 		150*time.Second,
 		helper.TxTimeoutDesc,
 	)

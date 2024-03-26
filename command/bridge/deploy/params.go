@@ -14,7 +14,6 @@ const (
 	deployerKeyFlag = "deployer-key"
 	jsonRPCFlag     = "json-rpc"
 	erc20AddrFlag   = "erc20-token"
-	txTimeoutFlag   = "tx-timeout"
 )
 
 type deployParams struct {
