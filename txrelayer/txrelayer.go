@@ -23,8 +23,8 @@ const (
 	defaultNumRetries          = 1000
 	gasLimitIncreasePercentage = 100
 	feeIncreasePercentage      = 100
-	DefaultTimeoutTransactions = time.Duration(50 * time.Second)
-	DefaultPollFreq            = time.Duration(50 * time.Millisecond)
+	DefaultTimeoutTransactions = 50 * time.Second
+	DefaultPollFreq            = 50 * time.Millisecond
 )
 
 var (
