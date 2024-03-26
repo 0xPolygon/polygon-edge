@@ -24,7 +24,7 @@ const (
 	gasLimitIncreasePercentage = 100
 	feeIncreasePercentage      = 100
 	DefaultTimeoutTransactions = 50 * time.Second
-	DefaultPollFreq            = 50 * time.Millisecond
+	DefaultPollFreq            = 1 * time.Second
 )
 
 var (
@@ -70,6 +70,18 @@ func NewTxRelayer(opts ...TxRelayerOption) (TxRelayer, error) {
 	}
 	for _, opt := range opts {
 		opt(t)
+	}
+
+	// Calculate receiptsPollFreq based on receiptsTimeout
+
+	if t.receiptsTimeout >= time.Minute {
+		t.receiptsPollFreq = 2 * time.Second
+	}
+
+	if t.receiptsPollFreq >= t.receiptsTimeout || t.receiptsTimeout < time.Second {
+		// if someone decides to configure a small receipts timeout (in ms)
+		// receiptsPollFreq should be less than receiptsTimeout
+		t.receiptsPollFreq = t.receiptsTimeout / 2
 	}
 
 	if t.client == nil {
@@ -379,12 +391,6 @@ func WithClient(client *jsonrpc.Client) TxRelayerOption {
 func WithIPAddress(ipAddress string) TxRelayerOption {
 	return func(t *TxRelayerImpl) {
 		t.ipAddress = ipAddress
-	}
-}
-
-func WithReceiptsPollFreq(receiptsPollFreq time.Duration) TxRelayerOption {
-	return func(t *TxRelayerImpl) {
-		t.receiptsPollFreq = receiptsPollFreq
 	}
 }
 
