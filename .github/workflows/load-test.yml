@@ -15,7 +15,7 @@ on: # yamllint disable-line rule:truthy
       timeout:
         description: Time Out
         type: string
-        default: "220s"
+        default: "1800s"
         required: true
       rate:
         description: Rate
@@ -136,7 +136,6 @@ jobs:
   check_network:
     name: Check if the network is already deployed
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
     outputs:
       rpc_url: ${{ steps.rpc_url.outputs.url }}
     steps:
@@ -228,6 +227,12 @@ jobs:
     with:
       environment: ${{ inputs.environment }}
       scenario: ${{ inputs.scenario }}
+      timeout: ${{ inputs.timeout }}
+      rate: ${{ inputs.rate }}
+      timeUnit: ${{ inputs.timeUnit }}
+      duration: ${{ inputs.duration }}
+      preAllocatedVUs: ${{ inputs.preAllocatedVUs }}
+      maxVUs: ${{ inputs.maxVUs }}
       tps_avg: ${{ needs.load_test_scenario.outputs.tps_avg }}
       tps_max: ${{ needs.load_test_scenario.outputs.tps_max }}
       iterations: ${{ needs.load_test_scenario.outputs.iterations }}

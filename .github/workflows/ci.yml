@@ -72,7 +72,7 @@ on: # yamllint disable-line rule:truthy
       benchmark-test:
         description: Benchmark Tests
         type: boolean
-        default: true
+        required: true
     outputs:
       build-blade:
         description: Build Blade output

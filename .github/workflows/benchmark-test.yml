@@ -1,11 +1,11 @@
 ---
 name: Benchmark Tests
 on: # yamllint disable-line rule:truthy
-    workflow_call:
-      outputs:
-        workflow_output:
-          description: "Benchmark Tests output"
-          value: ${{ jobs.benchmark_test.outputs.test_output_failure }}
+  workflow_call:
+    outputs:
+      workflow_output:
+        description: "Benchmark Tests output"
+        value: ${{ jobs.benchmark_test.outputs.test_output_failure }}
 
 jobs:
   benchmark_test:

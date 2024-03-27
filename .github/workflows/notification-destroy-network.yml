@@ -35,64 +35,52 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
-          green_color: '#03C03C'
-          red_color: '#E60012'
           succeed_bnt: 'primary'
           failed_bnt: 'danger'
-          url: https://s3.console.aws.amazon.com/s3/buckets/${{ secrets.AWS_S3_BLADE_BUCKET }}?region=${{ vars.AWS_REGION }}&prefix=logs/${{ github.run_id }}/
         with:
           payload: |
             {
-              "attachments": [
+              "blocks": [
                 {
-                  "color": "${{ inputs.destroy_network_upload_logs == '' && inputs.destroy_network_terraform_logs == '' && env.green_color || env.red_color }}",
-                  "blocks": [
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "Destroy ${{ inputs.environment }}net"
+                  }
+                },
+                {
+                  "type": "actions",
+                  "elements": [
                     {
-                      "type": "header",
+                      "type": "button",
                       "text": {
                         "type": "plain_text",
-                        "text": "Destroy ${{ inputs.environment }}net"
-                      }
+                        "text": "Workflow Run"
+                      },
+                      "style": "${{ inputs.destroy_network_upload_logs == '' && inputs.destroy_network_terraform_logs == '' && env.succeed_bnt || env.failed_bnt }}",
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
                     },
                     {
-                      "type": "context",
-                      "elements": [
-                        {
-                          "type": "mrkdwn",
-                          "text": "Environment: *${{ inputs.environment }}*"
-                        }
-                      ]
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "${{ inputs.logs && inputs.destroy_network_upload_logs == '' && 'Logs' || 'No Logs' }}"
+                      },
+                      "style": "${{ inputs.logs && inputs.destroy_network_upload_logs == '' && env.succeed_bnt || env.failed_bnt }}",
+                      "url": "https://s3.console.aws.amazon.com/s3/buckets/${{ secrets.AWS_S3_BLADE_BUCKET }}?region=${{ vars.AWS_REGION }}&prefix=logs/${{ github.run_id }}/"
+                    }
+                  ]
+                },
+                {
+                  "type": "context",
+                  "elements": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "Triggered by: *${{ github.triggering_actor }}*"
                     },
                     {
-                      "type": "context",
-                      "elements": [
-                        {
-                          "type": "mrkdwn",
-                          "text": "Triggered by: *${{ github.triggering_actor }}*"
-                        }
-                      ]
-                    },
-                    {
-                      "type": "actions",
-                      "elements": [
-                        {
-                          "type": "button",
-                          "text": {
-                            "type": "plain_text",
-                            "text": "Workflow Run"
-                          },
-                          "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-                        },
-                        {
-                          "type": "button",
-                          "text": {
-                            "type": "plain_text",
-                            "text": "${{ inputs.logs && inputs.destroy_network_upload_logs == '' && 'Logs' || 'No Logs' }}"
-                          },
-                          "style": "${{ inputs.logs && inputs.destroy_network_upload_logs == '' && env.succeed_bnt || env.failed_bnt }}",
-                          "url": "https://s3.console.aws.amazon.com/s3/buckets/${{ secrets.AWS_S3_BLADE_BUCKET }}?region=${{ vars.AWS_REGION }}&prefix=logs/${{ github.run_id }}/"
-                        }
-                      ]
+                      "type": "mrkdwn",
+                      "text": "Environment: *${{ inputs.environment }}*"
                     }
                   ]
                 }

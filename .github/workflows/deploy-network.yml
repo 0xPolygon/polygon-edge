@@ -18,6 +18,16 @@ on: # yamllint disable-line rule:truthy
         type: string
         default: "2"
         required: true
+      max_slots:
+        description: Max Slots
+        type: string
+        default: "276480"
+        required: true
+      max_enqueued:
+        description: Max Enqueued
+        type: string
+        default: "276480"
+        required: true
       is_london_fork_active:
         description: EIP-1559
         type: boolean
@@ -42,6 +52,14 @@ on: # yamllint disable-line rule:truthy
         required: true
       block_time:
         description: Block Time
+        type: string
+        required: true
+      max_slots:
+        description: Max Slots
+        type: string
+        required: true
+      max_enqueued:
+        description: Max Enqueued
         type: string
         required: true
       is_london_fork_active:
@@ -80,7 +98,6 @@ jobs:
   check_network:
     name: Check if the network is already deployed
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
     outputs:
       check_output: ${{ steps.check_state_file.outputs.resources }}
       rpc_url: ${{ steps.rpc_url.outputs.url }}
@@ -163,6 +180,8 @@ jobs:
           echo "${{ secrets.VAULT_PASSWORD }}" > password.txt
           sed 's/devnet/${{ inputs.environment }}/g' inventory/aws_ec2.yml > inventory/aws_ec2.yml.tmp && mv inventory/aws_ec2.yml.tmp inventory/aws_ec2.yml
           sed 's/blade_tag: .*/blade_tag: ${{ github.sha }}/g' group_vars/all.yml > group_vars/all.yml.tmp && mv group_vars/all.yml.tmp group_vars/all.yml
+          sed 's/is_bridge_active: .*/is_bridge_active: ${{ inputs.is_bridge_active }}/g' group_vars/all.yml > group_vars/all.yml.tmp && mv group_vars/all.yml.tmp group_vars/all.yml
+          sed 's/is_london_fork_active: .*/is_london_fork_active: ${{ inputs.is_london_fork_active }}/g' group_vars/all.yml > group_vars/all.yml.tmp && mv group_vars/all.yml.tmp group_vars/all.yml
           sed 's/INFO/${{ vars.LOG_LEVEL }}/g' roles/blade/templates/blade.service > roles/blade/templates/blade.service.tmp && mv roles/blade/templates/blade.service.tmp roles/blade/templates/blade.service
       - name: Setup Ansible
         working-directory: ansible
@@ -175,11 +194,11 @@ jobs:
       - name: Run Ansible (Bootstrap blade)
         if: (steps.previous_data.outputs.previous_data_output == '' || contains(steps.previous_data.outputs.previous_data_output, 'error'))
         working-directory: ansible
-        run: ansible-playbook site.yml --extra-vars "clean_deploy_title=${{ inputs.environment }} blade_repository=${{ github.repository }} block_gas_limit=${{ inputs.block_gas_limit }} block_time=${{ inputs.block_time }} is_london_fork_active=${{ inputs.is_london_fork_active }} is_bridge_active=${{ inputs.is_bridge_active }}"
+        run: ansible-playbook site.yml --extra-vars "clean_deploy_title=${{ inputs.environment }} blade_repository=${{ github.repository }} block_gas_limit=${{ inputs.block_gas_limit }} block_time=${{ inputs.block_time }} max_slots=${{ inputs.max_slots }} max_enqueued=${{ inputs.max_enqueued }}"
       - name: Run Ansible (Restore data)
         if: contains(steps.previous_data.outputs.previous_data_output, 'download')
         working-directory: ansible
-        run: ansible-playbook site.yml --extra-vars "clean_deploy_title=${{ inputs.environment }} blade_repository=${{ github.repository }} block_gas_limit=${{ inputs.block_gas_limit }} block_time=${{ inputs.block_time }} s3_bucket=${{ secrets.AWS_S3_BLADE_BUCKET }} restore_data=true"
+        run: ansible-playbook site.yml --extra-vars "clean_deploy_title=${{ inputs.environment }} blade_repository=${{ github.repository }} s3_bucket=${{ secrets.AWS_S3_BLADE_BUCKET }} restore_data=true"
       - name: Ansible Failed
         if: failure()
         id: ansible_failure
@@ -191,9 +210,15 @@ jobs:
     name: Deploy Notification
     needs: [check_network, deploy_network]
     uses: ./.github/workflows/notification-deploy-network.yml
-    if: (always() && inputs.notification)
+    if: ((success() || failure()) && inputs.notification)
     with:
       environment: ${{ inputs.environment }}
+      block_gas_limit: ${{ inputs.block_gas_limit }}
+      block_time: ${{ inputs.block_time }}
+      max_slots: ${{ inputs.max_slots }}
+      max_enqueued: ${{ inputs.max_enqueued }}
+      is_london_fork_active: ${{ inputs.is_london_fork_active }}
+      is_bridge_active: ${{ inputs.is_bridge_active }}
       deploy_network_terraform_output: ${{ needs.deploy_network.outputs.terraform_output }}
       deploy_network_ansible_output: ${{ needs.deploy_network.outputs.ansible_output }}
       rpc_url: ${{ needs.check_network.outputs.rpc_url || needs.deploy_network.outputs.rpc_url }}
