@@ -973,6 +973,7 @@ func (h *headElem) getUpdates() ([]*block, *headElem) {
 			if nextElem.header != nil {
 				res = append(res, nextElem.header)
 			}
+
 			cur = nextElem
 		}
 	}

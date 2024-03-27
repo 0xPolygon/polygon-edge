@@ -123,6 +123,7 @@ func TestEventSubscription_ProcessedEvents(t *testing.T) {
 
 			// Set the event listener
 			processed := int64(0)
+
 			go func() {
 				for range subscription.outputCh {
 					atomic.AddInt64(&processed, 1)
@@ -133,6 +134,7 @@ func TestEventSubscription_ProcessedEvents(t *testing.T) {
 			var wg sync.WaitGroup
 			for _, event := range testCase.events {
 				wg.Add(1)
+
 				go func(event *proto.TxPoolEvent) {
 					defer wg.Done()
 
@@ -141,8 +143,11 @@ func TestEventSubscription_ProcessedEvents(t *testing.T) {
 			}
 
 			wg.Wait()
+
 			eventWaitCtx, eventWaitFn := context.WithTimeout(context.Background(), 30*time.Second)
+
 			defer eventWaitFn()
+
 			if _, err := tests.RetryUntilTimeout(eventWaitCtx, func() (interface{}, bool) {
 				return nil, atomic.LoadInt64(&processed) != int64(testCase.expectedProcessed)
 			}); err != nil {

@@ -91,7 +91,9 @@ func TestE2E_TxPool_Transfer(t *testing.T) {
 			if err != nil {
 				return true
 			}
+
 			t.Logf("Balance %s %s", receiver, balance)
+
 			if balance.Uint64() != uint64(sendAmount) {
 				return false
 			}
@@ -295,6 +297,7 @@ func TestE2E_TxPool_BroadcastTransactions(t *testing.T) {
 		for _, srv := range cluster.Servers {
 			balance, err := srv.WaitForNonZeroBalance(ethgo.Address(recipient), time.Second*10)
 			assert.NoError(t, err)
+
 			if balance != nil && balance.BitLen() > 0 {
 				assert.Equal(t, sentAmount, balance)
 			} else {

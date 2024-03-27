@@ -667,6 +667,8 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 		result = t.Call2(msg.From(), *(msg.To()), msg.Input(), value, gasLeft)
 	}
 
+	result.AccessList = t.accessList
+
 	refundQuotient := LegacyRefundQuotient
 	if t.config.London {
 		refundQuotient = LondonRefundQuotient
@@ -882,7 +884,6 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 		}
 	}
 
-	//Berlin: check
 	// we add this to the access-list before taking a snapshot. Even if the creation fails,
 	// the access-list change should not be rolled back according to EIP2929 specs
 	if t.config.Berlin {

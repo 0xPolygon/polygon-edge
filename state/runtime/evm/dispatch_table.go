@@ -22,6 +22,7 @@ func registerRange(from, to OpCode, factory func(n int) instruction, gas uint64)
 	c := 1
 	for i := from; i <= to; i++ {
 		register(i, handler{factory(c), 0, gas})
+
 		c++
 	}
 }

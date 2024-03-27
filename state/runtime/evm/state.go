@@ -104,6 +104,7 @@ func (c *state) reset() {
 			return x.SetInt64(0)
 		}, c.stack[i])
 	}
+
 	c.stack = c.stack[:0]
 	c.tmp = c.tmp[:0]
 	c.ret = c.ret[:0]

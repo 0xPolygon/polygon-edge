@@ -13,6 +13,7 @@ func TestIsPush(t *testing.T) {
 			if !strings.HasPrefix(OpCode(i).String(), "PUSH") {
 				t.Fatal("err")
 			}
+
 			num++
 		}
 	}

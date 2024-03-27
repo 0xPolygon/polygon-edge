@@ -129,6 +129,7 @@ func (j *JSONRPC) setupHTTP() error {
 	}
 
 	j.logger.Info("http server started", "addr", j.config.Addr.String())
+
 	return nil
 }
 
@@ -151,6 +152,7 @@ func middlewareFactory(config *Config) func(http.Handler) http.Handler {
 					break
 				}
 			}
+
 			next.ServeHTTP(w, r)
 		})
 	}

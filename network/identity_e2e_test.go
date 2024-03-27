@@ -45,6 +45,7 @@ func TestIdentityHandshake(t *testing.T) {
 				},
 			}
 			servers, createErr := createServers(2, params)
+
 			if createErr != nil {
 				t.Fatalf("Unable to create servers, %v", createErr)
 			}

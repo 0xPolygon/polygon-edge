@@ -131,6 +131,7 @@ func TestEth_State_GetBalance(t *testing.T) {
 				assert.Equal(t, nil, balance)
 			} else {
 				assert.NoError(t, err)
+
 				if tt.expectedBalance == 0 {
 					uintBalance, ok := balance.(*argUint64)
 					if !ok {
@@ -383,6 +384,7 @@ func TestEth_State_GetCode(t *testing.T) {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
+
 				if tt.target.String() == uninitializedAddress.String() {
 					assert.Equal(t, "0x", code)
 				} else {
@@ -553,6 +555,7 @@ func TestEth_State_GetStorageAt(t *testing.T) {
 					storage: make(map[types.Hash][]byte),
 				}
 				account := store.account
+
 				for index, data := range storage {
 					account.Storage(index, data.Bytes())
 				}

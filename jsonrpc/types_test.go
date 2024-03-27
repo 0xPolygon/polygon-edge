@@ -156,9 +156,12 @@ func TestToTransaction_EIP1559(t *testing.T) {
 
 func TestBlock_Copy(t *testing.T) {
 	b := &block{
-		ExtraData: []byte{0x1},
-		Miner:     []byte{0x2},
-		Uncles:    []types.Hash{{0x0, 0x1}},
+		header: header{
+			ExtraData: []byte{0x1},
+			Miner:     []byte{0x2},
+		},
+
+		Uncles: []types.Hash{{0x0, 0x1}},
 	}
 
 	bb := b.Copy()
@@ -170,7 +173,7 @@ var testsuite embed.FS
 
 func TestBlock_Encoding(t *testing.T) {
 	getBlock := func() block {
-		return block{
+		return block{header: header{
 			ParentHash:   types.Hash{0x1},
 			Sha3Uncles:   types.Hash{0x2},
 			Miner:        types.Address{0x1}.Bytes(),
@@ -188,7 +191,7 @@ func TestBlock_Encoding(t *testing.T) {
 			Nonce:        types.Nonce{10},
 			Hash:         types.Hash{0x8},
 			BaseFee:      15,
-		}
+		}}
 	}
 
 	testBlock := func(name string, b block) {
