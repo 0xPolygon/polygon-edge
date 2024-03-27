@@ -111,7 +111,10 @@ func TestEth_Accounts(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Nil(t, res)
-	contractKey, _ := crypto.GenerateECDSAKey()
+
+	contractKey, err := crypto.GenerateECDSAKey()
+	assert.NoError(t, err)
+
 	eth.ecdsaKey = contractKey
 
 	res, err = eth.Accounts()
