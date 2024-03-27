@@ -654,6 +654,7 @@ func TestRunDial(t *testing.T) {
 				t.Fatalf("Unable to join peer, %v", joinErr)
 			}
 		}
+
 		closeServers(servers...)
 	})
 
@@ -674,6 +675,7 @@ func TestRunDial(t *testing.T) {
 				assert.Error(t, joinErr)
 			}
 		}
+
 		closeServers(servers...)
 	})
 
@@ -766,6 +768,7 @@ func TestSubscribe(t *testing.T) {
 		server := setupServer(t, true)
 
 		ctx, cancel := context.WithCancel(context.Background())
+
 		t.Cleanup(func() {
 			cancel()
 		})
@@ -801,6 +804,7 @@ func TestSubscribe(t *testing.T) {
 		server := setupServer(t, false)
 
 		ctx, cancel := context.WithCancel(context.Background())
+
 		t.Cleanup(func() {
 			cancel()
 		})

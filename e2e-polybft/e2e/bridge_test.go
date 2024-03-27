@@ -74,12 +74,13 @@ func TestE2E_Bridge_RootchainTokensTransfers(t *testing.T) {
 		framework.WithBridge(),
 		framework.WithSecretsCallback(func(addrs []types.Address, tcc *framework.TestClusterConfig) {
 			for i := 0; i < len(addrs); i++ {
-				tcc.StakeAmounts = append(tcc.StakeAmounts, ethgo.Ether(10))
 				// premine receivers, so that they are able to do withdrawals
+				tcc.StakeAmounts = append(tcc.StakeAmounts, ethgo.Ether(10))
 			}
 
 			tcc.Premine = append(tcc.Premine, receivers...)
 		}))
+
 	defer cluster.Stop()
 
 	cluster.WaitForReady(t)
@@ -1345,6 +1346,7 @@ func TestE2E_Bridge_NonMintableERC20Token_WithPremine(t *testing.T) {
 		checkBalancesFn(types.Address(rewardWalletKey.Address()), bigZero, command.DefaultPremineBalance, true)
 
 		validatorsExpectedBalance := new(big.Int).Sub(command.DefaultPremineBalance, command.DefaultStake)
+
 		for _, server := range cluster.Servers {
 			validatorAccount, err := validatorHelper.GetAccountFromDir(server.DataDir())
 			require.NoError(t, err)

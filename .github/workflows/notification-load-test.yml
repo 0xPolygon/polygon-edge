@@ -11,6 +11,30 @@ on: # yamllint disable-line rule:truthy
         description: The scenario to run
         type: string
         required: true
+      timeout:
+        description: Time Out
+        type: string
+        required: true
+      rate:
+        description: Rate
+        type: string
+        required: true
+      timeUnit:
+        description: Time Unit
+        type: string
+        required: true
+      duration:
+        description: Duration
+        type: string
+        required: true
+      preAllocatedVUs:
+        description: Preallocated VUs
+        type: string
+        required: true
+      maxVUs:
+        description: Max VUs
+        type: string
+        required: true
       tps_avg:
         description: "Average Transactions Per Second"
         type: string
@@ -47,91 +71,133 @@ jobs:
   notification:
     name: Notification
     runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
     steps:
+      - name: Short SHA
+        id: short_sha
+        run: echo "value=`echo ${{ github.sha }} | cut -c1-7`" >> $GITHUB_OUTPUT
       - name: Notify Slack
         uses: slackapi/slack-github-action@v1.25.0
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
-          green_color: '#03C03C'
           succeed_bnt: 'primary'
         with:
           payload: |
             {
-              "attachments": [
+              "blocks": [
                 {
-                  "color": "${{ env.green_color }}",
-                  "blocks": [
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "Load Test: ${{ inputs.scenario }}"
+                  }
+                },
+                {
+                  "type": "actions",
+                  "elements": [
                     {
-                      "type": "header",
+                      "type": "button",
                       "text": {
                         "type": "plain_text",
-                        "text": "Load Test: ${{ inputs.scenario }}"
-                      }
+                        "text": "Workflow Run"
+                      },
+                      "style": "${{ env.succeed_bnt }}",
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "context",
+                  "elements": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "Triggered by: *${{ github.triggering_actor }}*"
                     },
                     {
-                      "type": "context",
-                      "elements": [
-                        {
-                          "type": "mrkdwn",
-                          "text": "Environment: *${{ inputs.environment }}*"
-                        }
-                      ]
+                      "type": "mrkdwn",
+                      "text": "Commit: *<https://github.com/${{ github.repository }}/tree/${{ github.sha }}|${{ steps.short_sha.outputs.value }}>*"
+                    }
+                  ]
+                },
+                {
+                  "type": "divider"
+                },
+                {
+                  "type": "context",
+                  "elements": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "Environment: *${{ inputs.environment }}*"
                     },
                     {
-                      "type": "context",
-                      "elements": [
-                        {
-                          "type": "mrkdwn",
-                          "text": "Triggered by: *${{ github.triggering_actor }}*"
-                        }
-                      ]
+                      "type": "mrkdwn",
+                      "text": "Instance Type: *${{ vars.AWS_INSTANCE_TYPE }}*"
+                    }
+                  ]
+                },
+                {
+                  "type": "context",
+                  "elements": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "Time Out: *${{ inputs.timeout }}*"
                     },
                     {
-                      "type": "actions",
-                      "elements": [
-                        {
-                          "type": "button",
-                          "text": {
-                            "type": "plain_text",
-                            "text": "Workflow Run"
-                          },
-                          "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-                        }
-                      ]
+                      "type": "mrkdwn",
+                      "text": "Rate: *${{ inputs.rate }}*"
                     },
                     {
-                      "type": "section",
-                      "fields": [
-                        {
-                          "type": "mrkdwn",
-                          "text": "*Average TPS*\n${{ inputs.tps_avg }}"
-                        },
-                        {
-                          "type": "mrkdwn",
-                          "text": "*Max TPS*\n${{ inputs.tps_max }}"
-                        },
-                        {
-                          "type": "mrkdwn",
-                          "text": "*Average Gas Used*\n${{ inputs.gas_avg }}"
-                        },
-                        {
-                          "type": "mrkdwn",
-                          "text": "*Max Gas Used*\n${{ inputs.gas_max }}"
-                        },
-                        {
-                          "type": "mrkdwn",
-                          "text": "*Transactions*\n${{ inputs.iterations }}"
-                        },
-                        {
-                          "type": "mrkdwn",
-                          "text": "*Block Number*\n${{ inputs.block }}"
-                        },
-                        {
-                          "type": "mrkdwn",
-                          "text": "*Time to Mine*\n${{ inputs.ttm }}"
-                        }
-                      ]
+                      "type": "mrkdwn",
+                      "text": "Time Unit: *${{ inputs.timeUnit }}*"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "Duration: *${{ inputs.duration }}*"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "Preallocated VUs: *${{ inputs.preAllocatedVUs }}*"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "Max VUs: *${{ inputs.maxVUs }}*"
+                    }
+                  ]
+                },
+                {
+                  "type": "divider"
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Average TPS*\n${{ inputs.tps_avg }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Max TPS*\n${{ inputs.tps_max }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Average Gas Used*\n${{ inputs.gas_avg }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Max Gas Used*\n${{ inputs.gas_max }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Transactions*\n${{ inputs.iterations }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Block Number*\n${{ inputs.block }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Time to Mine (ms)*\n${{ inputs.ttm }}"
                     }
                   ]
                 }

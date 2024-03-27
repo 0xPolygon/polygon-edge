@@ -112,28 +112,38 @@ func toTransaction(
 	return res
 }
 
+type header struct {
+	ParentHash      types.Hash  `json:"parentHash"`
+	Sha3Uncles      types.Hash  `json:"sha3Uncles"`
+	Miner           argBytes    `json:"miner"`
+	StateRoot       types.Hash  `json:"stateRoot"`
+	TxRoot          types.Hash  `json:"transactionsRoot"`
+	ReceiptsRoot    types.Hash  `json:"receiptsRoot"`
+	LogsBloom       types.Bloom `json:"logsBloom"`
+	Difficulty      argUint64   `json:"difficulty"`
+	TotalDifficulty argUint64   `json:"totalDifficulty"`
+	Number          argUint64   `json:"number"`
+	GasLimit        argUint64   `json:"gasLimit"`
+	GasUsed         argUint64   `json:"gasUsed"`
+	Timestamp       argUint64   `json:"timestamp"`
+	ExtraData       argBytes    `json:"extraData"`
+	MixHash         types.Hash  `json:"mixHash"`
+	Nonce           types.Nonce `json:"nonce"`
+	Hash            types.Hash  `json:"hash"`
+	BaseFee         argUint64   `json:"baseFeePerGas,omitempty"`
+}
+
+type accessListResult struct {
+	Accesslist types.TxAccessList `json:"accessList"`
+	Error      error              `json:"error,omitempty"`
+	GasUsed    argUint64          `json:"gasUsed"`
+}
+
 type block struct {
-	ParentHash      types.Hash          `json:"parentHash"`
-	Sha3Uncles      types.Hash          `json:"sha3Uncles"`
-	Miner           argBytes            `json:"miner"`
-	StateRoot       types.Hash          `json:"stateRoot"`
-	TxRoot          types.Hash          `json:"transactionsRoot"`
-	ReceiptsRoot    types.Hash          `json:"receiptsRoot"`
-	LogsBloom       types.Bloom         `json:"logsBloom"`
-	Difficulty      argUint64           `json:"difficulty"`
-	TotalDifficulty argUint64           `json:"totalDifficulty"`
-	Size            argUint64           `json:"size"`
-	Number          argUint64           `json:"number"`
-	GasLimit        argUint64           `json:"gasLimit"`
-	GasUsed         argUint64           `json:"gasUsed"`
-	Timestamp       argUint64           `json:"timestamp"`
-	ExtraData       argBytes            `json:"extraData"`
-	MixHash         types.Hash          `json:"mixHash"`
-	Nonce           types.Nonce         `json:"nonce"`
-	Hash            types.Hash          `json:"hash"`
-	Transactions    []transactionOrHash `json:"transactions"`
-	Uncles          []types.Hash        `json:"uncles"`
-	BaseFee         argUint64           `json:"baseFeePerGas,omitempty"`
+	header
+	Size         argUint64           `json:"size"`
+	Transactions []transactionOrHash `json:"transactions"`
+	Uncles       []types.Hash        `json:"uncles"`
 }
 
 func (b *block) Copy() *block {
@@ -151,7 +161,7 @@ func (b *block) Copy() *block {
 
 func toBlock(b *types.Block, fullTx bool) *block {
 	h := b.Header
-	res := &block{
+	resHeader := header{
 		ParentHash:      h.ParentHash,
 		Sha3Uncles:      h.Sha3Uncles,
 		Miner:           argBytes(h.Miner),
@@ -161,7 +171,6 @@ func toBlock(b *types.Block, fullTx bool) *block {
 		LogsBloom:       h.LogsBloom,
 		Difficulty:      argUint64(h.Difficulty),
 		TotalDifficulty: argUint64(h.Difficulty), // not needed for POS
-		Size:            argUint64(b.Size()),
 		Number:          argUint64(h.Number),
 		GasLimit:        argUint64(h.GasLimit),
 		GasUsed:         argUint64(h.GasUsed),
@@ -170,9 +179,14 @@ func toBlock(b *types.Block, fullTx bool) *block {
 		MixHash:         h.MixHash,
 		Nonce:           h.Nonce,
 		Hash:            h.Hash,
-		Transactions:    []transactionOrHash{},
-		Uncles:          []types.Hash{},
 		BaseFee:         argUint64(h.BaseFee),
+	}
+
+	res := &block{
+		header:       resHeader,
+		Size:         argUint64(b.Size()),
+		Transactions: []transactionOrHash{},
+		Uncles:       []types.Hash{},
 	}
 
 	for idx, txn := range b.Transactions {
@@ -197,6 +211,31 @@ func toBlock(b *types.Block, fullTx bool) *block {
 
 	for _, uncle := range b.Uncles {
 		res.Uncles = append(res.Uncles, uncle.Hash)
+	}
+
+	return res
+}
+
+func toHeader(h *types.Header) *header {
+	res := &header{
+		ParentHash:      h.ParentHash,
+		Sha3Uncles:      h.Sha3Uncles,
+		Miner:           argBytes(h.Miner),
+		StateRoot:       h.StateRoot,
+		TxRoot:          h.TxRoot,
+		ReceiptsRoot:    h.ReceiptsRoot,
+		LogsBloom:       h.LogsBloom,
+		Difficulty:      argUint64(h.Difficulty),
+		TotalDifficulty: argUint64(h.Difficulty), // not needed for POS
+		Number:          argUint64(h.Number),
+		GasLimit:        argUint64(h.GasLimit),
+		GasUsed:         argUint64(h.GasUsed),
+		Timestamp:       argUint64(h.Timestamp),
+		ExtraData:       argBytes(h.ExtraData),
+		MixHash:         h.MixHash,
+		Nonce:           h.Nonce,
+		Hash:            h.Hash,
+		BaseFee:         argUint64(h.BaseFee),
 	}
 
 	return res

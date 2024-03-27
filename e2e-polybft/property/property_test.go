@@ -109,8 +109,11 @@ func TestProperty_DropValidators(t *testing.T) {
 		// check that block production is stoped
 		currentBlock, err = activeValidator.JSONRPC().Eth().BlockNumber()
 		require.NoError(t, err)
+
 		oldBlockNumber := currentBlock
+
 		time.Sleep(2 * blockTime)
+
 		currentBlock, err = activeValidator.JSONRPC().Eth().BlockNumber()
 		require.NoError(t, err)
 		require.Equal(t, oldBlockNumber, currentBlock)

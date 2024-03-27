@@ -11,7 +11,7 @@ on: # yamllint disable-line rule:truthy
       logs:
         description: Upload Logs
         type: boolean
-        default: false
+        default: true
       notification:
         description: Notification
         type: boolean

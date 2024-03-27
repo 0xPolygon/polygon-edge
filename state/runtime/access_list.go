@@ -113,3 +113,28 @@ func (al *AccessList) DeleteSlot(address types.Address, slot types.Hash) {
 		delete(slotMap, slot)
 	}
 }
+
+// ToTxAccessList converts access list from internal representation to the types.TxAccessList
+func (al *AccessList) ToTxAccessList() types.TxAccessList {
+	convertToKeysSlice := func(m map[types.Hash]struct{}) []types.Hash {
+		storageKeys := make([]types.Hash, 0, len(m))
+		for key := range m {
+			storageKeys = append(storageKeys, key)
+		}
+
+		return storageKeys
+	}
+
+	result := make(types.TxAccessList, 0, len(*al))
+	for address, storageKeys := range *al {
+		result = append(
+			result,
+			types.AccessTuple{
+				Address:     address,
+				StorageKeys: convertToKeysSlice(storageKeys),
+			},
+		)
+	}
+
+	return result
+}

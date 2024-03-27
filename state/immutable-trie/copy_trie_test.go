@@ -14,9 +14,11 @@ func TestCompareModelOfTrieCopy(t *testing.T) {
 		ldbStorageOld := ldbstorage.NewMemStorage()
 		ldbStorageNew := ldbstorage.NewMemStorage()
 		ldb, err := leveldb.Open(ldbStorageOld, nil)
+
 		if err != nil {
 			t.Fatal(err)
 		}
+
 		defer ldb.Close()
 
 		ldbNew, err := leveldb.Open(ldbStorageNew, nil)
@@ -39,11 +41,14 @@ func TestCompareModelOfTrieCopy(t *testing.T) {
 		}
 
 		tx.Commit()
+
 		stateRoot := trie.Hash()
 		result, err := HashChecker(stateRoot.Bytes(), kv)
+
 		if err != nil {
 			t.Fatal(err)
 		}
+
 		if stateRoot != result {
 			t.Fatal("Hashes are not equal", stateRoot, result)
 		}
@@ -57,6 +62,7 @@ func TestCompareModelOfTrieCopy(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
+
 		if stateRoot != result {
 			t.Error("Hashes are not equal", stateRoot, result)
 		}

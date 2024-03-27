@@ -661,13 +661,13 @@ func newMockWsConnWithMsgCh() (*mockWsConn, <-chan []byte) {
 func TestHeadStream_Basic(t *testing.T) {
 	t.Parallel()
 
-	b := newBlockStream(&block{Hash: types.StringToHash("1")})
-	b.push(&block{Hash: types.StringToHash("2")})
+	b := newBlockStream(&block{header: header{Hash: types.StringToHash("1")}})
 
+	b.push(&block{header: header{Hash: types.StringToHash("2")}})
 	cur := b.getHead()
 
-	b.push(&block{Hash: types.StringToHash("3")})
-	b.push(&block{Hash: types.StringToHash("4")})
+	b.push(&block{header: header{Hash: types.StringToHash("3")}})
+	b.push(&block{header: header{Hash: types.StringToHash("4")}})
 
 	// get the updates, there are two new entries
 	updates, next := cur.getUpdates()
@@ -686,7 +686,7 @@ func TestHeadStream_Concurrent(t *testing.T) {
 	nReaders := 20
 	nMessages := 10
 
-	b := newBlockStream(&block{Number: 0})
+	b := newBlockStream(&block{header: header{Number: 0}})
 
 	// Write co-routine with jitter
 	go func() {
@@ -696,7 +696,7 @@ func TestHeadStream_Concurrent(t *testing.T) {
 		z := rand.NewZipf(rand.New(rand.NewSource(seed)), 1.5, 1.5, 50)
 
 		for i := 0; i < nMessages; i++ {
-			b.push(&block{Number: argUint64(i)})
+			b.push(&block{header: header{Number: argUint64(i)}})
 
 			wait := time.Duration(z.Uint64()) * time.Millisecond
 			time.Sleep(wait)
@@ -723,6 +723,7 @@ func TestHeadStream_Concurrent(t *testing.T) {
 
 						return
 					}
+
 					expect++
 
 					if expect == uint64(nMessages) {

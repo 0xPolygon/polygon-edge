@@ -117,6 +117,7 @@ func (t *Txn) Hash() ([]byte, error) {
 		}
 	} else {
 		tmp := val.MarshalTo(nil)
+
 		h.hash.Reset()
 		h.hash.Write(tmp)
 

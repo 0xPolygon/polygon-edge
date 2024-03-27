@@ -7,6 +7,30 @@ on: # yamllint disable-line rule:truthy
         description: The environment to run against
         type: string
         required: true
+      block_gas_limit:
+        description: Block Gas Limit
+        type: string
+        required: true
+      block_time:
+        description: Block Time (sec)
+        type: string
+        required: true
+      max_slots:
+        description: Max Slots
+        type: string
+        required: true
+      max_enqueued:
+        description: Max Enqueued
+        type: string
+        required: true
+      is_london_fork_active:
+        description: EIP-1559
+        type: boolean
+        required: true
+      is_bridge_active:
+        description: With Bridge
+        type: boolean
+        required: true
       deploy_network_terraform_output:
         description: Deploy Network - Terraform output
         type: string
@@ -27,6 +51,7 @@ jobs:
   notification:
     name: Notification
     runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
     steps:
       - name: Short SHA
         id: short_sha
@@ -36,71 +61,117 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
-          green_color: '#03C03C'
-          red_color: '#E60012'
           succeed_bnt: 'primary'
           failed_bnt: 'danger'
         with:
           payload: |
             {
-              "attachments": [
+              "blocks": [
                 {
-                  "color": "${{ inputs.deploy_network_terraform_output == '' && inputs.deploy_network_ansible_output == '' && env.green_color || env.red_color }}",
-                  "blocks": [
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "Deploy ${{ inputs.environment }}net"
+                  }
+                },
+                {
+                  "type": "actions",
+                  "elements": [
                     {
-                      "type": "header",
+                      "type": "button",
                       "text": {
                         "type": "plain_text",
-                        "text": "Deploy ${{ inputs.environment }}net"
-                      }
+                        "text": "Workflow Run"
+                      },
+                      "style": "${{ inputs.deploy_network_terraform_output == '' && inputs.deploy_network_ansible_output == '' && env.succeed_bnt || env.failed_bnt }}",
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
                     },
                     {
-                      "type": "context",
-                      "elements": [
-                        {
-                          "type": "mrkdwn",
-                          "text": "Environment: *${{ inputs.environment }}*"
-                        }
-                      ]
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "JSON-RPC"
+                      },
+                      "url": "http://${{ inputs.rpc_url }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "context",
+                  "elements": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "Triggered by: *${{ github.triggering_actor }}*"
                     },
                     {
-                      "type": "context",
-                      "elements": [
-                        {
-                          "type": "mrkdwn",
-                          "text": "Commit: *<https://github.com/${{ github.repository }}/tree/${{ github.sha }}|${{ steps.short_sha.outputs.value }}>*"
-                        }
-                      ]
+                      "type": "mrkdwn",
+                      "text": "Commit: *<https://github.com/${{ github.repository }}/tree/${{ github.sha }}|${{ steps.short_sha.outputs.value }}>*"
+                    }
+                  ]
+                },
+                {
+                  "type": "divider"
+                },
+                {
+                  "type": "context",
+                  "elements": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "Environment: *${{ inputs.environment }}*"
                     },
                     {
-                      "type": "context",
-                      "elements": [
-                        {
-                          "type": "mrkdwn",
-                          "text": "Triggered by: *${{ github.triggering_actor }}*"
-                        }
-                      ]
+                      "type": "mrkdwn",
+                      "text": "Instances Type: *${{ vars.AWS_INSTANCE_TYPE }}*"
+                    }
+                  ]
+                },
+                {
+                  "type": "context",
+                  "elements": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "Validators: *${{ vars.VALIDATOR_COUNT }}*"
                     },
                     {
-                      "type": "actions",
-                      "elements": [
-                        {
-                          "type": "button",
-                          "text": {
-                            "type": "plain_text",
-                            "text": "Workflow Run"
-                          },
-                          "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-                        },
-                        {
-                          "type": "button",
-                          "text": {
-                            "type": "plain_text",
-                            "text": "JSON-RPC"
-                          },
-                          "url": "http://${{ inputs.rpc_url }}"
-                        }
-                      ]
+                      "type": "mrkdwn",
+                      "text": "Full Nodes: *${{ vars.FULLNODE_COUNT }}*"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "Rootchain servers: *${{ vars.GETH_COUNT }}*"
+                    }
+                  ]
+                },
+                {
+                  "type": "context",
+                  "elements": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "Block Gas Limit: *${{ inputs.block_gas_limit }}*"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "Block Time: *${{ inputs.block_time }}s*"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "Max Slots: *${{ inputs.max_slots }}*"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "Max Enqueued: *${{ inputs.max_enqueued }}*"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "Bridge: *${{ inputs.is_bridge_active }}*"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "London: *${{ inputs.is_london_fork_active }}*"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "Log Level: *${{ vars.LOG_LEVEL }}*"
                     }
                   ]
                 }

@@ -398,6 +398,7 @@ func TestE2E_Consensus_MintableERC20NativeToken(t *testing.T) {
 				config.Premine = append(config.Premine, fmt.Sprintf("%s:%d", addr, initValidatorsBalance))
 				config.StakeAmounts = append(config.StakeAmounts, new(big.Int).Set(initValidatorsBalance))
 				validatorsAddrs[i] = addr
+
 				initialTotalSupply.Add(initialTotalSupply, initValidatorsBalance)
 			}
 		}))

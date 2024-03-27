@@ -151,6 +151,7 @@ func TestTransfer(t *testing.T) {
 			err := transition.Transfer(tt.from, tt.to, amount)
 
 			assert.Equal(t, tt.expectedErr, err)
+
 			if err == nil {
 				// should move balance
 				oldBalanceOfFrom := big.NewInt(int64(tt.preState[tt.from].Balance))

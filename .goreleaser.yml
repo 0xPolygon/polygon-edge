@@ -34,7 +34,7 @@ builds:
       - CC=oa64-clang
       - CXX=oa64-clang++
     ldflags:
-      -s-w
+      -s -w
       -X 'github.com/0xPolygon/polygon-edge/versioning.Version=v{{ .Version }}'
       -X 'github.com/0xPolygon/polygon-edge/versioning.Commit={{ .Commit }}'
       -X 'github.com/0xPolygon/polygon-edge/versioning.Branch={{ .Branch }}'

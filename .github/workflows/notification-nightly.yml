@@ -7,6 +7,30 @@ on: # yamllint disable-line rule:truthy
         description: The environment to run against
         type: string
         required: true
+      block_gas_limit:
+        description: Block Gas Limit
+        type: string
+        required: true
+      block_time:
+        description: Block Time (sec)
+        type: string
+        required: true
+      max_slots:
+        description: Max Slots
+        type: string
+        required: true
+      max_enqueued:
+        description: Max Enqueued
+        type: string
+        required: true
+      is_london_fork_active:
+        description: EIP-1559
+        type: boolean
+        required: true
+      is_bridge_active:
+        description: With Bridge
+        type: boolean
+        required: true
       logs:
         description: Upload Logs
         type: string
@@ -77,6 +101,7 @@ jobs:
   notification:
     name: Notification
     runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
     steps:
       - name: Short SHA
         id: short_sha
@@ -86,120 +111,184 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
-          green_color: '#03C03C'
-          red_color: '#E60012'
           succeed_bnt: 'primary'
           failed_bnt: 'danger'
+          succeed_job: ':green:'
+          failed_job: ':red:'
         with:
           payload: |
             {
-              "attachments": [
+              "blocks": [
                 {
-                  "color": "${{ inputs.build_blade_output == '' && inputs.lint_output == '' && inputs.unit_test_output == '' && inputs.e2e_polybft_test_output == '' && inputs.e2e_legacy_test_output == '' && inputs.property_polybft_test_output == '' && inputs.fuzz_test_output == '' && inputs.benchmark_test_output == '' && inputs.deploy_network_terraform_output == '' && inputs.deploy_network_ansible_output == '' && inputs.load_test_multiple_eoa_output == 'true' && inputs.load_test_multiple_erc20_output == 'true' && inputs.destroy_network_logs_output == '' && inputs.destroy_network_terraform_output == '' && env.green_color || env.red_color }}",
-                  "blocks": [
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "Nightly build"
+                  }
+                },
+                {
+                  "type": "actions",
+                  "elements": [
                     {
-                      "type": "header",
+                      "type": "button",
                       "text": {
                         "type": "plain_text",
-                        "text": "Nightly build"
-                      }
+                        "text": "Workflow Run"
+                      },
+                      "style": "${{ inputs.build_blade_output == '' && inputs.lint_output == '' && inputs.unit_test_output == '' && inputs.e2e_polybft_test_output == '' && inputs.e2e_legacy_test_output == '' && inputs.property_polybft_test_output == '' && inputs.fuzz_test_output == '' && inputs.benchmark_test_output == '' && inputs.deploy_network_terraform_output == '' && inputs.deploy_network_ansible_output == '' && inputs.load_test_multiple_eoa_output == 'true' && inputs.load_test_multiple_erc20_output == 'true' && inputs.destroy_network_logs_output == '' && inputs.destroy_network_terraform_output == '' && env.succeed_bnt || env.failed_bnt }}",
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
                     },
                     {
-                      "type": "context",
-                      "elements": [
-                        {
-                          "type": "mrkdwn",
-                          "text": "Environment: *${{ inputs.environment }}*"
-                        }
-                      ]
-                    },
-                    {
-                      "type": "context",
-                      "elements": [
-                        {
-                          "type": "mrkdwn",
-                          "text": "Commit: *<https://github.com/${{ github.repository }}/tree/${{ github.sha }}|${{ steps.short_sha.outputs.value }}>*"
-                        }
-                      ]
-                    },
-                    {
-                      "type": "context",
-                      "elements": [
-                        {
-                          "type": "mrkdwn",
-                          "text": "Triggered by: *${{ github.triggering_actor }}*"
-                        }
-                      ]
-                    },
-                    {
-                      "type": "actions",
-                      "elements": [
-                        {
-                          "type": "button",
-                          "text": {
-                            "type": "plain_text",
-                            "text": "Workflow Run"
-                          },
-                          "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-                        },
-                        {
-                          "type": "button",
-                          "text": {
-                            "type": "plain_text",
-                            "text": "${{ inputs.logs == 'true' && inputs.destroy_network_logs_output == '' && 'Logs' || 'No Logs' }}"
-                          },
-                          "style": "${{ inputs.logs == 'true' && inputs.destroy_network_logs_output == '' && env.succeed_bnt || env.failed_bnt }}",
-                          "url": "https://s3.console.aws.amazon.com/s3/buckets/${{ secrets.AWS_S3_BLADE_BUCKET }}?region=${{ vars.AWS_REGION }}&prefix=logs/${{ github.run_id }}/"
-                        }
-                      ]
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "${{ inputs.logs == 'true' && inputs.destroy_network_logs_output == '' && 'Logs' || 'No Logs' }}"
+                      },
+                      "style": "${{ inputs.logs == 'true' && inputs.destroy_network_logs_output == '' && env.succeed_bnt || env.failed_bnt }}",
+                      "url": "https://s3.console.aws.amazon.com/s3/buckets/${{ secrets.AWS_S3_BLADE_BUCKET }}?region=${{ vars.AWS_REGION }}&prefix=logs/${{ github.run_id }}/"
                     }
                   ]
                 },
                 {
-                  "color": "${{ inputs.build_blade_output == '' && inputs.lint_output == '' && inputs.unit_test_output == '' && inputs.fuzz_test_output == '' && inputs.benchmark_test_output == '' && inputs.e2e_legacy_test_output == '' && inputs.e2e_polybft_test_output == '' && inputs.property_polybft_test_output == '' && env.green_color || env.red_color }}",
-                  "blocks": [
+                  "type": "context",
+                  "elements": [
                     {
-                      "type": "section",
-                      "text": {
-                        "type": "mrkdwn",
-                        "text": "*CI*\n${{ inputs.build_blade_output == '' && 'Build' || '~Build~' }}, ${{ inputs.lint_output == '' && 'Lint' || '~Lint~' }}, ${{ inputs.unit_test_output == '' && 'Unit Tests' || '~Unit Tests~' }},\n${{ inputs.fuzz_test_output == '' && 'Fuzz Tests' || '~Fuzz Tests~' }}, ${{ inputs.e2e_legacy_test_output == '' && 'E2E Legacy Tests' || '~E2E Legacy Tests~' }},\n${{ inputs.e2e_polybft_test_output == '' && 'E2E PolyBFT Tests' || '~E2E PolyBFT Tests~' }}, ${{ inputs.property_polybft_test_output == '' && 'Property PolyBFT Tests' || '~Property PolyBFT Tests~' }},\n${{ inputs.benchmark_test_output == '' && 'Benchmark Tests' || '~Benchmark Tests~' }}"
-                      }
+                      "type": "mrkdwn",
+                      "text": "Triggered by: *${{ github.triggering_actor }}*"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "Commit: *<https://github.com/${{ github.repository }}/tree/${{ github.sha }}|${{ steps.short_sha.outputs.value }}>*"
                     }
                   ]
                 },
                 {
-                  "color": "${{ inputs.deploy_network_terraform_output == '' && inputs.deploy_network_ansible_output == '' && env.green_color || env.red_color }}",
-                  "blocks": [
+                  "type": "divider"
+                },
+                {
+                  "type": "context",
+                  "elements": [
                     {
-                      "type": "section",
-                      "text": {
-                        "type": "mrkdwn",
-                        "text": "*Deploy Network*"
-                      }
+                      "type": "mrkdwn",
+                      "text": "Environment: *${{ inputs.environment }}*"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "Instances Type: *${{ vars.AWS_INSTANCE_TYPE }}*"
                     }
                   ]
                 },
                 {
-                  "color": "${{ inputs.load_test_multiple_eoa_output == 'true' && inputs.load_test_multiple_erc20_output == 'true' && env.green_color || env.red_color }}",
-                  "blocks": [
+                  "type": "context",
+                  "elements": [
                     {
-                      "type": "section",
-                      "text": {
-                        "type": "mrkdwn",
-                        "text": "*Load Tests*\n${{ inputs.load_test_multiple_eoa_output == 'true' && 'EOA' || '~EOA~' }},\n${{ inputs.load_test_multiple_erc20_output == 'true' && 'ERC20' || '~ERC20~' }}"
-                      }
+                      "type": "mrkdwn",
+                      "text": "Validators: *${{ vars.VALIDATOR_COUNT }}*"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "Full Nodes: *${{ vars.FULLNODE_COUNT }}*"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "Rootchain servers: *${{ vars.GETH_COUNT }}*"
                     }
                   ]
                 },
                 {
-                  "color": "${{ inputs.destroy_network_logs_output == '' && inputs.destroy_network_terraform_output == '' && env.green_color || env.red_color }}",
-                  "blocks": [
+                  "type": "context",
+                  "elements": [
                     {
-                      "type": "section",
-                      "text": {
-                        "type": "mrkdwn",
-                        "text": "*Destroy Network*"
-                      }
+                      "type": "mrkdwn",
+                      "text": "Block Gas Limit: *${{ inputs.block_gas_limit }}*"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "Block Time: *${{ inputs.block_time }}s*"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "Max Slots: *${{ inputs.max_slots }}*"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "Max Enqueued: *${{ inputs.max_enqueued }}*"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "Bridge: *${{ inputs.is_bridge_active }}*"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "London: *${{ inputs.is_london_fork_active }}*"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "Log Level: *${{ vars.LOG_LEVEL }}*"
+                    }
+                  ]
+                },
+                {
+                  "type": "divider"
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "${{ inputs.build_blade_output == '' && env.succeed_job || env.failed_job }} *Build*"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "${{ inputs.lint_output == '' && env.succeed_job || env.failed_job }} *Lint*"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "${{ inputs.unit_test_output == '' && env.succeed_job || env.failed_job }} *Unit Tests*"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "${{ inputs.fuzz_test_output == '' && env.succeed_job || env.failed_job }} *Fuzz Tests*"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "${{ inputs.e2e_legacy_test_output == '' && env.succeed_job || env.failed_job }} *E2E Legacy Tests*"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "${{ inputs.e2e_polybft_test_output == '' && env.succeed_job || env.failed_job }} *E2E PolyBFT Tests*"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "${{ inputs.property_polybft_test_output == '' && env.succeed_job || env.failed_job }} *Property PolyBFT Tests*"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "${{ inputs.benchmark_test_output == '' && env.succeed_job || env.failed_job }} *Benchmark Tests*"
+                    }
+                  ]
+                },
+                {
+                  "type": "divider"
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "${{ inputs.deploy_network_terraform_output == '' && inputs.deploy_network_ansible_output == '' && env.succeed_job || env.failed_job }} *Deploy Network*"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "${{ inputs.benchmark_test_output == '' && env.succeed_job || env.failed_job }} *Destroy Network*"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "${{ inputs.load_test_multiple_eoa_output == 'true' && env.succeed_job || env.failed_job }} *Load Test EOA*"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "${{ inputs.load_test_multiple_erc20_output == 'true' && env.succeed_job || env.failed_job }} *Load Test ERC20*"
                     }
                   ]
                 }

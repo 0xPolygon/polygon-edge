@@ -195,6 +195,7 @@ func TestE2E_JsonRPC(t *testing.T) {
 			Value: newBalance,
 		})
 		require.NoError(t, err)
+
 		txPrice := gasPrice * estimatedGas
 		// subtract gasPrice * estimatedGas from the balance and transfer the rest to the other account
 		// in order to leave no funds on the account
@@ -413,11 +414,44 @@ func TestE2E_JsonRPC(t *testing.T) {
 		require.NotEqual(t, ethTxn.From, ethgo.ZeroAddress)
 	})
 
+	t.Run("eth_getHeaderByNumber", func(t *testing.T) {
+		key1, err := crypto.GenerateECDSAKey()
+		require.NoError(t, err)
+
+		txn := cluster.Transfer(t, senderKey, key1.Address(), one)
+		require.NoError(t, txn.Wait())
+		require.True(t, txn.Succeed())
+		txReceipt := txn.Receipt()
+
+		var header types.Header
+		err = jsonRPC.Call("eth_getHeaderByNumber", &header, ethgo.BlockNumber(txReceipt.BlockNumber))
+		require.NoError(t, err)
+
+		require.Equal(t, txReceipt.BlockNumber, header.Number)
+		require.Equal(t, txReceipt.BlockHash, ethgo.Hash(header.Hash))
+	})
+
+	t.Run("eth_getHeaderByHash", func(t *testing.T) {
+		key1, err := crypto.GenerateECDSAKey()
+		require.NoError(t, err)
+
+		txn := cluster.Transfer(t, senderKey, key1.Address(), one)
+		require.NoError(t, txn.Wait())
+		require.True(t, txn.Succeed())
+		txReceipt := txn.Receipt()
+
+		var header types.Header
+		err = jsonRPC.Call("eth_getHeaderByHash", &header, txReceipt.BlockHash)
+		require.NoError(t, err)
+
+		require.Equal(t, txReceipt.BlockNumber, header.Number)
+		require.Equal(t, txReceipt.BlockHash, ethgo.Hash(header.Hash))
+	})
+
 	t.Run("debug_traceTransaction", func(t *testing.T) {
 		key1, err := crypto.GenerateECDSAKey()
 		require.NoError(t, err)
 
-		// Test. We should be able to query the transaction by its hash
 		txn := cluster.Transfer(t, senderKey, key1.Address(), one)
 		require.NoError(t, txn.Wait())
 		require.True(t, txn.Succeed())

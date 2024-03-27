@@ -4,6 +4,12 @@ on: # yamllint disable-line rule:truthy
   schedule:
     # * is a special character in YAML so you have to quote this string
     - cron: '0 0 * * *'
+  workflow_dispatch:
+    inputs:
+      force-run:
+        description: Force Run
+        type: boolean
+        default: false
 
 jobs:
   check:
@@ -21,7 +27,7 @@ jobs:
     name: CI
     uses: ./.github/workflows/ci.yml
     needs: check
-    if: needs.check.outputs.new_commit_count > 0
+    if: (needs.check.outputs.new_commit_count > 0 || inputs.force-run)
     with:
       build-blade: true
       lint: true
@@ -35,12 +41,14 @@ jobs:
     name: Deploy Network
     uses: ./.github/workflows/deploy-network.yml
     needs: check
-    if: needs.check.outputs.new_commit_count > 0
+    if: (needs.check.outputs.new_commit_count > 0 || inputs.force-run)
     with:
       environment: nightly
       block_gas_limit: "200000000"
       block_time: "2"
-      is_london_fork_active: true
+      max_slots: "276480"
+      max_enqueued: "276480"
+      is_london_fork_active: false
       is_bridge_active: true
       notification: false
     secrets:
@@ -96,8 +104,8 @@ jobs:
   destroy_network:
     name: Destroy Network
     uses: ./.github/workflows/destroy-network.yml
-    needs: [deploy_network, load_test_multiple_eoa, load_test_multiple_erc20]
-    if: always()
+    needs: [check, deploy_network, load_test_multiple_eoa, load_test_multiple_erc20]
+    if: (always() && (needs.check.outputs.new_commit_count > 0 || inputs.force-run))
     with:
       environment: nightly
       logs: true
@@ -113,6 +121,12 @@ jobs:
     if: success() || failure()
     with:
       environment: nightly
+      block_gas_limit: "200000000"
+      block_time: "2"
+      max_slots: "276480"
+      max_enqueued: "276480"
+      is_london_fork_active: false
+      is_bridge_active: true
       logs: true
       build_blade_output: ${{ needs.ci.outputs.build-blade }}
       lint_output: ${{ needs.ci.outputs.lint }}
@@ -151,7 +165,7 @@ jobs:
   notification_load_test_multiple_erc20:
     name: Load Test ERC20 Notification
     uses: ./.github/workflows/notification-load-test.yml
-    needs: [load_test_multiple_erc20, notification_nightly]
+    needs: [load_test_multiple_erc20, notification_nightly, notification_load_test_multiple_eoa]
     if: (always() && needs.load_test_multiple_erc20.outputs.load_test_output == 'true')
     with:
       environment: nightly
